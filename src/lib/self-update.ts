@@ -142,6 +142,16 @@ function writeJsonFile(file: string, value: unknown) {
   writeFileAtomic(file, JSON.stringify(value, null, 2));
 }
 
+type SelfUpdateLockOwner = { pid?: number; requestId?: string };
+
+function hasConfirmedDeadOwner(owner: SelfUpdateLockOwner | null): boolean {
+  const pid = owner?.pid;
+  if (typeof owner?.requestId !== "string" || !owner.requestId || typeof pid !== "number" || !Number.isSafeInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ESRCH"; }
+  return false;
+}
+
 export function readSelfUpdateStatus(): SelfUpdateStatus {
   const capability = getSelfUpdateCapability();
   const stored = readJsonFile<{
@@ -163,7 +173,9 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
   const request = readJsonFile<{ requestedAt?: string }>(selfUpdateRequestPath());
   // Publishing a request is the commit point. An abandoned queued receipt alone
   // must not prevent another attempt after a failed publication/rollback.
-  const orphanedQueue = stored?.phase === "queued" && !request && !fs.existsSync(selfUpdateLockPath());
+  const lockOwner = readJsonFile<SelfUpdateLockOwner>(selfUpdateLockPath());
+  const publisherGone = !fs.existsSync(selfUpdateLockPath()) || (stored?.requestId === lockOwner?.requestId && hasConfirmedDeadOwner(lockOwner));
+  const orphanedQueue = stored?.phase === "queued" && !fs.existsSync(selfUpdateRequestPath()) && publisherGone;
   const phase: SelfUpdatePhase =
     orphanedQueue ? "failed" : stored?.phase || (request ? "queued" : "idle");
 
@@ -218,14 +230,15 @@ function acquireLock(requestId: string): boolean {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     // Age alone never authorizes deleting a live owner's lock or pending job.
     try {
-      const owner = readJsonFile<{ pid?: number; requestId?: string }>(lock);
-      let alive = true;
-      try { if (owner?.pid && Number.isSafeInteger(owner.pid) && owner.pid > 0) process.kill(owner.pid, 0); }
-      catch (error) { alive = (error as NodeJS.ErrnoException).code !== "ESRCH"; }
-      const pending = readJsonFile<{ requestId?: string }>(selfUpdateRequestPath());
-      if (owner?.requestId && !alive && pending?.requestId !== owner.requestId) {
-        fs.unlinkSync(lock);
-        return acquireLock(requestId);
+      const identity = fs.lstatSync(lock);
+      const owner = readJsonFile<SelfUpdateLockOwner>(lock);
+      if (hasConfirmedDeadOwner(owner) && !fs.existsSync(selfUpdateRequestPath())) {
+        const currentIdentity = fs.lstatSync(lock);
+        const currentOwner = readJsonFile<SelfUpdateLockOwner>(lock);
+        if (identity.dev === currentIdentity.dev && identity.ino === currentIdentity.ino && currentOwner?.requestId === owner?.requestId && currentOwner?.pid === owner?.pid && hasConfirmedDeadOwner(currentOwner) && !fs.existsSync(selfUpdateRequestPath())) {
+          fs.unlinkSync(lock);
+          return acquireLock(requestId);
+        }
       }
     } catch {
       // ignore

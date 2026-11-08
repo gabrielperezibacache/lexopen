@@ -30,7 +30,7 @@ const { isAllowedAppUrl, isAllowedExternalUrl } = require("./external-url.cjs");
 const { pathToFileURL } = require("node:url");
 const { prepareDesktopToolpack } = require("./altazor-toolpack.cjs");
 const { attachMicrophoneGuards } = require("./media-permissions.cjs");
-const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, quitAndInstallUpdate, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
+const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, verifyDownloadedUpdate, quitAndInstallUpdate, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
 
 let mainWindow = null;
 let currentDesktopAppUrl = "";
@@ -238,6 +238,8 @@ async function promptInstallUpdate(info) {
       maintenanceActive = true;
       ownsMaintenance = true;
       assertUpdateVersion(bundledVersion(), info.version, updatePreferences(readConfig()).channel);
+      sendStatus({ phase: "verifying-update", message: "Comprobando la descarga antes de instalar…" });
+      const prepared = await verifyDownloadedUpdate(autoUpdater, info.version);
       const cfg = readConfig();
       await installPreparedUpdate({
         // Opening the setup assistant clears cfg.mode before the running Host
@@ -262,6 +264,9 @@ async function promptInstallUpdate(info) {
           }
           desktopPreparationAbort?.abort();
           await desktopPreparationTask;
+          // A long backup may outlive the downloaded cache file. Recheck its
+          // pinned bytes before AppImageUpdater can remove the current app.
+          await verifyDownloadedUpdate(autoUpdater, info.version, prepared);
           quitting = true;
           try { await quitAndInstallUpdate(autoUpdater, app, { nativeUpdater: process.platform === "darwin" ? nativeAutoUpdater : null }); }
           catch (error) { quitting = false; throw error; }
@@ -271,6 +276,10 @@ async function promptInstallUpdate(info) {
       });
     }
   } catch (error) {
+    if (error?.code === "ERR_UPDATER_CACHE_INVALID" || error?.cause?.code === "ERR_UPDATER_CACHE_INVALID") {
+      updateDownloadedInfo = null;
+      await autoUpdater.downloadedUpdateHelper?.clear().catch(() => {});
+    }
     if (pausedClientUrl && !quitting) startClientVersionWatch(pausedClientUrl);
     const message = error instanceof Error ? error.message : String(error);
     sendStatus({ phase: "update-error", message });

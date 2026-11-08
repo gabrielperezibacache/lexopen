@@ -35,25 +35,49 @@ const ACTIVE = new Set([
 export function SelfUpdatePanel() {
   const { t } = useI18n();
   const readingStatus = useRef(false);
+  const refreshPending = useRef(false);
+  const currentReceipt = useRef<string | null>(null);
+  const previousReceipt = useRef<string | null | undefined>(undefined);
   const [loadError, setLoadError] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const load = useCallback(async () => {
-    if (readingStatus.current) return;
+  const load = useCallback(async function readStatus(): Promise<void> {
+    if (readingStatus.current) { refreshPending.current = true; return; }
     readingStatus.current = true;
     try {
       const res = await fetch("/api/admin/self-update", { cache: "no-store", signal: AbortSignal.timeout(12_000) });
       if (!res.ok) throw new Error("status unavailable");
-      setStatus(await res.json());
+      const payload = await res.json();
+      if (refreshPending.current) return;
+      currentReceipt.current = payload.requestId || null;
+      setStatus(payload);
+      setRecovering(false);
+      if (ACTIVE.has(payload.phase) || payload.phase === "done" && payload.ok && payload.requestId !== previousReceipt.current) setMsg("");
       setLoadError("");
     } catch {
       setLoadError(t("updates.statusUnavailable"));
     } finally {
       readingStatus.current = false;
+      if (refreshPending.current) {
+        refreshPending.current = false;
+        queueMicrotask(() => void readStatus());
+      }
     }
   }, [t]);
+
+  useEffect(() => {
+    const starting = () => { previousReceipt.current = currentReceipt.current; setBusy(true); };
+    const refresh = () => { setBusy(false); setRecovering(true); void load(); };
+    window.addEventListener("lexopen:self-update:starting", starting);
+    window.addEventListener("lexopen:self-update", refresh);
+    return () => {
+      window.removeEventListener("lexopen:self-update:starting", starting);
+      window.removeEventListener("lexopen:self-update", refresh);
+    };
+  }, [load]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,20 +91,22 @@ export function SelfUpdatePanel() {
   }, [load]);
 
   useEffect(() => {
-    if (status && !ACTIVE.has(status.phase)) return;
+    if (!recovering && status && !ACTIVE.has(status.phase)) return;
     const id = setInterval(() => void load(), 3000);
     return () => clearInterval(id);
-  }, [status, load]);
+  }, [status, recovering, load]);
 
   async function start() {
     setBusy(true);
     setMsg("");
+    window.dispatchEvent(new Event("lexopen:self-update:starting"));
     const result = await apiMutation<{ status?: Status }>("/api/admin/self-update", {
       method: "POST",
+      signal: AbortSignal.timeout(20_000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "start" }),
     });
-    setBusy(false);
+    window.dispatchEvent(new Event("lexopen:self-update"));
     if (!result.ok) {
       setMsg(result.error || t("updates.startFailed"));
       return;
@@ -136,10 +162,12 @@ export function SelfUpdatePanel() {
         <div className="flex flex-wrap gap-2">
           {status.available && (
             <Button
-              disabled={busy || updating || status.recoveryRequired}
+              disabled={busy || recovering || updating || status.recoveryRequired}
               onClick={start}
             >
-              {updating
+              {recovering
+                ? t("updates.phases.preflight")
+                : updating
                 ? t("updates.updatingTitle")
                 : busy
                   ? t("updates.starting")

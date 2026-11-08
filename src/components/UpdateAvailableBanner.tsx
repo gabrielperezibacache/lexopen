@@ -17,6 +17,7 @@ type UpdatePayload = {
 type SelfUpdateStatus = {
   phase: string;
   currentVersion: string;
+  requestId?: string | null;
   ok: boolean;
   available: boolean;
   reason?: string;
@@ -81,7 +82,11 @@ export function UpdateAvailableBanner({
 }) {
   const { t } = useI18n();
   const readingStatus = useRef(false);
+  const refreshPending = useRef(false);
+  const currentReceipt = useRef<string | null>(null);
+  const previousReceipt = useRef<string | null | undefined>(undefined);
   const [tracking, setTracking] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [data, setData] = useState<UpdatePayload | null>(null);
   const [openSteps, setOpenSteps] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -89,22 +94,53 @@ export function UpdateAvailableBanner({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const refreshSelfUpdate = useCallback(async () => {
-    if (readingStatus.current) return null;
+  const refreshSelfUpdate = useCallback(async function readStatus(): Promise<SelfUpdateStatus | null> {
+    if (readingStatus.current) { refreshPending.current = true; return null; }
     readingStatus.current = true;
     try {
       const res = await fetch("/api/admin/self-update", { cache: "no-store", signal: AbortSignal.timeout(12_000) });
       if (!res.ok) return null;
       const payload = (await res.json()) as SelfUpdateStatus;
+      // A request begun before the local mutation finished may still describe
+      // the old idle state. The coalesced refresh below obtains a fresh receipt.
+      if (refreshPending.current) return null;
+      currentReceipt.current = payload.requestId || null;
       setSelfUpdate(payload);
-      if (ACTIVE_PHASES.has(payload.phase)) setTracking(true);
+      setRecovering(false);
+      if (ACTIVE_PHASES.has(payload.phase)) { setTracking(true); setMsg(""); }
+      else if (payload.phase === "done" && payload.requestId && payload.requestId === previousReceipt.current) setTracking(false);
+      if (payload.phase === "done" && payload.ok && payload.requestId !== previousReceipt.current) setMsg("");
       return payload;
     } catch {
       return null;
     } finally {
       readingStatus.current = false;
+      if (refreshPending.current) {
+        refreshPending.current = false;
+        queueMicrotask(() => void readStatus());
+      }
     }
   }, []);
+
+  useEffect(() => {
+    if (!enabled || !canSelfUpdate) return;
+    const starting = () => {
+      previousReceipt.current = currentReceipt.current;
+      setBusy(true);
+      setTracking(true);
+    };
+    const refresh = () => {
+      setBusy(false);
+      setRecovering(true);
+      void refreshSelfUpdate();
+    };
+    window.addEventListener("lexopen:self-update:starting", starting);
+    window.addEventListener("lexopen:self-update", refresh);
+    return () => {
+      window.removeEventListener("lexopen:self-update:starting", starting);
+      window.removeEventListener("lexopen:self-update", refresh);
+    };
+  }, [enabled, canSelfUpdate, refreshSelfUpdate]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -136,7 +172,7 @@ export function UpdateAvailableBanner({
 
   useEffect(() => {
     if (!enabled || !canSelfUpdate) return;
-    if (selfUpdate && !ACTIVE_PHASES.has(selfUpdate.phase)) return;
+    if (!recovering && selfUpdate && !ACTIVE_PHASES.has(selfUpdate.phase)) return;
     const id = setInterval(() => {
       void refreshSelfUpdate().then((st) => {
         if (st?.phase === "done") {
@@ -151,9 +187,9 @@ export function UpdateAvailableBanner({
       });
     }, 3000);
     return () => clearInterval(id);
-  }, [enabled, canSelfUpdate, selfUpdate, refreshSelfUpdate, t]);
+  }, [enabled, canSelfUpdate, selfUpdate, recovering, refreshSelfUpdate, t]);
 
-  const updating = Boolean(selfUpdate && ACTIVE_PHASES.has(selfUpdate.phase));
+  const updating = recovering || Boolean(selfUpdate && ACTIVE_PHASES.has(selfUpdate.phase));
   // A completed receipt belongs to an earlier operation. A fresh release check
   // for the currently running version must still offer the next update.
   const newUpdateAfterReceipt = selfUpdate?.phase === "done" && Boolean(
@@ -182,15 +218,19 @@ export function UpdateAvailableBanner({
   async function startUpdate() {
     setBusy(true);
     setMsg("");
+    window.dispatchEvent(new Event("lexopen:self-update:starting"));
     const result = await apiMutation<{ status?: SelfUpdateStatus }>(
       "/api/admin/self-update",
       {
         method: "POST",
+        signal: AbortSignal.timeout(20_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "start" }),
       }
     );
-    setBusy(false);
+    // Even an error/aborted response may have queued the update already. Read
+    // its receipt and keep retrying while the Host returns; never repeat POST.
+    window.dispatchEvent(new Event("lexopen:self-update"));
     if (!result.ok) {
       setMsg(result.error || t("updates.startFailed"));
       return;
@@ -215,7 +255,7 @@ export function UpdateAvailableBanner({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-[var(--ink)]">
             {updating
-              ? `${t("updates.updatingTitle")} ${phaseLabel(selfUpdate!.phase, t)}`
+              ? recovering ? t("updates.phases.preflight") : `${t("updates.updatingTitle")} ${phaseLabel(selfUpdate?.phase || "preflight", t)}`
               : finished
                 ? selfUpdate?.phase === "done" ? t("updates.completedTitle") : t("updates.failedTitle")
               : (
@@ -233,7 +273,7 @@ export function UpdateAvailableBanner({
           </p>
           <p className="mt-1 text-xs text-[var(--ink-soft)]/80">
             {updating
-              ? selfUpdate?.message ||
+              ? !recovering && selfUpdate?.message ||
                 t("updates.updatingHint")
               : finished
                 ? selfUpdate?.message || (selfUpdate?.phase === "done" ? t("updates.completedHint") : t("updates.failedHint"))

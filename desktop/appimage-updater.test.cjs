@@ -9,14 +9,14 @@ const { createHash } = require("node:crypto");
 const { EventEmitter, once } = require("node:events");
 const { AppImageUpdater } = require("electron-updater/out/AppImageUpdater");
 const { ElectronHttpExecutor } = require("electron-updater/out/electronHttpExecutor");
-const { applyUpdaterPolicy, withNetworkRetry, quitAndInstallUpdate } = require("./update-policy.cjs");
+const { applyUpdaterPolicy, withNetworkRetry, verifyDownloadedUpdate, quitAndInstallUpdate } = require("./update-policy.cjs");
 
 class LocalHttpExecutor extends ElectronHttpExecutor {
   // Preserve electron-updater's download pipeline and SHA512 verification,
   // replacing only Electron's network transport with loopback Node HTTP.
   createRequest(options, callback) {
     assert.equal(options.hostname, "127.0.0.1");
-    return http.request(options, callback);
+    return http.request({ ...options, agent: false }, callback);
   }
   addRedirectHandlers() {}
 }
@@ -95,6 +95,34 @@ async function main() {
     assert.equal(fs.statSync(download).mode & 0o777, 0o755);
     assert.equal(valid.events.filter(event => event === "update-downloaded").length, 1);
     assert.equal(fs.existsSync(appImage), true, "downloading preserves the current installation");
+    const originalApp = fs.readFileSync(appImage);
+    const linkedSource = path.join(root, "other-verified-file");
+    fs.writeFileSync(linkedSource, bytes);
+    for (const change of ["missing", "tampered", "symlink"]) {
+      const cached = valid.updater.downloadedUpdateHelper.file;
+      if (change === "missing") fs.unlinkSync(cached);
+      else if (change === "tampered") { const changed = Buffer.from(bytes); changed[0] ^= 1; fs.writeFileSync(cached, changed); }
+      else { fs.unlinkSync(cached); fs.symlinkSync(linkedSource, cached); }
+      await assert.rejects(bounded((async () => {
+        await verifyDownloadedUpdate(valid.updater, "1.0.1");
+        await quitAndInstallUpdate(valid.updater, valid.app);
+      })()), error => error.code === "ERR_UPDATER_CACHE_INVALID");
+      assert.deepEqual(fs.readFileSync(appImage), originalApp, `${change} cache must not remove the installed AppImage`);
+      assert.equal(fs.readFileSync(data, "utf8"), "fixture preserved data");
+      await valid.updater.downloadedUpdateHelper.clear();
+      await bounded(valid.updater.downloadUpdate());
+      assert.deepEqual(fs.readFileSync(valid.updater.downloadedUpdateHelper.file), bytes, "the same updater can download a fresh verified cache");
+      assert.deepEqual(fs.readFileSync(linkedSource), bytes, "cache cleanup never follows a rejected symlink");
+    }
+    const prepared = await verifyDownloadedUpdate(valid.updater, "1.0.1");
+    // The cache can be cleaned while the Host backup is running. The second
+    // preflight immediately before the real installer must reject that too.
+    fs.unlinkSync(prepared.file);
+    await assert.rejects(verifyDownloadedUpdate(valid.updater, "1.0.1", prepared), error => error.code === "ERR_UPDATER_CACHE_INVALID");
+    assert.deepEqual(fs.readFileSync(appImage), originalApp);
+    await valid.updater.downloadedUpdateHelper.clear();
+    await bounded(valid.updater.downloadUpdate());
+    await verifyDownloadedUpdate(valid.updater, "1.0.1");
     await bounded(quitAndInstallUpdate(valid.updater, valid.app));
     const destination = path.join(root, name);
     assert.equal(fs.existsSync(appImage), false);
@@ -113,7 +141,7 @@ async function main() {
     assert.equal(invalid.events.includes("update-downloaded"), false);
     assert.deepEqual(fs.readFileSync(destination), bytes);
     assert.equal(fs.readFileSync(data, "utf8"), "fixture preserved data");
-    console.log("AppImageUpdater real contract: loopback feed, HTTP retry, consent, SHA512, temporary executable replacement/restart and corrupt download rejection passed");
+    console.log("AppImageUpdater real contract: HTTP retry, consent, SHA512, missing/tampered/symlink cache preflight, redownload, temporary replacement/restart and corrupt download rejection passed");
   } finally {
     Module._load = originalLoad;
     for (const [key, value] of Object.entries(previousEnvironment)) {

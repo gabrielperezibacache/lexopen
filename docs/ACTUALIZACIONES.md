@@ -4,7 +4,7 @@ En Windows, el Host inicia y detiene PostgreSQL mediante `pg_ctl`, con espera de
 
 La aplicación de escritorio empaquetada y el Host ejecutado desde un clon tienen actualizadores distintos. Ambos conservan la carpeta de datos. Descargar código o un instalador no acredita que el Host haya reiniciado con la versión nueva.
 
-Esta entrega incorpora comprobaciones, preparación y recibos. Las pruebas descritas al final usan datos ficticios, componentes reales del actualizador y sustitutos de servicios nativos; no acreditan una actualización firmada real en todos los sistemas.
+La versión `1.1.0-preview.9` prepara las correcciones descritas aquí; su disponibilidad depende de una publicación que supere las comprobaciones. Esta entrega incorpora comprobaciones, preparación y recibos. Las pruebas descritas al final usan datos ficticios, componentes reales del actualizador y sustitutos de servicios nativos; no acreditan una actualización firmada real en todos los sistemas.
 
 ## Escritorio empaquetado
 
@@ -64,7 +64,7 @@ El coordinador usa solicitudes y bloqueos con identificador y propietario. La an
 
 El canal del clon puede configurarse con `LEXOPEN_UPDATE_CHANNEL=preview` en el entorno del Host o con la preferencia correspondiente en su configuración de datos. El valor por defecto es estable. La referencia de código sigue siendo la rama configurada; el canal no convierte un checkout arbitrario en un paquete publicado.
 
-El recibo `self-update-status.json` conserva fase, revisiones anterior/destino, versiones, identidad esperada, ubicación del respaldo y necesidad de recuperación. No registra las salidas completas de Git/npm, porque pueden contener URLs o configuración privada. Un administrador puede usar el diagnóstico local del paso fallido sin compartir secretos.
+El recibo `self-update-status.json` conserva fase, revisiones anterior/destino, versiones, identidad esperada, ubicación del respaldo y necesidad de recuperación. Reiniciar el coordinador no omite una recuperación requerida: antes de arrancar se comprueba el recibo y, para un reinicio preparado, la revisión, versión, compilación y ausencia de cambios locales. No registra las salidas completas de Git/npm, porque pueden contener URLs o configuración privada. Un administrador puede usar el diagnóstico local del paso fallido sin compartir secretos.
 
 ### Fallos y recuperación
 
@@ -87,7 +87,7 @@ npm run desktop:build
 
 Antes de arrancarlo contra datos existentes, revisar compatibilidad de esquema y la carpeta de datos explícita. Si se iniciaron migraciones o su estado es incierto, no ejecutar simplemente el binario anterior sobre esa base: utilizar el [procedimiento de restauración](WEB-HOST.md), aceptando conscientemente el punto temporal del respaldo. La intervención no debe descartar trabajo posterior sin revisarlo.
 
-Después de una recuperación manual, conservar el recibo hasta comprobar instalación, fuentes y permisos; el bloqueo de nuevas actualizaciones puede requerir revisión del estado anterior. No borrar archivos de estado mientras otro coordinador esté activo.
+Después de una recuperación manual, comprobar instalación, fuentes, compatibilidad de la base y permisos antes de habilitar el arranque. Con el coordinador detenido y sin una solicitud o bloqueo activo, archivar `self-update-status.json` junto al respaldo y registrar la revisión recuperada y la intervención realizada. El recibo archivado conserva la evidencia; no se debe cambiar su fase a `done` para fingir una comprobación. Reiniciar después el checkout comprobado con su carpeta de datos explícita. No mover ni borrar archivos de estado mientras otro coordinador esté activo.
 
 ## Dependencias incluidas y opcionales
 
@@ -127,7 +127,7 @@ El test de main ejecuta el entrypoint real dentro de un proceso Electron simulad
 
 La prueba del proveedor usa GitHubProvider real con respuestas HTTP simuladas. La de AppImage verifica descarga, SHA-512, sustitución y relanzamiento de ejecutables ficticios en Linux. La de MacUpdater sustituye el servicio nativo de Electron; no instala una aplicación de macOS. La integración del Host ejecuta el coordinador, Git, npm, procesos y HTTP locales, con un Host y migraciones ficticios.
 
-En el ensayo del DEB publicado, el Host no superó la comprobación de salud en Linux con OpenSSL 3 porque faltaba su motor Prisma. Tras añadir ese motor a una extracción temporal, pasó la prueba de arranque y persistencia. El empaquetado debe incluir y comprobar motores para OpenSSL 1.1 y 3; falta construir, probar y publicar un nuevo paquete con esa corrección. El parche temporal no modifica la descarga publicada ni acredita una actualización completa entre versiones.
+En el ensayo del DEB publicado `1.1.0-preview.8`, el Host no superó la comprobación de salud en Linux con OpenSSL 3 porque faltaba su motor Prisma. Tras añadir ese motor a una extracción temporal, pasó la prueba de arranque y persistencia. La preparación de recursos incorpora y comprueba motores para OpenSSL 1.1 y 3; cada nuevo paquete debe construirse y superar sus pruebas antes de publicarse. El parche temporal no modifica la descarga publicada ni acredita una actualización completa entre versiones.
 
 Windows y macOS siguen pendientes de una instalación y actualización firmadas en sus sistemas nativos; los paquetes preliminares publicados carecen de firma de editor y notarización. Las pruebas con sustitutos no resuelven ese requisito.
 

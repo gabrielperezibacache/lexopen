@@ -13,9 +13,22 @@ async function main() {
   const cfg = { ...realConfig.DEFAULTS, dataDir, hostDataDir: dataDir, mode: null };
   const events = [], intervals = [], status = [], dialogs = [], errors = [], handlers = new Map(), externalUrls = [];
   const packageCalls = [];
+  let cacheClears = 0;
+  let removeCacheAfterBackup = false;
   let mainMenu;
   let completePreparation;
   const updater = new EventEmitter(); let checks = 0;
+  const downloadFile = path.join(tmp, "downloaded.AppImage");
+  const downloadBytes = Buffer.from("fictitious verified installer bytes");
+  const downloadHash = require("node:crypto").createHash("sha512").update(downloadBytes).digest("base64");
+  const prepareDownload = version => {
+    fs.writeFileSync(downloadFile, downloadBytes);
+    updater.downloadedUpdateHelper = {
+      file: downloadFile, versionInfo: { version }, fileInfo: { info: { size: downloadBytes.length, sha512: downloadHash } }, downloadedFileInfo: { sha512: downloadHash },
+      async clear() { cacheClears++; fs.rmSync(downloadFile, { force: true }); this.file = null; this.versionInfo = null; this.fileInfo = null; },
+    };
+  };
+  prepareDownload("1.0.1");
   const signatureVerifier = async () => null;
   Object.assign(updater, { verifyUpdateCodeSignature: signatureVerifier, setFeedURL() {}, checkForUpdates: async () => { checks++; return {}; }, quitAndInstall: () => { events.push("install"); app.emit("before-quit"); } });
   const app = new EventEmitter(); Object.assign(app, { isPackaged: true, whenReady: () => Promise.resolve(), getPath: () => tmp, getAppPath: () => path.join(tmp, "app"), quit() {}, exit() {} });
@@ -36,7 +49,7 @@ async function main() {
       if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, async openExternal(url) { externalUrls.push(url); } }, Menu: { buildFromTemplate: value => value, setApplicationMenu: value => { mainMenu = value; } }, dialog: { showOpenDialog: async () => assert.fail("Automatic preparation must not show a file chooser"), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => errors.push(message) } };
       if (name === "electron-updater") return { autoUpdater: updater };
       if (name === "./config.cjs") return { ...realConfig, readConfig: () => ({ ...cfg }), writeConfig: value => Object.assign(cfg, value), readPackageVersion: () => "1.0.0", readAppState: () => ({}) };
-      if (name === "./backup.cjs") return { ...realBackup, createDataBackup: async (...args) => { events.push("backup"); return realBackup.createDataBackup(...args); } };
+      if (name === "./backup.cjs") return { ...realBackup, createDataBackup: async (...args) => { events.push("backup"); const manifest = await realBackup.createDataBackup(...args); if (removeCacheAfterBackup) fs.unlinkSync(downloadFile); return manifest; } };
       if (name === "./media-permissions.cjs") return { attachMicrophoneGuards() {} };
       if (name === "./altazor-toolpack.cjs") return {
         prepareDesktopToolpack: (version, { resourceRoot, progress, signal }) => {
@@ -159,15 +172,41 @@ async function main() {
     cfg.mode = "client"; events.length = 0;
     vm.runInContext("hostHandle = null", context);
     updater.checkForUpdates = async () => { updater.emit("update-available", { version: "1.0.2" }); return {}; };
-    updater.downloadUpdate = async () => { events.push("download"); updater.emit("update-downloaded", { version: "1.0.2" }); };
+    updater.downloadUpdate = async () => { prepareDownload("1.0.2"); events.push("download"); updater.emit("update-downloaded", { version: "1.0.2" }); };
     updater.quitAndInstall = () => { events.push("install"); app.emit("before-quit"); };
     const installed = new Promise(resolve => app.once("before-quit", resolve));
     await vm.runInContext("checkForUpdates(true)", context);
     await installed;
+    await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(events, ["download", "install"]);
     assert.equal(dialogs.filter(row => row.title === "Actualización disponible").length, 1);
     assert.equal(status.some(row => row.phase === "update-available" && row.updateVersion === "1.0.2"), true);
     assert.equal(status.some(row => row.phase === "update-downloaded" && row.updateVersion === "1.0.2"), true);
+    // A cleaned cache must fail before stopping the Host and allow another
+    // normal check/download rather than remaining stuck on a downloaded notice.
+    cfg.mode = "host"; events.length = 0;
+    vm.runInContext("quitting = false; hostHandle = fixtureHost", context);
+    fs.unlinkSync(downloadFile);
+    await vm.runInContext("promptInstallUpdate({version:'1.0.2'})", context);
+    assert.deepEqual(events, [], "missing cache is rejected before Host shutdown");
+    assert.equal(cacheClears, 1);
+    assert.equal(vm.runInContext("updateDownloadedInfo", context), null);
+    cfg.mode = "client";
+    vm.runInContext("hostHandle = null", context);
+    const downloadedAgain = new Promise(resolve => app.once("before-quit", resolve));
+    await vm.runInContext("checkForUpdates(true)", context);
+    await downloadedAgain;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(events, ["download", "install"], "a missing cache can be downloaded again in the same session");
+    cfg.mode = "host"; events.length = 0;
+    vm.runInContext("quitting = false; hostHandle = fixtureHost", context);
+    prepareDownload("1.0.3");
+    removeCacheAfterBackup = true;
+    await vm.runInContext("promptInstallUpdate({version:'1.0.3'})", context);
+    removeCacheAfterBackup = false;
+    assert.deepEqual(events, ["stop", "backup", "restart"], "cache loss during backup blocks the installer and resumes the Host");
+    assert.equal(cacheClears, 2);
+    assert.equal(vm.runInContext("quitting || maintenanceActive", context), false);
     assert.equal(handlers.has("desktop:choose-data-directory"), true);
     console.log("desktop main fixture: shared window.open/navigation/IPC OAuth policy; update preferences/progress, Host backup, maintenance guards, installation failure recovery and client watch passed");
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

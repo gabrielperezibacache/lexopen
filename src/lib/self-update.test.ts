@@ -122,6 +122,57 @@ async function main() {
     assert.ok(retried.requestId);
     releaseSelfUpdateLock(retried.requestId!);
     fs.unlinkSync(selfUpdateRequestPath());
+
+    // A crash after persisting queued but before committing request leaves the
+    // publisher's lock behind. Only a proven dead, matching owner is retryable.
+    const deadPid = 2_147_483_647;
+    const crashedId = "crashed-before-request-commit";
+    const kill = process.kill;
+    let probeResult: "dead" | "unknown" = "dead";
+    let onDeadProbe: (() => void) | undefined;
+    process.kill = ((pid: number, signal?: number | NodeJS.Signals) => {
+      if (pid === deadPid) {
+        onDeadProbe?.();
+        const error = new Error("fixture process probe") as NodeJS.ErrnoException;
+        error.code = probeResult === "dead" ? "ESRCH" : "EPERM";
+        throw error;
+      }
+      return kill(pid, signal);
+    }) as typeof process.kill;
+    try {
+      fs.writeFileSync(selfUpdateStatusPath(), JSON.stringify({ phase: "queued", requestId: crashedId }));
+      fs.writeFileSync(selfUpdateLockPath(), JSON.stringify({ pid: process.pid, requestId: crashedId }));
+      assert.equal(readSelfUpdateStatus().phase, "queued", "a live publisher may still commit its request");
+      assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /en curso/);
+      fs.writeFileSync(selfUpdateLockPath(), JSON.stringify({ pid: deadPid, requestId: crashedId }));
+      probeResult = "unknown";
+      assert.equal(readSelfUpdateStatus().phase, "queued", "EPERM does not prove the publisher is dead");
+      assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /en curso/);
+      probeResult = "dead";
+      fs.writeFileSync(selfUpdateRequestPath(), JSON.stringify({ requestId: crashedId }));
+      assert.equal(readSelfUpdateStatus().phase, "queued", "a committed request must survive its publisher");
+      assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /en curso/);
+      fs.unlinkSync(selfUpdateRequestPath());
+      fs.writeFileSync(selfUpdateLockPath(), JSON.stringify({ pid: deadPid, requestId: "different-owner" }));
+      assert.equal(readSelfUpdateStatus().phase, "queued", "a foreign lock cannot authorize recovering this receipt");
+      fs.writeFileSync(selfUpdateLockPath(), JSON.stringify({ pid: deadPid, requestId: crashedId }));
+      assert.equal(readSelfUpdateStatus().phase, "failed");
+      let probes = 0;
+      onDeadProbe = () => {
+        if (++probes === 2) fs.writeFileSync(selfUpdateLockPath(), JSON.stringify({ pid: process.pid, requestId: "replacement-owner" }));
+      };
+      assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /en curso/);
+      assert.equal(JSON.parse(fs.readFileSync(selfUpdateLockPath(), "utf8")).requestId, "replacement-owner", "reclaim must recheck the owner before removing a lock");
+      onDeadProbe = undefined;
+      fs.writeFileSync(selfUpdateLockPath(), JSON.stringify({ pid: deadPid, requestId: crashedId }));
+      const recovered = requestSelfUpdate({ actorId: "fixture-admin" });
+      assert.equal(recovered.phase, "queued");
+      assert.notEqual(recovered.requestId, crashedId);
+      assert.equal(JSON.parse(fs.readFileSync(selfUpdateLockPath(), "utf8")).pid, process.pid);
+      assert.equal(JSON.parse(fs.readFileSync(selfUpdateLockPath(), "utf8")).requestId, recovered.requestId);
+      releaseSelfUpdateLock(recovered.requestId!);
+      fs.unlinkSync(selfUpdateRequestPath());
+    } finally { process.kill = kill; }
     console.log("self-update capability/owned request/live-lock/recovery/atomic publication checks passed (temporary fixtures only)");
   } finally {
     process.chdir(previousDirectory);

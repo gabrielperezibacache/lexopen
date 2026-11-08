@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const { applyUpdaterPolicy, updatePreferences, assertUpdateVersion, compareVersions, friendlyUpdateError, withNetworkRetry, quitAndInstallUpdate, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
 const { NsisUpdater } = require("electron-updater/out/NsisUpdater");
 const { EventEmitter } = require("node:events");
+const { HttpError } = require("builder-util-runtime");
 
 async function main() {
   assert.deepEqual(updatePreferences(), { enabled: true, channel: "stable" });
@@ -56,6 +57,9 @@ async function main() {
   attempts = 0;
   await assert.rejects(() => withNetworkRetry(async () => { attempts++; throw new Error("ERR_UPDATER_INVALID_SIGNATURE"); }, { sleep: async () => {} }));
   assert.equal(attempts, 1);
+  attempts = 0;
+  assert.equal(await withNetworkRetry(async () => { if (++attempts === 1) throw new HttpError(503); return "retry succeeded"; }, { sleep: async () => {} }), "retry succeeded");
+  assert.equal(attempts, 2, "typed HTTP errors from the installed updater are transient");
   assert.match(friendlyUpdateError(new Error("Could not get code signature")), /instalador verificado/);
   const events = [];
   const host = { mode: "host", stopHost: async () => events.push("stop"), backupHost: async () => { events.push("backup"); return { type: "lexopen-host-data", includes: ["pgdata", "storage"] }; }, install: async () => events.push("install"), restartHost: async () => events.push("restart") };
