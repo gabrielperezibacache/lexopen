@@ -71,6 +71,34 @@ respuesta anuncia su cobertura parcial; no implica lectura de todo el expediente
 - `/agente` sigue siendo la consola rica para briefing, doc QA y utilidades ancladas.
 - En producción, demos `LLM_ALLOW_DEMO` / `HERMES_ALLOW_DEMO` hard-fail al boot salvo `LEXOPEN_KEEP_*_DEMO=1` (ver `docs/WEB-HOST.md`).
 
+### Elegir Codex personal o del Host
+
+En **Mi cuenta → Codex**, cada profesional puede activar Codex y elegir su cuenta
+personal o **Codex del Host**, cuando el administrador lo haya habilitado. Con
+Codex desactivado se utiliza la configuración de IA del estudio. El modelo se
+elige del catálogo de la conexión seleccionada; cambiar de cuenta requiere guardar
+la selección y revisar de nuevo el destino de los envíos pendientes.
+
+El administrador conecta y prueba la cuenta compartida desde **Configuración →
+Asistente / IA → Codex del Host**, y luego habilita su uso. Compartir está
+deshabilitado por defecto. Deshabilitar o cambiar esa cuenta revoca los envíos
+pendientes y detiene las solicitudes compartidas en curso. Quien la tuviera
+seleccionada verá que ya no está disponible y deberá elegir otra conexión; los
+errores no cambian automáticamente a otra cuenta o proveedor.
+
+El ejecutable `CODEX_BIN` se instala en el Host. Las credenciales personales se
+conservan por usuario bajo `CODEX_DATA_DIR`; la cuenta compartida tiene su propio
+directorio privado `host/`. LexOpen no reutiliza la sesión ambiental de Codex del
+operador. Sólo el administrador puede ver la cuenta compartida o su código de
+conexión. Compartir una cuenta no comparte los chats ni el historial de LexOpen:
+cada solicitud usa un hilo efímero sin herramientas, archivos ni navegación.
+La conexión compartida atiende una solicitud a la vez; una consulta simultánea
+debe reintentarse cuando termine la anterior.
+
+Ambas conexiones envían texto a OpenAI y quedan bloqueadas con la política
+`local_only`. Para cambiar una cuenta personal que estaba activa, conectarla de
+nuevo desactiva su uso hasta que el profesional la active y guarde otra vez.
+
 ## Calendario y Evento
 
 El asistente puede crear/mover **Eventos** (modelo Prisma `Evento`). El calendario

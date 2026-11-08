@@ -9,6 +9,7 @@ import { TranscriptionSettings } from "@/components/audio/TranscriptionSettings"
 import { LanguageSettingsPanel } from "@/components/i18n/LanguageSettingsPanel";
 import { FirmSettingsForm } from "@/components/FirmSettingsForm";
 import { LlmSettingsForm } from "@/components/LlmSettingsForm";
+import { HostCodexSettings } from "@/components/config/HostCodexSettings";
 import { ObsidianSettingsForm } from "@/components/config/ObsidianSettingsForm";
 import { GoogleSettingsForm } from "@/components/config/GoogleSettingsForm";
 import { PjudSettingsPanel } from "@/components/config/PjudSettingsPanel";
@@ -128,7 +129,7 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
         }))}
       />,
     "transcription-settings": <div id="transcription-settings"><TranscriptionSettings /></div>,
-    "llm-settings": <div id="llm-settings"><LlmSettingsForm /></div>,
+    "llm-settings": <div id="llm-settings"><LlmSettingsForm /><HostCodexSettings /></div>,
     "obsidian-settings": <ObsidianSettingsForm />,
     "google-settings": <GoogleSettingsForm />,
     "pjud-settings": <PjudSettingsPanel />,
