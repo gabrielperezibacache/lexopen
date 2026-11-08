@@ -79,7 +79,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             desktop/package-lock.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: altazor-desktop-source-context
           path: desktop/.release/altazor-desktop-source
@@ -143,7 +143,7 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci --prefix desktop --ignore-scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: native-artifacts
@@ -170,7 +170,7 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci --prefix desktop --ignore-scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: native-artifacts
