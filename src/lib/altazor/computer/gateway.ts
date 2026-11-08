@@ -47,7 +47,7 @@ export class KittiesGateway {
     if (!selected || /demo|scripted/i.test(JSON.stringify(selected))) throw new ConnectorError("provider_not_ready", "Configure un proveedor real de IA en el gateway del escritorio. ALTAZOR no transferirá sus credenciales.", 409);
     const fleet = await this.json("/v1/kitties");
     if (!Array.isArray(fleet.kitties) || fleet.kitties.some(item => !item || typeof item !== "object" || !knownKittyNames.includes(item.name) || String(item.container || "").startsWith("demo-"))) throw new ConnectorError("gateway_not_dedicated", "Este gateway contiene escritorios ajenos a este espacio. Use una instancia independiente y dedicada.", 409);
-    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1", cloudFileOAuth: health.lexopen_cloud_file_oauth === "v1", githubPersistentOAuth: health.lexopen_github_persistent_oauth === "v1" };
+    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1", cloudFileOAuth: health.lexopen_cloud_file_oauth === "v1", githubPersistentOAuth: health.lexopen_github_persistent_oauth === "v1", driveManagement: health.lexopen_drive_management === "v1" };
   }
   async createKitty(name: string, provider: string, connectors: readonly string[] = ["-"], start = true) {
     const selected = normalizeConnectorNames(connectors);
@@ -94,6 +94,7 @@ export class KittiesGateway {
   async requirePersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_persistent_oauth !== "v1") throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409); }
   async requireGithubPersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_github_persistent_oauth !== "v1") throw new ConnectorError("github_oauth_persistence_required", "Actualiza el escritorio de Altazor antes de conectar GitHub para guardar y renovar su acceso de forma segura.", 409); }
   async requireOAuthAliasCreation() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_oauth_alias_create !== "v1") throw new ConnectorError("oauth_alias_create_required", "Actualiza el escritorio de Altazor antes de conectar una cuenta nueva. El ingreso todavía no se ha iniciado.", 409); }
+  async requireDriveManagement() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_drive_management !== "v1") throw new ConnectorError("drive_management_required", "Actualiza el escritorio de Altazor para crear y guardar archivos en Google Drive con tu cuenta conectada.", 409); }
   async requireCloudFileOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_cloud_file_oauth !== "v1") throw new ConnectorError("cloud_file_oauth_required", "Actualice el escritorio de Altazor para conectar esta cuenta desde la aplicación instalada.", 409); }
   async requireComputerUsePolicy() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_computer_use_policy !== "v1") throw new ConnectorError("computer_policy_unsupported", "Actualice el escritorio de Altazor para aplicar autorizaciones de uso del computador.", 409); }
   async computerAuthorization(chatId: string, kittyId: string, binding: string) {
@@ -140,6 +141,7 @@ export class KittiesGateway {
   }
   async setPersistentEasyOAuth(name: string, input: PersistentEasyOAuthConfiguration) {
     connectorNameSchema.parse(name); validatePersistentEasyOAuth(input); await this.requirePersistentOAuth();
+    if (input.kind === "google-workspace" && input.scopes.includes("https://www.googleapis.com/auth/drive")) await this.requireDriveManagement();
     if (input.kind === "github") await this.requireGithubPersistentOAuth();
     else if (input.publicClient) await this.requireCloudFileOAuth();
     const result = await this.json(`/v1/lexopen/easy-oauth/${safeId(name)}`, "POST", { kind: input.kind, client_id: input.clientId, ...(input.publicClient ? { public_client: true } : { client_secret: input.clientSecret }), access_token: input.accessToken, refresh_token: input.refreshToken, expires_at: input.expiresAt, scopes: input.scopes, ...(input.account ? { account: input.account } : {}) });

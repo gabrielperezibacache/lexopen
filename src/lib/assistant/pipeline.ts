@@ -16,6 +16,7 @@ import { resolveDesktopTaskInput } from "./tools/escritorio";
 import { resolveAcademicToolInput } from "./tools/academic";
 import { resolveWorkflowToolInput } from "./tools/workflow";
 import { resolveLibrarySyncInput } from "./tools/library-sync";
+import { resolveDriveToolInput } from "./tools/drive";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import type { PermissionSubject } from "@/lib/auth/permissions";
 import type {
@@ -96,6 +97,9 @@ function buildToolInput(
   const causaId = (slots.causaId as string | undefined) || resolved.causaId;
 
   switch (toolId) {
+    case "drive.estado": return {};
+    case "drive.crearCarpeta": return { nombre: slots.nombre };
+    case "drive.guardarDocumento": return { documentoId: slots.documentoId, documento: slots.documento };
     case "academia.listar": return {};
     case "academia.crear": return { titulo: slots.titulo, tipo: slots.tipo || "research" };
     case "academia.preparar": return { trabajoId: slots.trabajoId, mode: slots.mode || "synthesis", instruction: slots.instruction || texto };
@@ -310,6 +314,7 @@ export async function runAssistantTurn(
     if (intent.toolId === "escritorio.encargar") toolInput = await resolveDesktopTaskInput(toolInput, ctx);
     const academic = intent.toolId.startsWith("academia."), workflow = intent.toolId.startsWith("audiencia.") || intent.toolId.startsWith("escrito.");
     try {
+      if (intent.toolId.startsWith("drive.")) toolInput = await resolveDriveToolInput(intent.toolId, toolInput, ctx);
       if (academic) toolInput = await resolveAcademicToolInput(intent.toolId, toolInput, ctx);
       if (workflow) toolInput = await resolveWorkflowToolInput(intent.toolId, toolInput, ctx);
       if (intent.toolId === "biblioteca.listar" || intent.toolId === "sincronizacion.estado") toolInput = await resolveLibrarySyncInput(intent.toolId,toolInput,ctx);

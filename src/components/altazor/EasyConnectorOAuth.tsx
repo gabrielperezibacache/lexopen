@@ -133,7 +133,7 @@ export function EasyConnectorAdministration() {
 }
 
 export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayReady, hasActiveSession, busy = false, onBusyChange, onDisconnect, onStatusChange }: Props) {
-  const uid = useId(), requestKey = useRef(operationKey()), filesRequestKey = useRef(operationKey()), disconnectKey = useRef(operationKey()), loadVersion = useRef(0), mounted = useRef(false);
+  const uid = useId(), requestKey = useRef(operationKey()), filesRequestKey = useRef(operationKey()), manageRequestKey = useRef(operationKey()), disconnectKey = useRef(operationKey()), loadVersion = useRef(0), mounted = useRef(false);
   const [data, setData] = useState<OAuthStatus | null>(null), [loading, setLoading] = useState(true), [working, setWorking] = useState(false), [error, setError] = useState("");
   const [removeConfirmed, setRemoveConfirmed] = useState(false), [notice, setNotice] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
@@ -175,11 +175,11 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
     }, Math.max(5, deviceAttempt.device?.interval || 5) * 1000);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [deviceAttempt, provider, workspaceId, refresh]);
-  async function connect(access: "basic" | "files" = "basic") {
-    if (!workspaceId || !current?.available || !gatewayReady || requiresStop || busy || working) return;
+  async function connect(access: "basic" | "files" | "manage" = "basic") {
+    if (!workspaceId || !current?.available || !gatewayReady || requiresStop || busy || working || access === "manage" && (provider !== "google" || current.manageAvailable !== true)) return;
     setWorking(true); onBusyChange(true); setError(""); setNotice("");
     try {
-      const result = await apiMutation<{ attemptId: string; provider: EasyConnectorProvider; authUrl: string; flow?: "redirect" | "external" | "device"; expiresAt: string }>(`${api}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, provider, external: true, requestId: access === "files" ? filesRequestKey.current : requestKey.current, ...(access === "files" ? { access } : {}), confirmed: true }) });
+      const result = await apiMutation<{ attemptId: string; provider: EasyConnectorProvider; authUrl: string; flow?: "redirect" | "external" | "device"; expiresAt: string }>(`${api}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, provider, external: true, requestId: access === "manage" ? manageRequestKey.current : access === "files" ? filesRequestKey.current : requestKey.current, ...(access !== "basic" ? { access } : {}), confirmed: true }) });
       if (!result.ok) { setError(result.error); const code = (result.data as { code?: string } | undefined)?.code; if (["oauth_attempt_consumed", "request_conflict"].includes(code || "")) setNeedsNewAttempt(true); return; }
       if (result.data.provider !== provider || !result.data.attemptId) throw new Error("No se pudo confirmar el inicio de sesión. Vuelva a comprobar el estado.");
       const url = officialUrl(result.data.authUrl, provider);
@@ -208,25 +208,29 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
   const attemptProblem = attempt && ["failed", "cancelled", "expired"].includes(attempt.state) ? attempt.reason || (attempt.state === "cancelled" ? "El ingreso se canceló. Puede volver a conectar cuando lo desee." : "No se confirmó el ingreso. Puede iniciar una conexión nueva.") : null;
   const computerHref = `/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`;
   const canConnect = Boolean(current?.available && gatewayReady && !requiresStop);
+  const googleManage = provider === "google" && connected && current?.canManageFiles === true;
+  const initialAccess = provider === "google" ? !current?.hasStoredConnection || googleManage ? "manage" as const : "files" as const : "basic" as const;
+  const canStart = canConnect && (initialAccess !== "manage" || current?.manageAvailable === true);
   const configurationHref = "/configuracion#cuentas-conectadas";
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="easy-connector-oauth">
     <h4 id={`${uid}-title`} className={connected ? styles.connected : undefined}>{connected && <CheckCircle2 size={20} aria-hidden="true" />}{connected ? `${label} conectado` : `Tu cuenta de ${label}`}</h4>
-    <p>{provider === "google" && (current?.canReadFiles || !current?.connected) ? "Conecta Drive para que Altazor pueda buscar y leer tus archivos en los encargos que le pidas." : providerHelp[provider]}</p>
+    <p>{provider === "google" ? googleManage ? "Puedes trabajar con tus archivos y carpetas de Drive desde Altazor, con las autorizaciones que elijas para cada encargo." : current?.hasStoredConnection ? current.canReadFiles ? "Tu cuenta conserva acceso de sólo lectura a los documentos de Drive." : providerHelp.google : "Google solicitará permiso para leer, crear, editar, organizar y eliminar archivos de Drive. Altazor seguirá las autorizaciones que elijas para sus encargos." : providerHelp[provider]}</p>
     {!connected && current?.available && current.state !== "unavailable" && <p className={styles.hint}>Inicia sesión una vez. LexOpen conservará la conexión.</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {loading ? <p role="status">Comprobando conexión…</p> : !workspaceId ? <p>Abre tu <a href={computerHref}>escritorio de Altazor</a> para preparar este espacio y conectar tu cuenta.</p> : <>
       {connected && <p role="status">{current?.autoRefresh ? "Conexión guardada. El acceso se renueva automáticamente." : "Conexión guardada para este espacio."}</p>}
       {(provider !== "github" || !current?.persistent) && connected && !current?.autoRefresh && (provider !== "google" || current?.canReadFiles) && <div className={styles.actions}>
         <p>Autoriza una vez la renovación automática para mantener tu cuenta conectada.</p>
-        <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Mantener conexión<ArrowUpRight size={16} aria-hidden="true" /></button>
+        <button type="button" className={styles.primary} disabled={busy || working || !canStart} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); manageRequestKey.current = operationKey(); void connect(initialAccess); }}>Mantener conexión<ArrowUpRight size={16} aria-hidden="true" /></button>
       </div>}
-      {provider === "google" && connected && !current?.canReadFiles && <div className={styles.actions}>
-        <p>Para trabajar con el contenido de tus documentos, autoriza su lectura en Google.</p>
-        <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect("files"); }}>Autorizar lectura de archivos<ArrowUpRight size={16} aria-hidden="true" /></button>
+      {provider === "google" && connected && !googleManage && <div className={styles.actions}>
+        <p>Si quieres que Altazor cree, edite y organice archivos, amplía el permiso en Google. Esta autorización también permite eliminarlos; tu acceso de lectura no cambia sin esta autorización.</p>
+        <button type="button" className={styles.primary} disabled={busy || working || !canConnect || current?.manageAvailable !== true} onClick={() => { if (needsNewAttempt) { manageRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect("manage"); }}>Permitir crear y editar<ArrowUpRight size={16} aria-hidden="true" /></button>
       </div>}
+      {provider === "google" && current?.available && current.manageAvailable !== true && (!current.hasStoredConnection || connected && !googleManage) && <p>Actualiza el escritorio de Altazor para habilitar la creación y edición de archivos.{current.hasStoredConnection ? " Tu acceso de lectura se conserva." : ""}</p>}
       {pending && <p role="status">Termina el ingreso en {label}. Si ya lo hiciste, pulsa Comprobar conexión.</p>}
       {deviceAttempt?.external && externalUrl && <p><a href={externalUrl} target="_blank" rel="noopener noreferrer">Continuar en {label}<ArrowUpRight size={16} aria-hidden="true" /></a></p>}
-      {deviceAttempt?.external && deviceAttempt.state === "pending" && !externalUrl && <div className={styles.actions}><p>Si se cerró la página de ingreso, puedes abrir un intento nuevo. El anterior no se reenviará.</p><button type="button" disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Reiniciar ingreso en {label}<ArrowUpRight size={16} aria-hidden="true" /></button></div>}
+      {deviceAttempt?.external && deviceAttempt.state === "pending" && !externalUrl && <div className={styles.actions}><p>Si se cerró la página de ingreso, puedes abrir un intento nuevo. El anterior no se reenviará.</p><button type="button" disabled={busy || working || !canStart} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); manageRequestKey.current = operationKey(); void connect(initialAccess); }}>Reiniciar ingreso en {label}<ArrowUpRight size={16} aria-hidden="true" /></button></div>}
       {deviceAttempt?.device && <div className={styles.device} aria-label="Iniciar sesión en GitHub">
         <p>Abre GitHub e introduce este código para conectar tu cuenta.</p>
         <code>{deviceAttempt.device.userCode}</code>
@@ -243,13 +247,14 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
       {requiresStop && <p>Detén tu escritorio antes de cambiar las cuentas que usa. <a href={computerHref}>Revisar mi escritorio</a></p>}
       {!connected && <div className={styles.actions}>
         {pending || !current || current.state === "unavailable" ? <button type="button" className={styles.primary} disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
-          : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(provider === "google" ? "files" : "basic"); }}>{working ? "Abriendo ingreso…" : current.available ? `Conectar ${label}` : "Servicio en preparación"}<ArrowUpRight size={16} aria-hidden="true" /></button>}
+          : <button type="button" className={styles.primary} disabled={busy || working || !canStart} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); manageRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(initialAccess); }}>{working ? "Abriendo ingreso…" : current.available ? `Conectar ${label}` : "Servicio en preparación"}<ArrowUpRight size={16} aria-hidden="true" /></button>}
       </div>}
       <details className={styles.management}>
         <summary>{connected ? "Gestionar conexión" : "Opciones de conexión"}</summary>
         {current?.lastVerifiedAt && <p>Última comprobación: {new Date(current.lastVerifiedAt).toLocaleString("es-CL")}.</p>}
         <button type="button" disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
-        {current?.state === "unavailable" && <button type="button" disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Volver a autorizar mi cuenta</button>}
+        {current?.state === "unavailable" && <button type="button" disabled={busy || working || !canStart} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); manageRequestKey.current = operationKey(); void connect(initialAccess); }}>Volver a autorizar mi cuenta</button>}
+        {provider === "google" && connected && !current?.canReadFiles && <button type="button" disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect("files"); }}>Autorizar sólo lectura de archivos</button>}
         {provider === "google" && <p>Para vincular carpetas de Drive a tus causas, abre <a href="/sincronizacion">Archivos conectados</a>.</p>}
         {current?.hasStoredConnection && <div className={styles.disconnect}><label className={styles.disconnectLabel}><input type="checkbox" checked={removeConfirmed} disabled={busy || working || requiresStop || !current.canDisconnect} onChange={event => setRemoveConfirmed(event.target.checked)} />Quiero desconectar {label} de este espacio.</label><button type="button" disabled={busy || working || requiresStop || !current.canDisconnect || !removeConfirmed} onClick={() => void disconnect()}>Desconectar {label}</button></div>}
         {data?.canAdmin && <p><a href={configurationHref}>Preparación del estudio en Configuración</a></p>}

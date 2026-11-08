@@ -21,18 +21,19 @@ La interfaz separa el ingreso del profesional de la administración avanzada: lo
 
 El recorrido del profesional es **Conectar → ingreso oficial del proveedor → autorización → volver a LexOpen → comprobar el acceso**. La configuración inicial de la identidad de la aplicación corresponde a quien la distribuye o administra; no se pide a cada profesional que registre un proyecto nuevo para utilizar una identidad ya preparada.
 
-Los permisos del ingreso guiado son de lectura y tienen límites concretos:
+Los permisos se solicitan según la función elegida. Las cuentas existentes conservan su autorización; la gestión de Drive requiere un consentimiento nuevo:
 
 | Servicio | Permiso del recorrido guiado | Límite relevante |
 | --- | --- | --- |
 | Google, consulta | `drive.metadata.readonly` | Nombres, tipos y otros metadatos; no permite leer el contenido del archivo. |
 | Google, documentos | `drive.readonly` | Lectura y descarga o exportación de contenido existente. La ampliación requiere otra autorización explícita; no se infiere del permiso de metadatos. |
+| Google, gestión de causas | `drive` | Permite acceder y gestionar archivos existentes. La nueva integración crea carpetas y copias o versiones separadas; el original se conserva. Requiere motor compatible y consentimiento explícito. |
 | GitHub | `read:user` | Perfil y recursos públicos admitidos por el conector; no repositorios privados. |
 | Dropbox | `account_info.read`, `files.metadata.read`, `files.content.read` | Identificación de la cuenta y lectura de sus archivos según la operación autorizada. |
 
-El botón actual **Conectar Google** solicita directamente lectura de archivos. Un usuario nuevo no necesita completar primero una conexión de metadatos y ampliarla después. Las cuentas antiguas que sólo conservan metadatos mantienen su ampliación explícita a contenido; no se cambia su permiso automáticamente. En los instaladores, GitHub puede pedir confirmar un código breve de dispositivo en su página oficial; no es una clave de API ni exige registrar otra aplicación. [Proceso oficial de GitHub](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps).
+El botón **Conectar Google** prepara la gestión de archivos cuando el motor compatible está disponible; la pantalla explica que se podrán crear carpetas y guardar documentos. La cuenta de lectura ya conectada ofrece **Permitir crear y editar**, sin cambiar sus permisos automáticamente. Esta ampliación está en validación y se documenta en la [integración de Drive con causas](DRIVE-CAUSAS-2026-11-08.md). El recorrido anterior solicitaba directamente lectura de archivos. Un usuario nuevo no necesita completar primero una conexión de metadatos y ampliarla después. Las cuentas antiguas que sólo conservan metadatos mantienen su ampliación explícita a contenido; no se cambia su permiso automáticamente. En los instaladores, GitHub puede pedir confirmar un código breve de dispositivo en su página oficial; no es una clave de API ni exige registrar otra aplicación. [Proceso oficial de GitHub](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps).
 
-Estos accesos no habilitan correo, calendario, edición, borrado ni publicación. Las integraciones específicas de correo y calendario tienen configuración y permisos separados. Guardar una conexión, comprobar su acceso y ejecutar una consulta o descarga son estados distintos.
+Estas conexiones no habilitan correo ni calendario. El permiso completo de Drive incluye técnicamente modificación y eliminación en Google; la integración nueva implementa creación de carpetas y guardado de copias verificadas, sin una operación de borrado. GitHub y Dropbox conservan sus permisos de lectura. Las integraciones específicas de correo y calendario tienen configuración y permisos separados. Guardar una conexión, comprobar su acceso y ejecutar una consulta o descarga son estados distintos.
 
 En Dropbox quedó registrado `http://127.0.0.1:3000/api/altazor/connectors/oauth/callback`; se conserva además el retorno previo de `localhost` en el puerto `3366`. Son retornos locales del piloto, no una afirmación de aprobación para producción. El perfil de cliente público evita introducir un secreto web en cada instalación.
 
@@ -66,7 +67,7 @@ Producción, propiedad del dominio, marca y aprobación de acceso a datos son pa
 
 ### Permisos y justificación
 
-El expediente declara exclusivamente los permisos de Drive `drive.metadata.readonly` y `drive.readonly`. Google los clasificó como restringidos en esta preparación. No se añadieron permisos para Gmail, Calendar, escritura, borrado o publicación. La justificación guardada corresponde a consultar y descargar documentos existentes para el trabajo jurídico y académico.
+El expediente guardado antes de la ampliación declara `drive.metadata.readonly` y `drive.readonly`. La gestión solicitada posteriormente necesita añadir `drive`, actualizar la justificación y la política pública, y demostrar el consentimiento y las escrituras reales. El expediente actual de lectura no acredita esta ampliación. No se solicitan permisos de Gmail ni Calendar en este recorrido. No se ha enviado una nueva solicitud de revisión ni se ha obtenido aprobación de Google para escritura.
 
 Antes de enviarlo, se debe comprobar que la justificación describe las funciones observables y explica por qué un permiso más limitado no basta para ellas. Declarar o justificar un permiso no equivale a que Google lo haya aprobado. [Gestión oficial del acceso a datos](https://support.google.com/cloud/answer/15549135?hl=en).
 
@@ -99,7 +100,7 @@ No se debe afirmar “Google verified”, “approved” o “published” duran
 
 1. Revisión de marca habilitada y estado real comprobado después del plazo indicado.
 2. Sitio y política accesibles, con identidad y tratamiento de datos coherentes con la instalación demostrada.
-3. Recorridos web y Desktop completos, con sus Client ID y los dos permisos de lectura visibles.
+3. Recorridos web y Desktop completos, con sus Client ID y todos los perfiles solicitados visibles; incluir la ampliación a gestión de Drive y no reutilizar un video que sólo demuestre lectura.
 4. Consulta, descarga o exportación, archivo en el escritorio y recibo correspondiente; ninguna sustitución por una respuesta de texto.
 5. Mapa de datos contrastado con los destinos reales del Host, VM, motor y proveedores de IA.
 6. Video real revisado y subido a YouTube como **Unlisted**, con autorización de quien administra la cuenta; enlace incorporado al campo del expediente.
@@ -122,7 +123,7 @@ El perfil real de publicación se preparó con los tres proveedores requeridos y
 ## Próximos pasos acotados
 
 1. Después del 8 de noviembre a las 20:45 de Chile continental, volver a comprobar la marca de Google y atender el resultado concreto. No anticipar un envío ni una aprobación.
-2. Preparar y grabar los dos recorridos de Google con datos ficticios; revisar el mapa de datos y completar el expediente sólo con evidencia real.
+2. Actualizar la política y justificación para gestionar Drive. Preparar y grabar los dos recorridos de Google con datos ficticios; revisar el mapa de datos y completar el expediente sólo con evidencia real.
 3. Cargar manualmente el icono oficial de Dropbox y continuar su preparación de producción. Hasta entonces, describirlo como piloto en Development con hasta 500 usuarios.
 4. Publicar futuros instaladores sólo desde el ensamblado estricto, con las tres identidades preparadas y la misma huella en todos los paquetes. No convertir los artefactos de comprobación en una publicación.
 5. Mantener Microsoft pendiente hasta que el usuario pida retomarlo. Validar cada proveedor adicional con una operación pequeña autorizada, sin extender a todo el catálogo las pruebas de las tres cuentas actuales.

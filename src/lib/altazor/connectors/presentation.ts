@@ -2,12 +2,13 @@ import type { ConnectorField } from "./types";
 
 /** Copy for account sign-in, whose permissions are narrower than the adapter API. */
 const accountPresentation: Record<string, { label: string; description: string }> = {
-  "google-workspace": { label: "Google Drive", description: "Busca y lee tus archivos de Drive, sin modificarlos." },
+  "google-workspace": { label: "Google Drive", description: "Archivos y carpetas de Google Drive para trabajar con Altazor." },
   github: { label: "GitHub", description: "Consulta tu perfil y los archivos de repositorios públicos de GitHub." },
   dropbox: { label: "Dropbox", description: "Busca y lee tus archivos autorizados de Dropbox, sin modificarlos." },
   "microsoft-365": { label: "OneDrive · Microsoft 365", description: "Busca y lee tus archivos de OneDrive, sin modificarlos." },
 };
-export function connectorAccountPresentation(entry: { id: string; label: string; description: string }) {
+export function connectorAccountPresentation(entry: { id: string; label: string; description: string }, account?: { connected: boolean; tested: boolean; canReadFiles?: boolean; canManageFiles?: boolean }) {
+  if (entry.id === "google-workspace" && account?.connected && account.tested) return { label: "Google Drive", description: account.canManageFiles === true && account.canReadFiles === true ? "Lee, crea, edita y organiza archivos en los encargos que autorices." : account.canReadFiles === true ? "Busca y lee tus archivos de Drive, sin modificarlos." : "Consulta nombres y datos básicos de tus archivos de Drive." };
   return accountPresentation[entry.id] || { label: entry.label, description: entry.description };
 }
 

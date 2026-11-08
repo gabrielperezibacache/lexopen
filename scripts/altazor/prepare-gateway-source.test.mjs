@@ -17,17 +17,17 @@ test("the recipe preflights all scripts, tests before mutation and preserves pin
   const result = await prepareGatewaySource(root, { gofmt: "/synthetic/gofmt", execute: async (binary, args, options) => { calls.push({ binary, args, cwd: options.cwd }); assert.equal(options.shell, false); } });
   const tests = calls.filter(call => call.args[0].endsWith(".test.mjs"));
   const changes = calls.filter(call => call.args[0].endsWith(".mjs") && !call.args[0].endsWith(".test.mjs"));
-  assert.equal(tests.length, 18); assert.equal(changes.length, 18); assert.equal(calls.length, 45);
-  assert.ok(calls.slice(0, 18).every(call => call.args[0].endsWith(".test.mjs")));
-  assert.deepEqual(changes.map(call => basename(call.args[0])), ["harden-connectors.mjs", "harden-async-messages.mjs", "harden-read-files.mjs", "harden-vision-context.mjs", "harden-native-connector-schema.mjs", "harden-connector-file-focus.mjs", "harden-native-file-actions.mjs", "harden-readable-file-results.mjs", "harden-compact-file-results.mjs", "harden-persistent-oauth.mjs", "harden-staged-file-actions.mjs", "harden-cloud-file-connectors.mjs", "harden-computer-use-policy.mjs", "harden-oauth-alias-create.mjs", "harden-connected-file-focus.mjs", "harden-cloud-metadata.mjs", "harden-github-persistent-oauth.mjs", "harden-staged-metadata-actions.mjs"]);
+  assert.equal(tests.length, 19); assert.equal(changes.length, 19); assert.equal(calls.length, 48);
+  assert.ok(calls.slice(0, 19).every(call => call.args[0].endsWith(".test.mjs")));
+  assert.deepEqual(changes.map(call => basename(call.args[0])), ["harden-connectors.mjs", "harden-async-messages.mjs", "harden-read-files.mjs", "harden-vision-context.mjs", "harden-native-connector-schema.mjs", "harden-connector-file-focus.mjs", "harden-native-file-actions.mjs", "harden-readable-file-results.mjs", "harden-compact-file-results.mjs", "harden-persistent-oauth.mjs", "harden-staged-file-actions.mjs", "harden-cloud-file-connectors.mjs", "harden-computer-use-policy.mjs", "harden-oauth-alias-create.mjs", "harden-connected-file-focus.mjs", "harden-cloud-metadata.mjs", "harden-github-persistent-oauth.mjs", "harden-staged-metadata-actions.mjs", "harden-drive-management.mjs"]);
   const formats = calls.filter(call => call.binary === "/synthetic/gofmt");
-  assert.deepEqual(formats.map(call => call.args.length - 1), [5, 14, 7, 14, 4, 8, 5, 9, 15]);
+  assert.deepEqual(formats.map(call => call.args.length - 1), [5, 14, 7, 14, 4, 8, 5, 9, 15, 15]);
   for (const format of formats) { assert.equal(format.cwd, root); assert.equal(format.args[0], "-w"); assert.ok(format.args.slice(1).every(file => file.startsWith("internal/") && file.endsWith(".go") && !file.includes(".."))); }
   for (const item of GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length)) {
     const index = calls.findIndex(call => basename(call.args[0]) === item.script);
     assert.deepEqual(calls[index + 1].args, ["-w", ...item.formatAfter]);
   }
-  assert.equal(result.compiled, false); assert.equal(result.installed, false); assert.equal(result.recipe, "gateway.16");
+  assert.equal(result.compiled, false); assert.equal(result.installed, false); assert.equal(result.recipe, "gateway.17");
 }));
 test("a wrong pin, Git checkout, previous hardening or symlink marker fails before any command", async () => {
   for (const kind of ["pin", "git", "previous", "symlink"]) await fixture(async root => {

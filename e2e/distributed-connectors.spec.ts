@@ -28,7 +28,7 @@ async function expectSimpleAccountPanel(catalog: Locator) {
   await expect(catalog.locator('a[href*="settings/applications/new"],a[href*="settings/personal-access-tokens"],a[href*="oauthplayground"]')).toHaveCount(0);
 }
 
-async function setup(page: Page, flowProvider: Provider = "github", options: { holdPending?: boolean; available?: boolean } = {}) {
+async function setup(page: Page, flowProvider: Provider = "github", options: { holdPending?: boolean; available?: boolean; managementReady?: boolean } = {}) {
   const flowAttemptId = flowProvider === "github" ? attemptId : `fictitious-${flowProvider}-external-attempt`;
   const authUrl = flowProvider === "github" ? "https://github.com/login/device" : flowProvider === "google" ? "https://accounts.google.com/o/oauth2/v2/auth?client_id=fictitious-public-client&state=fictitious-state" : flowProvider === "dropbox" ? "https://www.dropbox.com/oauth2/authorize?client_id=fictitious-public-client&state=fictitious-state" : "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=12345678-abcd-1234-abcd-123456789abc&state=fictitious-state";
   const state = { started: false, connected: false, polls: 0, setupReads: 0, activeAttemptId: flowAttemptId };
@@ -55,9 +55,10 @@ async function setup(page: Page, flowProvider: Provider = "github", options: { h
       workspaceId, causaId: null, canAdmin: true, requiresStop: false,
       providers: providers.map(provider => ({
         provider, label: labels[provider], available: options.available !== false, reason: options.available === false ? "Servicio en preparación." : null,
-        scopes: provider === "github" ? ["read:user"] : provider === "google" ? ["https://www.googleapis.com/auth/drive.readonly"] : provider === "microsoft" ? ["Files.Read", "User.Read"] : ["account_info.read", "files.metadata.read", "files.content.read"],
-        grantedScopes: state.connected ? provider === "github" ? ["read:user"] : provider === "google" ? ["https://www.googleapis.com/auth/drive.readonly"] : provider === "microsoft" ? ["Files.Read", "User.Read"] : ["account_info.read", "files.metadata.read", "files.content.read"] : [],
+        scopes: provider === "github" ? ["read:user"] : provider === "google" ? ["https://www.googleapis.com/auth/drive"] : provider === "microsoft" ? ["Files.Read", "User.Read"] : ["account_info.read", "files.metadata.read", "files.content.read"],
+        grantedScopes: state.connected ? provider === "github" ? ["read:user"] : provider === "google" ? ["https://www.googleapis.com/auth/drive"] : provider === "microsoft" ? ["Files.Read", "User.Read"] : ["account_info.read", "files.metadata.read", "files.content.read"] : [],
         canReadFiles: state.connected, autoRefresh: state.connected && provider !== "github", persistent: state.connected,
+        canManageFiles: provider === "google" && state.connected, manageAvailable: provider === "google" && options.managementReady !== false,
         connectionName: `${provider}-fictitious-account`, state: state.connected ? "connected" : options.available === false ? "blocked" : state.started && provider === flowProvider ? "pending" : "idle",
         connected: state.connected, tested: state.connected, hasStoredConnection: state.connected, canDisconnect: state.connected,
         expiresAt: null, lastVerifiedAt: state.connected ? "2030-05-06T12:00:00Z" : null,
@@ -132,6 +133,7 @@ test("Google abre el ingreso oficial fuera de la aplicación y confirma desde su
   const { state, starts, pollBodies, flowAttemptId, authUrl } = await setup(page, "google");
   await page.goto("/inicio?altazor=connectors&connector=google");
   const catalog = page.getByTestId("altazor-connector-catalog"), panel = page.getByTestId("easy-connector-oauth");
+  await expect(panel.getByText(/Google solicitará permiso para leer, crear, editar, organizar y eliminar/)).toBeVisible();
   await panel.getByRole("button", { name: "Conectar Google", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/inicio\\?.*oauthAttempt=${flowAttemptId}`));
   const official = panel.getByRole("link", { name: "Continuar en Google", exact: true });
@@ -141,13 +143,22 @@ test("Google abre el ingreso oficial fuera de la aplicación y confirma desde su
   await catalog.screenshot({ path: testInfo.outputPath("google-external-pending.png") });
   await expect(panel.getByRole("heading", { name: "Google conectado", exact: true })).toBeVisible({ timeout: 12_000 });
   await expect(panel.getByRole("status")).toContainText("El acceso se renueva automáticamente.");
-  expect(starts).toHaveLength(1); expect(starts[0]).toMatchObject({ workspaceId, provider: "google", access: "files", confirmed: true });
+  expect(starts).toHaveLength(1); expect(starts[0]).toMatchObject({ workspaceId, provider: "google", access: "manage", confirmed: true });
   expect(pollBodies).toEqual([{ attemptId: flowAttemptId }]); expect(state.setupReads).toBe(0);
   await page.reload();
   await expect(panel.getByRole("heading", { name: "Google conectado", exact: true })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Conectar Google", exact: true })).toHaveCount(0);
   expect(starts).toHaveLength(1); expect(state.polls).toBe(1); await expectSimpleAccountPanel(catalog);
   await catalog.screenshot({ path: testInfo.outputPath("google-external-connected.png") });
+});
+
+test("Google no solicita gestión si el escritorio aún no la admite", async ({ page }) => {
+  const { starts, state } = await setup(page, "google", { managementReady: false });
+  await page.goto("/inicio?altazor=connectors&connector=google");
+  const panel = page.getByTestId("easy-connector-oauth");
+  await expect(panel.getByRole("button", { name: "Conectar Google", exact: true })).toBeDisabled();
+  await expect(panel.getByText(/Actualiza el escritorio de Altazor para habilitar la creación y edición/)).toBeVisible();
+  expect(starts).toEqual([]); expect(state.setupReads).toBe(0);
 });
 
 for (const provider of ["google", "dropbox", "microsoft"] as const) {

@@ -9,7 +9,7 @@ export type ConnectorAvailability = {
 };
 
 type OAuthState = "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required" | "unavailable";
-export type ConnectorOAuthProviderStatus = { provider: EasyOAuthProvider; available: boolean; state: OAuthState; connected: boolean; tested: boolean; hasStoredConnection: boolean };
+export type ConnectorOAuthProviderStatus = { provider: EasyOAuthProvider; available: boolean; state: OAuthState; connected: boolean; tested: boolean; hasStoredConnection: boolean; canReadFiles?: boolean; canManageFiles?: boolean };
 export type ConnectorOAuthSnapshot = { workspaceId: string; causaId: string | null; providers: ConnectorOAuthProviderStatus[] };
 const oauthStates: readonly string[] = ["blocked", "idle", "pending", "connected", "failed", "expired", "reconnect_required", "unavailable"];
 
@@ -23,7 +23,7 @@ export function connectorOAuthSnapshot(value: unknown, workspaceId: string, caus
     if (!raw || typeof raw !== "object") return null;
     const item = raw as Record<string, unknown>, provider = EASY_OAUTH_PROVIDERS.find(provider => provider === item.provider);
     if (!provider || providers.some(item => item.provider === provider) || typeof item.state !== "string" || !oauthStates.includes(item.state) || typeof item.available !== "boolean" || typeof item.connected !== "boolean" || typeof item.tested !== "boolean" || typeof item.hasStoredConnection !== "boolean") return null;
-    providers.push({ provider, state: item.state as OAuthState, available: item.available, connected: item.connected, tested: item.tested, hasStoredConnection: item.hasStoredConnection });
+    providers.push({ provider, state: item.state as OAuthState, available: item.available, connected: item.connected, tested: item.tested, hasStoredConnection: item.hasStoredConnection, canReadFiles: item.canReadFiles === true, canManageFiles: provider === "google" && item.canManageFiles === true && item.canReadFiles === true });
   }
   return { workspaceId, causaId, providers };
 }
