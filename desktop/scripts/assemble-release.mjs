@@ -8,6 +8,7 @@ const require = createRequire(new URL("../package.json", import.meta.url));
 const yaml = require("js-yaml");
 const desktopProfile = require("./altazor-desktop-profile.json");
 const { maximumArchiveBytes, toolpackName, toolpackReceiptName } = require("./altazor-toolpack.cjs");
+const { requirePublishableOAuthProviders } = require("./oauth-clients.cjs");
 const targets = ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"];
 const toolpackArchitectures = ["amd64", "arm64"];
 async function hashes(file) {
@@ -42,8 +43,9 @@ async function verifyToolpack({ architecture, archive, receipt, byName, digests,
   return { architecture, archive, receipt, imageId: report.imageId };
 }
 
-export async function assembleRelease({ input, output, version, revision, withToolpacks = false, consumeInput = false }) {
+export async function assembleRelease({ input, output, version, revision, withToolpacks = false, consumeInput = false, verificationOnly = false }) {
   if (!/^\d+\.\d+\.\d+(?:-preview\.\d+)?$/.test(version) || !/^[a-f0-9]{40}$/.test(revision)) throw new Error("Exact release version and Git revision required");
+  if (typeof verificationOnly !== "boolean") throw new Error("Explicit verification-only mode required");
   input = path.resolve(input); output = path.resolve(output);
   if (input === output || output.startsWith(input + path.sep) || input.startsWith(output + path.sep)) throw new Error("Release input and output must be separate");
   const channel = version.includes("-") ? "preview" : "latest", preview = channel === "preview";
@@ -69,12 +71,21 @@ export async function assembleRelease({ input, output, version, revision, withTo
     if ((await fs.stat(byName.get(receipt))).size > 16 * 1024) throw new Error(`Oversized desktop toolpack receipt: ${architecture}`);
   }
   const signatures = [];
+  let distributedOAuth;
   for (const target of targets) {
     const [platform, arch] = target.split("-");
     const read = async kind => JSON.parse(await fs.readFile(byName.get(`lexopen-${kind}-${target}.json`), "utf8"));
     const packaged = await read("packaged"), smoke = await read("smoke"), signature = await read("signature");
     for (const report of [packaged, smoke, signature]) if (report.version !== version || report.platform !== platform || report.arch !== arch) throw new Error(`Report identity mismatch: ${target}`);
     if (packaged.sourceRevision !== revision || smoke.sourceRevision !== revision || packaged.sourceDirty !== false || !packaged.buildId || packaged.buildId !== smoke.buildId) throw new Error(`Unverified source/build: ${target}`);
+    const profile = packaged.distributedOAuth;
+    let verifiedProfile = null;
+    if (profile !== undefined) {
+      if (!profile || typeof profile.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(profile.sha256)) throw new Error(`Invalid public OAuth release profile: ${target}`);
+      verifiedProfile = { sha256: profile.sha256, providers: requirePublishableOAuthProviders(profile.providers) };
+    } else if (!verificationOnly) throw new Error(`Missing public OAuth release profile: ${target}`);
+    if (distributedOAuth === undefined) distributedOAuth = verifiedProfile;
+    else if (JSON.stringify(distributedOAuth) !== JSON.stringify(verifiedProfile)) throw new Error(`Public OAuth release profiles differ across targets: ${target}`);
     for (const key of ["standaloneHealthy", "bundledDocumentConversion", "bundledChromiumLaunched", "firstAdministratorCreated", "restartPreservedDatabase", "restartPreservedFiles", "restartPreservedSecrets"]) if (smoke[key] !== true) throw new Error(`Incomplete Host smoke: ${target}/${key}`);
     if (smoke.externalNodeUsed !== false || smoke.demoSeedUsed !== false) throw new Error(`Non-self-contained Host smoke: ${target}`);
     if (!preview && platform !== "linux" && (signature.publisherAuthenticated !== true || platform === "darwin" && signature.notarized !== true)) throw new Error(`Stable release requires publisher authentication: ${target}`);
@@ -104,7 +115,7 @@ export async function assembleRelease({ input, output, version, revision, withTo
   for (const arch of ["x64", "arm64"]) if (!mac.some(e => e.url === `LexOpen-${version}-mac-${arch}.zip`)) throw new Error(`Missing macOS update architecture: ${arch}`);
   if (!mergedFeeds.get(`${channel}.yml`).some(e => e.url.endsWith(".exe")) || !mergedFeeds.get(`${channel}-linux.yml`).some(e => e.url.endsWith(".AppImage"))) throw new Error("Missing installable update target");
   await fs.mkdir(output); // Never overwrite or erase an existing destination.
-  const manifest = { format: 1, version, channel, prerelease: preview, sourceRevision: revision, signatures, files: [], ...(withToolpacks ? { toolpacks: verifiedToolpacks } : {}) };
+  const manifest = { format: 1, version, channel, prerelease: preview, publishable: !verificationOnly, sourceRevision: revision, signatures, files: [], ...(distributedOAuth ? { distributedOAuth } : {}), ...(withToolpacks ? { toolpacks: verifiedToolpacks } : {}) };
   for (const [name, file] of byName) {
     const destination = path.join(output, name);
     // Release CI owns the downloaded copies and can move them after verification to avoid doubling disk usage.
@@ -126,7 +137,7 @@ export async function assembleRelease({ input, output, version, revision, withTo
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2), option = key => args[args.indexOf(key) + 1];
-  if (!["--input", "--output", "--version", "--revision"].every(k => args.includes(k))) throw new Error("Use --input --output --version --revision [--with-toolpacks] [--consume-input]");
-  const manifest = await assembleRelease({ input: option("--input"), output: option("--output"), version: option("--version"), revision: option("--revision"), withToolpacks: args.includes("--with-toolpacks"), consumeInput: args.includes("--consume-input") });
-  console.log(JSON.stringify({ version: manifest.version, files: manifest.files.length, targets: targets.length, channel: manifest.channel }));
+  if (!["--input", "--output", "--version", "--revision"].every(k => args.includes(k))) throw new Error("Use --input --output --version --revision [--with-toolpacks] [--consume-input] [--verification-only]");
+  const manifest = await assembleRelease({ input: option("--input"), output: option("--output"), version: option("--version"), revision: option("--revision"), withToolpacks: args.includes("--with-toolpacks"), consumeInput: args.includes("--consume-input"), verificationOnly: args.includes("--verification-only") });
+  console.log(JSON.stringify({ version: manifest.version, files: manifest.files.length, targets: targets.length, channel: manifest.channel, publishable: manifest.publishable }));
 }

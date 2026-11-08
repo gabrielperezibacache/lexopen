@@ -21,6 +21,7 @@ export const GATEWAY_HARDENING_STAGES = Object.freeze([
   stage("connected-file-focus", ["internal/chat/lexopen_connector_file_focus.go", "internal/chat/lexopen_cloud_file.go", "internal/chat/lexopen_native_file_actions.go", "internal/chat/chat.go", "internal/gateway/gateway.go", "internal/chat/lexopen_connected_file_focus.go", "internal/chat/lexopen_connected_file_focus_test.go", "internal/gateway/lexopen_connected_file_focus_test.go"]),
   stage("cloud-metadata", ["internal/connector/lexopen_cloud_file.go", "internal/gateway/gateway.go", "internal/connector/lexopen_cloud_metadata.go", "internal/connector/lexopen_cloud_metadata_test.go", "internal/gateway/lexopen_cloud_metadata_test.go"]),
   stage("github-persistent-oauth", ["internal/gateway/lexopen_persistent_oauth.go", "internal/gateway/gateway.go", "internal/oauth/oauth.go", "internal/oauth/lexopen_persistent.go", "internal/orchestrator/lexopen_persistent_oauth.go", "internal/oauth/lexopen_github_persistent.go", "internal/oauth/lexopen_github_persistent_test.go", "internal/gateway/lexopen_github_persistent_test.go", "internal/orchestrator/lexopen_github_persistent_test.go"]),
+  stage("staged-metadata-actions", ["internal/gateway/gateway.go", "internal/chat/approve.go", "internal/chat/lexopen_staged_file_actions.go", "internal/approvals/approvals.go", "internal/chat/chat.go", "internal/connector/catalog.go", "internal/chat/lexopen_staged_metadata.go", "internal/chat/lexopen_staged_metadata_approve.go", "internal/approvals/lexopen_staged_metadata.go", "internal/gateway/lexopen_staged_metadata.go", "internal/connector/lexopen_staged_metadata.go", "internal/chat/lexopen_staged_metadata_test.go", "internal/connector/lexopen_staged_metadata_test.go", "internal/gateway/lexopen_staged_metadata_test.go", "internal/approvals/lexopen_staged_metadata_test.go"]),
 ]);
 
 async function regular(file) {
@@ -44,7 +45,7 @@ export async function prepareGatewaySource(directory, { execute = executeFile, e
     await run(process.execPath, [join(scripts, item.script), root], `el refuerzo ${item.name}`);
     if (item.formatAfter.length) await run(gofmt, ["-w", ...item.formatAfter], `el formato posterior a ${item.name}`, root);
   }
-  return { source: PINNED_COMMIT, recipe: "gateway.15", hardeners: GATEWAY_HARDENING_STAGES.length, scriptTests: GATEWAY_HARDENING_STAGES.length, formattingPasses: GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length).length, compiled: false, installed: false };
+  return { source: PINNED_COMMIT, recipe: "gateway.16", hardeners: GATEWAY_HARDENING_STAGES.length, scriptTests: GATEWAY_HARDENING_STAGES.length, formattingPasses: GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length).length, compiled: false, installed: false };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

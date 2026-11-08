@@ -5,13 +5,14 @@ import { ArrowUpRight, CheckCircle2, Copy, RefreshCw } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
 import type { EasyOAuthProvider, EasyOAuthStatus } from "@/lib/altazor/connectors/easy-oauth";
+import { connectorOAuthSnapshot, type ConnectorOAuthSnapshot } from "@/lib/altazor/connectors/availability";
 import styles from "./EasyConnectorOAuth.module.css";
 
 export type EasyConnectorProvider = EasyOAuthProvider;
 type OAuthStatus = EasyOAuthStatus;
 type ProviderStatus = OAuthStatus["providers"][number];
 type ProviderSetup = { provider: EasyConnectorProvider; label: string; configured: boolean; source: "environment" | "saved" | "distributed" | "none"; publicClient?: boolean; callbackUri: string | null; canEdit: boolean; reason: string | null; registrationUrl: string };
-type Props = { provider: EasyConnectorProvider; workspaceId: string | null; causaId?: string | null; gatewayReady: boolean; hasActiveSession: boolean; busy?: boolean; onBusyChange: (busy: boolean) => void; onDisconnect: (name: string, requestId: string) => Promise<boolean> };
+type Props = { provider: EasyConnectorProvider; workspaceId: string | null; causaId?: string | null; gatewayReady: boolean; hasActiveSession: boolean; busy?: boolean; onBusyChange: (busy: boolean) => void; onDisconnect: (name: string, requestId: string) => Promise<boolean>; onStatusChange?: (snapshot: ConnectorOAuthSnapshot | null) => void };
 const api = "/api/altazor/connectors/oauth";
 const adminGuide = "https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ALTAZOR-CONEXIONES.md#inicio-de-sesión-sencillo";
 const providerLabels = { google: "Google", github: "GitHub", dropbox: "Dropbox", microsoft: "Microsoft 365" };
@@ -123,15 +124,15 @@ function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyC
 /** Administrative app registration belongs in Settings, outside account sign-in. */
 export function EasyConnectorAdministration() {
   const [busy, setBusy] = useState(false);
-  return <section className={styles.root} aria-label="Preparación de aplicaciones del estudio" data-testid="easy-connector-administration">
-    <h4>Preparación del estudio</h4>
-    <p>Configura cada servicio una sola vez. Después, cada persona podrá conectar su cuenta desde Aplicaciones.</p>
+  return <details className={`${styles.root} ${styles.management}`} aria-label="Administración avanzada de conexiones" data-testid="easy-connector-administration">
+    <summary>Administración avanzada de conexiones</summary>
+    <p>Para conectar tu cuenta, elige un servicio arriba. Abre esta preparación sólo si necesitas usar una aplicación propia del estudio.</p>
     {(Object.keys(providerLabels) as EasyConnectorProvider[]).map(provider => <AdminConnectorSetup key={provider}
       provider={provider} busy={busy} onBusyChange={setBusy} />)}
-  </section>;
+  </details>;
 }
 
-export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayReady, hasActiveSession, busy = false, onBusyChange, onDisconnect }: Props) {
+export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayReady, hasActiveSession, busy = false, onBusyChange, onDisconnect, onStatusChange }: Props) {
   const uid = useId(), requestKey = useRef(operationKey()), filesRequestKey = useRef(operationKey()), disconnectKey = useRef(operationKey()), loadVersion = useRef(0), mounted = useRef(false);
   const [data, setData] = useState<OAuthStatus | null>(null), [loading, setLoading] = useState(true), [working, setWorking] = useState(false), [error, setError] = useState("");
   const [removeConfirmed, setRemoveConfirmed] = useState(false), [notice, setNotice] = useState("");
@@ -147,11 +148,11 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
       const response = await fetch(`${api}?${query}`, { cache: "no-store" }), result = await response.json();
       if (!response.ok) throw new Error(result.error || "No se pudo comprobar la conexión. Vuelva a intentarlo.");
       if (result.workspaceId !== workspaceId || result.causaId !== (causaId || null) || typeof result.requiresStop !== "boolean" || !Array.isArray(result.providers) || !result.providers.some((item: ProviderStatus) => item.provider === provider && typeof item.connected === "boolean" && typeof item.tested === "boolean" && typeof item.available === "boolean" && typeof item.hasStoredConnection === "boolean" && typeof item.canDisconnect === "boolean")) throw new Error("No se pudo confirmar el estado de esta conexión.");
-      if (mounted.current && version === loadVersion.current) { setData({ ...result, canAdmin: result.canAdmin === true }); setError(""); }
+      if (mounted.current && version === loadVersion.current) { setData({ ...result, canAdmin: result.canAdmin === true }); setError(""); onStatusChange?.(connectorOAuthSnapshot(result, workspaceId, causaId || null)); }
     } catch (cause) {
-      if (mounted.current && version === loadVersion.current) { setData(null); setError(cause instanceof Error ? cause.message : "No se pudo comprobar la conexión."); }
+      if (mounted.current && version === loadVersion.current) { setData(null); setError(cause instanceof Error ? cause.message : "No se pudo comprobar la conexión."); onStatusChange?.(null); }
     } finally { if (mounted.current && version === loadVersion.current) setLoading(false); }
-  }, [workspaceId, causaId, provider]);
+  }, [workspaceId, causaId, provider, onStatusChange]);
   useEffect(() => {
     mounted.current = true;
     const cancelReads = () => { loadVersion.current++; };

@@ -126,14 +126,15 @@ try {
   // and a path, while absent/invalid input never produces a usable profile.
   const workflowRepo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   const workflow = yaml.load(fs.readFileSync(path.join(workflowRepo, ".github/workflows/desktop-release.yml"), "utf8"), { schema: yaml.JSON_SCHEMA });
-  const profileStep = workflow.jobs.native.steps.find(step => step.name === "Prepare optional public account connection profile");
+  const profileStep = workflow.jobs.native.steps.find(step => step.name === "Prepare public account connection profile");
   assert.equal(profileStep.env.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON, "${{ secrets.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON }}");
+  assert.equal(profileStep.env.LEXOPEN_PUBLIC_OAUTH_REQUIRED, "${{ startsWith(github.ref, 'refs/tags/') }}");
   const profileCommand = profileStep.run.match(/^node <<'NODE'\n([\s\S]*?)\nNODE\s*$/)?.[1];
   assert.ok(profileCommand, "the CI profile step must execute the checked parser directly");
-  const invokeProfileStep = (name, raw) => {
+  const invokeProfileStep = (name, raw, required = false) => {
     const directory = path.join(root, name); fs.mkdirSync(directory);
     const githubEnv = path.join(directory, "github.env");
-    const environment = { RUNNER_TEMP: directory, GITHUB_ENV: githubEnv };
+    const environment = { RUNNER_TEMP: directory, GITHUB_ENV: githubEnv, LEXOPEN_PUBLIC_OAUTH_REQUIRED: String(required) };
     if (process.env.SystemRoot) environment.SystemRoot = process.env.SystemRoot;
     if (raw !== undefined) environment.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON = raw;
     return { directory, githubEnv, result: spawnSync(process.execPath, ["-e", profileCommand], { cwd: workflowRepo, env: environment, encoding: "utf8" }) };
@@ -149,6 +150,29 @@ try {
   const ciAbsent = invokeProfileStep("ci-no-public-profile");
   assert.equal(ciAbsent.result.status, 0); assert.equal(fs.existsSync(ciAbsent.githubEnv), false);
   assert.equal(fs.existsSync(path.join(ciAbsent.directory, "lexopen-oauth-clients.json")), false);
+  const ciRequiredAbsent = invokeProfileStep("ci-release-no-profile", undefined, true);
+  assert.notEqual(ciRequiredAbsent.result.status, 0); assert.equal(fs.existsSync(ciRequiredAbsent.githubEnv), false);
+  const incompleteProfile = { schemaVersion: 1, google: publicOAuth.google, github: publicOAuth.github };
+  for (const required of [true, false]) {
+    const incomplete = invokeProfileStep(`ci-incomplete-${required}`, JSON.stringify(incompleteProfile), required);
+    assert.notEqual(incomplete.result.status, 0); assert.equal(fs.existsSync(incomplete.githubEnv), false);
+  }
+  const publicWithoutMicrosoft = { ...incompleteProfile, dropbox: publicOAuth.dropbox };
+  assert.equal(invokeProfileStep("ci-release-no-microsoft", JSON.stringify(publicWithoutMicrosoft), true).result.status, 0);
+  const verificationAssembly = workflow.jobs.assemble.steps.find(step => step.run?.startsWith("node desktop/scripts/assemble-release.mjs"));
+  const publishingAssembly = workflow.jobs.publish.steps.find(step => step.run?.startsWith("node desktop/scripts/assemble-release.mjs"));
+  assert.ok(verificationAssembly.run.includes("--verification-only"));
+  assert.equal(workflow.jobs.assemble.steps.find(step => step.uses === "actions/upload-artifact@v4").with.name, "verification-only-installers");
+  assert.equal(publishingAssembly.run.includes("--verification-only"), false);
+  assert.equal(workflow.jobs.assemble.if, "${{ !startsWith(github.ref, 'refs/tags/') }}");
+  const publishCommand = workflow.jobs.publish.steps.find(step => step.name === "Publish only after all native and application checks pass").run;
+  const publishGuard = publishCommand.match(/if\(m\.publishable!==true\|\|m\.version!==p\.version\|\|m\.sourceRevision!==process\.env\.GITHUB_SHA\)process\.exit\(1\);/)?.[0];
+  assert.ok(publishGuard, "publication must reject verification-only manifests");
+  for (const publishable of [undefined, false, "true", true]) {
+    const script = `const p={version:'fixture'},m=${JSON.stringify({ version: "fixture", sourceRevision: "fixture-revision", publishable })};${publishGuard}`;
+    const result = spawnSync(process.execPath, ["-e", script], { env: { GITHUB_SHA: "fixture-revision", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) } });
+    assert.equal(result.status, publishable === true ? 0 : 1);
+  }
   const ciRejected = invokeProfileStep("ci-invalid-public-profile", JSON.stringify({ schemaVersion: 1, google: { ...publicOAuth.google, type: "web", client_secret: "PRIVATE_WEB_CANARY_VALUE" } }));
   assert.notEqual(ciRejected.result.status, 0);
   assert.equal((ciRejected.result.stdout + ciRejected.result.stderr).includes("PRIVATE_WEB_CANARY_VALUE"), false);

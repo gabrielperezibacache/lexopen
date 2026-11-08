@@ -1,0 +1,12 @@
+package connector
+import("context";"encoding/json";"strconv";"math";"unicode/utf8")
+// Validate only the bounded Go14 projection, never an arbitrary provider body.
+func LexOpenValidateMetadataResult(kind,action,text string)bool{
+ if (kind!="dropbox"&&kind!="microsoft-365")||(action!="list"&&action!="search")||len(text)>3500||!utf8.ValidString(text){return false};var x map[string]any;if json.Unmarshal([]byte(text),&x)!=nil||len(x)!=7||x["schema"]!=LexOpenCloudMetadataSchema||x["service"]!=kind||x["action"]!=action||x["page_only"]!=true||x["exhaustive"]!=false{return false};if _,ok:=x["items_truncated"].(bool);!ok{return false};items,ok:=x["items"].([]any);if !ok||len(items)>50{return false};for _,raw:=range items{item,ok:=raw.(map[string]any);if !ok{return false};k:=item["kind"];if k!="file"&&k!="folder"&&k!="unknown"{return false};if lexopenMetadataName(item["name"])==""{return false};for key,value:=range item{switch key{case "kind","name":case "path":if kind!="dropbox"||!cloudPath(value,false){return false};case "id":id,ok:=value.(string);if kind!="microsoft-365"||!ok||!cloudItemID.MatchString(id){return false};case "size":n,ok:=value.(float64);if k!="file"||!ok||n<0||n>9007199254740991||math.Trunc(n)!=n{return false};case "mimeType":v,ok:=value.(string);if kind!="microsoft-365"||k!="file"||!ok||!lexopenMetadataMIME.MatchString(v){return false};case "modified_at":if k!="file"||lexopenMetadataTime(value)==""{return false};default:return false}}};return true
+}
+
+type lexopenMetadataStageKey struct{}
+func LexOpenMetadataStageContext(ctx context.Context)context.Context{return context.WithValue(ctx,lexopenMetadataStageKey{},true)}
+func lexopenMetadataStageRequest(ctx context.Context,kind,action string,args map[string]any,req *request){if ctx.Value(lexopenMetadataStageKey{})!=true||kind!="dropbox"{return};body,ok:=req.body.(map[string]any);if !ok{return};if action=="list"{body["limit"]=limitOf(args)};if action=="search"{if options,ok:=body["options"].(map[string]any);ok{options["filename_only"]=true;if q,_:=args["query"].(string);q=="pdf"||q==".pdf"{options["file_extensions"]=[]string{"pdf"}}}}}
+
+func LexOpenValidateMetadataTargetResult(kind,action,text string,target map[string]any)bool{limit,ok:=target["limit"].(string);if !ok{return false};n,e:=strconv.Atoi(limit);if e!=nil||n<1||n>50||!LexOpenValidateMetadataResult(kind,action,text){return false};var x map[string]any;json.Unmarshal([]byte(text),&x);return len(x["items"].([]any))<=n}

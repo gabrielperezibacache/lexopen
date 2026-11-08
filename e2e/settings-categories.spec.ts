@@ -68,7 +68,7 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
     const accounts = page.getByRole("region", { name: "Cuentas conectadas", exact: true });
     await expect(accounts.getByRole("listitem")).toHaveCount(4);
     await expect(accounts.getByRole("link", { name: /Google Drive/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=google");
-    await expect(accounts.getByText("Permite que Altazor busque y lea los archivos de Drive que autorices.", { exact: true })).toBeVisible();
+    await expect(accounts.getByText("Busca y lee tus archivos autorizados de Drive, sin modificarlos.", { exact: true })).toBeVisible();
     await expect(accounts.getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=github");
     await expect(accounts.getByRole("link", { name: /Dropbox/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=dropbox");
     await expect(accounts.getByRole("link", { name: /OneDrive · Microsoft 365/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=microsoft");
