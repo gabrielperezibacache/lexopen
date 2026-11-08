@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3100";
 
-const compiledBrowserSpecs = ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-*.spec.ts", "whatsapp-link.spec.ts"];
+const compiledBrowserSpecs = ["browser-smoke.spec.ts", "app-updates.spec.ts", "writing-review.spec.ts", "offline-*.spec.ts", "whatsapp-link.spec.ts"];
 const compiled = process.env.E2E_SERVER_MODE === "production";
 
 export default defineConfig({

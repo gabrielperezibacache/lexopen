@@ -21,6 +21,7 @@ files:
   - external-url.cjs
   - media-permissions.cjs
   - update-policy.cjs
+  - release-provider.cjs
   - altazor-desktop-profile.cjs
   - altazor-desktop-profile.json
   - altazor-toolpack.cjs

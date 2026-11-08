@@ -1,10 +1,48 @@
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { copyResourceTree, parseTargetArgs, privateResourcePath, sha256, stageDistributedOAuthProfile, trackedPublicFiles, verifyDesktopSourceResource, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
+import { createRequire } from "node:module";
+import { copyResourceTree, LINUX_PRISMA_BINARY_TARGETS, parseTargetArgs, privateResourcePath, sha256, stageDistributedOAuthProfile, trackedPublicFiles, verifyBinary, verifyDesktopSourceResource, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), repo = path.dirname(desktop);
+function loadPrismaDownload(directory) {
+  const require = createRequire(path.join(directory, "package.json"));
+  return { download: require("@prisma/fetch-engine").download, enginesVersion: require("@prisma/engines-version").enginesVersion };
+}
+/** Keep target-specific compatibility engines out of the shared Prisma schema. */
+export async function preparePrismaRuntimeEngines(sourceRepo, output, target, { loadPrisma = loadPrismaDownload } = {}) {
+  if (target.platform !== "linux") return;
+  const app = loadPrisma(sourceRepo), cli = loadPrisma(path.join(sourceRepo, "desktop"));
+  const client = path.join(output, "app-standalone", "node_modules", ".prisma", "client");
+  const engines = path.join(sourceRepo, "desktop", "node_modules", "@prisma", "engines");
+  if (!fs.existsSync(client)) throw new Error("Missing generated Prisma client before preparing compatibility engines");
+  // fetch-engine can trust an existing non-native engine without checking its
+  // revision when there is no verified cache. Empty download directories force
+  // every compatibility engine through its pinned cache/upstream SHA256 check.
+  const options = { binaryTargets: [...LINUX_PRISMA_BINARY_TARGETS], showProgress: true, failSilent: false };
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-prisma-engines-"));
+  const appDownload = path.join(temporary, "app"), cliDownload = path.join(temporary, "cli");
+  try {
+    fs.mkdirSync(appDownload); fs.mkdirSync(cliDownload);
+    await app.download({ ...options, version: app.enginesVersion, binaries: { "libquery-engine": appDownload } });
+    await cli.download({ ...options, version: cli.enginesVersion, binaries: { "libquery-engine": cliDownload, "schema-engine": cliDownload } });
+    for (const binaryTarget of LINUX_PRISMA_BINARY_TARGETS) {
+      for (const [directory, destination, name] of [
+        [appDownload, client, `libquery_engine-${binaryTarget}.so.node`],
+        [cliDownload, engines, `libquery_engine-${binaryTarget}.so.node`],
+        [cliDownload, engines, `schema-engine-${binaryTarget}`],
+      ]) {
+        const source = path.join(directory, name), stat = fs.lstatSync(source);
+        if (!stat.isFile()) throw new Error("Downloaded Prisma engine must be a regular file");
+        verifyBinary(source, target);
+        const outputFile = path.join(destination, name);
+        fs.copyFileSync(source, outputFile); fs.chmodSync(outputFile, stat.mode & 0o777);
+      }
+    }
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+}
 export function copyTrackedRuntimeResources(sourceRepo, output, { stripped = [] } = {}) {
   const app = path.join(output, "app-standalone");
   const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "desktop/oauth-clients.cjs", "LICENSE"]);
@@ -19,7 +57,7 @@ export function copyTrackedRuntimeResources(sourceRepo, output, { stripped = [] 
     if (file.startsWith("prisma/")) copyResourceTree(source, path.join(output, file), { stripped, boundary: sourceRepo, relative: file });
   }
 }
-export function prepareReleaseResources(target) {
+export async function prepareReleaseResources(target) {
   const output = path.join(desktop, ".release", "resources");
   if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error("Release staging directory must not be a symlink");
   for (const file of [".next/standalone/server.js", ".next/BUILD_ID", "desktop/scripts/host-smoke-runner.mjs"]) if (!fs.existsSync(path.join(repo, file))) throw new Error(`Build prerequisite missing: ${file}`);
@@ -42,6 +80,7 @@ export function prepareReleaseResources(target) {
   copyResourceTree(cache, path.join(app, "playwright-browsers"), { stripped });
   copyResourceTree(desktopSource, path.join(output, "altazor-desktop-source"), { stripped });
   const distributedOAuth = stageDistributedOAuthProfile(output);
+  await preparePrismaRuntimeEngines(repo, output, target);
   const buildId = fs.readFileSync(path.join(repo, ".next/BUILD_ID"), "utf8").trim();
   if (!/^[\w.-]{1,256}$/.test(buildId)) throw new Error("Invalid Next build identity");
   const version = JSON.parse(fs.readFileSync(path.join(desktop, "package.json"), "utf8")).version;
@@ -54,6 +93,6 @@ export function prepareReleaseResources(target) {
   return report;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { console.log(JSON.stringify(prepareReleaseResources(parseTargetArgs(process.argv.slice(2))))); }
+  try { console.log(JSON.stringify(await prepareReleaseResources(parseTargetArgs(process.argv.slice(2))))); }
   catch (error) { console.error(error instanceof Error ? error.message : "Release staging failed"); process.exitCode = 1; }
 }

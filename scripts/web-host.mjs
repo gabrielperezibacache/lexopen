@@ -69,6 +69,24 @@ async function waitForHost(url) {
   return false;
 }
 
+const dataDir = path.resolve(process.env.LEXOPEN_DATA_DIR || defaultDataDir());
+const {
+  applySelfUpdate,
+  requestPath: selfUpdateRequestPath,
+  statusPath: selfUpdateStatusPath,
+  finalizeSelfUpdate,
+  releaseUpdateLock,
+  claimUpdateLock,
+  canRestartPreparedUpdate,
+  stopHostForSelfUpdate,
+  assertSelfUpdateStartupSafe,
+} = await import("./web-self-update.mjs");
+try { assertSelfUpdateStartupSafe({ dataDir, rootDir: root }); }
+catch (error) {
+  console.error(`[web-host] ${error.message}`);
+  process.exit(1);
+}
+
 if (!fs.existsSync(desktopRuntime)) {
   runSetup(["run", "desktop:install"], "Instalando runtime local de PostgreSQL");
 }
@@ -77,9 +95,6 @@ if (!fs.existsSync(standaloneServer)) {
 }
 
 console.log("[web-host] Iniciando Host web local en el navegador");
-const dataDir = path.resolve(
-  process.env.LEXOPEN_DATA_DIR || defaultDataDir()
-);
 let backupScheduler = null;
 let child = null;
 const expectedChildExits = new WeakSet();
@@ -124,16 +139,21 @@ function startHostProcess() {
   return current;
 }
 
-async function stopCurrentHost() {
-  const current = child;
-  if (!current) throw new Error("No se conserva el proceso del Host; no se confirmó su parada para respaldar.");
+function hostStopDetails() {
   const hostEnv = { ...process.env, ...readEnvFile(path.join(dataDir, ".env")) };
   const port = Number(hostEnv.PORT || readConfig(dataDir).port || 3000);
   if (!hostEnv.DATABASE_URL) throw new Error("Falta la identidad de PostgreSQL; no se realizará el respaldo.");
   const pgPort = embeddedDatabasePort(hostEnv.DATABASE_URL), postgresPid = readPostgresPid(dataDir);
+  return { dataDir, port, pgPort, postgresPid };
+}
+
+async function stopCurrentHost() {
+  const current = child;
+  if (!current) throw new Error("No se conserva el proceso del Host; no se confirmó su parada para respaldar.");
+  const details = hostStopDetails();
   expectedChildExits.add(current);
   await stopChild(current, { requireCleanExit: true });
-  await assertHostStopped({ dataDir, port, pgPort, child: current, postgresPid });
+  await assertHostStopped({ ...details, child: current });
   if (child === current) child = null;
 }
 
@@ -163,16 +183,6 @@ backupScheduler = createLocalBackupScheduler({
   startHost: startHostProcess,
   waitForHost,
 });
-
-const {
-  applySelfUpdate,
-  requestPath: selfUpdateRequestPath,
-  statusPath: selfUpdateStatusPath,
-  finalizeSelfUpdate,
-  releaseUpdateLock,
-  claimUpdateLock,
-  canRestartPreparedUpdate,
-} = await import("./web-self-update.mjs");
 
 async function updateHealth() {
   try {
@@ -205,8 +215,12 @@ async function maybeRunSelfUpdate() {
   selfUpdateBusy = true;
   let hostStopped = false;
   try {
-    if (backupScheduler) await backupScheduler.stop();
-    await stopCurrentHost();
+    await stopHostForSelfUpdate({
+      backupScheduler,
+      getChild: () => child,
+      stopHost: stopCurrentHost,
+      assertStopped: () => assertHostStopped(hostStopDetails()),
+    });
     hostStopped = true;
     await applySelfUpdate({ dataDir, branch: "main", requestId: request.requestId, hostStopped: true,
       onPhase: phase => console.log(`[web-host] self-update ${phase}`),
@@ -218,7 +232,11 @@ async function maybeRunSelfUpdate() {
     try { status = JSON.parse(fs.readFileSync(selfUpdateStatusPath(dataDir), "utf8")); } catch { status = null; }
     // Failed dependency/build steps may leave new code with old generated files.
     // Do not start migrations or claim a rollback in that state.
-    const restartSafe = canRestartPreparedUpdate(status, request.requestId);
+    let restartSafe = canRestartPreparedUpdate(status, request.requestId);
+    if (restartSafe) {
+      try { assertSelfUpdateStartupSafe({ dataDir, rootDir: root }); }
+      catch (error) { restartSafe = false; console.error(`[web-host] ${error.message}`); }
+    }
     if (hostStopped && !shuttingDown && restartSafe) {
       startHostProcess();
       const ok = await waitForHost(initialUrl);

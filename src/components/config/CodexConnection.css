@@ -11,7 +11,10 @@
 .codex-authorize { display: grid; justify-items: start; gap: 1rem; padding-block: .5rem 1.5rem; }
 .codex-authorize code { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; font-size: var(--text-xl); letter-spacing: .08em; padding: .75rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); }
 .codex-preferences { display: grid; gap: 1rem; max-width: 52rem; }
-.codex-preferences > label:first-child { display: grid; gap: .5rem; }
+.codex-preferences > .btn { justify-self: start; }
+.codex-field { display: grid; gap: .5rem; max-width: 52rem; }
+.codex-host-settings { margin-top: 1.5rem; }
+.codex-model-test { display: grid; gap: 1rem; border-top: 1px solid var(--line); padding-top: 1.25rem; }
 .codex-check { display: flex; align-items: flex-start; gap: .75rem; min-height: 44px; line-height: 1.7; padding-block: .5rem; }
 .codex-check input { margin-top: .35rem; width: 18px; height: 18px; accent-color: var(--sea); flex-shrink: 0; }
 .codex-actions { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: center; }

@@ -55,7 +55,8 @@ function applyUpdaterPolicy(updater, config) {
   updater.allowDowngrade = false;
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = false;
-  if ("verifyUpdateCodeSignature" in updater) updater.verifyUpdateCodeSignature = true;
+  // NsisUpdater exposes verifyUpdateCodeSignature as a verifier function, not
+  // the boolean electron-builder option. Keep its built-in verifier intact.
 }
 
 function versionParts(raw) {
@@ -98,6 +99,8 @@ function friendlyUpdateError(error) {
 }
 
 function isTransientUpdateError(error) {
+  const status = Number(error?.statusCode ?? error?.status);
+  if (status === 429 || status >= 500 && status <= 599) return true;
   return /ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ERR_NETWORK|ERR_INTERNET_DISCONNECTED|timed? ?out|HTTP\s*(?:429|5\d\d)|status(?: code)?\s*[:=]?\s*(?:429|5\d\d)/i.test(String(error?.code || "") + " " + String(error?.message || error || ""));
 }
 
@@ -111,6 +114,67 @@ async function withNetworkRetry(run, { attempts = 3, sleep = ms => new Promise(r
       await sleep(delay);
     }
   }
+}
+
+async function verifyDownloadedUpdate(updater, version, prepared) {
+  const fs = require("node:fs"), path = require("node:path"), { createHash } = require("node:crypto");
+  const invalid = cause => Object.assign(new Error("La descarga de actualización ya no está disponible o cambió. Se conservó la instalación actual; busque la actualización para descargarla otra vez.", { cause }), { code: "ERR_UPDATER_CACHE_INVALID" });
+  const helper = updater.downloadedUpdateHelper;
+  const info = helper?.fileInfo?.info;
+  const expected = prepared || Object.freeze({ file: helper?.file, size: info?.size, sha512: info?.sha512, version });
+  if (typeof expected.file !== "string" || !path.isAbsolute(expected.file) || expected.version !== version ||
+    helper?.versionInfo?.version !== version || helper?.file !== expected.file ||
+    !Number.isSafeInteger(expected.size) || expected.size <= 0 || info?.size !== expected.size ||
+    typeof expected.sha512 !== "string" || !/^[A-Za-z0-9+/]{86}==$/.test(expected.sha512) ||
+    info?.sha512 !== expected.sha512 || helper?.downloadedFileInfo?.sha512 !== expected.sha512) throw invalid();
+  let handle;
+  try {
+    const before = await fs.promises.lstat(expected.file);
+    if (!before.isFile() || before.isSymbolicLink() || before.size !== expected.size) throw invalid();
+    handle = await fs.promises.open(expected.file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const opened = await handle.stat();
+    if (!opened.isFile() || opened.size !== expected.size || opened.ino !== before.ino || opened.dev !== before.dev) throw invalid();
+    const hash = createHash("sha512");
+    for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk);
+    const after = await handle.stat();
+    if (hash.digest("base64") !== expected.sha512 || after.size !== expected.size || after.mtimeMs !== opened.mtimeMs) throw invalid();
+    return expected;
+  } catch (error) {
+    throw error?.code === "ERR_UPDATER_CACHE_INVALID" ? error : invalid(error);
+  } finally { await handle?.close(); }
+}
+
+function quitAndInstallUpdate(updater, app, { nativeUpdater, timeoutMs = 10 * 60 * 1000 } = {}) {
+  // electron-updater reports installer failures through "error", including
+  // synchronous failures that quitAndInstall catches internally. Wait until
+  // Electron actually starts quitting so the caller can resume a stopped Host.
+  return new Promise((resolve, reject) => {
+    let timer;
+    // electron-updater 6.8.x MacUpdater adds its install callback synchronously
+    // in quitAndInstall(). Snapshot that call only; retain permanent native
+    // listeners, including MacUpdater's downloaded-state listener.
+    const priorNativeListeners = new Set(nativeUpdater?.rawListeners("update-downloaded") || []);
+    const addedNativeListeners = () => nativeUpdater?.rawListeners("update-downloaded").filter(listener => !priorNativeListeners.has(listener)) || [];
+    let installListeners;
+    const cleanup = () => {
+      clearTimeout(timer);
+      updater.removeListener("error", failed);
+      app.removeListener("before-quit", quitting);
+      // MacUpdater uses on(), so a native error otherwise leaves an install
+      // callback armed. A later download must not install after Host recovery.
+      for (const listener of installListeners || addedNativeListeners()) nativeUpdater.removeListener("update-downloaded", listener);
+    };
+    const failed = error => { cleanup(); reject(error); };
+    const quitting = () => { cleanup(); resolve(); };
+    updater.once("error", failed);
+    app.once("before-quit", quitting);
+    timer = setTimeout(() => failed(Object.assign(new Error("La instalación no confirmó el reinicio dentro del tiempo previsto. Se canceló el intento; puede volver a intentarlo."), { code: "ERR_UPDATER_INSTALL_TIMEOUT" })), timeoutMs);
+    try {
+      updater.quitAndInstall(false, true);
+      installListeners = addedNativeListeners();
+    }
+    catch (error) { failed(error); }
+  });
 }
 
 async function installPreparedUpdate({ mode, stopHost, backupHost, install, restartHost, status = () => {} }) {
@@ -129,9 +193,14 @@ async function installPreparedUpdate({ mode, stopHost, backupHost, install, rest
     status("installing-update");
     await install();
   } catch (error) {
-    if (stopped) await restartHost().catch(() => {});
+    if (stopped) {
+      try { await restartHost(); }
+      catch (restartError) {
+        throw Object.assign(new AggregateError([error, restartError], "La actualización falló y no se pudo reanudar el Host. Conserve el respaldo y vuelva a iniciar el Host antes de intentar otra actualización.", { cause: error }), { code: "ERR_UPDATER_HOST_RECOVERY_FAILED" });
+      }
+    }
     throw error;
   }
 }
 
-module.exports = { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, compareVersions, assertUpdateVersion, friendlyUpdateError, isTransientUpdateError, withNetworkRetry, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools };
+module.exports = { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, compareVersions, assertUpdateVersion, friendlyUpdateError, isTransientUpdateError, withNetworkRetry, verifyDownloadedUpdate, quitAndInstallUpdate, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools };

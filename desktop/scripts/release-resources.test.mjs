@@ -5,8 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, stageDistributedOAuthProfile, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
-import { copyTrackedRuntimeResources } from "./prepare-resources.mjs";
+import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, LINUX_PRISMA_BINARY_TARGETS, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, stageDistributedOAuthProfile, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
+import { copyTrackedRuntimeResources, preparePrismaRuntimeEngines } from "./prepare-resources.mjs";
 const require = createRequire(import.meta.url), yaml = require("js-yaml");
 
 for (const name of [".env", "host.env", "credentials.json", "database.sql", "pg-password-fixture", ".postgres-init-fixture/password", "node_modules/a/.env.production", ".tmp/session/case.txt", "storage/book.pdf", "pgdata/base/123", "secrets/key.txt", "a/client.p12", "node_modules/cache.sqlite", "x/private/data.json", ".next/cache/results.json"]) assert.equal(privateResourcePath(name), true, name);
@@ -64,6 +64,60 @@ try {
   for (const name of pgSqlAssets) write(path.join(pgRoot, name), "-- public PostgreSQL distribution fixture\nSELECT 1;");
   for (const name of ["prisma/build/index.js", "tsx/dist/cli.mjs", "embedded-postgres/dist/index.js"]) write(path.join(modules, name), "fixture");
   assert.equal(verifyNativeRuntime(resources, modules, native).postgresPackage, "darwin-arm64");
+  // A release runner can generate only its native OpenSSL variant. Such a package
+  // passes the architecture check but cannot open its DB on Debian/OpenSSL 3.
+  const linux = { platform: "linux", arch: "x64", target: "linux-x64" };
+  const linuxRepo = path.join(root, "linux-repo"), linuxResources = path.join(root, "linux-resources");
+  const linuxModules = path.join(linuxRepo, "desktop/node_modules");
+  const linuxClient = path.join(linuxResources, "app-standalone/node_modules/.prisma/client");
+  const linuxEngines = path.join(linuxModules, "@prisma/engines");
+  write(path.join(linuxClient, "libquery_engine-debian-openssl-1.1.x.so.node"), elf);
+  write(path.join(linuxEngines, "libquery_engine-debian-openssl-1.1.x.so.node"), elf);
+  write(path.join(linuxEngines, "schema-engine-debian-openssl-1.1.x"), elf);
+  for (const name of ["postgres", "initdb", "pg_ctl"]) write(path.join(linuxModules, "@embedded-postgres/linux-x64/bin", name), elf);
+  for (const name of ["prisma/build/index.js", "tsx/dist/cli.mjs", "embedded-postgres/dist/index.js"]) write(path.join(linuxModules, name), "fixture");
+  assert.throws(() => verifyNativeRuntime(linuxResources, linuxModules, linux), /Missing release resource: libquery_engine-debian-openssl-3\.0\.x/);
+  const downloads = [];
+  const downloadedEngine = Buffer.concat([elf, Buffer.from("verified engine fixture")]);
+  await preparePrismaRuntimeEngines(linuxRepo, linuxResources, linux, { loadPrisma: directory => ({
+    enginesVersion: directory === linuxRepo ? "app-pinned-engine-revision" : "cli-pinned-engine-revision",
+    download: async options => {
+      downloads.push(options);
+      for (const [kind, destination] of Object.entries(options.binaries)) {
+        for (const binaryTarget of options.binaryTargets) {
+          const file = path.join(destination, kind === "libquery-engine" ? `libquery_engine-${binaryTarget}.so.node` : `schema-engine-${binaryTarget}`);
+          // Actual fetch-engine skips existing non-native files with no cached
+          // checksum. A stale staged engine must not be reused by preparation.
+          if (!fs.existsSync(file)) write(file, downloadedEngine);
+        }
+      }
+    },
+  }) });
+  const appDownload = downloads[0].binaries["libquery-engine"], cliDownload = downloads[1].binaries["libquery-engine"];
+  assert.notEqual(appDownload, linuxClient);
+  assert.notEqual(cliDownload, linuxEngines);
+  assert.deepEqual(downloads, [
+    { binaryTargets: [...LINUX_PRISMA_BINARY_TARGETS], showProgress: true, failSilent: false, version: "app-pinned-engine-revision", binaries: { "libquery-engine": appDownload } },
+    { binaryTargets: [...LINUX_PRISMA_BINARY_TARGETS], showProgress: true, failSilent: false, version: "cli-pinned-engine-revision", binaries: { "libquery-engine": cliDownload, "schema-engine": cliDownload } },
+  ]);
+  assert.equal(fs.existsSync(appDownload), false, "temporary downloads are cleaned after staging");
+  assert.equal(fs.existsSync(cliDownload), false);
+  assert.deepEqual(fs.readFileSync(path.join(linuxClient, "libquery_engine-debian-openssl-1.1.x.so.node")), downloadedEngine, "a stale engine must be replaced with verified bytes");
+  assert.deepEqual(fs.readFileSync(path.join(linuxEngines, "schema-engine-debian-openssl-1.1.x")), downloadedEngine);
+  assert.equal(verifyNativeRuntime(linuxResources, linuxModules, linux).queryEngines, 2);
+  assert.equal(verifyNativeRuntime(linuxResources, linuxModules, linux).schemaEngines, 2);
+  for (const binaryTarget of LINUX_PRISMA_BINARY_TARGETS) {
+    for (const file of [path.join(linuxClient, `libquery_engine-${binaryTarget}.so.node`), path.join(linuxEngines, `libquery_engine-${binaryTarget}.so.node`), path.join(linuxEngines, `schema-engine-${binaryTarget}`)]) {
+      fs.unlinkSync(file);
+      assert.throws(() => verifyNativeRuntime(linuxResources, linuxModules, linux), /Missing release resource/);
+      write(file, elf);
+    }
+  }
+  for (const platform of ["darwin", "win32"]) await preparePrismaRuntimeEngines(linuxRepo, linuxResources, { platform }, { loadPrisma: () => { throw new Error("non-Linux builds must not load compatibility engines"); } });
+  await assert.rejects(preparePrismaRuntimeEngines(linuxRepo, linuxResources, linux, { loadPrisma: () => ({ enginesVersion: "fixture", download: async () => { throw new Error("fixture download failed"); } }) }), /fixture download failed/);
+  write(path.join(linuxEngines, "libquery_engine-darwin-arm64.dylib.node"), macho);
+  assert.throws(() => verifyNativeRuntime(linuxResources, linuxModules, linux), /does not match/);
+  fs.unlinkSync(path.join(linuxEngines, "libquery_engine-darwin-arm64.dylib.node"));
   write(path.join(pgRoot, "vault/database.sql"), "PRIVATE_DUMP_CANARY");
   assert.throws(() => verifyNativeRuntime(resources, modules, native), /Private native resource/);
   fs.rmSync(path.join(pgRoot, "vault"), { recursive: true });
@@ -258,4 +312,4 @@ assert.equal(sha256(path.join(repo, "src/app/favicon.ico")), sha256(path.join(re
 const png = fs.readFileSync(path.join(repo, "desktop/build/icon.png")); assert.equal(png.readUInt32BE(16), 1024); assert.equal(png.readUInt32BE(20), 1024);
 const ico = fs.readFileSync(path.join(repo, "desktop/build/icon.ico")); assert.equal(ico.readUInt16LE(2), 1); assert.equal(ico.readUInt16LE(4), 6);
 const icns = fs.readFileSync(path.join(repo, "desktop/build/icon.icns")); assert.equal(icns.toString("ascii", 0, 4), "icns"); assert.equal(icns.readUInt32BE(4), icns.length);
-console.log("Desktop release resources: complete afterPack copy, scoped Next aliases, tracked migrations, private dump exclusion, macOS Chromium/frameworks, native architecture, target guards and existing-brand icons passed.");
+console.log("Desktop release resources: complete afterPack copy, Linux Prisma OpenSSL 1.1/3 compatibility, scoped Next aliases, tracked migrations, private dump exclusion, macOS Chromium/frameworks, native architecture, target guards and existing-brand icons passed.");
