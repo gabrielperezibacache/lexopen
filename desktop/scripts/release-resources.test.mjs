@@ -162,7 +162,7 @@ try {
   const verificationAssembly = workflow.jobs.assemble.steps.find(step => step.run?.startsWith("node desktop/scripts/assemble-release.mjs"));
   const publishingAssembly = workflow.jobs.publish.steps.find(step => step.run?.startsWith("node desktop/scripts/assemble-release.mjs"));
   assert.ok(verificationAssembly.run.includes("--verification-only"));
-  assert.equal(workflow.jobs.assemble.steps.find(step => step.uses === "actions/upload-artifact@v4").with.name, "verification-only-installers");
+  assert.equal(workflow.jobs.assemble.steps.find(step => step.uses === "actions/upload-artifact@v7").with.name, "verification-only-installers");
   assert.equal(publishingAssembly.run.includes("--verification-only"), false);
   assert.equal(workflow.jobs.assemble.if, "${{ !startsWith(github.ref, 'refs/tags/') }}");
   const publishCommand = workflow.jobs.publish.steps.find(step => step.name === "Publish only after all native and application checks pass").run;
