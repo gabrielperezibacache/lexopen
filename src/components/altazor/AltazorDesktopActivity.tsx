@@ -112,9 +112,11 @@ export function AltazorDesktopActivity({ causaId, refreshKey, onOpen }: { causaI
       <Monitor aria-hidden="true" size={20} />
       <div className={styles.heading}><h2 id={heading}>Escritorio de Altazor</h2><p role="status">{label}</p></div>
       <button type="button" className={review ? "btn btn-primary" : "btn btn-ghost"} onClick={() => onOpen(activity?.sessionId ?? null, activity?.causaId === undefined ? causaId : activity.causaId, review)}>
-        {review === "help" ? "Revisar solicitud" : review === "approval" ? "Revisar autorización" : needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
+        {activity?.consultation ? "Revisar acción" : review === "help" ? "Revisar solicitud" : review === "approval" ? "Revisar autorización" : needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
       </button>
     </header>
+    {activity?.consultation && <p className={styles.consultation}>{activity.consultation.reason}</p>}
+    {activity?.outcomeUnknown && <p className={styles.consultation}>Una acción quedó sin confirmar. Revisa el monitor y toma el control si lo necesitas. Para continuar con nuevos encargos, detén este escritorio y abre uno nuevo.</p>}
     {activity?.detail && <div className={styles.progress}>
       {activity.detail.connections.length > 0 && <p>Aplicaciones de este escritorio: <strong>{activity.detail.connections.map(computerConnectionLabel).join(" · ")}</strong></p>}
       {activity.detail.step && <p className={styles.step}>{activity.detail.step.label}{Number.isFinite(Date.parse(activity.detail.step.at)) && <time dateTime={activity.detail.step.at}>{new Date(activity.detail.step.at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</time>}</p>}

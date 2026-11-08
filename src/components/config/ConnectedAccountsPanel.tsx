@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Cloud, Files, GitFork } from "lucide-react";
+import { ArrowUpRight, Cloud, Files, FolderOpen, GitFork } from "lucide-react";
 import { EasyConnectorAdministration } from "@/components/altazor/EasyConnectorOAuth";
 import styles from "./WorkspaceArea.module.css";
 
@@ -8,21 +8,27 @@ export function ConnectedAccountsPanel({ locale, canManage = false }: { locale: 
   const accounts = [
     {
       name: "Google Drive",
-      href: "/sincronizacion#sync-google",
-      icon: Files,
-      description: tr("Elige las carpetas que quieres vincular a tus causas.", "Choose the folders to link to your cases."),
-    },
-    {
-      name: "Google Workspace",
       href: "/inicio?altazor=connectors&connector=google",
-      icon: Cloud,
-      description: tr("Permite que Altazor consulte nombres y datos básicos de Drive.", "Let Altazor look up names and basic file information in Drive."),
+      icon: Files,
+      description: tr("Permite que Altazor busque y lea los archivos de Drive que autorices.", "Let Altazor find and read the Drive files you authorize."),
     },
     {
       name: "GitHub",
       href: "/inicio?altazor=connectors&connector=github",
       icon: GitFork,
       description: tr("Autoriza tu cuenta para usar GitHub desde Altazor.", "Authorize your account to use GitHub from Altazor."),
+    },
+    {
+      name: "Dropbox",
+      href: "/inicio?altazor=connectors&connector=dropbox",
+      icon: FolderOpen,
+      description: tr("Permite que Altazor busque y lea tus archivos autorizados de Dropbox.", "Let Altazor find and read your authorized Dropbox files."),
+    },
+    {
+      name: "OneDrive · Microsoft 365",
+      href: "/inicio?altazor=connectors&connector=microsoft",
+      icon: Cloud,
+      description: tr("Conecta OneDrive para buscar y leer tus archivos, sin modificarlos.", "Connect OneDrive to find and read your files without changing them."),
     },
   ];
 

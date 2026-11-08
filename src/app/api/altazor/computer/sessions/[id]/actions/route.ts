@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parseKnowledgeBody } from "@/lib/knowledge/route-body";
 import { computerActor, computerFailure, privateHeaders, requestIdSchema } from "@/lib/altazor/computer/http";
 import { inputSchema } from "@/lib/altazor/computer/policy";
-import { cancelComputerTask, closeComputerSession, controlComputer, inputComputer, decideComputerApproval, renewComputerSession } from "@/lib/altazor/computer/service";
+import { cancelComputerTask, closeComputerSession, controlComputer, inputComputer, decideComputerApproval, decideComputerUseApproval, renewComputerSession } from "@/lib/altazor/computer/service";
 const common = { requestId: requestIdSchema, confirmed: z.literal(true) };
 const schema = z.discriminatedUnion("action", [
   z.object({ ...common, action: z.literal("control"), hold: z.boolean() }).strict(),
@@ -12,12 +12,13 @@ const schema = z.discriminatedUnion("action", [
   z.object({ ...common, action: z.literal("close") }).strict(),
   z.object({ ...common, action: z.literal("renew"), causaId: z.string().min(1).max(100).nullable().optional() }).strict(),
   z.object({ ...common, action: z.literal("connector_approval"), approvalId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), approve: z.boolean() }).strict(),
+  z.object({ ...common, action: z.literal("computer_approval"), approvalId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), approve: z.boolean(), actionHash: z.string().regex(/^[a-f0-9]{64}$/), policyRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER) }).strict(),
 ]);
 export const runtime = "nodejs";
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const actor = await computerActor(request, true), { id } = await context.params, body = await parseKnowledgeBody(request, schema, 12 * 1024);
-    const action = body.action === "renew" ? await renewComputerSession(actor, id, body) : body.action === "control" ? await controlComputer(actor, id, body.requestId, body.hold) : body.action === "input" ? await inputComputer(actor, id, body.requestId, body.input) : body.action === "cancel" ? await cancelComputerTask(actor, id, body.requestId) : body.action === "connector_approval" ? await decideComputerApproval(actor, id, body.requestId, body.approvalId, body.approve) : await closeComputerSession(actor, id, body.requestId);
+    const action = body.action === "renew" ? await renewComputerSession(actor, id, body) : body.action === "control" ? await controlComputer(actor, id, body.requestId, body.hold) : body.action === "input" ? await inputComputer(actor, id, body.requestId, body.input) : body.action === "cancel" ? await cancelComputerTask(actor, id, body.requestId) : body.action === "connector_approval" ? await decideComputerApproval(actor, id, body.requestId, body.approvalId, body.approve) : body.action === "computer_approval" ? await decideComputerUseApproval(actor, id, body.requestId, body.approvalId, body.approve, body) : await closeComputerSession(actor, id, body.requestId);
     return NextResponse.json({ action }, { headers: privateHeaders });
   } catch (error) { return computerFailure(error); }
 }

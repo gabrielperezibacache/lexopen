@@ -35,6 +35,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { firmFormSelect } from "@/lib/config/firm-form-fields";
 import { PersonalSettingsIndex } from "@/components/config/PersonalSettingsIndex";
 import { ConnectedAccountsPanel } from "@/components/config/ConnectedAccountsPanel";
+import { ComputerAuthorizationSettings } from "@/components/config/ComputerAuthorizationSettings";
 import { HostSectionSettings } from "@/components/config/HostSectionSettings";
 import { getHostNavigationSections } from "@/lib/config/host-navigation-sections";
 
@@ -164,6 +165,7 @@ export default async function ConfiguracionPage() {
     </section>,
     "cuenta-personal": <PersonalSettingsIndex locale={locale} />,
     "preferencias-altazor": visibility.assistant ? <AltazorPreferencesPanel locale={locale} /> : undefined,
+    "autorizaciones-escritorio": visibility.assistant ? <ComputerAuthorizationSettings /> : undefined,
     "cuentas-conectadas": visibility.assistant ? <ConnectedAccountsPanel locale={locale} canManage={canManage} /> : undefined,
     comunicaciones: visibility.communications ? <section id="comunicaciones" className="panel space-y-3 p-5">
       <h3 className="text-lg font-semibold">{tr("Correo y mensajes", "Mail and messages")}</h3>

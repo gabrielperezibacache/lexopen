@@ -1,15 +1,17 @@
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import { endpointFor } from "./policy";
-import type { ComputerApproval, ComputerFile, ComputerTurn, VerifiedComputerFile } from "./types";
+import type { ComputerFile, ComputerTurn, ComputerUseApproval, VerifiedComputerFile } from "./types";
 import type { PersonInput } from "./policy";
 import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
 import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
-import type { ConnectorConfiguration } from "../connectors/types";
+import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
 import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
 import { validatePersistentEasyOAuth, type PersistentEasyOAuthConfiguration } from "../connectors/persistent-oauth";
 import { originalTaskForApproval } from "./approval-task";
 import { fileReceiptTarget, normalizeVerifiedFileReceipt } from "./file-receipt";
 import type { ExplicitFileTask } from "./file-task";
+import { normalizeComputerAuthorizationSnapshot, normalizeComputerAuthorizationAck, validateComputerAuthorizationAck, parseComputerAuthorizationChoice, type ComputerAuthorizationChoice } from "./authorization-policy";
+import { normalizeComputerUseApproval } from "./computer-use-approval";
 
 export type StagedFileApproval = { requestId: string; task: ExplicitFileTask };
 
@@ -77,6 +79,49 @@ export class KittiesGateway {
   }
   async requirePersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_persistent_oauth !== "v1") throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409); }
   async requireCloudFileOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_cloud_file_oauth !== "v1") throw new ConnectorError("cloud_file_oauth_required", "Actualice el escritorio de Altazor para conectar esta cuenta desde la aplicación instalada.", 409); }
+  async requireComputerUsePolicy() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_computer_use_policy !== "v1") throw new ConnectorError("computer_policy_unsupported", "Actualice el escritorio de Altazor para aplicar autorizaciones de uso del computador.", 409); }
+  async computerAuthorization(chatId: string, kittyId: string, binding: string) {
+    safeId(chatId); safeId(kittyId);
+    if (!/^[a-f0-9]{64}$/.test(binding)) throw new ConnectorError("computer_policy_binding", "No se pudo identificar el ámbito de las autorizaciones.", 409);
+    await this.requireComputerUsePolicy();
+    const result = await this.json(`/v1/lexopen/chats/${safeId(chatId)}/computer-policy?${new URLSearchParams({ kitty: kittyId, binding })}`);
+    const policy = normalizeComputerAuthorizationSnapshot(result, { chatId, kittyId, binding });
+    if (!policy) throw new ConnectorError("computer_policy_unknown", "El escritorio no confirmó sus autorizaciones actuales.", 502);
+    return policy;
+  }
+  async setComputerAuthorization(chatId: string, kittyId: string, binding: string, choice: ComputerAuthorizationChoice, expectedNativeRevision: number) {
+    safeId(chatId); safeId(kittyId);
+    if (!/^[a-f0-9]{64}$/.test(binding) || !Number.isSafeInteger(expectedNativeRevision) || expectedNativeRevision < 0 || expectedNativeRevision >= Number.MAX_SAFE_INTEGER) throw new ConnectorError("computer_policy_binding", "No se pudo confirmar la revisión de las autorizaciones.", 409);
+    const input = parseComputerAuthorizationChoice({ ...choice, expectedRevision: expectedNativeRevision });
+    await this.requireComputerUsePolicy();
+    const result = await this.json(`/v1/lexopen/chats/${safeId(chatId)}/computer-policy`, "PUT", { kitty: kittyId, binding, mode: input.mode, expected_revision: expectedNativeRevision, max_actions: input.maxActions, max_consultations: input.maxConsultations, allow_input: input.allowInput, allow_browser: input.allowBrowser, allow_apps: input.allowApps });
+    const expected = { chatId, kittyId, binding, mode: input.mode, revision: expectedNativeRevision + 1, allowInput: input.allowInput, allowBrowser: input.allowBrowser, allowApps: input.allowApps, maxActions: input.maxActions, maxConsultations: input.maxConsultations };
+    if (!validateComputerAuthorizationAck(result, expected)) throw new ConnectorError("computer_policy_unknown", "No se confirmó la aplicación exacta de las autorizaciones. Compruebe el estado; no se repetirá el cambio automáticamente.", 502);
+    return normalizeComputerAuthorizationAck(result, expected)!;
+  }
+  async pendingComputerApprovals(kittyId: string, chatId: string, binding: string, revision: number): Promise<ComputerUseApproval[]> {
+    await this.requireComputerUsePolicy();
+    const result = await this.json("/v1/approvals?status=pending");
+    if (!Array.isArray(result.approvals) || result.approvals.length > 200) throw new ConnectorError("computer_approval_contract", "No se pudieron comprobar las consultas del computador.", 502);
+    return result.approvals.filter(row => row && row.kitty === kittyId && row.chat === chatId && row.connector === "lexopen-computer-use" && row.status === "pending").map(row => normalizeComputerUseApproval(row, { kittyId, chatId, binding, revision }));
+  }
+  async decideComputerUseApproval(id: string, kittyId: string, chatId: string, binding: string, approve: boolean, reviewed: { actionHash: string; policyRevision: number }) {
+    safeId(id);
+    const policy = await this.computerAuthorization(chatId, kittyId, binding);
+    if (approve && policy.outcomeUnknown) throw new ConnectorError("computer_outcome_unknown", "Una acción quedó sin confirmar. Revisa y cierra este escritorio; no se repetirá automáticamente.", 409);
+    const pending = await this.pendingComputerApprovals(kittyId, chatId, binding, policy.revision), selected = pending.find(row => row.id === id);
+    if (!selected) throw new ConnectorError("computer_approval_missing", "La consulta cambió o no pertenece a este escritorio.", 409);
+    if (selected.computerAction.actionHash !== reviewed.actionHash || selected.computerAction.policyRevision !== reviewed.policyRevision) throw new ConnectorError("computer_approval_changed", "La acción cambió desde que la revisaste. Actualiza la consulta antes de decidir.", 409);
+    if (approve && !selected.reviewable) throw new ConnectorError("computer_approval_incomplete", "La acción contiene datos ocultos. Rechácela y use el control manual.", 409);
+    const computer = { chat_id: chatId, kitty: kittyId, binding, policy_revision: policy.revision, action_hash: selected.computerAction.actionHash };
+    const result = await this.json(`/v1/approvals/${safeId(id)}/${approve ? "approve" : "reject"}`, "POST", approve ? { always: false, computer } : { always: false, computer, reason: "La persona rechazó esta acción del computador en LexOpen." });
+    const row = result.approval as Record<string, unknown> | undefined;
+    if (!row || row.id !== id || row.kitty !== kittyId || row.chat !== chatId || row.kind !== "computer-use" || row.connector !== "lexopen-computer-use" || row.action !== selected.action || row.status !== (approve ? "approved" : "rejected") || row.always === true || !row.computer_result || typeof row.computer_result !== "object") throw new ConnectorError("computer_approval_unknown", "El computador no confirmó el resultado. No se repetirá la acción automáticamente.", 502);
+    const proof = normalizeComputerUseApproval({ ...row, status: "pending" }, { chatId, kittyId, binding, revision: policy.revision });
+    const completed = row.computer_result as Record<string, unknown>;
+    if (proof.computerAction.actionHash !== selected.computerAction.actionHash || completed.binding !== binding || completed.chat_id !== chatId || completed.kitty !== kittyId || completed.policy_revision !== policy.revision || completed.action_hash !== selected.computerAction.actionHash || typeof completed.attempted !== "boolean" || typeof completed.completed !== "boolean" || !["executed", "unknown", "rejected"].includes(String(completed.state)) || !approve && (completed.state !== "rejected" || completed.attempted || completed.completed) || approve && (completed.state === "rejected" || !completed.attempted || completed.state === "executed" && !completed.completed || completed.state === "unknown" && completed.completed)) throw new ConnectorError("computer_approval_unknown", "El resultado no coincide con la acción autorizada. No se repetirá automáticamente.", 502);
+    return { id, status: String(row.status), action: selected.action, state: String(completed.state), attempted: completed.attempted, completed: completed.completed, actionHash: selected.computerAction.actionHash, policyRevision: policy.revision, semanticOutcomeVerified: false };
+  }
   async setPersistentEasyOAuth(name: string, input: PersistentEasyOAuthConfiguration) {
     connectorNameSchema.parse(name); validatePersistentEasyOAuth(input); await this.requirePersistentOAuth();
     if (input.publicClient) await this.requireCloudFileOAuth();
@@ -133,7 +178,7 @@ export class KittiesGateway {
     const result = await this.json(`/v1/kitties/${safeId(id)}`, "PATCH", { connectors: selected, approvals: "ask" });
     return this.validateKitty(result.kitty, name, provider, selected);
   }
-  async pendingApprovals(kittyId: string, chatId: string, connectors: readonly string[]): Promise<ComputerApproval[]> {
+  async pendingApprovals(kittyId: string, chatId: string, connectors: readonly string[]): Promise<(ConnectorApproval & { requestId?: string })[]> {
     await this.requireConnectorGate(); const result = await this.json("/v1/approvals?status=pending");
     if (!Array.isArray(result.approvals) || result.approvals.length > 200) throw new ConnectorError("connector_approvals_contract", "No se pudo leer las autorizaciones pendientes.", 502);
     return result.approvals.filter(row => row && row.kitty === kittyId && row.chat === chatId && row.status === "pending" && connectors.includes(row.connector)).map(row => {

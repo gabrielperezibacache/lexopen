@@ -146,7 +146,30 @@ jobs:
             "$source_dir/internal/gateway/lexopen_staged_file_actions.go" "$source_dir/internal/gateway/lexopen_staged_file_actions_test.go"
           node scripts/altazor/harden-cloud-file-connectors.test.mjs
           node scripts/altazor/harden-cloud-file-connectors.mjs "$source_dir"
-          (cd "$source_dir" && go test ./internal/chat ./internal/connector ./internal/gateway ./internal/oauth ./internal/orchestrator ./internal/approvals -run '^TestLexOpen' -count=1)
+          gofmt -w "$source_dir/internal/oauth/lexopen_cloud_file.go" \
+            "$source_dir/internal/oauth/lexopen_cloud_file_test.go" \
+            "$source_dir/internal/chat/lexopen_cloud_file.go" \
+            "$source_dir/internal/chat/lexopen_cloud_file_test.go" \
+            "$source_dir/internal/connector/lexopen_cloud_file.go" \
+            "$source_dir/internal/connector/lexopen_cloud_file_test.go" \
+            "$source_dir/internal/gateway/lexopen_cloud_file_test.go"
+          node scripts/altazor/harden-computer-use-policy.test.mjs
+          node scripts/altazor/harden-computer-use-policy.mjs "$source_dir"
+          gofmt -w "$source_dir/internal/chat/chat.go" \
+            "$source_dir/internal/chat/actions.go" \
+            "$source_dir/internal/chat/approve.go" \
+            "$source_dir/internal/approvals/approvals.go" \
+            "$source_dir/internal/gateway/gateway.go" \
+            "$source_dir/internal/gateway/approvals.go" \
+            "$source_dir/internal/chat/lexopen_computer_use_test.go" \
+            "$source_dir/internal/chat/lexopen_computer_use.go" \
+            "$source_dir/internal/desktop/lexopen_computer_use_test.go" \
+            "$source_dir/internal/desktop/lexopen_computer_use.go" \
+            "$source_dir/internal/approvals/lexopen_computer_use_test.go" \
+            "$source_dir/internal/approvals/lexopen_computer_use.go" \
+            "$source_dir/internal/gateway/lexopen_computer_use_test.go" \
+            "$source_dir/internal/gateway/lexopen_computer_use.go"
+          (cd "$source_dir" && go test ./internal/chat ./internal/connector ./internal/gateway ./internal/oauth ./internal/orchestrator ./internal/approvals ./internal/desktop -run '^TestLexOpen' -count=1)
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
           node scripts/altazor/prepare-computer-ci.test.mjs
           node scripts/altazor/prepare-computer-ci.mjs "$source_dir"
@@ -295,12 +318,12 @@ jobs:
       - run: npm test
       - name: Check connection setup and OAuth errors
         run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts src/lib/altazor/connectors/oauth-access.test.ts src/lib/altazor/connectors/persistent-oauth.test.ts src/lib/altazor/connectors/github-device.test.ts src/lib/altazor/connectors/desktop-read-policy.test.ts src/lib/assistant/connector-desktop-intent.test.ts src/lib/altazor/computer/activity-detail.test.ts src/lib/altazor/computer/file-read-capability.test.ts src/lib/altazor/computer/approval-continuation.test.ts src/lib/altazor/computer/approval-task.test.ts src/lib/altazor/computer/presentation.test.ts
+      - name: Check verified downloads and connection availability
+        run: node --import tsx --test src/lib/altazor/computer/file-task.test.ts src/lib/altazor/computer/file-receipt.test.ts src/lib/altazor/computer/public-cloud-oauth.test.ts src/lib/altazor/connectors/availability.test.ts src/lib/altazor/connectors/operation-safety.test.ts src/lib/altazor/connectors/microsoft-oauth.test.ts src/lib/altazor/connectors/cloud-oauth.test.ts src/components/altazor/pane-location.test.ts src/lib/altazor/computer/authorization-policy.test.ts src/lib/altazor/computer/computer-use-approval.test.ts
+      - name: Check desktop authorizations and verified-file transactions
+        run: node --import tsx src/lib/altazor/computer/authorization.integration.test.ts && node --import tsx src/lib/altazor/computer/staged-files.integration.test.ts && node --import tsx src/lib/altazor/computer/approval-continuation.integration.test.ts
       - run: npm run test:integration
       - run: npm run lint
-      - name: Check verified downloads and connection availability
-        run: node --import tsx --test src/lib/altazor/computer/file-task.test.ts src/lib/altazor/computer/file-receipt.test.ts src/lib/altazor/computer/public-cloud-oauth.test.ts src/lib/altazor/connectors/availability.test.ts src/lib/altazor/connectors/operation-safety.test.ts src/lib/altazor/connectors/microsoft-oauth.test.ts src/lib/altazor/connectors/cloud-oauth.test.ts src/components/altazor/pane-location.test.ts
-      - name: Check verified downloads and connection availability
-        run: node --import tsx --test src/lib/altazor/computer/file-task.test.ts src/lib/altazor/computer/file-receipt.test.ts src/lib/altazor/computer/public-cloud-oauth.test.ts src/lib/altazor/connectors/availability.test.ts src/lib/altazor/connectors/operation-safety.test.ts src/lib/altazor/connectors/microsoft-oauth.test.ts src/lib/altazor/connectors/cloud-oauth.test.ts
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:pjud:browser

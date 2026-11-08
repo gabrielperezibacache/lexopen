@@ -26,8 +26,14 @@ async function main() {
     if (method === "POST") mutations++;
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     const fleet = fleets.get(target.origin) || []; fleets.set(target.origin, fleet);
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(path)) {
+      assert.equal(init?.method || "GET", "GET", "legacy fixtures never grant computer-use permission");
+      const binding = target.searchParams.get("binding"), kittyId = target.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: path.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
     let result: unknown;
-    if (path === "/v1/health") result = { ok: true, version: "synthetic-pg-contract", containers: true, lexopen_async_messages: "v1" };
+    if (path === "/v1/health") result = { ok: true, version: "synthetic-pg-contract", containers: true, lexopen_async_messages: "v1", lexopen_computer_use_policy: "v1" };
     else if (path === "/v1/providers") result = { providers: [{ name: "fictitious-model", kind: "openai", describe: "Synthetic model fixture" }] };
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {

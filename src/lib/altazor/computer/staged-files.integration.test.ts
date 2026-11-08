@@ -17,11 +17,17 @@ async function main() {
   globalThis.fetch = (async (raw, init) => {
     requests++; const url = new URL(String(raw)), path = url.pathname;
     assert.equal(url.origin, endpoint); assert.equal(new Headers(init?.headers).get("authorization"), "Bearer synthetic-staged-token");
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(path)) {
+      assert.equal(init?.method || "GET", "GET", "legacy fixtures never grant computer-use permission");
+      const binding = url.searchParams.get("binding"), kittyId = url.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: path.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     if (init?.method === "POST") posts.push({ path, body });
     const kitty = (f: Fixture) => ({ id: f.kittyId, name: f.name, provider: "synthetic-staged-model", desktop: true, container: `kitty-${f.name}`, status: "running", connectors: names, approvals: "ask", backup: "" });
     const approval = (f: Fixture) => ({ id: f.approvalId, kitty: f.kittyId, chat: f.chatId, connector: f.task!.connector, kind: f.task!.kind, action: "download_file", args: { action: "download_file", ...(f.task!.args as object) }, request_id: f.requestId, file_stage_ready: true, status: "pending", at: new Date().toISOString() });
-    if (path === "/v1/health") return Response.json({ ok: true, containers: true, version: "synthetic-files.9", lexopen_connector_gate: "v1", lexopen_file_reads: "v1", lexopen_async_messages: "v1", lexopen_staged_file_actions: "v1" });
+    if (path === "/v1/health") return Response.json({ ok: true, containers: true, version: "synthetic-files.9", lexopen_connector_gate: "v1", lexopen_file_reads: "v1", lexopen_async_messages: "v1", lexopen_computer_use_policy: "v1", lexopen_staged_file_actions: "v1" });
     if (path === "/v1/providers") return Response.json({ providers: [{ name: "synthetic-staged-model", kind: "ollama" }] });
     if (path === "/v1/kitties") return Response.json({ kitties: fixtures.map(kitty) });
     if (path.startsWith("/v1/kitties/")) { const f = fixtures.find(item => item.kittyId === path.split("/").pop()); assert.ok(f); return Response.json({ kitty: kitty(f) }); }

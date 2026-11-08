@@ -11,12 +11,15 @@ export function computerTurnNeedsHelp(turn?: ComputerTurn) {
   // separately when a turn finishes without being able to continue.
   return turn?.from === "assistant" && (turn.needsHelp || (turn.working && turn.steps.at(-1)?.action === "ask_help"));
 }
-export type ComputerApproval = import("../connectors/types").ConnectorApproval & { requestId?: string };
+export type ComputerUseApproval = { id: string; kittyId: string; chatId: string; connector: "lexopen-computer-use"; kind: "computer-use"; action: string; args: Record<string, unknown>; summary: string; reviewable: boolean; at: string; status: "pending"; computerAction: { version: "v1"; binding: string; policyRevision: number; category: "input" | "browser" | "apps" | "command" | "install" | "secret" | "machine"; reason: string; effectUnknown: boolean; actionHash: string } };
+export type ComputerApproval = (import("../connectors/types").ConnectorApproval & { requestId?: string }) | ComputerUseApproval;
+export type ComputerAuthorizationSettings = { mode: import("./authorization-policy").ComputerAuthorizationMode; allowInput: boolean; allowBrowser: boolean; allowApps: boolean; maxActions: number; maxConsultations: number };
+export type ComputerAuthorizationView = { workspaceId: string; revision: number; desired: ComputerAuthorizationSettings; applied: import("./authorization-policy").ComputerAuthorizationSnapshot | null; sessionId: string | null; state: "default" | "saved" | "applied" | "unknown" | "unsupported" | "mismatch"; canConfigure: boolean; reason?: string };
 export type VerifiedComputerFile = { state: "desktop_verified"; requestId: string; approvalId: string; chatId: string; kittyId: string; connector: string; kind: "google-workspace" | "github"; action: "download_file"; target: Record<string, string>; localPath: string; name: string; bytes: number; sha256: string; pages?: number; firstLine?: string };
-export type ComputerSessionView = { session: ComputerSessionSummary; runtime: "container"; kittyStatus: string; working: boolean; turns: ComputerTurn[]; approvals: ComputerApproval[]; verifiedFiles?: VerifiedComputerFile[] };
+export type ComputerSessionView = { session: ComputerSessionSummary; runtime: "container"; kittyStatus: string; working: boolean; turns: ComputerTurn[]; approvals: ComputerApproval[]; verifiedFiles?: VerifiedComputerFile[]; authorization?: ComputerAuthorizationView };
 export type ComputerActivityState = "disabled" | "unconfigured" | "restricted" | "idle" | "starting" | "ready" | "working" | "approval" | "help" | "paused" | "expired" | "unavailable";
 export type ComputerReview = "approval" | "help";
-export type ComputerActivity = { state: ComputerActivityState; sessionId: string | null; monitor: boolean; causaId?: string | null; detail?: { connections: string[]; step: { label: string; at: string } | null }; verifiedFiles?: VerifiedComputerFile[] };
+export type ComputerActivity = { state: ComputerActivityState; sessionId: string | null; monitor: boolean; causaId?: string | null; detail?: { connections: string[]; step: { label: string; at: string } | null }; consultation?: { action: string; reason: string; effectUnknown: boolean }; outcomeUnknown?: boolean; verifiedFiles?: VerifiedComputerFile[] };
 export type ComputerFile = { name: string; mime: string; data: string };
 export const COMPUTER_ATTACHMENT_FORMATS = ".pdf,.docx,.xlsx,.pptx,.odt,.epub,.txt,.md,.csv,.png,.jpg,.jpeg,.gif,.webp,.mp3,.wav,.m4a,.ogg,.webm,.flac";
 export type ComputerMessage = { requestId: string; text: string; files: ComputerFile[]; confirmed: true };

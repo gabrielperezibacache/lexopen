@@ -10,6 +10,7 @@ export const CONFIG_CATEGORIES = [
     sections: [
       { id: "cuenta-personal", label: "Cuenta", labelEn: "Account" },
       { id: "preferencias-altazor", label: "Altazor", labelEn: "Altazor" },
+      { id: "autorizaciones-escritorio", label: "Escritorio de Altazor", labelEn: "Altazor desktop" },
     ],
   },
   {
@@ -77,7 +78,7 @@ export const CONFIG_CATEGORIES = [
 export const CONFIG_SECTIONS: readonly ConfigSection[] = CONFIG_CATEGORIES.flatMap<ConfigSection>(category => [...category.sections]);
 export function configCategoriesForMode(mode: "manual" | "pjud_cl", visibility: SettingsVisibility) {
   return CONFIG_CATEGORIES.map(category => ({ ...category, sections: category.sections.filter(section => {
-    if (section.id === "preferencias-altazor" || section.id === "cuentas-conectadas") return visibility.assistant;
+    if (section.id === "preferencias-altazor" || section.id === "autorizaciones-escritorio" || section.id === "cuentas-conectadas") return visibility.assistant;
     if (section.id === "comunicaciones") return visibility.communications;
     if (section.id === "work-country") return visibility.canSetCountry;
     if (section.id === "apartados-visibles") return visibility.canSetCountry;

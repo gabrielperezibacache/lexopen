@@ -58,4 +58,7 @@
 .approvals pre { padding: 1rem; background: var(--mist); border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-xs); max-height: 300px; overflow-y: auto; }
 
 .screen:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+.authorization { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 1rem; padding-block: 1rem; border-block: 1px solid var(--line); margin-top: 1rem; }
+.authorization > div { flex: 1 1 18rem; min-width: 0; }
+.authorization p { margin: .4rem 0 0; color: var(--muted); line-height: 1.7; font-size: var(--text-sm); }
 .actions button[aria-pressed="true"] { color: var(--sea); border-color: var(--sea); background: var(--sea-soft); }

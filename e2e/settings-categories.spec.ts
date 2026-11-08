@@ -63,9 +63,12 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
     const nav = page.getByRole("navigation", { name: "Secciones de configuración" });
     await expect(nav.getByRole("link", { name: "Cuentas conectadas", exact: true })).toHaveAttribute("aria-current", "location");
     const accounts = page.getByRole("region", { name: "Cuentas conectadas", exact: true });
-    await expect(accounts.getByRole("link", { name: /Google Drive/ })).toHaveAttribute("href", "/sincronizacion#sync-google");
-    await expect(accounts.getByRole("link", { name: /Google Workspace/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=google");
+    await expect(accounts.getByRole("listitem")).toHaveCount(4);
+    await expect(accounts.getByRole("link", { name: /Google Drive/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=google");
+    await expect(accounts.getByText("Permite que Altazor busque y lea los archivos de Drive que autorices.", { exact: true })).toBeVisible();
     await expect(accounts.getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=github");
+    await expect(accounts.getByRole("link", { name: /Dropbox/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=dropbox");
+    await expect(accounts.getByRole("link", { name: /OneDrive · Microsoft 365/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=microsoft");
     await nav.getByRole("link", { name: "IA", exact: true }).click();
     await expect(page).toHaveURL(/#llm-settings$/);
     await expect(nav.getByRole("link", { name: "IA", exact: true })).toHaveAttribute("aria-current", "location");

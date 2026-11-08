@@ -143,7 +143,7 @@ test("las autorizaciones muestran origen comprensible y conservan los detalles c
   await loginAs(page, "abogado@estudio.cl");
   await page.goto(`/inicio?altazor=computer&escritorio=${sessionId}`);
   const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true });
-  const approvals = panel.getByRole("region", { name: "Autorizaciones de aplicaciones", exact: true });
+  const approvals = panel.getByRole("region", { name: "Consultas de Altazor", exact: true });
   await expect(approvals.getByRole("heading", { name: "Descargar archivo de GitHub", exact: true })).toBeVisible();
   await expect(approvals.getByRole("link", { name: /^fictitious\/legal-research/ })).toHaveAttribute("href", "https://github.com/fictitious/legal-research");
   await expect(approvals.getByText("docs/README.md", { exact: true })).toBeVisible();

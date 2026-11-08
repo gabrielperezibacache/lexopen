@@ -20,9 +20,15 @@ async function main() {
     const url = new URL(String(raw)), path = url.pathname, method = init?.method || "GET";
     assert.equal(url.origin, "http://127.0.0.1:18887");
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-continuation-token");
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(path)) {
+      assert.equal(init?.method || "GET", "GET", "legacy fixtures never grant computer-use permission");
+      const binding = url.searchParams.get("binding"), kittyId = url.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: path.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     const kitty = (fixture: Fixture) => ({ id: fixture.kittyId, name: fixture.kittyName, provider: "fictitious-continuation-model", desktop: true, container: `kitty-${fixture.kittyName}`, status: "running", connectors: [connector], approvals: "ask", backup: "" });
-    if (path === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-continuation-contract", lexopen_connector_gate: "v1", lexopen_file_reads: "v1", lexopen_async_messages: "v1" });
+    if (path === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-continuation-contract", lexopen_connector_gate: "v1", lexopen_file_reads: "v1", lexopen_async_messages: "v1", lexopen_computer_use_policy: "v1" });
     if (path === "/v1/providers") return Response.json({ providers: [{ name: "fictitious-continuation-model", kind: "openai" }] });
     if (path === "/v1/kitties") return Response.json({ kitties: sessions.map(kitty) });
     if (path.startsWith("/v1/kitties/")) {

@@ -165,6 +165,8 @@ export async function createComputerSession(user: CausaAccessUser, workspaceId: 
     if (connectors.length) { for (const name of selected) await client.setApprovalRule(kitty.id, name); await client.startKitty(kitty.id); kitty = await client.kitty(kitty.id, kittyName, workspace.providerName, selected); }
     await unchangedWorkspace(workspace, user); await policyAllowsAction();
     const chatId = await client.createChat(kitty);
+    const { applySavedComputerAuthorization } = await import("./authorization-service");
+    await applySavedComputerAuthorization(user, workspace, id, chatId, kitty.id, client);
     await workspaceFor(workspaceId, user);
     const saved = await prisma.altazorComputerSession.update({ where: { id }, data: { chatId, state: kitty.status === "running" ? "ready" : "starting" } });
     return summary(saved);
@@ -180,12 +182,19 @@ export async function readComputerSession(user: CausaAccessUser, id: string, pas
   if (hasConnections) await client.requireConnectorGate();
   const kitty = await client.kitty(session.kittyId, session.kittyName, workspace.providerName, names), chat = await client.chat(session.chatId, session.kittyId);
   const approvals = hasConnections ? await client.pendingApprovals(session.kittyId, session.chatId, names) : [];
+  const { readAuthorizationForSession } = await import("./authorization-service");
+  const authorization = await readAuthorizationForSession(user, workspace, session, client);
+  let computerApprovals: ComputerSessionView["approvals"] = [];
+  if (authorization.applied?.applied) {
+    try { computerApprovals = await client.pendingComputerApprovals(session.kittyId, session.chatId, authorization.applied.binding, authorization.applied.revision); }
+    catch { authorization.state = "unknown"; authorization.reason = "No se pudieron comprobar las consultas. El monitor y el control manual siguen disponibles."; }
+  }
   const verifiedFiles = await verifiedSessionFiles(session, names);
   // Containers may finish starting after create returns. Persist this transition so
   // manual controls and one-use Secretos grants see the same state as the interface.
   if (!passive && session.state === "starting" && kitty.status === "running") await prisma.altazorComputerSession.updateMany({ where: { id, ownerId: session.ownerId, state: "starting", updatedAt: session.updatedAt }, data: { state: "ready" } });
   const current = await sessionFor(id, user);
-  return { session: { ...summary(current.session), state: kitty.status === "running" ? "ready" : ["created", "starting"].includes(kitty.status) ? "starting" : kitty.status }, runtime: "container", kittyStatus: kitty.status, ...chat, approvals, verifiedFiles };
+  return { session: { ...summary(current.session), state: kitty.status === "running" ? "ready" : ["created", "starting"].includes(kitty.status) ? "starting" : kitty.status }, runtime: "container", kittyStatus: kitty.status, ...chat, approvals: [...computerApprovals, ...approvals], verifiedFiles, authorization };
 }
 
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -272,7 +281,9 @@ export async function readComputerActivity(user: CausaAccessUser, causaId?: stri
   if (await passiveControlHeld(after.session)) return reply("paused", candidate.id, true);
   if (view.session.state !== "ready") return reply(view.session.state === "starting" ? "starting" : "unavailable", candidate.id, true);
   const detail = computerActivityDetail(view);
-  const activity = (state: ComputerActivityState) => ({ ...reply(state, candidate.id, true), ...(detail ? { detail } : {}), ...(view.verifiedFiles?.length ? { verifiedFiles: view.verifiedFiles.slice(0, 3) } : {}) });
+  const consultation = view.approvals.find(row => row.kind === "computer-use");
+  const activity = (state: ComputerActivityState): ComputerActivity => ({ ...reply(state, candidate.id, true), ...(detail ? { detail } : {}), ...(consultation?.kind === "computer-use" ? { consultation: { action: consultation.action, reason: consultation.computerAction.reason, effectUnknown: consultation.computerAction.effectUnknown } } : {}), ...(view.authorization?.applied?.outcomeUnknown ? { outcomeUnknown: true } : {}), ...(view.verifiedFiles?.length ? { verifiedFiles: view.verifiedFiles.slice(0, 3) } : {}) });
+  if (view.authorization?.applied?.outcomeUnknown) return activity("help");
   if (view.approvals.length) return activity("approval");
   if (computerTurnNeedsHelp(view.turns.at(-1))) return activity("help");
   return activity(view.working ? "working" : "ready");
@@ -330,7 +341,7 @@ function matchingAction(row: AltazorComputerAction, sessionId: string, kind: str
 async function executeAction(user: CausaAccessUser, id: string, kind: string, requestId: string, input: unknown, run: (client: KittiesGateway, row: AltazorComputerSession, tx: Prisma.TransactionClient, actionId: string) => Promise<Record<string, unknown>>) {
   const cleanup = kind === "cancel" || kind === "close";
   const access = await sessionFor(id, user, cleanup), { actor, workspace } = access;
-  const needsModelPolicy = !["cancel", "close", "connector_reject"].includes(kind);
+  const needsModelPolicy = !["cancel", "close", "connector_reject", "computer_use_reject"].includes(kind);
   if (needsModelPolicy) await policyAllowsAction();
   let session = access.session;
   const inputHash = computerOperationHash(actor.id, id, kind, input);
@@ -360,7 +371,8 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
     if (needsModelPolicy) await policyAllowsAction(tx);
     const locked = await tx.altazorComputerSession.updateMany({ where: actionSessionWhere(session, workspace.id, cleanup), data: session.kittyId ? { updatedAt: session.updatedAt } : { kittyId } });
     if (!locked.count) throw new ConnectorError("session_changed", "La sesión cambió o venció. Actualice antes de actuar.", 409);
-    if (kind === "message" && await tx.altazorComputerAction.findFirst({ where: { sessionId: id, kind: { in: ["message", "connector_approval"] }, status: { in: ["sending", "unknown"] } }, select: { id: true } })) throw new ConnectorError("task_unconfirmed", "Existe una tarea sin confirmación. Compruebe el chat o cierre la sesión; no se reenviará automáticamente.", 409);
+    if (kind === "message" && await tx.altazorComputerAction.findFirst({ where: { sessionId: id, kind: { in: ["message", "connector_approval", "computer_use_approval"] }, status: { in: ["sending", "unknown"] } }, select: { id: true } })) throw new ConnectorError("task_unconfirmed", "Existe una tarea sin confirmación. Compruebe el chat o cierre la sesión; no se reenviará automáticamente.", 409);
+    if (kind === "message" && await tx.altazorConnectorOperation.count({ where: { workspaceId: workspace.id, ownerId: actor.id, kind: "computer_policy", status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("computer_policy_pending", "Compruebe el cambio de autorizaciones antes de enviar otra tarea.", 409);
     const row = await tx.altazorComputerAction.create({ data: { ownerId: actor.id, sessionId: id, requestId, kind, inputHash } });
     return { row, claimed: true, session: await tx.altazorComputerSession.findUniqueOrThrow({ where: { id } }) };
   });
@@ -380,6 +392,7 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
       if (!locked.count) throw new ConnectorError("session_changed", "La sesión cambió. Actualice antes de actuar.", 409);
       const liveSession = await tx.altazorComputerSession.findUniqueOrThrow({ where: { id } });
       if (needsModelPolicy) await policyAllowsAction(tx);
+      if (["message", "computer_use_approval"].includes(kind) && await tx.altazorConnectorOperation.count({ where: { workspaceId: workspace.id, ownerId: actor.id, kind: "computer_policy", status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("computer_policy_pending", "Comprueba el cambio de autorizaciones antes de continuar.", 409);
       if (cleanup) {
         cleanupSession(liveSession);
         await client.kitty(liveSession.kittyId!, liveSession.kittyName, workspace.providerName, sessionConnectors(liveSession));
@@ -406,6 +419,25 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
     throw error;
   }
 }
+
+/** Internal server broker. Never serialized or registered as a model tool. */
+export const computerAuthorizationBroker = { workspaceFor, lockWorkspace, readyGateway, policyAllowsAction, sessionFor, sessionConnectors };
+
+export async function decideComputerUseApproval(user: CausaAccessUser, id: string, requestId: string, approvalId: string, approve: boolean, reviewed: { actionHash: string; policyRevision: number }) {
+  return executeAction(user, id, approve ? "computer_use_approval" : "computer_use_reject", requestId, { approvalId, approve, ...reviewed }, async (client, session, tx) => {
+    const { assertComputerAuthorizationActor, computerAuthorizationBinding } = await import("./authorization-service");
+    if (approve) await assertComputerAuthorizationActor(user, tx);
+    if (approve && session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelve el control al asistente antes de autorizar esta acción.", 409);
+    const { workspace } = await workspaceFor(session.workspaceId, user, tx);
+    if (approve) {
+      const { assertComputerAuthorizationCurrent } = await import("./authorization-service");
+      await assertComputerAuthorizationCurrent(user, workspace, session, client, tx);
+    }
+    const result = await client.decideComputerUseApproval(approvalId, session.kittyId!, session.chatId!, computerAuthorizationBinding(workspace), approve, reviewed);
+    if (result.state === "unknown") throw new ConnectorError("computer_outcome_unknown", "La acción se intentó, pero su resultado no quedó confirmado. Revisa el escritorio; no se repetirá automáticamente.", 502);
+    return result;
+  });
+}
 export async function sendComputerMessage(user: CausaAccessUser, id: string, input: ComputerMessage) {
   if (input.confirmed !== true || !input.text.trim() || input.text.length > 16000) throw new ConnectorError("task_approval_required", "Revise y autorice una tarea de hasta 16000 caracteres antes de enviarla.", 400);
   const files = inspectSelectedFiles(input.files), safeHashInput = { text: input.text, files: files.map(file => ({ name: file.name, mime: file.mime, hash: digest(file.data) })) };
@@ -419,6 +451,9 @@ export async function sendComputerMessage(user: CausaAccessUser, id: string, inp
     const names = sessionConnectors(session);
     const task = files.length ? null : prepareExplicitFileTask(input.text, session.ownerId, session.workspaceId, names);
     if (task) return client.stageFileAction(session.chatId!, session.kittyId!, actionId, task, input.text);
+    const { assertComputerAuthorizationCurrent } = await import("./authorization-service");
+    const { workspace } = await workspaceFor(session.workspaceId, user, _tx);
+    await assertComputerAuthorizationCurrent(user, workspace, session, client, _tx);
     return client.send(session.chatId!, desktopConnectorTask(input.text, session.ownerId, session.workspaceId, names), files, actionId);
   });
 }
@@ -509,8 +544,11 @@ export async function decideComputerApproval(user: CausaAccessUser, id: string, 
     const { resumeTask, ...result } = await client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve, staged);
     if (!result.canContinue) return result;
     if (!resumeTask) return { ...result, continued: false, continuationPending: true };
-    const unresolved = await tx.altazorComputerAction.count({ where: { sessionId: id, id: { not: actionId }, kind: { in: ["message", "connector_approval"] }, status: { in: ["sending", "unknown"] } } });
+    const unresolved = await tx.altazorComputerAction.count({ where: { sessionId: id, id: { not: actionId }, kind: { in: ["message", "connector_approval", "computer_use_approval"] }, status: { in: ["sending", "unknown"] } } });
     if (unresolved) return { ...result, continued: false, continuationPending: true };
+    const { assertComputerAuthorizationCurrent } = await import("./authorization-service");
+    try { const { workspace } = await workspaceFor(session.workspaceId, user, tx); await assertComputerAuthorizationCurrent(user, workspace, session, client, tx); }
+    catch { return { ...result, continued: false, authorizationPending: true }; }
     return { ...result, ...await continueApprovedRead(client, { chatId: session.chatId!, kittyId: session.kittyId!, actionId, expiresAt: session.expiresAt, task: resumeTask }, async () => { assertSessionLive(session); await workspaceFor(session.workspaceId, user, tx); await policyAllowsAction(tx); }) };
   });
 }
