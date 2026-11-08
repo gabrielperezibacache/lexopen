@@ -5,8 +5,8 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, Code2,
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
 import { CONNECTOR_CATALOG } from "@/lib/altazor/connectors/catalog";
-import { connectorFieldPresentation } from "@/lib/altazor/connectors/presentation";
-import { connectorAvailability, connectorConnectionAvailability, type ConnectorAccessChecks } from "@/lib/altazor/connectors/availability";
+import { connectorAccountPresentation, connectorFieldPresentation } from "@/lib/altazor/connectors/presentation";
+import { connectorAccountAvailability, connectorAvailability, connectorConnectionAvailability, connectorOAuthSnapshot, type ConnectorAccessChecks, type ConnectorOAuthSnapshot } from "@/lib/altazor/connectors/availability";
 import type { ConnectorCatalogEntry, ConnectorConnection, ConnectorInventory } from "@/lib/altazor/connectors/types";
 import type { ComputerStatus } from "@/lib/altazor/computer/types";
 import { EasyConnectorOAuth } from "./EasyConnectorOAuth";
@@ -25,6 +25,7 @@ function AdvancedOptions({ enabled, children }: { enabled: boolean; children: Re
 export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }) {
   const uid = useId(), formRef = useRef<HTMLFormElement>(null), requestKey = useRef(operationKey());
   const loadVersion = useRef(0), loadRequest = useRef<AbortController | null>(null), mounted = useRef(false);
+  const oauthStatusVersion = useRef(0);
   const detailHeading = useRef<HTMLHeadingElement>(null), searchInput = useRef<HTMLInputElement>(null), previousSelection = useRef("");
   const [computer, setComputer] = useState<ComputerStatus | null>(null), [inventory, setInventory] = useState<Inventory | null>(null);
   const [category, setCategory] = useState("all"), [query, setQuery] = useState(""), [selected, setSelected] = useState("");
@@ -33,12 +34,14 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const [verified, setVerified] = useState(false), [checking, setChecking] = useState(false);
   const [accessChecks, setAccessChecks] = useState<ConnectorAccessChecks>({});
+  const [oauthStatus, setOAuthStatus] = useState<ConnectorOAuthSnapshot | null>(null);
   const load = useCallback(async () => {
     const version = ++loadVersion.current;
+    const oauthVersion = ++oauthStatusVersion.current;
     loadRequest.current?.abort();
     const controller = new AbortController(); loadRequest.current = controller;
     const current = () => mounted.current && !controller.signal.aborted && version === loadVersion.current;
-    setChecking(true); setVerified(false); setAuthUrl(""); setAccessChecks({});
+    setChecking(true); setVerified(false); setAuthUrl(""); setAccessChecks({}); setOAuthStatus(null);
     try {
     const statusResponse = await fetch(`/api/altazor/computer${causaId ? `?causaId=${encodeURIComponent(causaId)}` : ""}`, { cache: "no-store", signal: controller.signal });
     const status = await statusResponse.json();
@@ -52,6 +55,15 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     if (!response.ok) throw new Error(result.error || "No se pudieron comprobar las conexiones.");
     setInventory(result.connectors);
     setConnection(previous => previous ? result.connectors.connections.find((item: ConnectorConnection) => item.name === previous.name && item.kind === previous.kind) ?? null : null);
+    if (status.computer.policyAllowed && result.connectors.gateReady) {
+      // This public endpoint checks account access. App registration is never read here.
+      try {
+        const oauthResponse = await fetch(`${api}/oauth?workspaceId=${encodeURIComponent(status.computer.workspaceId)}`, { cache: "no-store", signal: controller.signal });
+        const oauthResult: unknown = await oauthResponse.json();
+        if (!current()) return;
+        if (oauthResponse.ok && oauthVersion === oauthStatusVersion.current) setOAuthStatus(connectorOAuthSnapshot(oauthResult, status.computer.workspaceId, causaId || null));
+      } catch { if (!current()) return; }
+    }
     setVerified(true);
     return true;
     } catch (cause) {
@@ -92,9 +104,14 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   const entry = catalog.find(item => item.id === selected);
   const easyProvider = EASY_OAUTH_PROVIDERS.find(provider => EASY_OAUTH_CONNECTOR[provider] === entry?.id);
   const workspaceId = computer?.configured ? computer.workspaceId : null;
+  const scopedOAuthStatus = oauthStatus?.workspaceId === workspaceId && oauthStatus.causaId === (causaId || null) ? oauthStatus : null;
+  const updateOAuthStatus = useCallback((snapshot: ConnectorOAuthSnapshot | null) => {
+    oauthStatusVersion.current++;
+    if (mounted.current) setOAuthStatus(snapshot?.workspaceId === workspaceId && snapshot.causaId === (causaId || null) ? snapshot : null);
+  }, [workspaceId, causaId]);
   const gatewayReady = Boolean(verified && !checking && computer?.policyAllowed && inventory?.gateReady && entry?.available && entry.fields.some(field => field.name === "token" && field.secret));
   const activeSession = Boolean(computer?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
-  const filtered = catalog.filter(item => (category === "all" || item.category === category) && `${item.label} ${item.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()));
+  const filtered = catalog.filter(item => { const copy = connectorAccountPresentation(item, scopedOAuthStatus?.providers.find(account => EASY_OAUTH_CONNECTOR[account.provider] === item.id)); return (category === "all" || item.category === category) && `${copy.label} ${copy.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()); });
   const canConfigure = Boolean(verified && !checking && computer?.configured && inventory?.gateReady && computer.policyAllowed && !activeSession);
   function select(item: ConnectorCatalogEntry, existing: ConnectorConnection | null = null) {
     setSelected(item.id); setConnection(existing); setName(existing?.name || item.id); setAuthUrl(""); setNotice(""); setError(""); setRemoveConfirmed(false); requestKey.current = operationKey(); formRef.current?.reset();
@@ -102,7 +119,8 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   async function mutate(path: string, body: Record<string, unknown>, method = "POST"): Promise<MutationReply | null> {
     if (!computer?.workspaceId || !verified || checking) return null;
     loadVersion.current++; loadRequest.current?.abort();
-    setBusy(true); setError(""); setNotice(""); setAccessChecks({});
+    oauthStatusVersion.current++;
+    setBusy(true); setError(""); setNotice(""); setAccessChecks({}); setOAuthStatus(null);
     try {
       const result = await apiMutation<MutationReply>(`${api}${path}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, workspaceId: computer.workspaceId, confirmed: true }) });
       if (!result.ok) { setError(result.error); await load().catch(() => {}); return null; }
@@ -145,8 +163,8 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     {inventory?.operations?.map(operation => <div key={operation.id} className={styles.pending}><p>Hay un cambio de conexión sin confirmar. Revise el estado de la aplicación; reconocerlo aquí no repite ni confirma su resultado.</p><button type="button" disabled={busy || checking || !verified} onClick={async () => { const result = await mutate(`/operations/${encodeURIComponent(operation.id)}`, {}); if (result) { await load().catch(() => {}); setNotice("Revisión registrada. La operación anterior no se reenvió."); } }}>Revisé el estado; continuar sin repetir</button></div>)}
     {entry ? <div className={styles.detail}>
       <button type="button" disabled={busy} onClick={() => { setSelected(""); setConnection(null); setAuthUrl(""); }}><ArrowLeft size={16} aria-hidden="true" />Todas las aplicaciones</button>
-      <div className={styles.detailHeading}><h3 ref={detailHeading} tabIndex={-1}>{entry.label}</h3>{!easyProvider && <><p>{entry.description}</p><p role="status">{connectorAvailability(entry, inventory?.connections || [], verified && !checking, accessChecks).label}</p></>}</div>
-      {easyProvider && !loading && <EasyConnectorOAuth key={`${workspaceId || "unavailable"}:${easyProvider}`} provider={easyProvider} workspaceId={workspaceId} causaId={causaId} gatewayReady={gatewayReady} hasActiveSession={activeSession} busy={busy || checking || !verified} onBusyChange={setBusy} onDisconnect={disconnectEasy} />}
+      <div className={styles.detailHeading}><h3 ref={detailHeading} tabIndex={-1}>{connectorAccountPresentation(entry).label}</h3>{!easyProvider && <><p>{entry.description}</p><p role="status">{connectorAvailability(entry, inventory?.connections || [], verified && !checking, accessChecks).label}</p></>}</div>
+      {easyProvider && !loading && <EasyConnectorOAuth key={`${workspaceId || "unavailable"}:${easyProvider}`} provider={easyProvider} workspaceId={workspaceId} causaId={causaId} gatewayReady={gatewayReady} hasActiveSession={activeSession} busy={busy || checking || !verified} onBusyChange={setBusy} onDisconnect={disconnectEasy} onStatusChange={updateOAuthStatus} />}
       {!easyProvider && <AdvancedOptions enabled={false}>
       {entry.fields.some(field => field.name === "token") && ["github", "google-workspace"].includes(entry.id) && <div className={styles.setup}><h4>Probar con permisos de lectura</h4>{entry.id === "google-workspace" ? <><p>En OAuth Playground, elija acceso Online y autorice únicamente <code>https://www.googleapis.com/auth/drive.metadata.readonly</code>. Inicie sesión personalmente, intercambie el código y pegue sólo el access token en el campo reservado de abajo. No necesita completar los campos de una aplicación OAuth para esta modalidad.</p><a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer">Abrir OAuth Playground de Google <ArrowUpRight size={15} aria-hidden="true" /></a></> : <><p>Cree personalmente un token fine-grained con caducidad de un día, acceso sólo al repositorio que elija y permiso Contents de lectura. Péguelo en el campo reservado de abajo. No necesita completar los campos de una aplicación OAuth para esta modalidad.</p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Crear token limitado en GitHub <ArrowUpRight size={15} aria-hidden="true" /></a></>}<p>Guarde la conexión y pulse Probar acceso. Un inicio de sesión en el navegador no configura por sí solo este conector. Introduzca las credenciales únicamente en el proveedor o en el formulario reservado; no las envíe al chat.</p></div>}
       {entry.id === "slack" && <div className={styles.setup}><h4>Elija cómo conectar Slack</h4><ul><li><strong>Webhook:</strong> pegue su dirección para el canal al que enviará mensajes.</li><li><strong>Bot:</strong> introduzca el token del bot y el canal de destino.</li><li><strong>Inicio de sesión:</strong> registre su propia aplicación Slack, introduzca su identificador y secreto, y elija un canal. Después de guardar podrá iniciar sesión.</li></ul><p>Complete sólo los campos de la modalidad elegida. Los campos individuales se marcan según lo declarado por el servicio.</p></div>}
@@ -165,7 +183,7 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
       <div className={styles.search}><Search size={18} aria-hidden="true" /><label className="sr-only" htmlFor={`${uid}-search`}>Buscar aplicaciones</label><input ref={searchInput} id={`${uid}-search`} value={query} type="search" placeholder="Buscar correo, GitHub, calendario…" onChange={event => setQuery(event.target.value)} /></div>
       <nav className={styles.categories} aria-label="Categorías de aplicaciones">{categories.filter(item => item.id === "all" || catalog.some(entry => entry.category === item.id)).map(item => <button type="button" key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</nav>
       <p className={styles.count} role="status">{filtered.length} aplicaciones{category !== "all" ? ` · ${categories.find(item => item.id === category)?.label}` : ""}</p>
-      <ul className={styles.list}>{filtered.map(item => { const Icon = categories.find(category => category.id === item.category)?.Icon || Globe, accounts = inventory?.connections.filter(connection => connection.kind === item.id) || [], availability = connectorAvailability(item, accounts, verified && !checking, accessChecks); return <li key={item.id}><button type="button" onClick={() => select(item, accounts[0] || null)}><Icon size={22} aria-hidden="true" /><span><strong>{item.label}</strong><small>{availability.label}</small></span><ArrowRight size={17} aria-hidden="true" /></button></li>; })}</ul>
+      <ul className={styles.list}>{filtered.map(item => { const Icon = categories.find(category => category.id === item.category)?.Icon || Globe, accounts = inventory?.connections.filter(connection => connection.kind === item.id) || [], guided = EASY_OAUTH_PROVIDERS.some(provider => EASY_OAUTH_CONNECTOR[provider] === item.id), availability = guided ? connectorAccountAvailability(item, verified && !checking, scopedOAuthStatus) : connectorAvailability(item, accounts, verified && !checking, accessChecks); return <li key={item.id}><button type="button" onClick={() => select(item, accounts[0] || null)}><Icon size={22} aria-hidden="true" /><span><strong>{connectorAccountPresentation(item).label}</strong><small>{availability.label}</small></span><ArrowRight size={17} aria-hidden="true" /></button></li>; })}</ul>
       {!filtered.length && <p>No hay coincidencias. Pruebe otro nombre o seleccione Todas.</p>}
     </>}
   </section>;

@@ -8,6 +8,7 @@ import { assembleRelease } from "./assemble-release.mjs";
 import { toolpackName, toolpackReceiptName } from "../altazor-toolpack.cjs";
 import desktopProfile from "../altazor-desktop-profile.json" with { type: "json" };
 const revision = "a".repeat(40);
+const publicOAuth = { sha256: "c".repeat(64), providers: ["google", "github", "dropbox"] };
 async function fixture(version = "1.1.0-preview.1") {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "lexopen-release-test-")), input = path.join(root, "input"), output = path.join(root, "release");
   const channel = version.includes("-") ? "preview" : "latest";
@@ -22,7 +23,7 @@ async function fixture(version = "1.1.0-preview.1") {
       entries.push({ url: name, size: bytes.length, sha512: crypto.createHash("sha512").update(bytes).digest("base64") });
     }
     const base = { version, platform, arch }, buildId = `build-${target}`;
-    await fs.writeFile(path.join(dir, `lexopen-packaged-${target}.json`), JSON.stringify({ ...base, sourceRevision: revision, sourceDirty: false, buildId }));
+    await fs.writeFile(path.join(dir, `lexopen-packaged-${target}.json`), JSON.stringify({ ...base, sourceRevision: revision, sourceDirty: false, buildId, distributedOAuth: publicOAuth }));
     await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, externalNodeUsed: false, demoSeedUsed: false }));
     await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, publisherAuthenticated: false, notarized: false }));
     const feed = `${channel}${platform === "darwin" ? "-mac" : platform === "linux" ? "-linux" : ""}.yml`;
@@ -31,13 +32,59 @@ async function fixture(version = "1.1.0-preview.1") {
   return { root, input, output, version, revision };
 }
 async function check(name, work, version) { const f = await fixture(version); try { await work(f); console.log(`PASS ${name}`); } finally { await fs.rm(f.root, { recursive: true, force: true }); } }
+async function changeProfile(fixture, target, profile) {
+  const file = path.join(fixture.input, target, `lexopen-packaged-${target}.json`), report = JSON.parse(await fs.readFile(file, "utf8"));
+  if (profile === undefined) delete report.distributedOAuth; else report.distributedOAuth = profile;
+  await fs.writeFile(file, JSON.stringify(report));
+}
 await check("four native targets assemble with both macOS architectures and exact checksums", async f => {
   const manifest = await assembleRelease(f); assert.equal(manifest.channel, "preview"); assert.equal(manifest.signatures.length, 4);
+  assert.equal(manifest.publishable, true); assert.deepEqual(manifest.distributedOAuth, publicOAuth);
   const feed = JSON.parse(await fs.readFile(path.join(f.output, "preview-mac.yml"), "utf8"));
   assert.equal(feed.files.length, 4); assert(feed.files.some(a => a.url.endsWith("arm64.zip")));
   const sumLines = (await fs.readFile(path.join(f.output, "SHA256SUMS"), "utf8")).trim().split("\n");
   for (const line of sumLines) { const [hash, file] = line.split("  "); assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(f.output, file))).digest("hex"), hash); }
   await assert.rejects(assembleRelease(f), /EEXIST/);
+});
+await check("publication requires all three identities even without desktop toolpacks", async f => {
+  await changeProfile(f, "win32-x64", undefined);
+  await assert.rejects(assembleRelease(f), /Missing public OAuth/);
+  await assert.rejects(fs.stat(f.output), { code: "ENOENT" });
+  await changeProfile(f, "win32-x64", { ...publicOAuth, providers: ["google", "github"] });
+  await assert.rejects(assembleRelease(f), /publicación requiere/);
+});
+await check("all packaged targets must have the same public profile hash and providers", async f => {
+  await changeProfile(f, "win32-x64", { ...publicOAuth, sha256: "d".repeat(64) });
+  await assert.rejects(assembleRelease(f), /profiles differ across targets/);
+  await changeProfile(f, "win32-x64", { ...publicOAuth, providers: [...publicOAuth.providers, "microsoft"] });
+  await assert.rejects(assembleRelease(f), /profiles differ across targets/);
+  await changeProfile(f, "win32-x64", { ...publicOAuth, sha256: "not-a-hash" });
+  await assert.rejects(assembleRelease(f), /Invalid public OAuth/);
+  await changeProfile(f, "win32-x64", { ...publicOAuth, providers: [...publicOAuth.providers, "dropbox"] });
+  await assert.rejects(assembleRelease(f), /publicación requiere/);
+});
+await check("verification without public identities is explicitly not publishable", async f => {
+  for (const target of ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"]) await changeProfile(f, target, undefined);
+  await assert.rejects(assembleRelease(f), /Missing public OAuth/);
+  const manifest = await assembleRelease({ ...f, verificationOnly: true });
+  assert.equal(manifest.publishable, false); assert.equal(manifest.distributedOAuth, undefined);
+  const saved = JSON.parse(await fs.readFile(path.join(f.output, "release-manifest.json"), "utf8"));
+  assert.equal(saved.publishable, false);
+});
+await check("verification still rejects incomplete, missing-on-one-target or inconsistent profiles", async f => {
+  for (const target of ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"]) await changeProfile(f, target, { ...publicOAuth, providers: ["google", "github"] });
+  await assert.rejects(assembleRelease({ ...f, verificationOnly: true }), /publicación requiere/);
+  for (const target of ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"]) await changeProfile(f, target, publicOAuth);
+  await changeProfile(f, "darwin-x64", undefined);
+  await assert.rejects(assembleRelease({ ...f, verificationOnly: true }), /profiles differ across targets/);
+  await changeProfile(f, "darwin-x64", { ...publicOAuth, sha256: "d".repeat(64) });
+  await assert.rejects(assembleRelease({ ...f, verificationOnly: true }), /profiles differ across targets/);
+});
+await check("verification with valid public identities remains not publishable", async f => {
+  await assert.rejects(assembleRelease({ ...f, verificationOnly: "true" }), /Explicit verification-only/);
+  await changeProfile(f, "win32-x64", { ...publicOAuth, providers: ["dropbox", "github", "google"] });
+  const manifest = await assembleRelease({ ...f, verificationOnly: true });
+  assert.equal(manifest.publishable, false); assert.deepEqual(manifest.distributedOAuth, publicOAuth);
 });
 await check("missing native target blocks publication", async f => { await fs.rm(path.join(f.input, "win32-x64"), { recursive: true }); await assert.rejects(assembleRelease(f), /Missing native/); });
 await check("modified installer cannot pass its update checksum", async f => { await fs.appendFile(path.join(f.input, "darwin-arm64", `LexOpen-${f.version}-mac-arm64.zip`), "tamper"); await assert.rejects(assembleRelease(f), /checksum mismatch/); });
@@ -96,6 +143,14 @@ await check("toolpack publication requires both architectures from the exact rev
   await addToolpack(f, "arm64");
   await fs.appendFile(amd64.file, "tamper");
   await assert.rejects(assembleRelease({ ...f, withToolpacks: true }), /Unverified desktop toolpack: amd64/);
+});
+
+await check("desktop toolpack publication cannot bypass the public connection gate", async f => {
+  await addToolpack(f, "amd64"); await addToolpack(f, "arm64");
+  await changeProfile(f, "linux-x64", undefined);
+  await assert.rejects(assembleRelease({ ...f, withToolpacks: true, consumeInput: true }), /Missing public OAuth/);
+  await fs.stat(path.join(f.input, "win32-x64", `LexOpen-${f.version}-win-x64.exe`));
+  await assert.rejects(fs.stat(f.output), { code: "ENOENT" });
 });
 
 await check("a desktop toolpack cannot be injected into the updater feed", async f => {

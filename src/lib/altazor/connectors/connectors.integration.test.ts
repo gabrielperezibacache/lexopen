@@ -117,8 +117,12 @@ async function main() {
     assert.deepEqual(session.connectors, ["clima", "github"]); assert.deepEqual(lifecycle, ["create:false", "rule:clima", "rule:github", "start"]);
     const row = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } }); assert.ok(row.kittyId); assert.ok(row.chatId);
     const pending = (id: string, overrides: Record<string, unknown> = {}) => ({ id, kitty: row.kittyId!, chat: row.chatId!, connector: "github", kind: "github", action: "create_issue", args: { title: "Ejemplo ficticio", body: "Sin información real" }, summary: "Crear una incidencia de prueba", status: "pending", at: new Date().toISOString(), ...overrides });
-    approvals.push(pending("owned-a"), pending("owned-b"), pending("foreign-chat", { chat: "chat-foreign" }), pending("foreign-name", { connector: "not-selected" }));
     await sendComputerMessage(owner, session.id, { requestId: `message-selected-${tag}`, text: "Prepara ejemplos ficticios", files: [], confirmed: true }); assert.equal(messages, 1);
+    approvals.push(pending("owned-a"), pending("owned-b"), pending("foreign-chat", { chat: "chat-foreign" }), pending("foreign-name", { connector: "not-selected" }));
+    const blockedMessage = `blocked-by-approval-${tag}`;
+    await assert.rejects(sendComputerMessage(owner, session.id, { requestId: blockedMessage, text: "Otro encargo mientras espera autorización", files: [], confirmed: true }), error => (error as { code?: string }).code === "connector_approval_pending");
+    assert.equal(messages, 1);
+    assert.equal(await prisma.altazorComputerAction.count({ where: { ownerId: owner.id, requestId: blockedMessage } }), 0);
     assert.equal((await readComputerSession(owner, session.id)).approvals.length, 2);
     await assert.rejects(decideComputerApproval(owner, session.id, `foreign-chat-${tag}`, "foreign-chat", true), status(409));
     await assert.rejects(decideComputerApproval(owner, session.id, `foreign-name-${tag}`, "foreign-name", true), status(409)); assert.equal(approvalPosts, 0);

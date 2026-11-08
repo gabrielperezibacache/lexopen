@@ -2,13 +2,17 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { parseDistributedOAuthProfile: parse, applyDistributedOAuthProfile: apply, DISTRIBUTED_OAUTH_ENV: key } = require("./oauth-clients.cjs");
+const { parseDistributedOAuthProfile: parse, requirePublishableOAuthProviders: publishable, applyDistributedOAuthProfile: apply, DISTRIBUTED_OAUTH_ENV: key } = require("./oauth-clients.cjs");
 
 const fixture = { schemaVersion: 1, google: { type: "installed", client_id: "123456789-fixture.apps.googleusercontent.com", client_secret: "fixture-installed-public-parameter" }, github: { type: "device", client_id: "fixturePublicClient123" } };
 assert.deepEqual(parse(JSON.stringify(fixture)), fixture);
 assert.equal(Object.isFrozen(parse(fixture).google), true);
 const publicCloud = { schemaVersion: 1, dropbox: { type: "public_client", client_id: "fixtureDropboxApp123" }, microsoft: { type: "public_client", client_id: "12345678-abcd-1234-abcd-123456789abc" } };
 assert.deepEqual(parse(JSON.stringify(publicCloud)), publicCloud);
+assert.deepEqual(publishable(["dropbox", "google", "github"]), ["google", "github", "dropbox"]);
+assert.deepEqual(publishable(["microsoft", "github", "google", "dropbox"]), ["google", "github", "dropbox", "microsoft"]);
+for (const missing of ["google", "github", "dropbox"]) assert.throws(() => publishable(["google", "github", "dropbox"].filter(provider => provider !== missing)), /publicación requiere/);
+for (const invalid of [undefined, null, {}, [], ["google", "github", "dropbox", "dropbox"], ["google", "github", "dropbox", "unknown"]]) assert.throws(() => publishable(invalid), /publicación requiere/);
 for (const bad of [
   {}, { schemaVersion: 1 }, { ...fixture, schemaVersion: 2 }, { ...fixture, endpoint: "https://fixture.invalid" },
   { schemaVersion: 1, google: { ...fixture.google, type: "web" } },

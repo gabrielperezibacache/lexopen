@@ -12,8 +12,10 @@ import { fileReceiptTarget, normalizeVerifiedFileReceipt } from "./file-receipt"
 import type { ExplicitFileTask } from "./file-task";
 import { normalizeComputerAuthorizationSnapshot, normalizeComputerAuthorizationAck, validateComputerAuthorizationAck, parseComputerAuthorizationChoice, type ComputerAuthorizationChoice } from "./authorization-policy";
 import { normalizeComputerUseApproval } from "./computer-use-approval";
+import { metadataTarget, verifyMetadataReceipt, type ExplicitMetadataTask } from "./metadata-task";
 
 export type StagedFileApproval = { requestId: string; task: ExplicitFileTask };
+export type StagedMetadataApproval = { requestId: string; metadataTask: ExplicitMetadataTask };
 
 type Fetcher = typeof fetch;
 export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
@@ -45,7 +47,7 @@ export class KittiesGateway {
     if (!selected || /demo|scripted/i.test(JSON.stringify(selected))) throw new ConnectorError("provider_not_ready", "Configure un proveedor real de IA en el gateway del escritorio. ALTAZOR no transferirá sus credenciales.", 409);
     const fleet = await this.json("/v1/kitties");
     if (!Array.isArray(fleet.kitties) || fleet.kitties.some(item => !item || typeof item !== "object" || !knownKittyNames.includes(item.name) || String(item.container || "").startsWith("demo-"))) throw new ConnectorError("gateway_not_dedicated", "Este gateway contiene escritorios ajenos a este espacio. Use una instancia independiente y dedicada.", 409);
-    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1", cloudFileOAuth: health.lexopen_cloud_file_oauth === "v1", githubPersistentOAuth: health.lexopen_github_persistent_oauth === "v1" };
+    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1", cloudFileOAuth: health.lexopen_cloud_file_oauth === "v1", githubPersistentOAuth: health.lexopen_github_persistent_oauth === "v1", driveManagement: health.lexopen_drive_management === "v1" };
   }
   async createKitty(name: string, provider: string, connectors: readonly string[] = ["-"], start = true) {
     const selected = normalizeConnectorNames(connectors);
@@ -64,6 +66,17 @@ export class KittiesGateway {
   async requireConnectorGate() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_connector_gate !== CONNECTOR_GATE) throw new ConnectorError("connector_gate_required", "El gateway necesita el refuerzo de permisos de LexOpen para usar conexiones.", 409); }
   async requireFileReads() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_file_reads !== "v1") throw new ConnectorError("file_reads_required", "Actualice el escritorio de Altazor para trabajar con archivos completos de Google Drive y GitHub.", 409); }
   async requireStagedFileActions() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_staged_file_actions !== "v1") throw new ConnectorError("staged_file_actions_required", "Actualice el escritorio de Altazor para descargar archivos con comprobación real de sus resultados.", 409); }
+  async requireStagedMetadataActions() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_staged_metadata_actions !== "v1") throw new ConnectorError("staged_metadata_actions_required", "Actualiza el escritorio de Altazor para consultar nombres de archivos directamente, sin delegar la búsqueda al modelo.", 409); }
+  async stageMetadataAction(chatId: string, kittyId: string, requestId: string, task: ExplicitMetadataTask, text: string) {
+    safeId(chatId); safeId(kittyId); safeId(requestId); connectorNameSchema.parse(task.connector);
+    assertEasyConnectorRead({ ...task, args: { action: task.action, ...task.args } }); metadataTarget(task.args);
+    if (!text.trim() || Buffer.byteLength(text, "utf8") > 16000) throw new ConnectorError("task_approval_required", "Acorta el encargo antes de preparar esta consulta.", 400);
+    await this.requireStagedMetadataActions();
+    const result = await this.json(`/v1/lexopen/chats/${safeId(chatId)}/metadata-actions`, "POST", { request_id: requestId, kitty: kittyId, connector: task.connector, action: task.action, args: task.args, text });
+    if (result.state !== "pending" || result.request_id !== requestId || typeof result.approval_id !== "string") throw new ConnectorError("metadata_stage_unknown", "No se confirmó la preparación de la consulta. Revisa su estado; no se repetirá automáticamente.", 502);
+    safeId(result.approval_id);
+    return { accepted: true, staged: true, metadataStaged: true, state: "pending", requestId, approvalId: result.approval_id, metadataTask: task };
+  }
   async stageFileAction(chatId: string, kittyId: string, requestId: string, task: ExplicitFileTask, text: string) {
     safeId(chatId); safeId(kittyId); safeId(requestId); connectorNameSchema.parse(task.connector);
     assertEasyConnectorRead({ ...task, args: { action: task.action, ...task.args } });
@@ -81,6 +94,7 @@ export class KittiesGateway {
   async requirePersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_persistent_oauth !== "v1") throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409); }
   async requireGithubPersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_github_persistent_oauth !== "v1") throw new ConnectorError("github_oauth_persistence_required", "Actualiza el escritorio de Altazor antes de conectar GitHub para guardar y renovar su acceso de forma segura.", 409); }
   async requireOAuthAliasCreation() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_oauth_alias_create !== "v1") throw new ConnectorError("oauth_alias_create_required", "Actualiza el escritorio de Altazor antes de conectar una cuenta nueva. El ingreso todavía no se ha iniciado.", 409); }
+  async requireDriveManagement() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_drive_management !== "v1") throw new ConnectorError("drive_management_required", "Actualiza el escritorio de Altazor para crear y guardar archivos en Google Drive con tu cuenta conectada.", 409); }
   async requireCloudFileOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_cloud_file_oauth !== "v1") throw new ConnectorError("cloud_file_oauth_required", "Actualice el escritorio de Altazor para conectar esta cuenta desde la aplicación instalada.", 409); }
   async requireComputerUsePolicy() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_computer_use_policy !== "v1") throw new ConnectorError("computer_policy_unsupported", "Actualice el escritorio de Altazor para aplicar autorizaciones de uso del computador.", 409); }
   async computerAuthorization(chatId: string, kittyId: string, binding: string) {
@@ -127,6 +141,7 @@ export class KittiesGateway {
   }
   async setPersistentEasyOAuth(name: string, input: PersistentEasyOAuthConfiguration) {
     connectorNameSchema.parse(name); validatePersistentEasyOAuth(input); await this.requirePersistentOAuth();
+    if (input.kind === "google-workspace" && input.scopes.includes("https://www.googleapis.com/auth/drive")) await this.requireDriveManagement();
     if (input.kind === "github") await this.requireGithubPersistentOAuth();
     else if (input.publicClient) await this.requireCloudFileOAuth();
     const result = await this.json(`/v1/lexopen/easy-oauth/${safeId(name)}`, "POST", { kind: input.kind, client_id: input.clientId, ...(input.publicClient ? { public_client: true } : { client_secret: input.clientSecret }), access_token: input.accessToken, refresh_token: input.refreshToken, expires_at: input.expiresAt, scopes: input.scopes, ...(input.account ? { account: input.account } : {}) });
@@ -182,26 +197,32 @@ export class KittiesGateway {
     const result = await this.json(`/v1/kitties/${safeId(id)}`, "PATCH", { connectors: selected, approvals: "ask" });
     return this.validateKitty(result.kitty, name, provider, selected);
   }
-  async pendingApprovals(kittyId: string, chatId: string, connectors: readonly string[]): Promise<(ConnectorApproval & { requestId?: string })[]> {
+  async pendingApprovals(kittyId: string, chatId: string, connectors: readonly string[]): Promise<(ConnectorApproval & { requestId?: string; metadataStaged?: true })[]> {
     await this.requireConnectorGate(); const result = await this.json("/v1/approvals?status=pending");
     if (!Array.isArray(result.approvals) || result.approvals.length > 200) throw new ConnectorError("connector_approvals_contract", "No se pudo leer las autorizaciones pendientes.", 502);
     return result.approvals.filter(row => row && row.kitty === kittyId && row.chat === chatId && row.status === "pending" && connectors.includes(row.connector)).map(row => {
       const kind = connectorKind(String(row.kind));
       if (!kind || typeof row.id !== "string" || typeof row.action !== "string" || !row.args || typeof row.args !== "object" || Array.isArray(row.args)) throw new ConnectorError("connector_approvals_contract", "La autorización no corresponde a una conexión verificada.", 502);
       safeId(row.id);
-      if (row.request_id !== undefined && (typeof row.request_id !== "string" || !row.request_id || row.file_stage_ready !== true)) throw new ConnectorError("connector_approvals_contract", "La petición de descarga todavía no está confirmada para su revisión.", 502);
+      if (row.request_id !== undefined && (typeof row.request_id !== "string" || !row.request_id || (row.file_stage_ready === true) === (row.metadata_stage_ready === true)) || row.request_id === undefined && (row.file_stage_ready === true || row.metadata_stage_ready === true)) throw new ConnectorError("connector_approvals_contract", "La petición todavía no está confirmada para su revisión.", 502);
       if (typeof row.request_id === "string") safeId(row.request_id);
-      return { id: row.id, kittyId, chatId, connector: String(row.connector), kind: kind.id, action: row.action.slice(0, 100), summary: typeof row.summary === "string" ? row.summary.slice(0, 1000) : "", ...safeApprovalArgs(row.args), at: typeof row.at === "string" ? row.at.slice(0, 80) : "", status: "pending" as const, ...(typeof row.request_id === "string" ? { requestId: row.request_id } : {}) };
+      return { id: row.id, kittyId, chatId, connector: String(row.connector), kind: kind.id, action: row.action.slice(0, 100), summary: typeof row.summary === "string" ? row.summary.slice(0, 1000) : "", ...safeApprovalArgs(row.args), at: typeof row.at === "string" ? row.at.slice(0, 80) : "", status: "pending" as const, ...(typeof row.request_id === "string" ? { requestId: row.request_id } : {}), ...(row.metadata_stage_ready === true ? { metadataStaged: true as const } : {}) };
     });
   }
-  async decideApproval(id: string, kittyId: string, chatId: string, connectors: readonly string[], approve: boolean, staged?: StagedFileApproval): Promise<{ id: string; status: string; failed: boolean; canContinue: boolean; resumeTask: string | null; verifiedFile?: VerifiedComputerFile }> {
+  async decideApproval(id: string, kittyId: string, chatId: string, connectors: readonly string[], approve: boolean, staged?: StagedFileApproval | StagedMetadataApproval): Promise<{ id: string; status: string; failed: boolean; canContinue: boolean; resumeTask: string | null; verifiedFile?: VerifiedComputerFile; metadataReady?: boolean }> {
     const pending = await this.pendingApprovals(kittyId, chatId, connectors);
     const selected = pending.find(row => row.id === id);
     if (!selected) throw new ConnectorError("connector_approval_missing", "La autorización ya cambió o no pertenece a esta sesión.", 409);
+    const metadata = staged && "metadataTask" in staged ? staged : undefined;
     if (selected.requestId || staged) {
-      await this.requireStagedFileActions();
-      const exact = (value: Record<string, unknown>) => JSON.stringify(Object.entries(fileReceiptTarget(value)).sort(([a], [b]) => a.localeCompare(b)));
-      if (!staged || selected.requestId !== staged.requestId || selected.kind !== staged.task.kind || selected.connector !== staged.task.connector || selected.action !== staged.task.action || exact(selected.args) !== exact(staged.task.args)) throw new ConnectorError("file_stage_binding", "La autorización no coincide con el archivo del encargo original. No se ejecutará.", 409);
+      if (metadata) {
+        await this.requireStagedMetadataActions();
+        if (!selected.metadataStaged || selected.requestId !== metadata.requestId || selected.kind !== metadata.metadataTask.kind || selected.connector !== metadata.metadataTask.connector || selected.action !== metadata.metadataTask.action || metadataTarget(selected.args) !== metadataTarget(metadata.metadataTask.args)) throw new ConnectorError("metadata_stage_binding", "La autorización no coincide con la consulta original. No se ejecutará.", 409);
+      } else {
+        await this.requireStagedFileActions();
+        const exact = (value: Record<string, unknown>) => JSON.stringify(Object.entries(fileReceiptTarget(value)).sort(([a], [b]) => a.localeCompare(b)));
+        if (!staged || "metadataTask" in staged || selected.metadataStaged || selected.requestId !== staged.requestId || selected.kind !== staged.task.kind || selected.connector !== staged.task.connector || selected.action !== staged.task.action || exact(selected.args) !== exact(staged.task.args)) throw new ConnectorError("file_stage_binding", "La autorización no coincide con el archivo del encargo original. No se ejecutará.", 409);
+      }
     }
     if (approve) assertEasyConnectorRead(selected);
     if (approve && selected.kind === "dropbox" && selected.action === "download_file") await this.requireCloudFileOAuth();
@@ -221,7 +242,13 @@ export class KittiesGateway {
     const result = await this.json(`/v1/approvals/${safeId(id)}/${approve ? "approve" : "reject"}`, "POST", approve ? { always: false } : { reason: "La persona rechazó esta operación en LexOpen.", always: false });
     const approval = result.approval as Record<string, unknown> | undefined;
     if (!approval || approval.id !== id || approval.kitty !== kittyId || approval.chat !== chatId || approval.status !== (approve ? "approved" : "rejected") || approval.always === true) throw new ConnectorError("connector_approval_unknown", "El gateway no confirmó la decisión. No se repetirá automáticamente.", 502);
+    if (metadata) {
+      if (approval.request_id !== metadata.requestId || approval.connector !== selected.connector || approval.kind !== selected.kind || approval.action !== metadata.metadataTask.action || approval.structured_receipt !== undefined) throw new ConnectorError("metadata_receipt_unknown", "El resultado no coincide con esta consulta. No se repetirá automáticamente.", 502);
+      const verified = approve && !approval.error ? verifyMetadataReceipt(approval.metadata_receipt, approval.result, { requestId: metadata.requestId, approvalId: id, chatId, kittyId, task: metadata.metadataTask }) : {};
+      return { id, status: String(approval.status), failed: Boolean(approval.error), canContinue: false, resumeTask: null, ...verified };
+    }
     if (staged) {
+      if ("metadataTask" in staged) throw new ConnectorError("metadata_receipt_unknown", "La consulta no se confirmó.", 502);
       if (approval.request_id !== staged.requestId || approval.connector !== selected.connector || approval.kind !== selected.kind || approval.action !== "download_file") throw new ConnectorError("file_receipt_unknown", "El resultado no coincide con esta descarga. No se repetirá automáticamente.", 502);
       const verifiedFile = approve && !approval.error ? normalizeVerifiedFileReceipt(approval.structured_receipt, { requestId: staged.requestId, approvalId: id, chatId, kittyId, connector: staged.task.connector, kind: staged.task.kind, action: staged.task.action, args: staged.task.args }) : undefined;
       return { id, status: String(approval.status), failed: Boolean(approval.error), canContinue: false, resumeTask: null, ...(verifiedFile ? { verifiedFile } : {}) };

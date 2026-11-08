@@ -109,9 +109,9 @@ export function DriveFolderPanel({
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Google Drive</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-            Elija una carpeta para este expediente. Al activar la actualización
-            automática se guardan sus archivos nuevos y sus nuevas versiones,
-            conservando cada original para su lectura y citas.
+            Vincula la carpeta de esta causa con la cuenta conectada a Altazor.
+            Puedes recibir sus documentos y guardar tus nuevas versiones,
+            conservando los originales y sus fuentes.
           </p>
         </div>
         <FolderOpen className="text-[var(--copper)]" size={20} />
@@ -232,7 +232,7 @@ export function DriveFolderPanel({
           )}
         </div>
       ) : (
-        canImport ? <div className="mt-4 space-y-3">
+        canImport ? <details className="mt-4 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)] underline underline-offset-4">Otras conexiones y enlaces</summary><div className="mt-2 space-y-3">
           <button
             type="button"
             className="btn btn-primary"
@@ -277,7 +277,7 @@ export function DriveFolderPanel({
               Vincular carpeta
             </button>
           </details>
-        </div> : <p className="mt-4 text-sm text-[var(--ink-soft)]/80">Esta causa todavía no tiene una carpeta vinculada.</p>
+        </div></details> : <p className="mt-4 text-sm text-[var(--ink-soft)]/80">Esta causa todavía no tiene una carpeta vinculada.</p>
       )}
 
       {msg && (
