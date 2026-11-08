@@ -4,6 +4,9 @@ import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
+
+// Network-failure fixtures must intercept requests before any service worker.
+test.use({ serviceWorkers: "block" });
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Use the explicit disposable database");
 async function fixture(page: Page, readOnly = false) {

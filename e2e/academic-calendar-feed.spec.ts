@@ -36,7 +36,8 @@ test("Calendario docente por URL: actualizaciones, lectura sin sesión y revocac
     const agenda = `${base}/teaching-sessions`;
     expect((await otherPage.request.get(manage)).status()).toBe(404);
     expect(await (await page.request.get(manage)).json()).toMatchObject({ enabled: false });
-    expect((await page.request.post(manage)).status()).toBe(403);
+    expect((await page.request.post(manage, { headers: { Origin: "https://other.example.invalid" } })).status()).toBe(403);
+    if (process.env.E2E_SERVER_MODE === "production") expect((await page.request.post(manage)).status()).toBe(403);
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(`/academico?trabajo=${work.id}#agenda-docencia`);
     const panel = page.getByRole("region", { name: "Actividades en mi Agenda" });

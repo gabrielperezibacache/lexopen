@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
 
+// Network-failure fixtures must intercept requests before any service worker.
+test.use({ serviceWorkers: "block" });
+
 test("Drive ofrece reutilizar la aplicación preparada y conserva la alternativa propia", async ({ page }, testInfo) => {
   const api = "/api/personal-connectors/google-drive";
   const callbackPath = `${api}/oauth/callback`;

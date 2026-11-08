@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
 import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
 
+// Network-failure fixtures must intercept requests before any service worker.
+test.use({ serviceWorkers: "block" });
+
 const legacyAnchors = ["idioma", "estudio", "usuarios", "transcription-settings", "llm-settings", "obsidian-settings", "google-settings", "notify-settings", "pjud-settings", "pjud-log", "runtime-settings", "integraciones-overview", "host-status", "purge-demo"];
 
 test("Preferencias personales lleva directamente a la seguridad de la cuenta", async ({ page }, info) => {
