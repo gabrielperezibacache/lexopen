@@ -22,7 +22,7 @@ Misma superficie de seguridad que el resto del Host (sesión, CSRF, RBAC, rate-l
 
 ## Configuración del estudio
 
-En **Configuración → Asistente / IA** (`FirmSettings`):
+En **Configuración → Conexiones e IA → IA** (`FirmSettings`):
 
 - `assistantLlmMode`: `local_only` \| `remote_allowed`
 - `auditLlmPrompts`: si está activo, la auditoría puede guardar prompts completos (default off)
@@ -80,7 +80,7 @@ elige del catálogo de la conexión seleccionada; cambiar de cuenta requiere gua
 la selección y revisar de nuevo el destino de los envíos pendientes.
 
 El administrador conecta y prueba la cuenta compartida desde **Configuración →
-Asistente / IA → Codex del Host**, y luego habilita su uso. Compartir está
+Conexiones e IA → IA → Codex del Host**, y luego habilita su uso. Compartir está
 deshabilitado por defecto. Deshabilitar o cambiar esa cuenta revoca los envíos
 pendientes y detiene las solicitudes compartidas en curso. Quien la tuviera
 seleccionada verá que ya no está disponible y deberá elegir otra conexión; los
