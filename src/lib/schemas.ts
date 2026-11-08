@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { parseDateInput } from "@/lib/date-input";
+import { MAX_DIAS_PLAZO } from "@/lib/plazos";
 
 export const loginSchema = z.object({
   email: z.string().email().max(320),
@@ -46,6 +48,7 @@ export const causaCreateSchema = z.object({
 /** Partial update for ficha fields (no Drive — use Google integration routes). */
 export const causaUpdateSchema = z
   .object({
+    expectedUpdatedAt: z.string().datetime().optional(),
     titulo: z.string().min(3).max(500).optional(),
     rit: caseIdentifierSchema.optional().nullable(),
     ruc: caseIdentifierSchema.optional().nullable(),
@@ -63,16 +66,17 @@ export const causaUpdateSchema = z
     abogadoContraparte: z.string().max(300).optional().nullable(),
     acceso: z.enum(["estudio", "equipo"]).optional(),
   })
-  .refine((obj) => Object.keys(obj).length > 0, {
+  .refine((obj) => Object.keys(obj).some(key => key !== "expectedUpdatedAt"), {
     message: "Sin campos para actualizar",
   });
 
+const deadlineDateInput = z.string().trim().max(80).refine(value => !value || parseDateInput(value) !== null, "Fecha inválida");
 export const plazoCreateSchema = z.object({
-  titulo: z.string().min(2),
-  descripcion: z.string().optional().nullable(),
-  fechaLimite: z.string().optional().nullable(),
-  fechaNotificacion: z.string().optional().nullable(),
-  diasPlazo: z.number().int().positive().optional().nullable(),
+  titulo: z.string().trim().min(2).max(300),
+  descripcion: z.string().max(10000).optional().nullable(),
+  fechaLimite: deadlineDateInput.optional().nullable(),
+  fechaNotificacion: deadlineDateInput.optional().nullable(),
+  diasPlazo: z.number().int().positive().max(MAX_DIAS_PLAZO).optional().nullable(),
   tipoComputo: z.enum(["habiles", "corridos"]).optional(),
   esFatal: z.boolean().optional(),
   tipo: z.string().optional(),
@@ -95,6 +99,7 @@ export const documentoCreateSchema = z.object({
 });
 
 export const documentoUpdateSchema = z.object({
+  expectedVersion: z.number().int().positive().optional(),
   nombre: z.string().min(1).max(255).optional(),
   tipo: z.string().min(1).max(80).optional(),
   confidencial: z.boolean().optional(),
@@ -124,6 +129,7 @@ export const tramiteCreateSchema = z.object({
 });
 
 export const tramiteUpdateSchema = z.object({
+  expectedUpdatedAt: z.string().datetime().optional(),
   titulo: z.string().min(2).max(300).optional(),
   detalle: z.string().max(10000).optional().nullable(),
   estado: z.enum(["pendiente", "en_curso", "hecho", "cancelado"]).optional(),

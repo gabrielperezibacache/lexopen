@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
@@ -28,7 +30,10 @@ export async function altazorTransaction<T>(client: PrismaClient, run: (tx: Pris
     try { return await client.$transaction(run, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 }); }
     catch (error) {
       const code = (error as { code?: string }).code;
-      if (!["P2034", "P2002"].includes(code || "") || attempt >= 3) { if (code === "P2002") throw httpError("Ya hay una operación en curso. Vuelva a cargar la conversación", 409); throw error; }
+      if (!["P2034", "P2002"].includes(code || "") || attempt >= 6) { if (code === "P2002") throw httpError("Ya hay una operación en curso. Vuelva a cargar la conversación", 409); throw error; }
+      // Retry only rolled-back database transactions. A short jittered backoff
+      // lets concurrent commits finish instead of exhausting retries in lockstep.
+      await delay(Math.min(250, 10 * 2 ** attempt) + randomInt(0, 21));
     }
   }
 }

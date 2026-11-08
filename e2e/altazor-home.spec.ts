@@ -234,7 +234,7 @@ test("memoria privada: grafo confirmado entra al contexto y olvidar oculta el hi
   expect(modelRequests.slice(before).some(messages=>JSON.stringify(messages).includes(labels[0]))).toBe(true);const turn=await db.altazorTurn.findUniqueOrThrow({where:{id:chat.turns[0].id}});expect(JSON.parse(turn.contextJson).memoryDependencies).toHaveLength(3);
   await page.getByRole("button",{name:"Memoria",exact:true}).click();const memoryButton=memory.locator("article").getByRole("button",{name:new RegExp(`^${labels[0]}`)});if(await memoryButton.getAttribute("aria-expanded")!=="true")await memoryButton.click();await memory.getByRole("button",{name:"Olvidar",exact:true}).first().click();await memory.getByRole("button",{name:"Sí, olvidar",exact:true}).click();
   await expect.poll(async()=>(await json<{nodes:{label:string}[]}>(await page.request.get("/api/altazor/memory"))).nodes.some(node=>node.label===labels[0])).toBe(false);
-  await page.reload();await expect(page.locator(".altazor-turns")).toContainText("Contenido no disponible");await expect(page.locator(".altazor-turns")).not.toContainText(chat.turns[0].assistantText);expect((await readChat(page,chat.conversation.id)).turns[0].status).toBe("blocked");
+  await page.reload();await page.getByRole("button",{name:"Volver a la conversación",exact:true}).click();await expect(page.locator(".altazor-turns")).toContainText("Contenido no disponible");await expect(page.locator(".altazor-turns")).not.toContainText(chat.turns[0].assistantText);expect((await readChat(page,chat.conversation.id)).turns[0].status).toBe("blocked");
   expect(await db.altazorMemoryNode.count({where:{space:{ownerId:user.id},status:"forgotten",label:"",body:""}})).toBe(1);
 });
 

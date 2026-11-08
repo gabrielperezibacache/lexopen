@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
@@ -38,6 +38,7 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.emulateMedia({ colorScheme: "dark" });
     await loginAs(page, "socio@estudio.cl");
+    await authenticateApiRequests(page);
     await page.getByTestId("desktop-sidebar").getByRole("link", { name: "Causas", exact: true }).click();
     await expect(page).toHaveURL(/\/mis-causas$/);
     await expect(page.getByRole("heading", { name: "Mis Causas", exact: true })).toBeVisible();
@@ -54,7 +55,7 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
     await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole("link", { name: title, exact: true }).click();
-    const archive = page.getByTestId("case-archive");
+    const archive = page.locator("#main-content").getByTestId("case-archive");
     await expect(archive.getByRole("heading", { name: "Carpetas y documentos" })).toBeVisible();
     await expect(archive.getByText("Descargado de OJV", { exact: true })).toBeVisible();
     await expect(archive.getByText("Importado de Drive", { exact: true })).toBeVisible();
@@ -121,7 +122,8 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
     await expect(page.getByRole("textbox", { name: "Mensaje para ALTAZOR" })).toHaveValue(/revisar este documento/);
 
     await loginAs(page, "abogado@estudio.cl");
-    const denied = await page.request.post(`/api/causas/${causaId}/expediente`, { data: { action: "create-folder", name: "Ajena", parentId: null } });
+    await authenticateApiRequests(page);
+    const denied = await apiRequest(page).post(`/api/causas/${causaId}/expediente`, { data: { action: "create-folder", name: "Ajena", parentId: null } });
     expect(denied.status()).toBe(404);
   } finally {
     if (causaId) {

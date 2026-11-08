@@ -1,3 +1,4 @@
+import { saveWhatsAppConfig, whatsappFields } from "@/lib/notify/whatsapp-config";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -34,7 +35,8 @@ export async function GET() {
 }
 
 const schema = z.object({
-  provider: z.enum(["smtp", "telegram", "webpush"]),
+  whatsapp: whatsappFields.partial().optional(),
+  provider: z.enum(["smtp", "telegram", "webpush", "whatsapp"]),
   enabled: z.boolean(),
   smtp: z
     .object({
@@ -70,7 +72,9 @@ export async function PUT(req: NextRequest) {
     const body = await parseBody(req, schema);
 
     await notificationTransaction(prisma, async tx => {
-      if (body.provider === "smtp") {
+      if (body.provider === "whatsapp") {
+        await saveWhatsAppConfig(body.enabled, body.whatsapp || {}, tx);
+      } else if (body.provider === "smtp") {
         await saveSmtpConfig({
           enabled: body.enabled,
           config: body.smtp || {},

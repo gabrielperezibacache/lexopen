@@ -33,6 +33,7 @@ const FERIADOS_FIJOS = [
 ];
 
 export type TipoComputo = "habiles" | "corridos";
+export const MAX_DIAS_PLAZO = 3650;
 export type UrgenciaPlazo = "vencido" | "critico" | "proximo" | "ok";
 
 function pad(n: number) {
@@ -189,8 +190,9 @@ export function calcularVencimientoYmd(opts: {
   tipoComputo?: TipoComputo;
 }): string {
   if (!isValidYmd(opts.desde)) throw new Error("Fecha inválida");
+  if (!Number.isSafeInteger(opts.dias) || opts.dias < 0 || opts.dias > MAX_DIAS_PLAZO) throw new RangeError(`Indique entre 0 y ${MAX_DIAS_PLAZO} días`);
   const tipo = opts.tipoComputo || "habiles";
-  let remaining = Math.max(0, opts.dias);
+  let remaining = opts.dias;
   if (remaining === 0) return opts.desde;
 
   let cursor = addCivilDays(opts.desde, 1);

@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Read pinned desktop source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: madkoding/kitties
           ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - name: Archive desktop source and license notices
         run: python3 scripts/altazor/prepare-desktop-source.py .tmp/altazor-desktop-upstream "$RUNNER_TEMP/altazor-desktop-source"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: altazor-desktop-source-context
           path: ${{ runner.temp }}/altazor-desktop-source/
@@ -71,15 +71,15 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/desktop/.release/playwright-browsers
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: |
             package-lock.json
             desktop/package-lock.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: altazor-desktop-source-context
           path: desktop/.release/altazor-desktop-source
@@ -90,6 +90,29 @@ jobs:
         env:
           TARGET_PLATFORM: ${{ matrix.platform }}
           TARGET_ARCH: ${{ matrix.arch }}
+      - name: Prepare public account connection profile
+        shell: bash
+        env:
+          LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON: ${{ secrets.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON }}
+          LEXOPEN_PUBLIC_OAUTH_REQUIRED: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs"), path = require("node:path");
+          const { parseDistributedOAuthProfile, requirePublishableOAuthProviders } = require("./desktop/oauth-clients.cjs");
+          const raw = process.env.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON;
+          if (!raw) {
+            if (process.env.LEXOPEN_PUBLIC_OAUTH_REQUIRED === "true") throw new Error("Falta el perfil público de conexiones requerido para publicar.");
+            process.exit(0);
+          }
+          const profile = parseDistributedOAuthProfile(raw);
+          requirePublishableOAuthProviders(Object.keys(profile).filter(provider => provider !== "schemaVersion"));
+          if (!process.env.RUNNER_TEMP || !process.env.GITHUB_ENV) throw new Error("Missing release runner configuration");
+          const file = path.join(process.env.RUNNER_TEMP, "lexopen-oauth-clients.json");
+          if (/[\r\n]/.test(file)) throw new Error("Invalid release runner directory");
+          fs.writeFileSync(file, JSON.stringify(profile), { flag: "wx", mode: 0o600 });
+          fs.chmodSync(file, 0o600);
+          fs.appendFileSync(process.env.GITHUB_ENV, "LEXOPEN_DISTRIBUTED_OAUTH_PROFILE=" + file + "\n");
+          NODE
       - run: npm ci --prefix desktop
       - name: Diagnose native Windows PostgreSQL using owned fictitious clusters
         if: runner.os == 'Windows'
@@ -107,12 +130,15 @@ jobs:
         run: |
           node -e 'const fs=require("fs"),c=require("crypto").randomBytes(32).toString("hex");for(const d of ["storage",".tmp","desktop/data"]){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(d+"/release-private-canary.txt",c)}fs.appendFileSync(process.env.GITHUB_ENV,"LEXOPEN_RELEASE_CANARY="+c+"\n")'
       - name: Build native installers and audit resources
+        env:
+          # Type checking exceeds the default 2 GiB V8 heap on macOS arm64.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run desktop:dist -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Exercise packaged Host without external Node or npm
         run: npm run desktop:smoke
       - name: Record actual publisher signature status
         run: node desktop/scripts/signature-report.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           retention-days: 14
@@ -138,21 +164,21 @@ jobs:
     needs: native
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - run: npm ci --prefix desktop --ignore-scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: native-artifacts
-      - name: Assemble verified feeds, manifest and checksums
+      - name: Assemble verification artifacts only (not publishable)
         shell: bash
-        run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA"
-      - uses: actions/upload-artifact@v4
+        run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA" --verification-only
+      - uses: actions/upload-artifact@v7
         with:
-          name: verified-release
+          name: verification-only-installers
           path: release/*
           if-no-files-found: error
           retention-days: 14
@@ -163,14 +189,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - run: npm ci --prefix desktop --ignore-scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: native-artifacts
@@ -183,7 +209,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(node -p 'require("./package.json").version')"
-          node -e 'const fs=require("fs"),p=require("./package.json"),m=require("./release/release-manifest.json");if(m.version!==p.version||m.sourceRevision!==process.env.GITHUB_SHA)process.exit(1);fs.writeFileSync("/tmp/lexopen-release-notes.md",`LexOpen ${m.version}\n\nGrabados editoriales integrados en los apartados de LexOpen, con encuadres y tamaños ajustados para escritorio y móvil. Fondos de filósofo y Atenea fundidos con el azul de la aplicación. Los cuatro vídeos de Google Flow se reproducen automáticamente, despacio y sin sonido, respetando las preferencias de movimiento y ahorro de datos. Cabeceras, tablas y estados vacíos conservan la paleta índigo, plata e iris.\n\nInstaladores nativos con comprobación de inicio, creación del primer administrador y persistencia tras reiniciar.\n\n${m.prerelease?"Versión preliminar: consulte release-manifest.json para el estado de firma. Los paquetes sin firma pueden mostrar avisos del sistema y no garantizan actualización automática en macOS.":"Versión estable con validación de firma del editor."}\n\nSHA256SUMS permite comprobar integridad; no sustituye la firma del editor. No incluye datos de expedientes.\n\nGuía: https://github.com/gabrielperezibacache/lexopen/blob/${process.env.GITHUB_REF_NAME}/docs/INSTALADORES.md\n`);'
+          node -e 'const fs=require("fs"),p=require("./package.json"),m=require("./release/release-manifest.json");if(m.publishable!==true||m.version!==p.version||m.sourceRevision!==process.env.GITHUB_SHA)process.exit(1);fs.writeFileSync("/tmp/lexopen-release-notes.md",`LexOpen ${m.version}\n\nGrabados editoriales integrados en los apartados de LexOpen, con encuadres y tamaños ajustados para escritorio y móvil. Fondos de filósofo y Atenea fundidos con el azul de la aplicación. Los cuatro vídeos de Google Flow se reproducen automáticamente, despacio y sin sonido, respetando las preferencias de movimiento y ahorro de datos. Cabeceras, tablas y estados vacíos conservan la paleta índigo, plata e iris.\n\nInstaladores nativos con comprobación de inicio, creación del primer administrador y persistencia tras reiniciar.\n\n${m.prerelease?"Versión preliminar: consulte release-manifest.json para el estado de firma. Los paquetes sin firma pueden mostrar avisos del sistema y no garantizan actualización automática en macOS.":"Versión estable con validación de firma del editor."}\n\nSHA256SUMS permite comprobar integridad; no sustituye la firma del editor. No incluye datos de expedientes.\n\nGuía: https://github.com/gabrielperezibacache/lexopen/blob/${process.env.GITHUB_REF_NAME}/docs/INSTALADORES.md\n`);'
           FLAGS=()
           if [[ "$VERSION" == *-* ]]; then FLAGS+=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" release/* --verify-tag --title "LexOpen $VERSION" --notes-file /tmp/lexopen-release-notes.md "${FLAGS[@]}"

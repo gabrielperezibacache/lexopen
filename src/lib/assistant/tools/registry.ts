@@ -27,6 +27,7 @@ import { academiaListarTool, academiaCrearTool, academiaPrepararTool } from "./a
 import { audienciaListarTool, audienciaCrearTool, audienciaNotaTool, escritoListarTool, escritoGuardarTool } from "./workflow";
 import { bibliotecaListarTool, sincronizacionEstadoTool } from "./library-sync";
 import { icaroListarTool, icaroDelegarTool } from "./icaro";
+import { driveEstadoTool, driveCrearCarpetaTool, driveGuardarDocumentoTool } from "./drive";
 
 export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "nota.crear": notaCrearTool,
@@ -67,6 +68,9 @@ export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "sincronizacion.estado": sincronizacionEstadoTool,
   "icaro.listar": icaroListarTool,
   "icaro.delegar": icaroDelegarTool,
+  "drive.estado": driveEstadoTool,
+  "drive.crearCarpeta": driveCrearCarpetaTool,
+  "drive.guardarDocumento": driveGuardarDocumentoTool,
 };
 
 // Sanity check en tiempo de carga: todo AssistantIntentId debe tener tool.

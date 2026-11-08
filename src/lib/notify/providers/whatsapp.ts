@@ -1,9 +1,8 @@
-/**
- * WhatsApp Meta Cloud API templates and signed inbound parsing.
- * Legacy factories remain for callers that explicitly request unavailable adapters.
- */
+/** WhatsApp general notices and the separate Altazor help template contract. */
 
 import type { ChannelProvider, SendResult } from "./types";
+import type { WhatsAppConfig } from "../whatsapp-config";
+import { e164 } from "../whatsapp-config";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { fetchSafeOutbound } from "@/lib/net/safe-url";
 import { boundedProviderText } from "./ntfy";
@@ -44,7 +43,9 @@ export function parseWhatsAppInbound(body: unknown): WhatsAppInbound[] {
   return result.slice(0, 100);
 }
 
-/** Meta templates can initiate a notification outside the 24-hour service window. */
+/** Altazor help: one approved text parameter carries the nonce for an authenticated reply.
+ * The help service calls this explicitly with provider=whatsapp_meta; the general
+ * outbox must use createWhatsAppProvider and its zero-variable template instead. */
 export function createWhatsAppMetaProvider(config: WhatsAppMetaConfig, http: typeof fetchSafeOutbound = fetchSafeOutbound): ChannelProvider {
   const configured = /^\d{5,40}$/.test(config.phoneNumberId) && /^v\d{1,3}\.\d$/.test(config.apiVersion) && /^[a-z0-9_]{1,100}$/.test(config.templateName) && /^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(config.templateLanguage) && Boolean(config.accessToken && config.appSecret && config.verifyToken);
   return {
@@ -60,37 +61,42 @@ export function createWhatsAppMetaProvider(config: WhatsAppMetaConfig, http: typ
         });
         if (!response.ok) return { ok: false, retryable: response.status === 429 || response.status >= 500, uncertain: response.status >= 500, error: `WhatsApp Meta respondió HTTP ${response.status}.` };
         const value = JSON.parse(await boundedProviderText(response, 32 * 1024)) as { messages?: { id?: string }[] };
-        return { ok: true, providerMessageId: value.messages?.[0]?.id?.slice(0, 200) };
+        const id = value.messages?.[0]?.id;
+        if (typeof id !== "string" || !id || id.length > 512) return { ok: false, retryable: false, uncertain: true, error: "WhatsApp aceptó la solicitud sin un identificador verificable" };
+        return { ok: true, providerMessageId: id };
       } catch { return { ok: false, retryable: false, uncertain: true, error: "No se pudo confirmar la entrega en WhatsApp. Comprueba la solicitud antes de reenviarla." }; }
     },
   };
 }
 
-export const WHATSAPP_NOT_IMPLEMENTED =
-  "Este adaptador legado no está disponible. Configure WhatsApp Meta Cloud API para los avisos de ayuda de Altazor.";
-
-export function createWhatsAppMetaStub(): ChannelProvider {
+type Transport = (url: string, init: RequestInit) => Promise<Response>;
+/** Approved, zero-variable template: no case names, links or document text in its body. */
+export function createWhatsAppProvider(config: WhatsAppConfig, transport: Transport = fetchSafeOutbound): ChannelProvider {
+  const meta = config.vendor === "meta";
+  const base = meta ? `https://graph.facebook.com/${config.apiVersion}/${config.phoneNumberId}` : `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}`;
+  const authorization = meta ? `Bearer ${config.accessToken}` : `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`;
   return {
-    id: "whatsapp_meta",
+    id: meta ? "whatsapp_meta" : "whatsapp_twilio",
     limits: { globalPerSec: 5, perDestinationPerSec: 1 },
     async health() {
-      return { ok: false, detail: WHATSAPP_NOT_IMPLEMENTED };
+      try {
+        const res = await transport(meta ? `${base}?fields=id` : `${base}.json`, { headers: { Authorization: authorization }, signal: AbortSignal.timeout(10_000) });
+        return { ok: res.ok, detail: res.ok ? "Credenciales aceptadas; compruebe la aprobación de la plantilla en el proveedor" : `WhatsApp HTTP ${res.status}` };
+      } catch { return { ok: false, detail: "No se pudo comprobar WhatsApp" }; }
     },
-    async send(): Promise<SendResult> {
-      return { ok: false, retryable: false, error: WHATSAPP_NOT_IMPLEMENTED };
-    },
-  };
-}
-
-export function createWhatsAppTwilioStub(): ChannelProvider {
-  return {
-    id: "whatsapp_twilio",
-    limits: { globalPerSec: 5, perDestinationPerSec: 1 },
-    async health() {
-      return { ok: false, detail: WHATSAPP_NOT_IMPLEMENTED };
-    },
-    async send(): Promise<SendResult> {
-      return { ok: false, retryable: false, error: WHATSAPP_NOT_IMPLEMENTED };
+    async send(_msg, dest): Promise<SendResult> {
+      if (dest.kind !== "whatsapp" || !e164.test(dest.e164)) return { ok: false, retryable: false, error: "Destino WhatsApp inválido" };
+      try {
+        const body = meta ? JSON.stringify({ messaging_product: "whatsapp", to: dest.e164.slice(1), type: "template", template: { name: config.templateName, language: { code: config.language } } })
+          : new URLSearchParams({ From: `whatsapp:${config.businessNumber}`, To: `whatsapp:${dest.e164}`, ContentSid: config.contentSid! }).toString();
+        const res = await transport(meta ? `${base}/messages` : `${base}/Messages.json`, { method: "POST", headers: { Authorization: authorization, "Content-Type": meta ? "application/json" : "application/x-www-form-urlencoded" }, body, signal: AbortSignal.timeout(20_000) });
+        // Provider response text can contain credentials and telephone numbers: never persist it.
+        if (!res.ok) return { ok: false, retryable: res.status === 429, uncertain: res.status >= 500, error: `WhatsApp HTTP ${res.status}`, retryAfterMs: res.status === 429 ? 60_000 : undefined };
+        const value = JSON.parse(await boundedProviderText(res, 32 * 1024)) as { messages?: { id?: string }[]; sid?: string } | null;
+        const id = meta ? value?.messages?.[0]?.id : value?.sid;
+        if (typeof id !== "string" || !id || id.length > 512) return { ok: false, retryable: false, uncertain: true, error: "WhatsApp aceptó la solicitud sin un identificador verificable" };
+        return { ok: true, providerMessageId: id };
+      } catch { return { ok: false, retryable: false, uncertain: true, error: "WhatsApp: respuesta de transporte desconocida; compruebe la entrega antes de reenviar" }; }
     },
   };
 }

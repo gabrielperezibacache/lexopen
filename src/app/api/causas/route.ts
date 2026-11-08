@@ -1,3 +1,6 @@
+import { serializable } from "@/lib/command-execution";
+import { currentStaffActor } from "@/lib/auth/staff-actor";
+import { httpError } from "@/lib/auth/access";
 import {
   assertCsrf,
   handleRouteError,
@@ -128,7 +131,6 @@ export async function POST(req: NextRequest) {
         rut: p.rut,
       })),
     });
-    const conflicts = risk.conflicts;
     const blocked = risk.status === "blocked";
     if (blocked && !body.conflictOverride) {
       return NextResponse.json(
@@ -141,7 +143,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (blocked && body.conflictOverride && !body.conflictNotes?.trim()) return jsonError("Debe registrar el fundamento de la autorización", 400);
-    return await prisma.$transaction(async (tx) => {
+    return await serializable(async (tx) => {
+      const actor = await currentStaffActor(user, tx);
+      if (!canSome(actor, "causa.create")) throw httpError("Sin permiso para crear causas", 403);
+      if (body.conflictOverride && !can(actor, "causa.override_walls")) throw httpError("Sin permiso para autorizar conflictos", 403);
+      if (duplicateWhere && await tx.causa.findFirst({ where: duplicateWhere, select: { id: true } })) throw httpError("Ya existe una causa con esa referencia y tribunal", 409);
+      const currentRisk = await checkConflicts({ user: actor, partes: (body.partes || []).map(p => ({ nombre: p.nombre, rut: p.rut })), client: tx });
+      if (currentRisk.status === "blocked" && !body.conflictOverride) throw httpError("Posible conflicto de interés detectado", 409);
+      if (currentRisk.status === "blocked" && body.conflictOverride && !body.conflictNotes?.trim()) throw httpError("Debe registrar el fundamento de la autorización", 400);
+      const assignedNow = await tx.user.findUnique({ where: { id: abogadoId }, select: { role: true } });
+      if (!assignedNow || !isStaff(assignedNow.role)) throw httpError("El responsable ya no está disponible", 403);
       const causa = await tx.causa.create({
         data: {
           titulo: body.titulo,
@@ -163,7 +174,7 @@ export async function POST(req: NextRequest) {
           clienteId: body.clienteId || null,
           abogadoId,
           conflictCheckedAt: new Date(),
-          conflictStatus: risk.status,
+          conflictStatus: currentRisk.status,
           conflictNotes: body.conflictNotes || null,
           partes: body.partes?.length
             ? {
@@ -194,7 +205,7 @@ export async function POST(req: NextRequest) {
 
       await writeAuditStrict({
         actorId: user.id,
-        action: body.conflictOverride && blocked
+        action: body.conflictOverride && currentRisk.status === "blocked"
           ? "causa.create.conflict_override"
           : "causa.create",
         entityType: "Causa",
@@ -202,14 +213,14 @@ export async function POST(req: NextRequest) {
         after: {
           titulo: causa.titulo,
           rit: causa.rit,
-          conflicts,
-          conflictOverride: Boolean(body.conflictOverride && blocked),
+          conflicts: currentRisk.conflicts,
+          conflictOverride: Boolean(body.conflictOverride && currentRisk.status === "blocked"),
           conflictNotes: body.conflictNotes || null,
         },
       }, tx);
 
-      return NextResponse.json({ ...causa, ...risk }, { status: 201 });
-    }, { isolationLevel: "Serializable" });
+      return NextResponse.json({ ...causa, ...currentRisk }, { status: 201 });
+    });
   } catch (e) {
     return handleRouteError(e);
   }

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import type { z } from "zod";
 import { prisma } from "@/lib/db";
-import { actorFor } from "@/lib/books/access";
+import { actorFor, bookFor } from "@/lib/books/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { httpError } from "@/lib/auth/access";
 import { bookTransaction } from "@/lib/books/service";
@@ -12,8 +13,13 @@ import { writeAuditStrict } from "@/lib/audit";
 import { createCaseWritingFromSnapshots } from "@/lib/writings/service";
 import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
-import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, ACADEMIC_LABELS, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
+import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, academicCongressSchema, committeeAgreementConversionSchema, ACADEMIC_CONGRESS_LIMITS, ACADEMIC_LABELS, ACADEMIC_MANUSCRIPT_MAX, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicCongress, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
+import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, isAcademicTeachingProgram, isAcademicTeachingSessionKind, type AcademicManuscriptTemplate } from "./academic-templates";
+import type { AcademicCallOrigin } from "./academic-calls";
+import { readTeachingSessionContent } from "./teaching-session-content";
+import { teachingTime } from "./teaching-sessions";
+import { parseCommitteeDeliverableHref } from "./committee-deliverables";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
 const unavailableRowTitle = "Fila cuyo respaldo ya no está disponible";
 const unavailableSource = (error: unknown) => [403,404,409,410,413,422].includes(Number((error as { status?: number }).status));
@@ -27,11 +33,15 @@ async function workspaceFor(id: string, user: CausaAccessUser, client: AcademicC
 export async function academicOverview(user: CausaAccessUser, client: PrismaClient = prisma) {
   const actor = await actorFor(user, client);
   const [workspaces, profile, destination] = await Promise.all([
-    client.altazorAcademicWorkspace.findMany({ where: { ownerId: actor.id, archivedAt: null }, select: { id: true, title: true, kind: true, revision: true, updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 100 }),
+    client.altazorAcademicWorkspace.findMany({ where: { ownerId: actor.id, archivedAt: null }, select: { id: true, title: true, kind: true, revision: true, updatedAt: true, briefJson: true }, orderBy: { updatedAt: "desc" }, take: ACADEMIC_WORKSPACE_LIMIT }),
     client.altazorAcademicProfile.findUnique({ where: { ownerId: actor.id } }),
     workbenchDestination(actor.id, "assisted_draft"),
   ]);
-  return { workspaces, profile: profile ? JSON.parse(profile.profileJson) : { name: actor.name, headline: "", orcid: "", biography: "", education: "", experience: "", publications: "", languages: "", interests: "" }, profileRevision: profile?.revision || 0, destination, modes: ACADEMIC_LABELS };
+  const summaries = workspaces.map(({ briefJson, ...workspace }) => {
+    const call = workspace.kind === "call" ? (JSON.parse(briefJson) as typeof emptyAcademicBrief).call : undefined;
+    return { ...workspace, ...(call ? { call: { country: call.country, status: call.status, deadline: call.deadline } } : {}) };
+  });
+  return { workspaces: summaries, profile: profile ? JSON.parse(profile.profileJson) : { name: actor.name, headline: "", orcid: "", biography: "", education: "", experience: "", publications: "", languages: "", interests: "" }, profileRevision: profile?.revision || 0, destination, modes: ACADEMIC_LABELS };
 }
 export async function saveAcademicProfile(raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicProfileSaveSchema.parse(raw), actor = await actorFor(user, client);
@@ -51,14 +61,19 @@ export async function createAcademicWorkspace(raw: unknown, user: CausaAccessUse
   return bookTransaction(client, async tx => {
     const previous = await tx.altazorAcademicWorkspace.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
     if (previous) { if (previous.title !== input.title || previous.kind !== input.kind) throw httpError("Esta solicitud identifica otro trabajo", 409); return { id: previous.id, reused: true }; }
-    if (await tx.altazorAcademicWorkspace.count({ where: { ownerId: actor.id, archivedAt: null } }) >= 100) throw httpError("Archive un trabajo para crear otro; el límite activo es cien", 413);
-    const task = input.kind === "course" ? "syllabus" : input.kind === "career" ? "cv" : input.kind === "writing" ? "academic_writing" : "literature_review";
+    if (await tx.altazorAcademicWorkspace.count({ where: { ownerId: actor.id, archivedAt: null } }) >= ACADEMIC_WORKSPACE_LIMIT) throw httpError("Archive un trabajo para crear otro; el límite activo es cien", 413);
+    const task = input.kind === "course" ? "syllabus" : isAcademicTeachingKind(input.kind) ? "teaching_material" : input.kind === "career" ? "cv" : input.kind === "writing" ? "academic_writing" : "literature_review";
     const workspace = await tx.altazorAcademicWorkspace.create({ data: { ...input, ownerId: actor.id, briefJson: JSON.stringify({ ...emptyAcademicBrief, task }), matrixJson: JSON.stringify(emptyAcademicMatrix) } });
     return { id: workspace.id, reused: false };
   });
 }
 export async function readAcademicWorkspace(id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { actor, workspace } = await workspaceFor(id, user, client), matrix = JSON.parse(workspace.matrixJson);
+  const { actor, workspace } = await workspaceFor(id, user, client);
+  const storedMatrix = JSON.parse(workspace.matrixJson);
+  const matrix = {
+    dimensions: storedMatrix.dimensions ?? emptyAcademicMatrix.dimensions,
+    rows: storedMatrix.rows ?? [],
+  };
   const sources = [], storedSources = JSON.parse(workspace.sourcesJson) as AltazorSourceSnapshot[];
   let unavailableSources = 0;
   for (const source of storedSources) {
@@ -66,7 +81,7 @@ export async function readAcademicWorkspace(id: string, user: CausaAccessUser, c
     catch (error) { if (!unavailableSource(error)) throw error; unavailableSources++; }
   }
   // A cell with a source is a dependent artifact: hide the whole row if the source was revoked.
-  for (const row of matrix.rows || []) {
+  for (const row of matrix.rows) {
     try { await verifyAltazorSources(actor, row.proofs || [], { client }); }
     catch (error) { if (!unavailableSource(error)) throw error; row.title = unavailableRowTitle; row.cells = {}; row.included = false; row.available = false; }
     delete row.proofs;
@@ -76,16 +91,61 @@ export async function readAcademicWorkspace(id: string, user: CausaAccessUser, c
     try { artifacts.push(await readAcademicArtifact(id, row.id, actor, client)); }
     catch (error) { if (![403,404,409,410,413,422].includes(Number((error as { status?: number }).status))) throw error; artifacts.push({ id: row.id, available: false as const }); }
   }
-  return { id, title: workspace.title, kind: workspace.kind, revision: workspace.revision, brief: { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) }, matrix, artifacts, sources, unavailableSources };
+  const callOrigin = workspace.callOriginJson ? JSON.parse(workspace.callOriginJson) as AcademicCallOrigin : undefined;
+  return { id, title: workspace.title, kind: workspace.kind, revision: workspace.revision, brief: { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) }, matrix, artifacts, sources, unavailableSources, ...(callOrigin ? { callOrigin } : {}) };
 }
 export async function saveAcademicWorkspace(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicWorkspaceSaveSchema.parse(raw);
   return bookTransaction(client, async tx => {
     const actor = await actorFor(user, tx), current = await tx.altazorAcademicWorkspace.findFirst({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null } });
     if (!current) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
+    const congress = input.brief.congress;
+    if (congress && (congress.axes.length || congress.tables.length || congress.actions?.length || congress.meetings?.length)) {
+      if (current.kind !== "congress") throw httpError("Los ejes, las mesas, los encargos y las reuniones se organizan dentro de un congreso.", 400);
+      for (const action of congress.actions ?? []) if (action.dueAtLocal) teachingTime(action.dueAtLocal);
+      const sessionIds = congress.tables.flatMap(table => table.sessionIds);
+      const available = sessionIds.length ? await tx.altazorTeachingSession.count({ where: { workspaceId: id, id: { in: sessionIds } } }) : 0;
+      if (available !== sessionIds.length) throw httpError("Alguna sesión vinculada a las mesas ya no está disponible. Revisa Ejes y mesas y quita las sesiones retiradas antes de guardar.", 409);
+    }
+    const storedBrief = JSON.parse(current.briefJson) as typeof emptyAcademicBrief;
+    const storedOrigins = new Map((storedBrief.congress?.actions ?? []).map(action => [action.id, action.agreementOrigin]));
+    const storedActions = new Map((storedBrief.congress?.actions ?? []).map(action => [action.id, action]));
+    const verifiedDeliverableLinks = new Set<string>();
+    for (const action of congress?.actions ?? []) {
+      if (JSON.stringify(action.agreementOrigin) !== JSON.stringify(storedOrigins.get(action.id))) {
+        throw httpError("El origen de un encargo se conserva al crearlo desde un acuerdo. Recarga el trabajo antes de guardar.", 409);
+      }
+      const previousDeliverables = new Map((storedActions.get(action.id)?.deliverables ?? []).map(deliverable => [deliverable.id, deliverable]));
+      for (const deliverable of action.deliverables ?? []) {
+        if (!deliverable.href) continue;
+        const link = parseCommitteeDeliverableHref(deliverable.href);
+        if (!link) throw httpError("Revisa el enlace del entregable antes de guardar.", 400);
+        if (link.kind === "academic" && link.workspaceId !== id) {
+          throw httpError("Vincula un resultado del mismo trabajo académico al entregable.", 409);
+        }
+        // Existing references remain editable if the destination is later removed.
+        // The destination's own reader still enforces current access when opened.
+        if (previousDeliverables.get(deliverable.id)?.href === deliverable.href || verifiedDeliverableLinks.has(deliverable.href)) continue;
+        try {
+          if (link.kind === "academic") await readAcademicArtifact(id, link.artifactId, actor, tx);
+          else if (link.kind === "library") {
+            await bookFor(link.bookId, actor, tx);
+            if (link.fragmentOrdinal !== undefined && !await tx.libraryBookFragment.findFirst({ where: { bookId: link.bookId, ordinal: link.fragmentOrdinal }, select: { id: true } })) {
+              throw httpError("El fragmento de Biblioteca ya no está disponible.", 404);
+            }
+          }
+        } catch (error) {
+          if (!unavailableSource(error)) throw error;
+          throw httpError("Un documento del entregable ya no está disponible o no tienes acceso. Revisa su enlace antes de guardar.", 409);
+        }
+        verifiedDeliverableLinks.add(deliverable.href);
+      }
+    }
     type StoredRow = (typeof input.matrix.rows)[number] & { proofs: AltazorSourceSnapshot[] };
-    const previous = JSON.parse(current.matrixJson) as { dimensions: typeof input.matrix.dimensions; rows: StoredRow[] }, retained = new Map<string, StoredRow>(), rows: StoredRow[] = [];
-    for (const row of previous.rows) {
+    const previous = JSON.parse(current.matrixJson) as { dimensions?: typeof input.matrix.dimensions; rows?: StoredRow[] };
+    const previousDimensions = previous.dimensions ?? emptyAcademicMatrix.dimensions;
+    const retained = new Map<string, StoredRow>(), rows: StoredRow[] = [];
+    for (const row of previous.rows ?? []) {
       const placeholder = input.matrix.rows.find(item => item.id === row.id), redacted = Boolean(placeholder && placeholder.title === unavailableRowTitle && !placeholder.included && !Object.keys(placeholder.cells).length);
       let unavailable = false;
       try { await verifyAltazorSources(actor, row.proofs || [], { client: tx }); }
@@ -96,7 +156,7 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
       // A revoked source may be restored while this redacted form is still open.
       // The placeholder is never a replacement for the retained source or its cells.
       if (unavailable || redacted && row.proofs?.length) {
-        if (!redacted || JSON.stringify(previous.dimensions) !== JSON.stringify(input.matrix.dimensions)) throw httpError("Hay filas cuyo respaldo no está disponible. Se conservaron sin cambios; recargue antes de modificar la estructura de la matriz", 409);
+        if (!redacted || JSON.stringify(previousDimensions) !== JSON.stringify(input.matrix.dimensions)) throw httpError("Hay filas cuyo respaldo no está disponible. Se conservaron sin cambios; recargue antes de modificar la estructura de la matriz", 409);
         retained.set(row.id, row);
       }
     }
@@ -113,13 +173,72 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
     return { revision: input.expectedRevision + 1 };
   });
 }
+export async function createCommitteeActionFromAgreement(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const input = committeeAgreementConversionSchema.parse(raw);
+  return bookTransaction(client, async tx => {
+    const { actor, workspace } = await workspaceFor(id, user, tx);
+    if (workspace.kind !== "congress") throw httpError("Los acuerdos del comité se gestionan dentro de un congreso.", 400);
+    const brief = JSON.parse(workspace.briefJson) as typeof emptyAcademicBrief;
+    const congress = academicCongressSchema.parse(brief.congress ?? emptyAcademicCongress);
+    const existing = congress.actions?.find(action => action.agreementOrigin?.meetingId === input.meetingId
+      && action.agreementOrigin.agreementId === input.agreementId);
+    if (existing) return { actionId: existing.id, revision: workspace.revision, reused: true };
+    if (workspace.revision !== input.expectedRevision) throw httpError("El trabajo cambió. Recárgalo antes de crear el encargo.", 409);
+    const meeting = congress.meetings?.find(item => item.id === input.meetingId);
+    const agreement = meeting?.agreements.find(item => item.id === input.agreementId);
+    if (!meeting || !agreement) throw httpError("La reunión o el acuerdo ya no están disponibles. Revisa las reuniones del comité.", 404);
+    const actions = congress.actions ?? [];
+    if (actions.length >= ACADEMIC_CONGRESS_LIMITS.actions) throw httpError("El congreso alcanzó cien encargos. Retira uno para crear otro desde el acuerdo.", 413);
+    const title = agreement.text.replace(/[\s\p{Cc}]+/gu, " ").trim().slice(0, ACADEMIC_CONGRESS_LIMITS.titleLength);
+    if (!title) throw httpError("Escribe el acuerdo con texto legible antes de crear el encargo.", 400);
+    const actionId = randomUUID();
+    const action = {
+      id: actionId,
+      title,
+      responsible: "",
+      status: "pending" as const,
+      notes: agreement.text,
+      agreementOrigin: {
+        meetingId: meeting.id,
+        agreementId: agreement.id,
+        meetingTitle: meeting.title,
+        meetingDate: meeting.date,
+        agreementText: agreement.text,
+      },
+    };
+    const nextCongress = academicCongressSchema.parse({ ...congress, actions: [...actions, action] });
+    const nextBrief = { ...brief, congress: nextCongress };
+    const storedMatrix = JSON.parse(workspace.matrixJson) as Partial<z.infer<typeof academicWorkspaceSaveSchema>["matrix"]>;
+    const futureSave = {
+      expectedRevision: input.expectedRevision + 1,
+      title: workspace.title,
+      brief: nextBrief,
+      matrix: {
+        dimensions: storedMatrix.dimensions ?? emptyAcademicMatrix.dimensions,
+        rows: (storedMatrix.rows ?? []).map(({ id, title, included, cells }) => ({ id, title, included, cells })),
+      },
+    };
+    // Keep room below the form's JSON limit for subsequent edits.
+    if (Buffer.byteLength(JSON.stringify(futureSave), "utf8") > 256 * 1024 - 2048) {
+      throw httpError("Reduce las notas o los acuerdos del trabajo antes de crear otro encargo.", 413);
+    }
+    const changed = await tx.altazorAcademicWorkspace.updateMany({
+      where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null },
+      data: { briefJson: JSON.stringify(nextBrief), revision: { increment: 1 } },
+    });
+    if (!changed.count) throw httpError("El trabajo cambió. Recárgalo antes de crear el encargo.", 409);
+    await writeAuditStrict({
+      actorId: actor.id, action: "altazor.academic.agreement.action-create", entityType: "AltazorAcademicWorkspace", entityId: id,
+      after: { meetingId: meeting.id, agreementId: agreement.id, actionId },
+    }, tx);
+    return { actionId, revision: input.expectedRevision + 1, reused: false };
+  });
+}
 export async function prepareAcademicArtifact(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicPrepareSchema.parse(raw), { actor, workspace } = await workspaceFor(id, user, client), inputSha256 = sha256(JSON.stringify(input));
   const prior = await client.altazorAcademicArtifact.findUnique({ where: { workspaceId_requestId: { workspaceId: id, requestId: input.requestId } } });
   if (prior) { if (prior.inputSha256 !== inputSha256) throw httpError("El intento identifica otra preparación", 409); return { artifact: await readAcademicArtifact(id, prior.id, actor, client), reused: true }; }
   if (workspace.revision !== input.expectedRevision) throw httpError("Guarde y recargue el trabajo antes de preparar otro resultado", 409);
-  if (["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "peer_review"].includes(input.mode) && !input.sources.length) throw httpError("Esta revisión necesita al menos una fuente seleccionada", 400);
-  if (input.mode === "comparison" && new Set(input.sources.map(source => source.kind === "book" ? source.bookId : source.kind === "legal" || source.kind === "document" ? source.versionId : "")).size < 2) throw httpError("Seleccione pasajes de dos documentos distintos para compararlos", 400);
   const destination = await workbenchDestination(actor.id, "assisted_draft");
   if (destination.key !== input.destinationKey || !destination.permitted || destination.remote && !input.allowRemote) throw httpError("Revise el destino y autorice el envío de la selección antes de continuar", 409);
   const selection = [...input.sources], profile = input.mode === "cv" ? await client.altazorAcademicProfile.findUnique({ where: { ownerId: actor.id } }) : null;
@@ -131,7 +250,19 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
   }
   if (selection.length > 8) throw httpError("Elija hasta ocho pasajes entre la selección y las filas incluidas de la matriz", 413);
   const { refs } = await resolveAltazorSources(actor, selection, { client });
-  const data = { destination, instruction: input.instruction, brief: JSON.parse(workspace.briefJson), matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
+  if (["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "peer_review"].includes(input.mode) && !refs.length) {
+    throw httpError("Esta revisión necesita al menos una fuente seleccionada", 400);
+  }
+  if (input.mode === "comparison") {
+    const documents = new Set(refs.map(({ input: source }) => source.kind === "book" ? source.bookId : source.kind === "legal" || source.kind === "document" ? source.versionId : ""));
+    if (documents.size < 2) throw httpError("Seleccione pasajes de dos documentos distintos para compararlos", 400);
+  }
+  const brief = JSON.parse(workspace.briefJson) as typeof emptyAcademicBrief;
+  // Agenda selections belong to locally generated drafts.
+  if (brief.syllabus) delete brief.syllabus.sessionIds;
+  delete brief.programSessionIds;
+  delete brief.congress;
+  const data = { destination, instruction: input.instruction, brief, matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
   if (JSON.stringify(data).length > 60000) throw httpError("La matriz o el perfil excede el contexto de una consulta; reduzca la selección", 413);
   return bookTransaction(client, async tx => {
     await actorFor(actor, tx); await verifyAltazorSources(actor, refs, { client: tx });
@@ -145,15 +276,81 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
     return { artifact: { id: artifact.id, status: artifact.status }, reused: false };
   });
 }
-export async function readAcademicArtifact(workspaceId: string, id: string, user: CausaAccessUser, client: AcademicClient = prisma) {
+export async function createAcademicDraft(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const input = academicDraftCreateSchema.parse(raw);
+  const inputSha256 = sha256(JSON.stringify(input));
+  return bookTransaction(client, async tx => {
+    const { actor, workspace } = await workspaceFor(id, user, tx);
+    const previous = await tx.altazorAcademicArtifact.findUnique({ where: { workspaceId_requestId: { workspaceId: id, requestId: input.requestId } } });
+    if (previous) {
+      if (previous.inputSha256 !== inputSha256 || JSON.parse(previous.destinationJson).template !== input.template) throw httpError("Esta solicitud identifica otro borrador", 409);
+      await readAcademicArtifact(id, previous.id, actor, tx);
+      return { id: previous.id, reused: true };
+    }
+    if (workspace.revision !== input.expectedRevision) throw httpError("El trabajo cambió. Recárgalo antes de crear el borrador", 409);
+    if (await tx.altazorAcademicArtifact.count({ where: { workspaceId: id } }) >= 100) throw httpError("El trabajo alcanzó cien resultados; crea otro trabajo para continuar", 413);
+    const handout = input.template === "participant_handout";
+    if (handout && !isAcademicTeachingSessionKind(workspace.kind)) {
+      throw httpError("La hoja para participantes se prepara desde un curso, seminario, congreso o taller.", 400);
+    }
+    const refs = JSON.parse(workspace.sourcesJson) as AltazorSourceSnapshot[];
+    await verifyAltazorSources(actor, refs, { client: tx });
+    const template = ACADEMIC_MANUSCRIPT_TEMPLATES[input.template];
+    const title = `${input.template === "blank" ? "Borrador" : template.label} · ${workspace.title}`.slice(0, 240);
+    const brief: typeof emptyAcademicBrief = { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) };
+    const syllabus = input.template === "course";
+    const selectedSessionIds = workspace.kind === "course" ? brief.syllabus?.sessionIds : brief.programSessionIds;
+    const sessionIds = handout || input.template === workspace.kind && (syllabus || isAcademicTeachingProgram(input.template))
+      ? selectedSessionIds ?? [] : [];
+    if (handout && !sessionIds.length) throw httpError("Elige al menos una sesión de la Agenda para crear la hoja para participantes.", 400);
+    const documentLabel = handout ? "material para participantes" : syllabus ? "syllabus" : "programa";
+    const sessions = sessionIds.length ? await tx.altazorTeachingSession.findMany({
+      where: { workspaceId: workspace.id, id: { in: sessionIds } },
+      select: { id: true, title: true, startsAt: true, endsAt: true, contentJson: true },
+      orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    }) : [];
+    if (sessions.length !== sessionIds.length) {
+      throw httpError(`Alguna sesión elegida ya no está disponible. Revisa la selección de la Agenda antes de crear el ${documentLabel}.`, 409);
+    }
+    const body = academicManuscriptBody(input.template, workspace.title, brief, sessions.map(({ contentJson, ...session }) => ({
+      ...session,
+      content: readTeachingSessionContent(contentJson),
+    })));
+    if (body.length > ACADEMIC_MANUSCRIPT_MAX) {
+      throw httpError(`Las sesiones elegidas exceden el tamaño del ${documentLabel}. Reduce la selección e inténtalo nuevamente.`, 413);
+    }
+    const mode = syllabus ? "syllabus" : handout || isAcademicTeachingKind(input.template) ? "teaching_material" : "academic_writing";
+    const artifact = await tx.altazorAcademicArtifact.create({
+      data: {
+        workspaceId: id, requestId: input.requestId, inputSha256, mode, title,
+        status: "proposed", body, bodySha256: sha256(body), sourceSnapshotsJson: JSON.stringify(refs),
+        destinationJson: JSON.stringify({ template: input.template }),
+      },
+      select: { id: true },
+    });
+    await retainAcademicVersion(artifact.id, 1, body, false, tx);
+    await writeAuditStrict({ actorId: actor.id, action: "altazor.academic.draft.create", entityType: "AltazorAcademicArtifact", entityId: artifact.id, after: { template: input.template, sourceCount: refs.length } }, tx);
+    return { id: artifact.id, reused: false };
+  });
+}
+
+async function readAcademicArtifactWithSources(workspaceId: string, id: string, user: CausaAccessUser, client: AcademicClient) {
   const { actor } = await workspaceFor(workspaceId, user, client), row = await client.altazorAcademicArtifact.findFirst({ where: { id, workspaceId } });
   if (!row) throw missing();
   const refs = JSON.parse(row.sourceSnapshotsJson) as AltazorSourceSnapshot[]; await verifyAltazorSources(actor, refs, { client });
   const data = JSON.parse(row.destinationJson);
   for (const matrixRow of data.matrix?.rows || []) await verifyAltazorSources(actor, matrixRow.proofs || [], { client });
-  if (row.body && sha256(row.body) !== row.bodySha256) throw httpError("El resultado no coincide con su versión conservada", 409);
+  const hasManuscript = ["proposed", "reviewed"].includes(row.status);
+  if ((hasManuscript || row.body) && sha256(row.body) !== row.bodySha256) throw httpError("El resultado no coincide con su versión conservada", 409);
   const status = row.status === "running" && row.leaseExpiresAt && row.leaseExpiresAt < new Date() ? "interrupted" : row.status;
-  return { id, available: true as const, title: row.title, mode: row.mode, status, body: ["proposed","reviewed"].includes(status) ? row.body : "", revision: row.revision, sources: refs.map(ref => ({ title: ref.title, text: ref.text, href: ref.href, warnings: ref.warnings })), destination: data.destination, createdAt: row.createdAt.toISOString(), errorCode: row.errorCode };
+  return {
+    refs,
+    artifact: { id, available: true as const, title: row.title, mode: row.mode, status, body: hasManuscript ? row.body : "", revision: row.revision, sources: refs.map(ref => ({ title: ref.title, text: ref.text, href: ref.href, warnings: ref.warnings })), destination: data.destination, template: data.template as AcademicManuscriptTemplate | undefined, createdAt: row.createdAt.toISOString(), errorCode: row.errorCode },
+  };
+}
+
+export async function readAcademicArtifact(workspaceId: string, id: string, user: CausaAccessUser, client: AcademicClient = prisma) {
+  return (await readAcademicArtifactWithSources(workspaceId, id, user, client)).artifact;
 }
 export async function executeAcademicArtifact(workspaceId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma, model: Model = askLlm) {
   const { actor } = await workspaceFor(workspaceId, user, client); await readAcademicArtifact(workspaceId, id, actor, client);
@@ -176,7 +373,7 @@ export async function executeAcademicArtifact(workspaceId: string, id: string, u
     abort.signal.throwIfAborted();
     if (result.source !== "llm") throw httpError(result.note || "No se obtuvo una respuesta del proveedor configurado", 503);
     const body = `# ${row.title}\n\nPropuesta de ALTAZOR para revisión profesional.\n\n${parseAcademicOutput(result.content, refs)}${academicReferenceAppendix(refs)}`;
-    if (body.length > 100000) throw httpError("La respuesta excedió el tamaño de un documento. Prepare un encargo más acotado", 413);
+    if (body.length > ACADEMIC_MANUSCRIPT_MAX) throw httpError("La respuesta excedió el tamaño de un documento. Prepare un encargo más acotado", 413);
     await readAcademicArtifact(workspaceId, id, actor, client); await actorFor(actor, client);
     const saved = await client.altazorAcademicArtifact.updateMany({ where: { id, leaseToken: token, status: "running", cancelRequestedAt: null }, data: { status: "proposed", body, bodySha256: sha256(body), leaseToken: null, leaseExpiresAt: null } });
     if (!saved.count) throw httpError("El trabajo se canceló antes de guardar el resultado", 409);
@@ -223,15 +420,43 @@ export async function academicArtifactHistory(workspaceId: string, id: string, u
   const page = versions.slice(0, 50);
   return { versions: page.map(version => ({ ...version, createdAt: version.createdAt.toISOString() })), currentRevision: current.revision, nextBefore: versions.length > 50 ? page[page.length - 1].revision : null };
 }
-export async function readAcademicArtifactVersion(workspaceId: string, id: string, revision: number, user: CausaAccessUser, client: AcademicClient = prisma) {
-  const current = await readAcademicArtifact(workspaceId, id, user, client);
-  const row = await client.altazorAcademicArtifactVersion.findUnique({ where: { artifactId_revision: { artifactId: id, revision } } });
+type AcademicArtifactView = Awaited<ReturnType<typeof readAcademicArtifact>>;
+
+async function readStoredAcademicVersion(current: AcademicArtifactView, revision: number, client: AcademicClient) {
+  const row = await client.altazorAcademicArtifactVersion.findUnique({ where: { artifactId_revision: { artifactId: current.id, revision } } });
   if (!row) {
     if (revision === current.revision && ["proposed", "reviewed"].includes(current.status)) return { revision, body: current.body, reviewed: current.status === "reviewed" };
     throw httpError("La versión solicitada no está disponible", 404);
   }
   if (sha256(row.body) !== row.bodySha256) throw httpError("El texto conservado no coincide con su versión", 409);
+  if (revision === current.revision && (row.body !== current.body || row.reviewed !== (current.status === "reviewed"))) {
+    throw httpError("El historial no coincide con la revisión vigente", 409);
+  }
   return { revision: row.revision, body: row.body, reviewed: row.reviewed };
+}
+
+export function academicRevisionParam(value: string | null) {
+  if (value === null) return undefined;
+  if (!/^[1-9][0-9]{0,8}$/.test(value)) throw httpError("La versión solicitada no es válida", 400);
+  return Number(value);
+}
+
+export async function readAcademicArtifactVersion(workspaceId: string, id: string, revision: number, user: CausaAccessUser, client: AcademicClient = prisma) {
+  return readStoredAcademicVersion(await readAcademicArtifact(workspaceId, id, user, client), revision, client);
+}
+
+export async function readAcademicArtifactDownload(workspaceId: string, id: string, user: CausaAccessUser, options: {
+  revision?: number;
+  referencesOnly?: boolean;
+}, client: AcademicClient = prisma) {
+  const { artifact, refs } = await readAcademicArtifactWithSources(workspaceId, id, user, client);
+  if (!["proposed", "reviewed"].includes(artifact.status)) throw httpError("El resultado todavía no está disponible para descargar", 409);
+  const version = options.revision === undefined ? artifact : await readStoredAcademicVersion(artifact, options.revision, client);
+  if (options.referencesOnly && !refs.length) throw httpError("Esta versión no tiene fuentes conservadas", 404);
+  const body = options.referencesOnly
+    ? `# Fuentes de la versión ${version.revision}${academicReferenceAppendix(refs)}\n`
+    : version.body;
+  return { id: artifact.id, revision: version.revision, body };
 }
 export async function restoreAcademicArtifactVersion(workspaceId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicArtifactRestoreSchema.parse(raw);

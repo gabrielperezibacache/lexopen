@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertPlainDocx } from "./docx";
+import { assertAcademicDocx, assertPlainDocx } from "./docx";
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main", R = "http://schemas.openxmlformats.org/package/2006/relationships";
 const base: Record<string, string> = {
   "[Content_Types].xml": '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>',
@@ -27,6 +27,21 @@ test("allowed ZIP part names cannot hide an external relationship", () => {
   const relation = `<?xml version="1.0"?><Relationships xmlns="${R}"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="https://example.invalid/" TargetMode="External"/></Relationships>`;
   assert.throws(() => assertPlainDocx(archive({ ...base, "word/_rels/document.xml.rels": relation })));
   assert.throws(() => assertPlainDocx(archive({ ...base, "word/_rels/document.xml.rels": relation.replace("External", "&#x45;xternal") })));
+});
+test("only academic DOCX accepts internal numbering; no external or duplicate relationships", () => {
+  const file = "word/_rels/document.xml.rels";
+  const numbering = '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>';
+  const academic = {
+    ...base,
+    "[Content_Types].xml": base["[Content_Types].xml"].replace("</Types>", '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>'),
+    "word/numbering.xml": `<w:numbering xmlns:w="${W}"/>`,
+    [file]: base[file].replace("</Relationships>", numbering + "</Relationships>"),
+  };
+  const bytes = archive(academic);
+  assert.doesNotThrow(() => assertAcademicDocx(bytes));
+  assert.throws(() => assertPlainDocx(bytes));
+  assert.throws(() => assertAcademicDocx(archive({ ...academic, [file]: academic[file].replace('Target="numbering.xml"', 'Target="https://example.invalid/" TargetMode="External"') })));
+  assert.throws(() => assertAcademicDocx(archive({ ...academic, [file]: academic[file].replace("</Relationships>", numbering + "</Relationships>") })));
 });
 test("fields, DDE, INCLUDETEXT, objects, altChunk and DTD are refused", () => {
   for (const field of ['<w:fldSimple w:instr="INCLUDETEXT https://example.invalid"/>', '<w:instrText>DDEAUTO</w:instrText>', '<w:object/>', '<w:altChunk/>']) assert.throws(() => assertPlainDocx(archive({ ...base, "word/document.xml": base["word/document.xml"].replace("<w:p>", field + "<w:p>") })));

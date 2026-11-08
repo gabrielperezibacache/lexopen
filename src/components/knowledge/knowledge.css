@@ -121,7 +121,7 @@
 .knowledge-edit-form { background: var(--surface-solid); }
 
 .knowledge-export { border-block: 1px solid var(--line-strong); }
-.knowledge-export > summary { display: flex; align-items: center; gap: 1rem; min-height: 64px; color: var(--sea); }
+.knowledge-export > summary { display: flex; align-items: center; gap: 1rem; min-height: 64px; padding-inline: .75rem; color: var(--sea); }
 .knowledge-export-chevron { margin-left: auto; flex-shrink: 0; }
 .knowledge-export[open] .knowledge-export-chevron { transform: rotate(180deg); }
 .knowledge-export-body { display: grid; gap: 1rem; padding: .5rem 0 1.5rem; }
@@ -136,7 +136,7 @@
 .evidence-toolbar { padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
 .evidence-reading-fragment { padding-block: 1.7rem; }
 .evidence-reading-fragment > p { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.07rem; line-height: 1.95; max-width: 70ch; }
-.evidence-reading-fragment > p.text-sm { font-family: inherit; font-size: .875rem; line-height: 1.75; }
+.evidence-reading-fragment > p.text-sm { font-family: inherit; font-size: var(--text-sm); line-height: 1.75; }
 .source-library-panel > div:first-child p { line-height: 1.8; }
 .source-library-panel [data-testid="library-detail"] > div:first-child h3 { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.6rem; font-weight: 500; line-height: 1.4; }
 .source-library-panel [data-testid="library-detail"] > ul > li { padding-block: 1.5rem; }
@@ -146,7 +146,7 @@
   .research-header { display: grid; gap: 1rem; }
   .research-header > div:first-child { min-width: 0; }
   .knowledge-view-tabs { width: 100%; gap: 0; }
-  .knowledge-view-tabs .btn { font-size: .875rem; padding-inline: .9rem; }
+  .knowledge-view-tabs .btn { font-size: var(--text-sm); padding-inline: .9rem; }
   .research-query-form > fieldset { gap: 1.5rem; }
   .research-query-form > fieldset > div:first-child > label { font-size: 1.25rem; }
   .source-quotation,.knowledge-citation > blockquote { padding: 1rem .85rem; font-size: 1rem; }

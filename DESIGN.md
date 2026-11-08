@@ -356,6 +356,10 @@ El movimiento acompaña acciones: aperturas breves de folios y pestañas, llegad
 
 **The Opaque Workspace Rule.** Un diálogo o acompañante mantiene su superficie sólida durante la apertura, el uso y el cierre; el fondo atenuado pertenece a la página que queda detrás.
 
+Las nuevas imágenes editoriales se crean o editan con generación de GPT y conservan el trazo en plata, índigo e iris. Google Flow se utiliza exclusivamente para animarlas. Los recortes transparentes se integran directamente sobre la superficie; los vídeos comparten el tratamiento de fondo para evitar placas de otro color.
+
+**Animación editorial pausada.** Las animaciones del expediente, libro contable, reloj y lupa proceden de Google Flow. Comienzan automáticamente al permanecer visibles durante 900 ms, silenciadas a 0,8× y con 14 segundos de reposo entre ciclos. El grabado sigue visible hasta que el navegador presenta el primer fotograma válido; un fundido breve conserva continuidad y el fondo índigo real. Fuera de pantalla o con la pestaña oculta se suspende la reproducción. El control de pausa aparece con el cursor o el foco, mantiene al menos 44 px y conserva la pausa manual. Movimiento reducido y ahorro de datos mantienen la imagen sin descargar automáticamente el vídeo. Un bloqueo de autoplay o un fallo de carga conserva el grabado y permite una reproducción o un reintento explícito. Los archivos integrados no contienen audio.
+
 **The Responsive Depth Rule.** Al pasar el puntero o enfocar el enlace, el libro se eleva y gira una sola vez mediante una transición corta; con movimiento reducido se conserva la pose estática y se elimina la transición. La legibilidad y la apertura del libro no dependen del giro.
 
 ## Shapes
@@ -377,6 +381,10 @@ Etiquetas seminegritas pequeñas para estado o categoría, con cápsula y color 
 ### Cards / Containers
 
 Conversación, importación, lector y escritura utilizan superficies sólidas y jerarquía interior. Las listas académicas y de sincronización se separan por filetes; las opciones secundarias se agrupan en detalles. El estante forma una estructura de madera continua con rótulo, libros y canto. Galería y salón redistribuyen esa estructura según la tabla de variantes.
+
+Los paneles comunes añaden la sombra ambiental pequeña del sistema; los paneles anidados conservan el tratamiento sin sombra. Las cabeceras compartidas cierran con un filete doble y un tramo iris, con acciones agrupadas y subtítulos de medida contenida. Las tablas separan su cabecera con el tono niebla y reservan Fraunces para el nombre principal del registro. En móvil mantienen los encabezados accesibles, los metadatos en dos columnas y un filete bajo el nombre.
+
+Facturación utiliza columnas de balance con divisores, la primera en índigo profundo y una franja tonal para la cuenta corriente. Los movimientos recientes forman filas abiertas con filetes y títulos serif, sin tarjetas interiores. Configuración coloca la explicación de cada categoría junto a sus formularios a partir de 1280 px; en compacto conserva el orden vertical. La categoría activa usa la pareja de colores de acción del tema. Los vacíos compartidos presentan un folio junto al mensaje y su acción; en móvil se apilan.
 
 ### Inputs / Fields
 

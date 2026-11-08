@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { attemptContext, digest, randomToken, seal } from "@/lib/personal-connectors/core";
 import { completeLinkedInOAuth, publicLinkedInAccount, receiveLinkedInCallback } from "@/lib/personal-connectors/linkedin/account";
-import { closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerActivity, readComputerSession, sendComputerMessage } from "./service";
+import { cancelComputerTask, closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerActivity, readComputerSession, sendComputerMessage } from "./service";
 
 type KittyFixture = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
 type TurnFixture = { from: string; text: string; working?: boolean; needs_help?: boolean; steps?: { action: string }[] };
@@ -18,6 +18,7 @@ async function main() {
   Object.assign(process.env, { ALTAZOR_COMPUTER_ENABLED: "1", LINKEDIN_CLIENT_ID: `fixture-${tag}`, LINKEDIN_CLIENT_SECRET: "fictitious-client-secret", LINKEDIN_REDIRECT_URI: "https://fixture.invalid/api/personal-connectors/linkedin/oauth/callback", LINKEDIN_SHARE_ENABLED: "1" });
   const fleets = new Map<string, KittyFixture[]>(), chats = new Map<string, { id: string; members: string[]; turns: TurnFixture[] }>();
   let network = 0, mutations = 0, kittyCreates = 0, sends = 0, loseNextMessage = false;
+  const acceptedRequests = new Map<string, { chatId: string; content: string }>();
   globalThis.fetch = (async (raw, init) => {
     network++; const target = new URL(String(raw)), path = target.pathname, method = init?.method || "GET";
     assert.equal(target.hostname, "127.0.0.1"); assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-gateway-token");
@@ -25,8 +26,14 @@ async function main() {
     if (method === "POST") mutations++;
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     const fleet = fleets.get(target.origin) || []; fleets.set(target.origin, fleet);
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(path)) {
+      assert.equal(init?.method || "GET", "GET", "legacy fixtures never grant computer-use permission");
+      const binding = target.searchParams.get("binding"), kittyId = target.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: path.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
     let result: unknown;
-    if (path === "/v1/health") result = { ok: true, version: "synthetic-pg-contract", containers: true };
+    if (path === "/v1/health") result = { ok: true, version: "synthetic-pg-contract", containers: true, lexopen_async_messages: "v1", lexopen_computer_use_policy: "v1" };
     else if (path === "/v1/providers") result = { providers: [{ name: "fictitious-model", kind: "openai", describe: "Synthetic model fixture" }] };
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {
@@ -37,15 +44,30 @@ async function main() {
       const chat = { id: `chat-${chats.size + 1}`, members: [member.id], turns: [] as TurnFixture[] }; chats.set(`${target.origin}:${chat.id}`, chat); result = { chat };
     } else if (/^\/v1\/kitties\/[\w-]+$/.test(path)) result = { kitty: fleet.find(kitty => kitty.id === path.split("/").pop() || kitty.name === path.split("/").pop()) };
     else if (/^\/v1\/chats\/[\w-]+$/.test(path)) result = { chat: chats.get(`${target.origin}:${path.split("/").pop()}`) };
-    else if (path.endsWith("/messages")) {
+    else if (path.endsWith("/messages/async")) {
       sends++; const id = path.split("/")[3], chat = chats.get(`${target.origin}:${id}`); assert.ok(chat);
-      chat.turns.push({ from: "user", text: String(body.text) }, { from: "fixture-kitty", text: "Resultado completamente ficticio" });
-      result = { turns: chat.turns };
+      assert.equal(method, "POST");
+      assert.match(String(body.request_id), /^[A-Za-z0-9_-]{1,100}$/);
+      const requestId = String(body.request_id), content = JSON.stringify({ text: body.text, files: body.files });
+      const previous = acceptedRequests.get(requestId);
+      if (previous) {
+        assert.equal(previous.chatId, id); assert.equal(previous.content, content);
+      } else {
+        assert.equal(chat.turns.some(turn => turn.working), false, "the fixture cannot accept a second task during its first inference");
+        acceptedRequests.set(requestId, { chatId: id, content });
+        chat.turns.push({ from: "user", text: String(body.text) }, { from: "fixture-kitty", text: "", working: true });
+      }
       if (loseNextMessage) { loseNextMessage = false; throw new Error("Synthetic response lost after acceptance"); }
+      return Response.json({ request_id: requestId, chat_id: id, status: "accepted", state: "accepted" }, { status: 202 });
     } else if (path.endsWith("/screenshot")) return new Response(new Uint8Array(fixtureFrame), { headers: { "Content-Type": "image/png" } });
     else if (path.endsWith("/control")) result = { held: body.hold === true };
     else if (path.endsWith("/input")) result = { ok: true };
-    else if (path.endsWith("/cancel")) result = { cancelled: false };
+    else if (path.endsWith("/cancel")) {
+      const chat = chats.get(`${target.origin}:${path.split("/")[3]}`); assert.ok(chat);
+      const working = chat.turns.filter(turn => turn.working);
+      for (const turn of working) turn.working = false;
+      result = { cancelled: working.length > 0 };
+    }
     else if (path.endsWith("/stop")) { const kitty = fleet.find(kitty => kitty.id === path.split("/")[3]); assert.ok(kitty); kitty.status = "stopped"; result = { kitty }; }
     else throw new Error("Unexpected fixture endpoint");
     return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
@@ -75,6 +97,11 @@ async function main() {
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "help", sessionId: first.id, monitor: true });
     turn.steps?.push({ action: "helped" });
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "working", sessionId: first.id, monitor: true });
+    turn.steps?.push({ action: "run" });
+    const progress = await readComputerActivity(owner, cause.id);
+    assert.deepEqual(progress, { state: "working", sessionId: first.id, monitor: true, detail: { connections: [], step: { label: "Trabajando con archivos y herramientas", at: "" } } });
+    assert.equal(JSON.stringify(progress).includes(turn.text), false, "passive progress does not expose the task or document contents");
+    turn.steps?.pop();
     turn.working = false;
     turn.needs_help = true;
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "help", sessionId: first.id, monitor: true });
@@ -97,15 +124,31 @@ async function main() {
     assert.equal(JSON.stringify(inputReceipt).includes("fictitious manually typed text"), false);
     await controlComputer(owner, first.id, `release-${tag}`, false);
     const message = { requestId: `message-${tag}`, text: "Ordena sólo el archivo ficticio elegido", files: [{ name: "fixture.txt", mime: "text/plain", data: Buffer.from("Contenido público completamente ficticio").toString("base64") }], confirmed: true as const };
-    const sent = await sendComputerMessage(owner, first.id, message); assert.equal(sent.status, "completed"); assert.equal(sends, 1);
+    const sent = await sendComputerMessage(owner, first.id, message); assert.equal(sent.status, "completed"); assert.equal(sent.result?.accepted, true); assert.equal(sends, 1);
+    assert.equal(acceptedRequests.size, 1);
+    assert.equal(acceptedRequests.has(sent.id), true, "the durable gateway request is bound to the claimed broker action");
+    assert.equal(acceptedRequests.has(message.requestId), false, "the browser's submission key is not used as the gateway receipt id");
+    assert.equal((await readComputerSession(owner, first.id)).turns.at(-1)?.working, true, "delivery completes while the first inference is still pending");
+    assert.equal((await readComputerSession(owner, first.id)).turns.at(-1)?.text, "", "acceptance is not a fabricated model result");
     await sendComputerMessage(owner, first.id, message); assert.equal(sends, 1);
     await assert.rejects(sendComputerMessage(owner, first.id, { ...message, text: "Contenido diferente" }), hasStatus(409));
+    await assert.rejects(sendComputerMessage(owner, first.id, { ...message, requestId: `busy-${tag}` }), hasStatus(409)); assert.equal(sends, 1);
+    await controlComputer(owner, first.id, `hold-first-inference-${tag}`, true);
+    assert.equal((await readComputerSession(owner, first.id)).session.held, true, "manual control does not wait for the pending inference");
+    await controlComputer(owner, first.id, `release-first-inference-${tag}`, false);
+    const cancelled = await cancelComputerTask(owner, first.id, `cancel-first-inference-${tag}`);
+    assert.equal(cancelled.status, "completed"); assert.equal(cancelled.result?.cancelled, true);
+    assert.equal((await readComputerSession(owner, first.id)).turns.at(-1)?.working, false);
+    const continued = { ...message, requestId: `continued-${tag}`, text: "Continuación ficticia tras cancelar", files: [] };
+    assert.equal((await sendComputerMessage(owner, first.id, continued)).status, "completed"); assert.equal(sends, 2);
+    const completedTurn = chat.turns.at(-1)!;
+    completedTurn.working = false; completedTurn.text = "Resultado completamente ficticio";
     assert.equal((await readComputerSession(owner, first.id)).turns.at(-1)?.text, "Resultado completamente ficticio");
     loseNextMessage = true;
     const ambiguous = { ...message, requestId: `lost-${tag}`, text: "Tarea ficticia con respuesta perdida", files: [] };
-    await assert.rejects(sendComputerMessage(owner, first.id, ambiguous)); assert.equal(sends, 2);
-    assert.equal((await sendComputerMessage(owner, first.id, ambiguous)).status, "unknown"); assert.equal(sends, 2);
-    await assert.rejects(sendComputerMessage(owner, first.id, { ...ambiguous, requestId: `must-not-resend-${tag}` }), hasStatus(409)); assert.equal(sends, 2);
+    await assert.rejects(sendComputerMessage(owner, first.id, ambiguous)); assert.equal(sends, 3);
+    assert.equal((await sendComputerMessage(owner, first.id, ambiguous)).status, "unknown"); assert.equal(sends, 3);
+    await assert.rejects(sendComputerMessage(owner, first.id, { ...ambiguous, requestId: `must-not-resend-${tag}` }), hasStatus(409)); assert.equal(sends, 3);
     const beforeRevoked = network;
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: outsider.id } });
     await assert.rejects(readComputerActivity(owner, cause.id), hasStatus(404));
@@ -133,7 +176,7 @@ async function main() {
     const account = await prisma.personalConnectorAccount.findUniqueOrThrow({ where: { ownerId_provider: { ownerId: owner.id, provider: "linkedin" } } });
     assert.equal(publicLinkedInAccount({ ...account, expiresAt: new Date(0) }).state, "expired");
     assert.equal(network, beforeOAuth);
-    console.log("Computer/LinkedIn disposable integration PASS: owner + case ACL, endpoint reservation, replay, selected inputs, no typed-text persistence, unknown without resend, TTL, OAuth state single-use + session binding + no inferred publish permission. All gateway responses fictitious; no external traffic.");
+    console.log("Computer/LinkedIn disposable integration PASS: owner + case ACL, endpoint reservation, async acceptance before inference, first-inference control/cancel, replay, selected inputs, no typed-text persistence, unknown without resend, TTL, OAuth state single-use + session binding + no inferred publish permission. All gateway responses fictitious; no external traffic.");
   } finally {
     globalThis.fetch = fetchBefore;
     await prisma.altazorComputerAction.deleteMany({ where: { ownerId: { in: users } } });

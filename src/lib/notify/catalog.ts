@@ -3,7 +3,7 @@
  * los canales externos se resuelven con preferencias del usuario.
  */
 
-export const EXTERNAL_CHANNELS = ["email", "telegram", "push"] as const;
+export const EXTERNAL_CHANNELS = ["email", "telegram", "push", "whatsapp"] as const;
 export type ExternalChannel = (typeof EXTERNAL_CHANNELS)[number];
 export type Canal = "inapp" | ExternalChannel;
 
@@ -27,34 +27,34 @@ export type TipoDef = {
   soloAdmin?: boolean;
 };
 
-const OFF: Record<ExternalChannel, Modo> = { email: "off", telegram: "off", push: "off" };
+const OFF: Record<ExternalChannel, Modo> = { email: "off", telegram: "off", push: "off", whatsapp: "off" };
 
 export const CATALOGO = {
   "plazo.fatal": {
     label: "Plazo fatal (T-7, T-3, T-1, T-0)",
     severidad: "critica",
-    defaults: { email: "realtime", telegram: "realtime", push: "realtime" },
+    defaults: { email: "realtime", telegram: "realtime", push: "realtime", whatsapp: "off" },
     apagable: false,
     seccion: "fatales",
   },
   "plazo.fatal.escalamiento": {
     label: "Escalamiento de plazo fatal sin acuse",
     severidad: "critica",
-    defaults: { email: "realtime", telegram: "realtime", push: "realtime" },
+    defaults: { email: "realtime", telegram: "realtime", push: "realtime", whatsapp: "off" },
     apagable: false,
     seccion: "fatales",
   },
   "plazo.normal": {
     label: "Plazo no fatal (T-3, T-0)",
     severidad: "alta",
-    defaults: { email: "digest_diario", telegram: "off", push: "off" },
+    defaults: { email: "digest_diario", telegram: "off", push: "off", whatsapp: "off" },
     apagable: true,
     seccion: "plazos",
   },
   "pjud.movimiento": {
     label: "Movimiento PJUD relevante",
     severidad: "media",
-    defaults: { email: "digest_diario", telegram: "off", push: "off" },
+    defaults: { email: "digest_diario", telegram: "off", push: "off", whatsapp: "off" },
     apagable: true,
     seccion: "pjud",
   },
@@ -68,35 +68,35 @@ export const CATALOGO = {
   "tarea.asignada": {
     label: "Tarea asignada",
     severidad: "media",
-    defaults: { email: "digest_diario", telegram: "off", push: "off" },
+    defaults: { email: "digest_diario", telegram: "off", push: "off", whatsapp: "off" },
     apagable: true,
     seccion: "tareas",
   },
   "tramite.asignado": {
     label: "Trámite asignado",
     severidad: "media",
-    defaults: { email: "digest_diario", telegram: "off", push: "off" },
+    defaults: { email: "digest_diario", telegram: "off", push: "off", whatsapp: "off" },
     apagable: true,
     seccion: "tareas",
   },
   "minuta.nueva": {
     label: "Nueva minuta en una causa",
     severidad: "media",
-    defaults: { email: "digest_diario", telegram: "off", push: "off" },
+    defaults: { email: "digest_diario", telegram: "off", push: "off", whatsapp: "off" },
     apagable: true,
     seccion: "tareas",
   },
   "mensaje.interno": {
     label: "Mensaje interno",
     severidad: "media",
-    defaults: { email: "off", telegram: "off", push: "realtime" },
+    defaults: { email: "off", telegram: "off", push: "realtime", whatsapp: "off" },
     apagable: true,
     seccion: "mensajes",
   },
   "sistema.canal_caido": {
     label: "Canal de notificación con fallas",
     severidad: "alta",
-    defaults: { email: "realtime", telegram: "off", push: "off" },
+    defaults: { email: "realtime", telegram: "off", push: "off", whatsapp: "off" },
     apagable: false,
     seccion: "sistema",
     soloAdmin: true,
@@ -136,8 +136,9 @@ export function prioridadPara(severidad: Severidad): number {
   return { critica: 0, alta: 2, media: 5, baja: 7 }[severidad];
 }
 
-/** Canales que se ofrecen en 1.1. WhatsApp entra en 1.2 vía el mismo adaptador. */
+/** WhatsApp requiere vinculación verificada y preferencias explícitas. */
 export const CANAL_LABEL: Record<ExternalChannel, string> = {
+  whatsapp: "WhatsApp",
   email: "Email",
   telegram: "Telegram",
   push: "Push (navegador/PWA)",

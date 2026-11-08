@@ -1,3 +1,5 @@
+import { httpError } from "@/lib/auth/access";
+import { currentStaffActor } from "@/lib/auth/staff-actor";
 import {
   assertCsrf,
   confidentialWhere,
@@ -74,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const data: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(body)) {
-      if (value !== undefined) data[key] = value;
+      if (value !== undefined && key !== "expectedUpdatedAt") data[key] = value;
     }
 
     if (typeof data.abogadoId === "string") {
@@ -94,16 +96,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (data.abogadoId === "") data.abogadoId = null;
 
     return await prisma.$transaction(async (tx) => {
+      const actor = await currentStaffActor(user, tx);
+      await mutateCausa(id, actor, "causa.write", tx);
       const prev = await tx.causa.findFirst({
-        where: { AND: [scopedcausaAccessWhere(user), { id }] },
+        where: { AND: [scopedcausaAccessWhere(actor), { id }] },
         include: { partes: true },
       });
       if (!prev) {
         return NextResponse.json({ error: "No encontrada" }, { status: 404 });
       }
-      if ((data.abogadoId !== undefined && data.abogadoId !== prev.abogadoId) || (data.acceso !== undefined && data.acceso !== prev.acceso)) await assertCausaTeamManage(id, user, tx);
+      if (body.expectedUpdatedAt && prev.updatedAt.toISOString() !== body.expectedUpdatedAt) throw httpError("La causa cambió en otra sesión. Conserve sus cambios y compare la versión actual antes de guardar.", 409);
+      if ((data.abogadoId !== undefined && data.abogadoId !== prev.abogadoId) || (data.acceso !== undefined && data.acceso !== prev.acceso)) await assertCausaTeamManage(id, actor, tx);
+      if (typeof data.abogadoId === "string" && data.abogadoId) {
+        const assignedNow = await tx.user.findUnique({ where: { id: data.abogadoId }, select: { role: true } });
+        if (!assignedNow || !isStaff(assignedNow.role)) throw httpError("El responsable ya no está disponible", 403);
+      }
       const causa = await tx.causa.update({
-        where: { id },
+        where: { id, updatedAt: prev.updatedAt },
         data,
       });
 
@@ -113,7 +122,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
       // Re-check conflicts against current parties after any update.
       const risk = await checkConflicts({
-        user,
+        user: actor,
+        client: tx,
         partes: prev.partes.map((p) => ({ nombre: p.nombre, rut: p.rut })),
         excludeCausaId: id,
       });

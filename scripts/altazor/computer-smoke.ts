@@ -70,7 +70,7 @@ async function main() {
   await chmod(root, 0o755); await mkdir(gatewayRoot, { mode: 0o700 }); await writeFile(join(root, ".owned-computer-smoke"), "fictitious-ci-only\n", { mode: 0o600 });
   const token = `fixture-${randomUUID()}`, modelToken = `fixture-model-${randomUUID()}`, userIds: string[] = [], causeIds: string[] = [];
   let gateway: ChildProcess | undefined, networkCreated = false, containerId = "", sessionId = "", organizationId = "", workspaceId = "", traffic = 0, providerCalls = 0;
-  let lastProviderPayload = "", fixtureError = "", modelMode: "reply" | "start-task" | "hang-task" = "reply", pendingModelRequests = 0;
+  let lastProviderPayload = "", fixtureError = "", modelMode: "reply" | "hang-task" = "reply", pendingModelRequests = 0;
   const sockets = new Set<import("node:net").Socket>();
   const model = createServer(async (request, response) => {
     try {
@@ -80,10 +80,7 @@ async function main() {
       for await (const chunk of request) { const bytes = Buffer.from(chunk); size += bytes.length; check(size < 3 * 1024 * 1024, "Provider fixture request too large"); chunks.push(bytes); }
       const payload = Buffer.concat(chunks).toString("utf8"); JSON.parse(payload); providerCalls++; lastProviderPayload = payload;
       if (modelMode === "hang-task") { pendingModelRequests++; response.once("close", () => { pendingModelRequests--; }); return; }
-      // First return a real desktop action so Kitties creates an asynchronous task.
-      // Its next model request stays pending until the real cancel endpoint aborts it.
-      const content = modelMode === "start-task" ? "@tool screenshot {}" : responseText;
-      if (modelMode === "start-task") modelMode = "hang-task";
+      const content = responseText;
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ id: "fictitious-ci", object: "chat.completion", choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 } }));
     } catch { fixtureError = "Local model fixture contract failed"; response.writeHead(400); response.end("{}"); }
@@ -155,8 +152,8 @@ async function main() {
     check(inspected.Config.Labels?.["org.lexopen.altazor.desktop-profile"] === desktopProfile.id &&
       inspected.Config.Labels?.["org.lexopen.altazor.desktop-source"] === KITTIES_SOURCE_COMMIT, "Expected the pinned LexOpen desktop tool profile");
     const toolchain = JSON.parse(await run("docker", ["exec", containerId, "lexopen-desktop-check"], 150_000));
-    check(toolchain.ok === true && Array.isArray(toolchain.checks) && toolchain.checks.length === 9,
-      "Document, OCR, bibliography, search and audio tests must run inside the actual desktop");
+    check(toolchain.ok === true && Array.isArray(toolchain.checks) && toolchain.checks.length === 10 && toolchain.checks.includes("lexopen-wallpaper"),
+      "Document, OCR, bibliography, search, audio and LexOpen wallpaper tests must run inside the actual desktop");
     stage = "screenshot-and-manual-control";
     const png = await until(async () => { try { return await computerScreenshot(owner, session.id); } catch { return null; } }, bytes => Boolean(bytes && bytes.length > 1024));
     check(png && png.subarray(0, 8).toString("hex") === "89504e470d0a1a0a" && png.readUInt32BE(16) >= 640 && png.readUInt32BE(20) >= 480, "Actual screenshot must have PNG bytes and desktop dimensions");
@@ -203,7 +200,9 @@ async function main() {
     await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { expiresAt: new Date(0) } }); const beforeExpiry = traffic;
     await assert.rejects(computerScreenshot(owner, session.id), error => (error as { status?: number }).status === 410); check(traffic === beforeExpiry, "Expired access must precede gateway traffic");
     await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { expiresAt: new Date(Date.now() + 60_000) } });
-    modelMode = "start-task";
+    // The FIRST inference remains pending: acceptance and cancellation must work
+    // before the provider has returned any tool call or response.
+    modelMode = "hang-task";
     await sendComputerMessage(owner, session.id, { ...task, requestId: `cancel-${randomUUID()}`, text: "Fictitious pending task for cancellation", files: [] });
     await until(() => readComputerSession(owner, session.id), view => view.working);
     await until(async () => pendingModelRequests, count => count > 0);

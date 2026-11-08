@@ -50,17 +50,20 @@ La memoria funciona con nodos y relaciones en PostgreSQL; no requiere instalar o
 
 ## Investigación, escritura y docencia
 
-**Academia** organiza trabajos privados de investigación, escritura, docencia y carrera académica. Cada trabajo conserva su pregunta, destinatarios, matriz y resultados.
+**Académico** organiza trabajos privados de investigación, escritura, docencia y carrera académica. Busca un trabajo por su título para retomar su pregunta, destinatarios, matriz y resultados.
 
 | Apartado | Recorrido |
 | --- | --- |
 | Trabajo | Elegir fuentes y preparar síntesis, estado del arte, comparación, revisión de afirmaciones o bibliografía, escritura, traducción, abstract y revisión por pares. |
 | Matriz de literatura | Configurar dimensiones de texto, número, fecha o etiqueta; registrar filas; incluirlas o excluirlas del análisis; asociar pasajes a celdas. |
-| Docencia | Usar objetivo, destinatarios, duración, resultados de aprendizaje y evaluación para preparar programas, rúbricas y material docente. |
+| Mesa de revisión | Identificar el siguiente paso del trabajo y comprobar qué secciones de cada manuscrito enlazan con un pasaje disponible. |
+| Docencia | Organizar cursos, seminarios, congresos, talleres y convocatorias en trabajos privados. Crear un syllabus desde la ficha del curso o partir de una plantilla en el editor. |
 | Mi perfil | Conservar los datos profesionales aportados por el titular y preparar propuestas de currículum; no certifica títulos ni cumplimiento de formularios institucionales. |
 | Descubrir | Consultar Crossref y OpenAlex, explorar relaciones bibliográficas, contrastar un registro ORCID público y conservar referencias. |
 
-Las propuestas de IA se guardan para edición y revisión. Puedes descargarlas en Word real o Markdown. **Incorporar a una causa** crea un escrito privado con sus respaldos nativos, después de revisar el resultado; repetir la incorporación recupera el mismo escrito. No presenta documentos ante tribunales.
+El editor reúne borradores propios y propuestas de IA en el mismo trabajo. Puedes comenzar con un documento en blanco o con una plantilla, dar formato al texto, insertar referencias a pasajes del trabajo y revisar una vista previa. Descarga una versión guardada en Word o Markdown y su respaldo en un archivo separado. **Incorporar a una causa** crea un escrito privado con sus respaldos nativos después de revisar el resultado. Si repites la incorporación, vuelves al mismo escrito.
+
+El syllabus recoge resumen, enfoque, destinatarios, requisitos, horario, sala, evaluación y bibliografía base. Puedes abrir un mensaje editable en Altazor para solicitar sugerencias bibliográficas. Tú decides qué referencias incorporar después de revisarlas. El [mapa docente](DOCENCIA.md) describe el flujo y sus siguientes etapas.
 
 Una fila de matriz con acceso revocado se oculta, pero su contenido y respaldo originales se conservan. Guardar el título o los datos generales no la transforma en una fila manual vacía. Las ediciones concurrentes se rechazan antes de sobrescribir cambios.
 
@@ -102,6 +105,10 @@ El conector envía un nonce por intento y exige su correspondencia en el ID toke
 **Computadora** conecta un escritorio opcional mediante un broker de LexOpen. Cada profesional y ámbito utiliza un gateway dedicado; un mismo endpoint no se comparte entre causas. El motor de escritorio es un contenedor, no una VM con kernel propio.
 
 El recorrido permite crear una sesión con caducidad, enviar un encargo y archivos expresamente elegidos, observar capturas, tomar el control para un ingreso manual, devolverlo, cancelar una tarea y cerrar la sesión. LexOpen conserva sus propios permisos y recibos. No entrega su base de datos, el almacenamiento completo ni sus credenciales al escritorio.
+
+La vista ampliada actualiza las capturas mientras está visible y pausa las consultas al ocultarla. Si la apertura falla después de crear una sesión, vuelve a comprobar el listado y muestra la sesión pendiente para revisarla o detenerla, sin reenviar el encargo. Una comprobación fallida de conexiones deja su estado **Sin comprobar** y bloquea las operaciones hasta recibir una respuesta actual.
+
+En Configuración, el [gestor de modelos locales](MODELOS-LOCALES.md) reúne la detección del equipo, las recomendaciones por uso y el inventario de Ollama. La conexión de IA del estudio y el modelo independiente del escritorio conservan sus propias configuraciones y comprobaciones.
 
 El adaptador está desactivado por defecto. No instala ni inicia un motor al abrir Mi jornada. La configuración se realiza desde el Host local y exige un gateway preparado expresamente para ese espacio. Con la política **sólo IA local**, no se permite iniciar tareas en un gateway cuyo destino de modelo independiente no pueda acreditarse como local.
 

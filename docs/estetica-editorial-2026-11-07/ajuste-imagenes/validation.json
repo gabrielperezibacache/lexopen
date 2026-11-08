@@ -1,0 +1,53 @@
+{
+  "scope": "Integración editorial de las imágenes existentes; tamaños, alineación y mezcla con el fondo azul.",
+  "environment": "Next dev aislado, Chromium, PostgreSQL local con datos ficticios; sin publicación.",
+  "routes": 40,
+  "first_round_captures": 168,
+  "confirmation_captures": 12,
+  "viewports": [
+    [
+      1440,
+      1000
+    ],
+    [
+      820,
+      1100
+    ],
+    [
+      360,
+      900
+    ],
+    [
+      320,
+      900
+    ]
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "all_images_decoded": true,
+  "title_art_overlap_count": 0,
+  "capture_errors": 0,
+  "page_errors": [],
+  "tablet_overflow_fix": {
+    "viewport": 820,
+    "before": 867,
+    "after": 820,
+    "fix": "position: relative on the existing table scroller",
+    "passed": true
+  },
+  "eslint": "passed: EditorialHeading.tsx and SiteNav.tsx",
+  "typescript": "passed: scoped config for EditorialHeading.tsx and SiteNav.tsx, including their imports",
+  "existing_autoplay_tests": {
+    "passed": 4,
+    "duration_seconds": 51,
+    "test": "e2e/editorial-motion.spec.ts --grep comienza sola",
+    "service_workers": "blocked via temporary test config",
+    "initial_run": "A navigation timeout and an interruption prevented completing the initial run with the standard config. All four tests passed in the clean browser configuration."
+  },
+  "limitations": [
+    "Mobile sizes are browser emulation, not physical phone verification.",
+    "No production build, deployment, global typecheck, new image generation or new animation generation was performed in this pass."
+  ]
+}

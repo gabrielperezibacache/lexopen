@@ -11,7 +11,7 @@ import styles from "./AltazorConnectors.module.css";
 
 const base = "/api/personal-connectors/linkedin";
 const attemptKey = "altazor:linkedin:pending-attempt";
-const stateLabels: Record<PublicLinkedInAccount["state"], string> = { unconfigured: "Configuración pendiente", disconnected: "Sin conectar", connecting: "Autorización pendiente", connected: "Autorización comprobada", expired: "Autorización vencida", verification_required: "Requiere comprobación", reconnect_required: "Vuelva a conectar", error: "No se pudo comprobar" };
+const stateLabels: Record<PublicLinkedInAccount["state"], string> = { unconfigured: "Conexión pendiente de preparación", disconnected: "Sin conectar", connecting: "Termina el ingreso en LinkedIn", connected: "Conectado", expired: "Vuelve a conectar para renovar el acceso", verification_required: "Comprueba la conexión", reconnect_required: "Vuelve a conectar", error: "No se pudo comprobar la conexión" };
 const existingConnections = [
   { provider: "codex", label: "ChatGPT / Codex personal", href: "/cuenta#codex", description: "Inicie sesión y compruebe su autorización en Mi cuenta.", icon: SquareTerminal },
   { provider: "mail", label: "Mi correo", href: COMMUNICATIONS_SETTINGS_PATH, description: "Abra su bandeja y administre sus cuentas desde Configuración.", icon: Mail },
@@ -30,6 +30,7 @@ export function AltazorConnectors({ compact = false }: { compact?: boolean }) {
   const [attemptId, setAttemptId] = useState(""), [authUrl, setAuthUrl] = useState("");
   const [saveKey, setSaveKey] = useState(""), [publishKey, setPublishKey] = useState("");
   const [withheldDrafts, setWithheldDrafts] = useState(0);
+  const [disconnectConfirmed, setDisconnectConfirmed] = useState(false);
   const refresh = useCallback(async () => {
     const responses = await Promise.all([fetch("/api/personal-connectors", { cache: "no-store" }), fetch(`${base}/drafts`, { cache: "no-store" })]);
     if (responses.some(response => !response.ok)) throw new Error("No se pudo cargar su conexión. Vuelva a comprobarla.");
@@ -78,9 +79,10 @@ export function AltazorConnectors({ compact = false }: { compact?: boolean }) {
     if (result) { setAccount(result.account); setNotice("LinkedIn confirmó la autorización de esta cuenta."); }
   }
   async function disconnect() {
+    if (!disconnectConfirmed) return;
     const result = await action<{ account: PublicLinkedInAccount }>(base, undefined, "DELETE");
     if (result) {
-      setAccount(result.account); setAttemptId(""); setAuthUrl(""); setPreview(null);
+      setAccount(result.account); setAttemptId(""); setAuthUrl(""); setPreview(null); setDisconnectConfirmed(false);
       try { sessionStorage.removeItem(attemptKey); } catch { /* No credentials are stored here. */ }
       setNotice("Autorización eliminada de ALTAZOR AI. Puede revocar también el acceso en los ajustes de LinkedIn.");
     }
@@ -116,21 +118,24 @@ export function AltazorConnectors({ compact = false }: { compact?: boolean }) {
   const dirty = !saved || saved.title !== form.title || saved.body !== form.body || (saved.sourceUrl || "") !== form.sourceUrl || saved.visibility !== form.visibility;
   const unresolved = receipts.some(receipt => receipt.draftId === form.id && ["sending", "unknown"].includes(receipt.status));
   return <section className={styles.root} aria-labelledby={`${uid}-heading`}>
-    <header className={styles.heading}><div><h2 id={`${uid}-heading`}>Conexiones personales</h2><p>Sus herramientas y sus borradores académicos, bajo su control.</p></div><Link2 aria-hidden="true" size={22} /></header>
+    <header className={styles.heading}><div><h2 id={`${uid}-heading`}>Compartir en LinkedIn</h2><p>Prepara un borrador privado y revisa lo que quieres publicar.</p></div><Link2 aria-hidden="true" size={22} /></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {withheldDrafts > 0 && <p className={styles.notice} role="status">Hay {withheldDrafts} borrador(es) cuyo origen cambió o ya no está disponible. Revise sus fuentes antes de preparar una nueva versión.</p>}
-    <nav className={styles.existing} aria-label="Herramientas y conexiones existentes" data-testid="altazor-existing-connections" data-catalog-state={existingProviders ? "ready" : loading ? "loading" : "unavailable"}>
+    <details className={styles.otherConnections}><summary>Otras conexiones personales</summary><nav className={styles.existing} aria-label="Herramientas y conexiones existentes" data-testid="altazor-existing-connections" data-catalog-state={existingProviders ? "ready" : loading ? "loading" : "unavailable"}>
       {existingProviders ? existingConnections.filter(entry => existingProviders.includes(entry.provider)).map(entry => <Link key={entry.provider} href={entry.href} prefetch={false} className={styles.existingLink}><entry.icon size={20} aria-hidden="true" /><span><strong>{entry.label}</strong><span>{entry.description}</span></span><ArrowRight size={17} aria-hidden="true" /></Link>) : <p className={styles.detail}>{loading ? "Consultando sus herramientas disponibles…" : "No se pudo cargar el catálogo de conexiones. Vuelva a abrir esta sección."}</p>}
-    </nav>
+    </nav></details>
     <div className={styles.connection} aria-busy={loading}>
       <Linkedin size={25} aria-hidden="true" /><div className={styles.connectionText}><h3>LinkedIn</h3><p>{loading ? "Cargando estado de su autorización…" : account ? stateLabels[account.state] : "Estado no disponible"}{account?.identity ? ` · ${account.identity.name}` : ""}</p>{account?.reason && <p className={styles.detail}>{account.reason}</p>}</div>
       <div className={styles.actions}>
-        {account?.canVerify && <button type="button" disabled={busy} onClick={verifyAccount}><RefreshCw size={15} aria-hidden="true" />Comprobar</button>}
-        {account?.canStartOAuth && <button type="button" disabled={busy} onClick={() => connect("identity")}>{account.connected ? "Renovar conexión" : "Conectar LinkedIn"}</button>}
-        {account?.connected && !account.canPublish && account.canRequestPublish && <button type="button" disabled={busy} onClick={() => connect("publish")}>Autorizar publicación</button>}
-        {(account?.identity || attemptId) && <button type="button" disabled={busy} onClick={disconnect}>Desconectar</button>}
+        {account?.canStartOAuth && !account.connected && <button type="button" className={styles.primary} disabled={busy} onClick={() => connect("identity")}>Conectar LinkedIn</button>}
       </div>
+      <details className={styles.management}><summary>Gestionar conexión de LinkedIn</summary>
+        {account?.canVerify && <button type="button" disabled={busy} onClick={verifyAccount}><RefreshCw size={15} aria-hidden="true" />Comprobar conexión</button>}
+        {account?.canStartOAuth && account.connected && <button type="button" disabled={busy} onClick={() => connect("identity")}>Renovar conexión</button>}
+        {account?.connected && !account.canPublish && account.canRequestPublish && <button type="button" disabled={busy} onClick={() => connect("publish")}>Autorizar publicación</button>}
+        {(account?.identity || attemptId) && <div className={styles.disconnect}><label><input type="checkbox" disabled={busy} checked={disconnectConfirmed} onChange={event => setDisconnectConfirmed(event.target.checked)} />Quiero desconectar LinkedIn de LexOpen.</label><button type="button" disabled={busy || !disconnectConfirmed} onClick={disconnect}>Desconectar LinkedIn</button></div>}
+      </details>
     </div>
     {authUrl && <p className={styles.pending}><a href={authUrl} target="_blank" rel="noopener noreferrer">Continuar en LinkedIn <ArrowUpRight size={14} aria-hidden="true" /></a></p>}
     {attemptId && <button className={styles.complete} type="button" disabled={busy} onClick={complete}>Comprobar autorización</button>}
@@ -142,11 +147,11 @@ export function AltazorConnectors({ compact = false }: { compact?: boolean }) {
           <label htmlFor={`${uid}-title`}>Título privado del borrador</label><input id={`${uid}-title`} disabled={busy} value={form.title} maxLength={200} required onChange={event => update("title", event.target.value)} />
           <label htmlFor={`${uid}-body`}>Texto para compartir</label><textarea id={`${uid}-body`} disabled={busy} value={form.body} maxLength={3000} required rows={7} onChange={event => update("body", event.target.value)} /><span className={styles.counter}>{form.body.length} / 3000 caracteres</span>
           <label htmlFor={`${uid}-source`}>Enlace a la fuente <span>(opcional)</span></label><input id={`${uid}-source`} disabled={busy} value={form.sourceUrl} type="url" maxLength={2000} placeholder="https://…" onChange={event => update("sourceUrl", event.target.value)} />
-          <label htmlFor={`${uid}-audience`}>Audiencia de la publicación por API</label><select id={`${uid}-audience`} disabled={busy} value={form.visibility} onChange={event => update("visibility", event.target.value as Form["visibility"])}><option value="CONNECTIONS">Mis contactos de primer grado</option><option value="PUBLIC">Pública</option></select>
+          <label htmlFor={`${uid}-audience`}>Quién podrá ver la publicación</label><select id={`${uid}-audience`} disabled={busy} value={form.visibility} onChange={event => update("visibility", event.target.value as Form["visibility"])}><option value="CONNECTIONS">Mis contactos de primer grado</option><option value="PUBLIC">Pública</option></select>
           <p className={styles.detail}>Si publica manualmente, confirme la audiencia también en LinkedIn.</p>
           <div className={styles.actions}><button className={styles.primary} type="submit" disabled={busy || !form.title.trim() || !form.body.trim() || !dirty}>Guardar borrador privado</button><button type="button" disabled={!form.body.trim()} onClick={copy}><Copy size={15} aria-hidden="true" />Copiar texto</button><a href="https://www.linkedin.com/feed/" target="_blank" rel="noopener noreferrer">Abrir LinkedIn <ArrowUpRight size={14} aria-hidden="true" /></a></div>
         </form>
-        <div className={styles.publish}><button type="button" disabled={busy || dirty || unresolved || !account?.canPublish} onClick={review}>Revisar publicación por API</button>{!account?.canPublish && <p>Puede guardar, copiar y abrir su borrador en LinkedIn. La publicación desde aquí requiere una autorización comprobada.</p>}{dirty && form.id && <p>Guarde los cambios antes de revisar la publicación.</p>}{unresolved && <p>Compruebe el envío pendiente en LinkedIn. Este borrador no se reenviará automáticamente.</p>}</div>
+        <div className={styles.publish}><button type="button" disabled={busy || dirty || unresolved || !account?.canPublish} onClick={review}>Revisar para publicar</button>{!account?.canPublish && <p>Puede guardar, copiar y abrir su borrador en LinkedIn. La publicación desde aquí requiere una autorización comprobada.</p>}{dirty && form.id && <p>Guarde los cambios antes de revisar la publicación.</p>}{unresolved && <p>Compruebe el envío pendiente en LinkedIn. Este borrador no se reenviará automáticamente.</p>}</div>
         {preview && <div className={styles.preview}><h3>Antes de publicar</h3><p>Autor: <strong>{preview.author}</strong> · {preview.visibility === "PUBLIC" ? "Publicación pública" : "Contactos de primer grado"}</p><p className={styles.postText}>{preview.commentary}</p>{preview.reason && <p>{preview.reason}</p>}<label className={styles.confirm}><input type="checkbox" disabled={busy} checked={reviewed} onChange={event => setReviewed(event.target.checked)} />Revisé este texto y la audiencia.</label><button className={styles.primary} type="button" disabled={busy || !reviewed || !preview.canPublish} onClick={publish}>Publicar en LinkedIn</button></div>}
         {receipts.filter(receipt => receipt.draftId === form.id).map(receipt => <div className={styles.receipt} key={receipt.id}>{receipt.status === "published" ? <Check size={16} aria-hidden="true" /> : <CircleAlert size={16} aria-hidden="true" />}<p>{receipt.status === "published" ? "Publicación confirmada por LinkedIn." : receipt.status === "failed" ? "LinkedIn rechazó este intento; el borrador se conserva." : "Envío sin confirmación. Compruebe LinkedIn antes de intentar otra publicación."}{receipt.externalUrl && <> <a href={receipt.externalUrl} target="_blank" rel="noopener noreferrer">Ver publicación</a></>}</p></div>)}
       </div>

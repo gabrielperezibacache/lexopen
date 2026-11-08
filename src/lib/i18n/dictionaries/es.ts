@@ -1,4 +1,8 @@
 export const es = {
+  computerReading: {
+    documentRead: "Leer texto del documento local",
+    confirmation: "Confirma la lectura del archivo seleccionado dentro del escritorio. Su texto estará disponible para el asistente y su proveedor configurado.",
+  },
   meta: {
     title: "LexOpen — Operaciones jurídicas open source",
     description:

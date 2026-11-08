@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-07",
+  "provider": "OpenAI GPT image generation",
+  "tool": "built-in image_gen",
+  "mode": "generate",
+  "transparent_background": true,
+  "prompt": "Use case: illustration-story. Asset type: a genuine transparent-background editorial engraving for LexOpen, a scholarly legal application. Create ONE anonymous philosopher of ancient Greece in a classic gesture of thought. Full seated figure, three-quarter view facing LEFT, wearing a simply draped Greek himation. Calm mature Hellenic profile, curly hair, finely engraved beard, dignified expression. Leaning forward slightly, one elbow naturally supported on his own knee, the knuckles of that hand resting lightly beneath his chin in reflection. The other hand rests quietly on his lap inside the robe folds. Anatomically coherent hands, exactly two arms, sensible joints and proportions. Seated on one small plain stone support; include the whole figure, support and feet with twelve percent clear safe margin on all sides. Portrait 3:4 composition. Render as an exquisite nineteenth-century silver steel engraving, like a classical scholar in a fine legal publisher's frontispiece: very precise fine crosshatching, delicately carved curls and beard, tactile robe folds, elegant controlled silhouette, strong negative spaces. Match the visual family of an antique silver engraved Greek reader, never a cartoon or modern icon. Palette strictly cool silver-white #f4f3f7, slate-indigo #313958, deep ink #0d1022, with one almost imperceptible iris #aab5ff accent in a robe fold. Favor engraved lines and open dark negative spaces over broad white fills. This will be rendered quietly at low opacity over a deep indigo interface background. Genuine clean alpha transparency all around the figure and in every gap; no rectangular backdrop, floor, horizon, atmosphere, smoke, halo, aura, glow, rays, surrounding shadow, architecture, columns, books, scrolls, text, letters, numbers, lettering, signature, logos or watermarks. No photorealistic marble photograph, no painted statue, no pedestal inscription. Restrained, thoughtful and beautifully drawn.",
+  "source": "docs/estetica-editorial-2026-11-07/media-sources/filosofo-gpt-v1-original.png",
+  "file": "public/editorial/generated/filosofo-gpt-v1.webp",
+  "originalDimensions": [
+    1086,
+    1448
+  ],
+  "dimensions": [
+    960,
+    1280
+  ],
+  "originalGeneratedFile": "/Users/gabrielsimonpi/.codex/generated_images/01a1b6f9-697f-7473-94d3-890f1954f883/exec-1b3d75c1-d0db-406f-8e7c-2973eaee5433.png",
+  "processing": "Resize and WebP encoding only; generated alpha preserved.",
+  "userInstruction": "Use GPT image generation for the background; integrate the visual elements already created.",
+  "presentation": {
+    "technique": "CSS soft-light on existing indigo, grayscale, mask fade toward the bottom",
+    "role": "Decorative background figure behind content",
+    "desktopOpacity": 0.48,
+    "mobileOpacity": 0.38,
+    "sidebarOpacity": 0.35
+  }
+}

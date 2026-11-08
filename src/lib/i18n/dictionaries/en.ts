@@ -1,6 +1,10 @@
 import type { Dictionary } from "./es";
 
 export const en: Dictionary = {
+  computerReading: {
+    documentRead: "Read local document text",
+    confirmation: "Confirm reading the selected file inside the desktop. Its text will be available to the assistant and its configured provider.",
+  },
   meta: {
     title: "LexOpen — Open-source legal operations",
     description:

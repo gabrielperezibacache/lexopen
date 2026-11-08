@@ -47,6 +47,9 @@ export const ASSISTANT_TOOL_IDS = [
   "sincronizacion.estado",
   "icaro.listar",
   "icaro.delegar",
+  "drive.estado",
+  "drive.crearCarpeta",
+  "drive.guardarDocumento",
 ] as const;
 
 export type AssistantIntentId = (typeof ASSISTANT_TOOL_IDS)[number];

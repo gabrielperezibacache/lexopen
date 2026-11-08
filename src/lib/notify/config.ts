@@ -1,3 +1,4 @@
+import { whatsappSnapshot } from "./whatsapp-config";
 /**
  * Configuración de proveedores de notificación en IntegrationConfig
  * (provider=smtp|telegram|webpush). Secretos cifrados con lib/notify/secrets.
@@ -230,9 +231,6 @@ export async function notifyProvidersSnapshot() {
       subject: wpRaw.subject || null,
       hasPrivateKey: Boolean(wpRaw.privateKey),
     },
-    whatsapp: {
-      enabled: (await import("@/lib/altazor/help/config").then(module => module.whatsAppMetaSnapshot())).enabled,
-      note: "Meta Cloud API está disponible para avisos y respuestas de ayuda de Altazor. Configura la conexión del Host y vincula tu número desde la ayuda de Altazor. Twilio continúa sin configurar.",
-    },
+    whatsapp: await whatsappSnapshot(),
   };
 }

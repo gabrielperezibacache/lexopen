@@ -1,0 +1,18 @@
+{
+  "scope": "Local dummy-data verification of distinct sidebar and workspace engravings",
+  "views": 11,
+  "centerPreserved": true,
+  "sidebarDistinct": true,
+  "allRouteResponsesOk": true,
+  "imageFailures": [],
+  "overflow": false,
+  "javascriptErrors": [],
+  "centerAssetStatus": 200,
+  "sidebarAssetStatus": 200,
+  "collapsedSidebarHidesArt": true,
+  "visualReview": [
+    "buscar-dark-desktop.png",
+    "menu-dark-mobile.png"
+  ],
+  "deployed": false
+}

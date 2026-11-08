@@ -14,7 +14,8 @@ export default async function CorreoPage({ searchParams }: { searchParams: Promi
   const { t } = await getI18n();
   return (
     <div className="space-y-6">
-      <PageHeader artwork="correspondence"
+      <PageHeader
+        artwork="correspondence"
         eyebrow={t("mailbox.eyebrow")}
         title={t("mailbox.title")}
         subtitle={t("mailbox.subtitle")}

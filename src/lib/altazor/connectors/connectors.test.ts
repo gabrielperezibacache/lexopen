@@ -147,7 +147,10 @@ test("pending approvals are bound to kitty, chat and selected connection; perman
   await assert.rejects(() => client.decideApproval("approval-a", "kitty-a", "chat-a", ["correo"], true), /datos ocultos/);
   assert.equal(decisions, 0);
   owned.args = { to: "example@invalid.test", text: "Borrador de prueba" };
-  assert.deepEqual(await client.decideApproval("approval-a", "kitty-a", "chat-a", ["correo"], true), { id: "approval-a", status: "approved", failed: false });
+  const decided = await client.decideApproval("approval-a", "kitty-a", "chat-a", ["correo"], true);
+  assert.equal(decided.id, "approval-a"); assert.equal(decided.status, "approved"); assert.equal(decided.failed, false);
+  assert.equal(decided.canContinue, false); assert.equal(decided.resumeTask, null);
+  assert.doesNotMatch(JSON.stringify(decided), /private upstream result|must-not-leave/);
   await assert.rejects(() => client.decideApproval("foreign-chat", "kitty-a", "chat-a", ["correo"], true)); assert.equal(decisions, 1);
 });
 test("an ambiguous PUT with credentials is never retried and its error contains no payload", async () => {

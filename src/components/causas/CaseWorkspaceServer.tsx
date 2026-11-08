@@ -1,3 +1,4 @@
+import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CaseAudioManager } from "@/components/audio/CaseAudioManager";
 import { CaseKnowledgePanel } from "@/components/knowledge/CaseKnowledgePanel";
@@ -81,7 +82,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
           },
         },
         plazos: { where: plazoAccessWhere(user),  orderBy: { fechaLimite: "asc" } },
-        tramites: { where: scopedrequiredCausaWhere(user),
+        tramites: { where: { AND: [scopedrequiredCausaWhere(user), { OR: [{ task: null }, { task: { is: taskWorkspaceAccessWhere(user) } }] }] },
           orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
           include: { responsable: { select: { id: true, name: true } } },
         },
@@ -199,6 +200,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
         subtitle={<>{causa.caratula || h.noCaratula}{causa.rit ? ` · ${causa.rit}` : ""}</>}
       />
       {canUseKnowledge && <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" mode={mode} />}
+      {can(user, "causa.write", { causaRol: access.causaRol }) && <Link href={`/offline.html?kind=causa&record=${causa.id}`} className="btn btn-secondary">Trabajar sin conexión</Link>}
       <CausaActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={user.role === "admin"} />
           <div className="flex flex-wrap gap-2">
             <StatusBadge estado={causa.estado} />
@@ -523,7 +525,8 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
                     hasBinary={d.hasBinary}
                   />
                 </div>
-                <DocumentoAiActions documentoId={d.id} causaId={causa.id} />
+                <Link href={`/offline.html?kind=documento&record=${d.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)]">Sin conexión</Link>
+                <DocumentoAiActions documentoId={d.id} causaId={causa.id} version={d.version} />
               </div>
             ))}
             {documentos.length === 0 && (
@@ -546,6 +549,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
             {causa.notas.map((n) => (
               <article key={n.id} className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4">
                 <h3 className="font-medium">{n.titulo}</h3>
+                {can(user, "causa.write", { causaRol: access.causaRol }) && <Link href={`/offline.html?kind=nota&record=${n.id}`} className="btn btn-secondary">Sin conexión</Link>}
                 <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-[var(--ink-soft)]/85">
                   {n.contenido}
                 </pre>

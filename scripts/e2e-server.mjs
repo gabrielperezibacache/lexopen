@@ -47,16 +47,20 @@ function run(command, args, env) {
 }
 
 const databaseUrl = databaseForE2e();
+const compiled = process.env.E2E_SERVER_MODE === "production";
 const env = {
   ...process.env,
   DATABASE_URL: databaseUrl,
   E2E_DATABASE_URL: databaseUrl,
-  NODE_ENV: "test",
+  NODE_ENV: compiled ? "production" : "test",
   LEXOPEN_E2E: "1",
   SESSION_SECRET: process.env.SESSION_SECRET || "e2e-session-secret-32-chars",
-  HERMES_ALLOW_DEMO: "1",
+  HERMES_ALLOW_DEMO: compiled ? "0" : "1",
   LEXOPEN_DEMO_SWITCHER: "0",
-  LEXOPEN_RELAX_CSRF: "1",
+  LEXOPEN_RELAX_CSRF: compiled ? "0" : "1",
+  // The fixture binds HTTP loopback; production CSRF checks still apply.
+  LEXOPEN_COOKIE_SECURE: "0",
+  LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE: compiled ? "1" : process.env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE,
   PORT: String(port),
   HOSTNAME: "127.0.0.1",
 };
@@ -66,11 +70,13 @@ await run(
   ["--no-install", "prisma", "migrate", "reset", "--force", "--skip-seed"],
   env
 );
-await run("npx", ["--no-install", "tsx", "prisma/seed.ts"], env);
+await run("npx", ["--no-install", "tsx", "prisma/seed.ts"], { ...env, NODE_ENV: "test" });
 
 const server = spawn(
   npm,
-  process.env.E2E_BUNDLER === "webpack"
+  compiled
+    ? ["exec", "--", "next", "start", "--hostname", "127.0.0.1", "--port", String(port)]
+    : process.env.E2E_BUNDLER === "webpack"
     ? ["exec", "--", "next", "dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)]
     : ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)],
   {

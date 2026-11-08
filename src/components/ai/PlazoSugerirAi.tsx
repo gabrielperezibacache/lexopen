@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
 import { civilDateKey } from "@/lib/chile-time";
-import { calcularVencimiento } from "@/lib/plazos";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 
@@ -42,9 +41,6 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
     for (const [index, item] of items.entries()) {
       const dias = typeof item.dias === "number" && item.dias > 0 ? item.dias : 5;
       const tipoComputo = item.tipoComputo === "corridos" ? "corridos" : "habiles";
-      const fechaLimite = civilDateKey(
-        calcularVencimiento({ desde: hoy, dias, tipoComputo })
-      );
       const payload = {
           causaId,
           titulo: item.titulo,
@@ -54,7 +50,6 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
           tipoComputo,
           diasPlazo: dias,
           fechaNotificacion: civilDateKey(hoy),
-          fechaLimite,
       };
       let submission = submissions.current.get(index);
       if (!submission) { submission = createSubmissionKeys(undefined, `lexopen:suggested-deadline:${causaId}:${index}`); submissions.current.set(index, submission); }
@@ -65,6 +60,7 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
         body: JSON.stringify(payload),
       });
       if (res.ok) created += 1;
+      else { setBusy(false); setNote(res.error); if (created) router.refresh(); return; }
     }
     if (created === items.length) {
       for (const item of sent) item.submission.complete(item.payload);

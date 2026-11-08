@@ -152,4 +152,3 @@ ALTER TABLE "AltazorIcaroMemory" ADD CONSTRAINT "AltazorIcaroMemory_icaroId_fkey
 
 -- AddForeignKey
 ALTER TABLE "AltazorHelpRequest" ADD CONSTRAINT "AltazorHelpRequest_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

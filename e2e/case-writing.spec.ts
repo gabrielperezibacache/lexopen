@@ -6,7 +6,7 @@ import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { putObject } from "../src/lib/storage";
 import type { WritingDraftView, WritingHistory, WritingMutationResult } from "../src/lib/writings/types";
-import { loginAs } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Writing fixtures require local storage");
@@ -37,21 +37,21 @@ async function openWritingTool(editor: Locator, tool: "sources" | "references" |
   await expect(panel).toBeVisible();
 }
 async function createDraft(page: Page, title: string, body = "") {
-  return (await json<WritingMutationResult>(await page.request.post(base(), { data: { requestId: randomUUID(), title, body } }), 201)).draft;
+  return (await json<WritingMutationResult>(await apiRequest(page).post(base(), { data: { requestId: randomUUID(), title, body } }), 201)).draft;
 }
 async function current(page: Page, id: string) { return json<WritingDraftView>(await page.request.get(`${base()}/${id}`)); }
 async function prepare(page: Page) {
   if (prepared) return;
-  await json(await page.request.post(`/api/documentos/${documentId}/evidence`), 201);
-  await json(await page.request.post(`/api/causas/${causaId}/knowledge/analyze`, { data: {} }));
+  await json(await apiRequest(page).post(`/api/documentos/${documentId}/evidence`), 201);
+  await json(await apiRequest(page).post(`/api/causas/${causaId}/knowledge/analyze`, { data: {} }));
   factId = (await db.caseFact.findFirstOrThrow({ where: { causaId }, select: { id: true } })).id;
-  const imported = await json<{ book: { id: string } }>(await page.request.post("/api/books", { multipart: { requestId: randomUUID(), title: "Tratado ficticio de contratos", author: "Autora ficticia", preserveOriginal: "true", convertToText: "false", file: { name: "contratos-ficticios.txt", mimeType: "text/plain", buffer: Buffer.from(bookText) } } }), 201);
+  const imported = await json<{ book: { id: string } }>(await apiRequest(page).post("/api/books", { multipart: { requestId: randomUUID(), title: "Tratado ficticio de contratos", author: "Autora ficticia", preserveOriginal: "true", convertToText: "false", file: { name: "contratos-ficticios.txt", mimeType: "text/plain", buffer: Buffer.from(bookText) } } }), 201);
   bookId = imported.book.id;
   bookStorageKey = (await db.libraryBook.findUniqueOrThrow({ where: { id: bookId }, select: { storageKey: true } })).storageKey;
-  const hearing = await json<{ id: string }>(await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title: "Audiencia preparatoria ficticia" } }), 201);
+  const hearing = await json<{ id: string }>(await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title: "Audiencia preparatoria ficticia" } }), 201);
   workspaceId = hearing.id;
-  await json(await page.request.post(`/api/causas/${causaId}/hearings/${workspaceId}/notes`, { data: { title: "Pedir exhibición del comprobante", body: noteText, citation: null } }));
-  await json(await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title: "Otra mesa ficticia más reciente" } }), 201);
+  await json(await apiRequest(page).post(`/api/causas/${causaId}/hearings/${workspaceId}/notes`, { data: { title: "Pedir exhibición del comprobante", body: noteText, citation: null } }));
+  await json(await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title: "Otra mesa ficticia más reciente" } }), 201);
   prepared = true;
 }
 
@@ -84,7 +84,7 @@ test.afterAll(async () => {
 test("escrito por causa: guardado, tres orígenes, historial y salida con respaldos", async ({ page }, info) => {
   test.setTimeout(150_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await loginAs(page, email); await prepare(page);
+  await loginAs(page, email); await authenticateApiRequests(page); await prepare(page);
   await page.goto(`/causas/${causaId}/escritos`);
   await page.getByLabel("Nombre del nuevo escrito", { exact: true }).fill("Presentación de antecedentes");
   const creating = page.waitForResponse(response => new URL(response.url()).pathname === base() && response.request().method() === "POST");
@@ -166,7 +166,7 @@ test("escrito por causa: guardado, tres orígenes, historial y salida con respal
 
 test("cuaderno de fuentes: recupera cargas fallidas y conserva libro y búsqueda al revisar referencias", async ({ page }) => {
   test.setTimeout(90_000); await page.setViewportSize({ width: 1440, height: 1000 });
-  await loginAs(page, email); await prepare(page);
+  await loginAs(page, email); await authenticateApiRequests(page); await prepare(page);
   const draft = await createDraft(page, "Continuidad del cuaderno", "Texto propio sin incorporación automática.");
   let allowList = false;
   await page.route(url => url.pathname === base(), async route => {
@@ -269,7 +269,7 @@ test("cuaderno de fuentes: recupera cargas fallidas y conserva libro y búsqueda
 test("móvil: fallo al incorporar una fuente mantiene el aviso y la recuperación en el panel activo", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 360, height: 800 });
-  await loginAs(page, email); await prepare(page);
+  await loginAs(page, email); await authenticateApiRequests(page); await prepare(page);
   const draft = await createDraft(page, "Recuperación móvil de fuentes", "Observación propia que debe conservarse.");
   const requests: unknown[] = [];
   await page.route(url => url.pathname === `${base()}/${draft.id}/sources`, async route => {
@@ -310,7 +310,7 @@ test("móvil: fallo al incorporar una fuente mantiene el aviso y la recuperació
 });
 
 test("guardado perdido y edición durante la solicitud: conserva texto y evita duplicados", async ({ page }) => {
-  test.setTimeout(90_000); await loginAs(page, email);
+  test.setTimeout(90_000); await loginAs(page, email); await authenticateApiRequests(page);
   const draft = await createDraft(page, "Continuidad ante desconexión", "Texto inicial.");
   await page.goto(`/causas/${causaId}/escritos?draft=${draft.id}`);
   const editor = page.getByTestId("writing-editor"), body = editor.getByLabel("Texto del escrito", { exact: true });
@@ -339,7 +339,7 @@ test("guardado perdido y edición durante la solicitud: conserva texto y evita d
 });
 
 test("volver en el navegador antes de la pausa de guardado conserva la última edición", async ({ page }) => {
-  test.setTimeout(90_000); await loginAs(page, email);
+  test.setTimeout(90_000); await loginAs(page, email); await authenticateApiRequests(page);
   const draft = await createDraft(page, "Continuidad al volver", "Texto inicial de navegación.");
   await page.goto(`/causas/${causaId}`);
   await page.getByRole("link", { name: "Escribir con fuentes", exact: true }).click();
@@ -354,18 +354,18 @@ test("volver en el navegador antes de la pausa de guardado conserva la última e
 });
 
 test("conflicto de pestañas y revocación: no sobrescribe ni exporta derivados sin acceso", async ({ page }) => {
-  test.setTimeout(90_000); await loginAs(page, email); await prepare(page);
+  test.setTimeout(90_000); await loginAs(page, email); await authenticateApiRequests(page); await prepare(page);
   const draft = await createDraft(page, "Revisión de concurrencia", "Texto compartido entre dos sesiones propias.");
   await page.goto(`/causas/${causaId}/escritos?draft=${draft.id}`);
   const editor = page.getByTestId("writing-editor"), body = editor.getByLabel("Texto del escrito", { exact: true });
   await expect(body).toHaveValue(draft.body);
-  const external = await json<WritingMutationResult>(await page.request.patch(`${base()}/${draft.id}`, { data: { requestId: randomUUID(), expectedRevision: draft.revision, title: draft.title, body: "Cambio confirmado desde la otra sesión." } }));
+  const external = await json<WritingMutationResult>(await apiRequest(page).patch(`${base()}/${draft.id}`, { data: { requestId: randomUUID(), expectedRevision: draft.revision, title: draft.title, body: "Cambio confirmado desde la otra sesión." } }));
   await body.fill("Texto local que debe poder recuperarse y no sobrescribir al otro.");
   await expect(editor.getByRole("alert")).toContainText(/otra sesión|conflicto/i);
   await expect(body).toHaveValue("Texto local que debe poder recuperarse y no sobrescribir al otro.");
   expect((await current(page, draft.id)).body).toBe(external.draft.body);
   const fact = await db.caseFact.findUniqueOrThrow({ where: { id: factId }, select: { revision: true } });
-  const attached = await json<WritingMutationResult>(await page.request.post(`${base()}/${draft.id}/sources`, { data: { requestId: randomUUID(), expectedRevision: external.draft.revision, source: { kind: "fact", factId, revision: fact.revision } } }));
+  const attached = await json<WritingMutationResult>(await apiRequest(page).post(`${base()}/${draft.id}/sources`, { data: { requestId: randomUUID(), expectedRevision: external.draft.revision, source: { kind: "fact", factId, revision: fact.revision } } }));
   await db.documento.update({ where: { id: documentId }, data: { confidencial: true } });
   await db.user.update({ where: { id: ownerId }, data: { capabilityRevokes: "doc.confidential.read" } });
   try {
@@ -373,7 +373,7 @@ test("conflicto de pestañas y revocación: no sobrescribe ni exporta derivados 
       const response = await page.request.get(`${base()}/${draft.id}${suffix}`);
       expect([404, 409]).toContain(response.status()); expect(await response.text()).not.toContain(publicText);
     }
-    const restored = await page.request.post(`${base()}/${draft.id}/restore`, { data: { requestId: randomUUID(), expectedRevision: attached.draft.revision, targetRevision: attached.draft.revision } });
+    const restored = await apiRequest(page).post(`${base()}/${draft.id}/restore`, { data: { requestId: randomUUID(), expectedRevision: attached.draft.revision, targetRevision: attached.draft.revision } });
     expect([404, 409]).toContain(restored.status());
     await page.reload(); await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveCount(0);
     await expect(page.getByText(publicText, { exact: true })).toHaveCount(0);

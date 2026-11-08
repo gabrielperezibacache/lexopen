@@ -1,3 +1,4 @@
+import { normalizeIsbn, sameBibliographyWork } from "./bibliography-identity";
 import { z } from "zod";
 import { type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -17,7 +18,7 @@ export const addBibliographySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("book"), requestId: altazorRequestId, bookId: altazorId }).strict(),
 ]);
 export const importBibliographySchema = z.object({ requestId: altazorRequestId, format: z.enum(["ris", "bibtex", "json"]), content: z.string().min(1).max(220_000) }).strict();
-const normalizedMetadata = (input: BibliographyMetadata) => bibliographyMetadataSchema.parse({ ...input, doi: input.doi ? normalizeDoi(input.doi) : "" });
+const normalizedMetadata = (input: BibliographyMetadata) => bibliographyMetadataSchema.parse({ ...input, doi: input.doi ? normalizeDoi(input.doi) : "", ...(input.isbn ? { isbn: normalizeIsbn(input.isbn) } : {}) });
 type Entry = { id: string; ownerId: string; requestId: string; identifierKey: string; metadataJson: string; source: string; sourceUrl: string | null; checkedAt: Date | null; revision: number; createdAt: Date; updatedAt: Date };
 async function view(row: Entry, style: BibliographyStyle, actorId: string, client: PrismaClient) {
   if (row.source === "own_book") { const bookId = row.identifierKey.replace(/^book:/, ""), book = await client.libraryBook.findFirst({ where: { id: bookId, ownerId: actorId, deletedAt: null }, select: { id: true } }); if (!book) return { id: row.id, available: false, notice: "Los metadatos del libro ya no están disponibles", revision: row.revision }; }
@@ -32,8 +33,13 @@ async function insertEntries(entries: Array<{ metadata: BibliographyMetadata; so
   return altazorTransaction(client, async tx => {
     const actor = await altazorActor(user, tx), ids: string[] = []; let reused = 0;
     for (const entry of entries) {
-      const metadata = normalizedMetadata(entry.metadata), key = entry.key || (metadata.doi ? `doi:${metadata.doi}` : metadata.openalexId ? `openalex:${metadata.openalexId}` : `import:${sha256(canonicalJson(metadata))}`), prior = await tx.altazorBibliographyEntry.findFirst({ where: { ownerId: actor.id, OR: [{ requestId: entry.requestId }, { identifierKey: key }] } });
+      const metadata = normalizedMetadata(entry.metadata), key = entry.key || (metadata.doi ? `doi:${metadata.doi}` : metadata.isbn ? `isbn:${metadata.isbn}` : metadata.openalexId ? `openalex:${metadata.openalexId}` : `import:${sha256(canonicalJson(metadata))}`), prior = await tx.altazorBibliographyEntry.findFirst({ where: { ownerId: actor.id, OR: [{ requestId: entry.requestId }, { identifierKey: key }] } });
       if (prior) { if (prior.requestId === entry.requestId && prior.identifierKey !== key) throw httpError("La clave ya corresponde a otra referencia", 409); ids.push(prior.id); reused++; continue; }
+      if (entry.source !== "own_book") {
+        const candidates = await tx.altazorBibliographyEntry.findMany({ where: { ownerId: actor.id, source: { not: "own_book" } }, take: 200, orderBy: { createdAt: "asc" } });
+        const equivalents = candidates.filter(candidate => sameBibliographyWork(normalizedMetadata(bibliographyMetadataSchema.parse(JSON.parse(candidate.metadataJson))), metadata));
+        if (equivalents.length === 1) { ids.push(equivalents[0].id); reused++; continue; }
+      }
       if (await tx.altazorBibliographyEntry.count({ where: { ownerId: actor.id } }) >= 200) throw httpError("La bibliografía admite hasta doscientas referencias", 413);
       ids.push((await tx.altazorBibliographyEntry.create({ data: { ownerId: actor.id, requestId: entry.requestId, identifierKey: key, metadataJson: canonicalJson(metadata), source: entry.source, sourceUrl: entry.sourceUrl || null, checkedAt: entry.checkedAt || null } })).id);
     }
@@ -48,8 +54,8 @@ export async function addBibliography(raw: unknown, user: CausaAccessUser, clien
     return insertEntries([{ metadata: paper.metadata, source: paper.provider, sourceUrl: paper.sourceUrl, checkedAt: new Date(paper.checkedAt), requestId: input.requestId }], actor, client);
   }
   const book = await client.libraryBook.findFirst({ where: { id: input.bookId, ownerId: actor.id, deletedAt: null }, select: { id: true, title: true, author: true, year: true, publisher: true, identifier: true } }); if (!book) throw httpError("Libro propio no encontrado", 404);
-  let doi = ""; try { doi = normalizeDoi(book.identifier); } catch { /* ISBN and local identifiers are not DOIs. */ }
-  const parsedYear = Number(book.year), metadata = bibliographyMetadataSchema.parse({ title: book.title, authors: book.author ? [{ name: book.author, family: "", given: "" }] : [], year: Number.isInteger(parsedYear) && parsedYear >= 1000 && parsedYear <= 2200 ? parsedYear : null, publisher: book.publisher, doi, type: "book", warnings: ["Datos de catálogo aportados al importar el libro; no corroborados externamente."] });
+  let doi = "", isbn = ""; try { doi = normalizeDoi(book.identifier); } catch { try { isbn = normalizeIsbn(book.identifier); } catch { /* Local identifier. */ } }
+  const parsedYear = Number(book.year), metadata = bibliographyMetadataSchema.parse({ title: book.title, authors: book.author ? [{ name: book.author, family: "", given: "" }] : [], year: Number.isInteger(parsedYear) && parsedYear >= 1000 && parsedYear <= 2200 ? parsedYear : null, publisher: book.publisher, doi, ...(isbn ? { isbn } : {}), type: "book", warnings: ["Datos de catálogo aportados al importar el libro; no corroborados externamente."] });
   return insertEntries([{ metadata, source: "own_book", key: `book:${book.id}`, requestId: input.requestId }], actor, client);
 }
 export async function importBibliographyEntries(raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {

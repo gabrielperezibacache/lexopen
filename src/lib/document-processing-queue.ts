@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
 import { processDocumentBytes, type DocumentProcessingResult } from "@/lib/document-processing";
 
-type DocumentJob = { id: string; name: string; bytes: Buffer };
+type DocumentJob = { id: string; name: string; bytes?: Buffer };
 const LEASE_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 4;
 

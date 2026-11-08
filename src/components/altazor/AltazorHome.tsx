@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowUp, BellRing, BrainCircuit, CircleStop, Ellipsis, Feather, MessageSquare, Monitor, Paperclip, Settings2, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, BellRing, BrainCircuit, CircleStop, Ellipsis, Feather, Link2, MessageSquare, Monitor, Paperclip, Settings2, X } from "lucide-react";
 import { ResultCard, type AssistantResultItem } from "@/components/inicio/ResultCard";
 import { AltazorMark } from "./AltazorMark";
 import { AltazorMemory } from "./AltazorMemory";
@@ -92,13 +92,13 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
             }}
             onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(); } }} />
         {destination && !destination.permitted && <p className="altazor-connection-notice">Conecta ALTAZOR para empezar. <Link href="/configuracion#preferencias-altazor">Conectar</Link></p>}
-          <div className="altazor-composer-footer"><button type="button" className="btn btn-ghost" disabled={uploading || busy} onClick={() => input.current?.click()}><Paperclip size={18} /> {uploading ? "Preparando archivo…" : "Adjuntar"}</button><input ref={input} type="file" className="sr-only" multiple accept=".pdf,.epub,.doc,.docx,.odt,.rtf,.txt,.md,.csv,.json,.html,.htm" onChange={event => void upload(event.target.files)} />{text.length >= 7200 && <span aria-live="polite">{8000-text.length} caracteres disponibles</span>}<button type="button" className="btn btn-primary" aria-label="Enviar mensaje a ALTAZOR" data-testid="inicio-send" disabled={!text.trim() || busy || uploading || Boolean(running) || preferenceSaving || loading || !destination?.permitted} onClick={sendMessage}><ArrowUp size={18} /> Enviar</button></div>
+          <div className="altazor-composer-footer"><button type="button" className="btn btn-ghost" disabled={uploading || busy} onClick={() => input.current?.click()}><Paperclip size={18} /> {uploading ? "Preparando archivo…" : "Adjuntar"}</button><button type="button" className="btn btn-ghost altazor-composer-apps" aria-label="Aplicaciones" title="Aplicaciones" onClick={() => choosePane("connectors")}><Link2 size={18} aria-hidden="true" /><span>Aplicaciones</span></button><input ref={input} type="file" aria-label="Archivos para adjuntar al mensaje de ALTAZOR" className="sr-only" multiple accept=".pdf,.epub,.doc,.docx,.odt,.rtf,.txt,.md,.csv,.json,.html,.htm" onChange={event => void upload(event.target.files)} />{text.length >= 7200 && <span aria-live="polite">{8000-text.length} caracteres disponibles</span>}<button type="button" className="btn btn-primary" aria-label="Enviar mensaje a ALTAZOR" data-testid="inicio-send" disabled={!text.trim() || busy || uploading || Boolean(running) || preferenceSaving || loading || !destination?.permitted} onClick={sendMessage}><ArrowUp size={18} /> Enviar</button></div>
           <p id="altazor-keyboard-help" className="altazor-keyboard-help">Enter para enviar · Mayús + Enter para un salto de línea</p>
         </div>
         {data?.attachments.length ? <details className="altazor-attachment-archive" open={attachmentIds.length ? true : undefined}><summary>Archivos de este contexto <span>{data.attachments.length}</span></summary><ul className="altazor-attachments">{data.attachments.map(file => <li key={file.id}><span>{file.sourceName}{file.status !== "ready" && <small>{file.status === "processing" ? "Preparando…" : "Revisar archivo"}</small>}</span>{attachmentIds.includes(file.id) ? <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`No adjuntar ${file.sourceName}`} onClick={() => setAttachmentIds(previous => previous.filter(id => id !== file.id))}><X size={16} /></button> : <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Adjuntar de nuevo ${file.sourceName}`} onClick={() => setAttachmentIds(previous => [...previous,file.id])}><Paperclip size={16} /></button>}<details className="altazor-attachment-options"><summary aria-label={`Opciones de ${file.sourceName}`}><Ellipsis size={18} /></summary><div><a href={`/api/altazor/conversations/${activeId}/attachments/${file.id}/original`}>Descargar original</a><button type="button" disabled={busy||uploading} onClick={()=>{setBusy(true);setError("");void request<{book:{id:string;title:string}}>(`/api/altazor/conversations/${activeId}/attachments/${file.id}/library`,{}).then(result=>setLibraryNotice(result.book)).catch(reason=>setError(reason.message)).finally(()=>setBusy(false));}}>Guardar en biblioteca</button><button type="button" disabled={busy} aria-label={`Retirar archivo ${file.sourceName}`} onClick={() => { void request(`/api/altazor/conversations/${activeId}/attachments/${file.id}`,{},"DELETE").then(() => { setAttachmentIds(previous => previous.filter(id => id !== file.id)); return reload(activeId); }).catch(reason => setError(reason.message)); }}>Retirar de la conversación</button></div></details></li>)}</ul></details> : null}
 
       </section>
-      {showDesktopActivity && <AltazorDesktopActivity causaId={currentCase} onOpen={(id, causaId, review) => {
+      {showDesktopActivity && <AltazorDesktopActivity causaId={currentCase} refreshKey={timelineVersion} onOpen={(id, causaId, review) => {
         setDesktopSelection({ causaId, id, review });
         choosePane("computer");
       }} />}
@@ -143,7 +143,7 @@ function AltazorTurnMessage({ turn, busy, onAction }: { turn: TimelineTurn; busy
       {canAct && turn.plan && turn.status === "awaiting_confirmation" && <div className="altazor-plan">
         <h4>Revisa el encargo completo</h4>
         {!turn.progress && turn.assistantText && <AltazorMessageContent text={turn.assistantText} />}
-        <details><summary>Ver las {turn.plan.steps.length} {turn.plan.steps.length === 1 ? "acción propuesta" : "acciones propuestas"}</summary><ol>{turn.plan.steps.map((step, index) => <li key={index}>{step.preview}</li>)}</ol></details>
+        <details><summary>{turn.plan.steps.length === 1 ? "Ver la acción propuesta" : `Ver las ${turn.plan.steps.length} acciones propuestas`}</summary><ol>{turn.plan.steps.map((step, index) => <li key={index}>{step.preview}</li>)}</ol></details>
         <button type="button" className="btn btn-primary" data-testid="plan-confirm" disabled={busy} onClick={() => onAction("confirm")}>Confirmar estos cambios</button>
         <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => onAction("reject")}>Descartar plan</button>
       </div>}

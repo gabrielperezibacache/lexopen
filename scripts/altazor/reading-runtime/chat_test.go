@@ -21,12 +21,12 @@ func (r *lexopenReaderRunner) Screenshot(context.Context, string) ([]byte, error
 }
 func TestLexOpenSemanticReadingBeforeScreenshot(t *testing.T) {
 	runner := &lexopenReaderRunner{output: `{"version":"v1","source":"browser","text":"synthetic page","items":[]}`}
-	message, ok := lexopenSemanticReading(context.Background(), runner, "fixture")
+	message, ok := lexopenSemanticReading(context.Background(), func(ctx context.Context) (string,error) { return runner.Exec(ctx,"fixture","lexopen-read","browser") })
 	if !ok || runner.screenshots != 0 || !strings.Contains(message.Content, "synthetic page") {
 		t.Fatal("DOM was not used before images")
 	}
 	runner.output = `not a semantic reading`
-	if _, ok := lexopenSemanticReading(context.Background(), runner, "fixture"); ok {
+	if _, ok := lexopenSemanticReading(context.Background(), func(ctx context.Context) (string,error) { return runner.Exec(ctx,"fixture","lexopen-read","browser") }); ok {
 		t.Fatal("malformed reading suppressed screenshot fallback")
 	}
 	service := &Service{}

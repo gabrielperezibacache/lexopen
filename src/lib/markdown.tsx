@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 function escapeHtml(text: string) {
   return text
@@ -8,19 +8,21 @@ function escapeHtml(text: string) {
     .replace(/"/g, "&quot;");
 }
 
-function inlineMarkdown(text: string): ReactNode[] {
-  const escaped = escapeHtml(text);
+function inlineMarkdown(text: string, academic: boolean): ReactNode[] {
+  const source = academic ? text : escapeHtml(text);
   const parts: ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  const re = academic ? /(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g : /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
   let last = 0;
   let match: RegExpExecArray | null;
   let key = 0;
-  while ((match = re.exec(escaped))) {
+  while ((match = re.exec(source))) {
     if (match.index > last) {
-      parts.push(escaped.slice(last, match.index));
+      parts.push(source.slice(last, match.index));
     }
     const token = match[0];
-    if (token.startsWith("**")) {
+    if (academic && token.startsWith("***")) {
+      parts.push(<strong key={key++}><em>{token.slice(3, -3)}</em></strong>);
+    } else if (token.startsWith("**")) {
       parts.push(<strong key={key++}>{token.slice(2, -2)}</strong>);
     } else if (token.startsWith("`")) {
       parts.push(
@@ -33,12 +35,15 @@ function inlineMarkdown(text: string): ReactNode[] {
     }
     last = match.index + token.length;
   }
-  if (last < escaped.length) parts.push(escaped.slice(last));
+  if (last < source.length) parts.push(source.slice(last));
   return parts;
 }
 
-/** Minimal Markdown → React for wiki pages (headings, lists, code, paragraphs). */
-export function MarkdownView({ content }: { content: string }) {
+/** Minimal Markdown to inert React text and semantic elements. */
+export function MarkdownView({ content, variant = "wiki" }: { content: string; variant?: "wiki" | "academic" }) {
+  const academic = variant === "academic";
+  const renderInline = (text: string) => inlineMarkdown(text, academic);
+  const quotePrefix = /^>[ \t]?/;
   const lines = content.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let i = 0;
@@ -74,24 +79,15 @@ export function MarkdownView({ content }: { content: string }) {
     const heading = /^(#{1,3})\s+(.+)$/.exec(line);
     if (heading) {
       const level = heading[1].length;
-      const text = inlineMarkdown(heading[2]);
+      const text = renderInline(heading[2]);
       const className =
         level === 1
           ? "mt-4 text-2xl font-semibold"
           : level === 2
             ? "mt-3 text-xl font-semibold"
             : "mt-2 text-lg font-semibold";
-      blocks.push(
-        <Fragment key={key++}>
-          {level === 1 ? (
-            <h2 className={className}>{text}</h2>
-          ) : level === 2 ? (
-            <h3 className={className}>{text}</h3>
-          ) : (
-            <h4 className={className}>{text}</h4>
-          )}
-        </Fragment>
-      );
+      const Heading = academic ? (["h3", "h4", "h5"] as const)[level - 1] : (["h2", "h3", "h4"] as const)[level - 1];
+      blocks.push(<Heading key={key++} className={className}>{text}</Heading>);
       i += 1;
       continue;
     }
@@ -105,7 +101,7 @@ export function MarkdownView({ content }: { content: string }) {
       blocks.push(
         <ul key={key++} className="my-2 list-disc space-y-1 pl-5 text-sm leading-relaxed">
           {items.map((item, idx) => (
-            <li key={idx}>{inlineMarkdown(item)}</li>
+            <li key={idx}>{renderInline(item)}</li>
           ))}
         </ul>
       );
@@ -113,18 +109,29 @@ export function MarkdownView({ content }: { content: string }) {
     }
 
     if (/^\d+\.\s+/.test(line)) {
+      const first = academic ? /^\d{1,9}(?=\.)/.exec(line)?.[0] : undefined;
       const items: string[] = [];
       while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
         items.push(lines[i].replace(/^\d+\.\s+/, ""));
         i += 1;
       }
       blocks.push(
-        <ol key={key++} className="my-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed">
+        <ol key={key++} start={first === undefined ? undefined : Number(first)} className="my-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed">
           {items.map((item, idx) => (
-            <li key={idx}>{inlineMarkdown(item)}</li>
+            <li key={idx}>{renderInline(item)}</li>
           ))}
         </ol>
       );
+      continue;
+    }
+
+    if (academic && quotePrefix.test(line)) {
+      const quote: string[] = [];
+      while (i < lines.length && quotePrefix.test(lines[i])) {
+        quote.push(lines[i].replace(quotePrefix, ""));
+        i += 1;
+      }
+      blocks.push(<blockquote key={key++}>{renderInline(quote.join("\n"))}</blockquote>);
       continue;
     }
 
@@ -135,6 +142,7 @@ export function MarkdownView({ content }: { content: string }) {
       lines[i].trim() &&
       !lines[i].startsWith("#") &&
       !lines[i].startsWith("```") &&
+      !(academic && quotePrefix.test(lines[i])) &&
       !/^[-*]\s+/.test(lines[i]) &&
       !/^\d+\.\s+/.test(lines[i])
     ) {
@@ -143,7 +151,7 @@ export function MarkdownView({ content }: { content: string }) {
     }
     blocks.push(
       <p key={key++} className="my-2 text-sm leading-relaxed text-[var(--ink-soft)]/90">
-        {inlineMarkdown(para.join(" "))}
+        {renderInline(para.join(" "))}
       </p>
     );
   }

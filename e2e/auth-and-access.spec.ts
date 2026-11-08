@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
-import { loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 
 test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   page,
 }) => {
   test.setTimeout(90_000);
   await loginAs(page, "socio@estudio.cl");
+  await authenticateApiRequests(page);
 
   await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
   await expect(page.getByTestId("inicio-composer")).toBeVisible();
@@ -36,22 +37,22 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
 
   await page.goto("/personas");
   await expect(page.getByRole("heading", { name: "Personas" })).toBeVisible();
-  await expect(page.getByTestId("people-manager")).toBeVisible();
+  await expect(page.getByRole("main").getByTestId("people-manager")).toBeVisible();
 
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/causas$/);
   await expect(
     page.getByRole("heading", { name: "Causas", exact: true })
   ).toBeVisible();
-  await expect(page.getByText("C-4521-2025")).toBeVisible();
-  const causeRow = page.locator("tr").filter({ hasText: "C-4521-2025" }).first();
+  const causeRow = page.getByRole("main").locator("tr").filter({ hasText: "C-4521-2025" }).first();
+  await expect(causeRow).toBeVisible();
   const causeHref = await causeRow
     .locator('a[href^="/causas/"]:not([href*="/editar"])')
     .first()
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
-  await page.getByText("Registrar movimientos manualmente", { exact: true }).click();
+  await page.locator("#main-content").getByText("Registrar movimientos manualmente", { exact: true }).click();
   const exportHref = await page
     .getByRole("link", { name: "Exportar movimientos" })
     .getAttribute("href");
@@ -83,7 +84,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   expect(csvText).toContain("folioInterno");
   expect(csvText).toContain("rutEmisor");
 
-  const overpayment = await page.request.post("/api/billing/payments", {
+  const overpayment = await apiRequest(page).post("/api/billing/payments", {
     data: {
       invoiceId: openInvoice!.id,
       clienteId: openInvoice!.clienteId,
@@ -103,7 +104,7 @@ test("un profesional abre sus ajustes sin acceso a la administración", async ({
   const origin = new URL(page.url()).origin;
   const csrf = (await page.context().cookies(origin)).find(cookie => cookie.name === CSRF_COOKIE)?.value;
   expect(csrf).toBeTruthy();
-  const response = await page.request.patch("/api/configuracion", {
+  const response = await apiRequest(page).patch("/api/configuracion", {
     headers: { Origin: origin, [CSRF_HEADER]: csrf! },
     data: { name: "Cambio ficticio no autorizado", defaultRetencionPct: 0, ivaPct: 0 },
   });
@@ -114,6 +115,7 @@ test("un profesional abre sus ajustes sin acceso a la administración", async ({
 test("un cliente queda limitado al portal y a sus espacios", async ({ page }) => {
   test.setTimeout(90_000);
   await loginAs(page, "cliente@andes.cl");
+  await authenticateApiRequests(page);
 
   await expect(page).toHaveURL(/\/portal$/);
   await expect(
@@ -165,24 +167,24 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
   expect(siteId).toBeTruthy();
 
   expect(
-    (await page.request.post(`/api/sites/${siteId}/files`, {
+    (await apiRequest(page).post(`/api/sites/${siteId}/files`, {
       data: { action: "create-folder", name: "hack" },
     })).status()
   ).toBe(403);
   expect(
-    (await page.request.post(`/api/sites/${siteId}/files`, {
+    (await apiRequest(page).post(`/api/sites/${siteId}/files`, {
       data: { action: "add-comment", fileId: "x", body: "nota interna" },
     })).status()
   ).toBe(403);
   expect((await page.request.get(`/api/sites/${siteId}/isheets`)).status()).toBe(403);
   expect(
-    (await page.request.post(`/api/sites/${siteId}/isheets`, {
+    (await apiRequest(page).post(`/api/sites/${siteId}/isheets`, {
       data: { action: "update-row", rowId: "x", data: {} },
     })).status()
   ).toBe(403);
   expect((await page.request.get(`/api/sites/${siteId}/wiki`)).status()).toBe(403);
   expect(
-    (await page.request.post(`/api/sites/${siteId}/wiki`, {
+    (await apiRequest(page).post(`/api/sites/${siteId}/wiki`, {
       data: { title: "hack", content: "no" },
     })).status()
   ).toBe(403);
@@ -193,22 +195,22 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
   await expect(page).toHaveURL(/\/portal$/);
 
   expect(
-    (await page.request.post("/api/messages", {
+    (await apiRequest(page).post("/api/messages", {
       data: { receiverId: "x", body: "hola" },
     })).status()
   ).toBe(403);
   expect(
-    (await page.request.post(`/api/sites/${siteId}/members`, {
+    (await apiRequest(page).post(`/api/sites/${siteId}/members`, {
       data: { userId: "x", role: "viewer" },
     })).status()
   ).toBe(403);
   expect(
-    (await page.request.post("/api/sites", {
+    (await apiRequest(page).post("/api/sites", {
       data: { name: "hack", tipo: "matter" },
     })).status()
   ).toBe(403);
   expect(
-    (await page.request.post("/api/auth/impersonate", {
+    (await apiRequest(page).post("/api/auth/impersonate", {
       data: { userId: "x" },
     })).status()
   ).toBe(403);

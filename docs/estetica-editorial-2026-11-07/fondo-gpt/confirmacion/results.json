@@ -1,0 +1,130 @@
+{
+  "results": [
+    {
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.1",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "buscar",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.075",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.1",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "buscar",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.075",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.1",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.075",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.1",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.075",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "menu",
+      "theme": "light",
+      "device": "mobile",
+      "image": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "pointerEvents": "none",
+      "opacity": "0.085"
+    },
+    {
+      "route": "menu",
+      "theme": "dark",
+      "device": "mobile",
+      "image": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "pointerEvents": "none",
+      "opacity": "0.085"
+    },
+    {
+      "route": "sidebar-collapsed",
+      "backgroundDisplay": "none"
+    }
+  ],
+  "errors": [],
+  "backgroundAssetStatus": 200
+}

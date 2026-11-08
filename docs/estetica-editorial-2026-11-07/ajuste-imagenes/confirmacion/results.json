@@ -1,0 +1,612 @@
+{
+  "results": [
+    {
+      "route": "academico",
+      "artwork": "academic",
+      "theme": "dark",
+      "device": "tablet",
+      "width": 820,
+      "height": 1100,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-academico-dark-tablet.png",
+      "overflow": false,
+      "heading": {
+        "x": 284,
+        "y": 150,
+        "width": 504,
+        "height": 103.65625,
+        "right": 788,
+        "bottom": 253.65625
+      },
+      "media": {
+        "x": 652,
+        "y": 163.578125,
+        "width": 136,
+        "height": 76.5,
+        "right": 788,
+        "bottom": 240.078125
+      },
+      "title": {
+        "x": 284,
+        "y": 150,
+        "width": 349.5625,
+        "height": 38.875,
+        "right": 633.5625,
+        "bottom": 188.875
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 652.0272827148438,
+        "y": 160.9898681640625,
+        "width": 136.13604736328125,
+        "height": 76.57650756835938,
+        "right": 788.163330078125,
+        "bottom": 237.56637573242188
+      },
+      "source": "/editorial/generated/academico-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "configuracion",
+      "artwork": "settings",
+      "theme": "dark",
+      "device": "tablet",
+      "width": 820,
+      "height": 1100,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-configuracion-dark-tablet.png",
+      "overflow": true,
+      "heading": {
+        "x": 284,
+        "y": 142,
+        "width": 504,
+        "height": 78.0625,
+        "right": 788,
+        "bottom": 220.0625
+      },
+      "media": {
+        "x": 652,
+        "y": 142.78125,
+        "width": 136,
+        "height": 76.5,
+        "right": 788,
+        "bottom": 219.28125
+      },
+      "title": {
+        "x": 284,
+        "y": 142,
+        "width": 349.5625,
+        "height": 38.875,
+        "right": 633.5625,
+        "bottom": 180.875
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 644.8228759765625,
+        "y": 135.05340576171875,
+        "width": 150.14404296875,
+        "height": 84.45599365234375,
+        "right": 794.9669189453125,
+        "bottom": 219.5093994140625
+      },
+      "source": "/editorial/generated/configuracion-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "academico",
+      "artwork": "academic",
+      "theme": "dark",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-academico-dark-desktop.png",
+      "overflow": false,
+      "heading": {
+        "x": 284,
+        "y": 150,
+        "width": 913.171875,
+        "height": 94.5,
+        "right": 1197.171875,
+        "bottom": 244.5
+      },
+      "media": {
+        "x": 1029.171875,
+        "y": 150,
+        "width": 168,
+        "height": 94.5,
+        "right": 1197.171875,
+        "bottom": 244.5
+      },
+      "title": {
+        "x": 284,
+        "y": 153.171875,
+        "width": 717.171875,
+        "height": 49.75,
+        "right": 1001.171875,
+        "bottom": 202.921875
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 1029.20556640625,
+        "y": 146.80274963378906,
+        "width": 168.16796875,
+        "height": 94.59449768066406,
+        "right": 1197.37353515625,
+        "bottom": 241.39724731445312
+      },
+      "source": "/editorial/generated/academico-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "academico",
+      "artwork": "academic",
+      "theme": "dark",
+      "device": "mobile",
+      "width": 360,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-academico-dark-mobile.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 142,
+        "width": 328,
+        "height": 113.375,
+        "right": 344,
+        "bottom": 255.375
+      },
+      "media": {
+        "x": 257.609375,
+        "y": 142,
+        "width": 86.390625,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 190.59375
+      },
+      "title": {
+        "x": 16,
+        "y": 142,
+        "width": 328,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 190.59375
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 257.626708984375,
+        "y": 140.3559112548828,
+        "width": 86.47702026367188,
+        "height": 48.64234924316406,
+        "right": 344.1037292480469,
+        "bottom": 188.99826049804688
+      },
+      "source": "/editorial/generated/academico-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "minutas",
+      "artwork": "writing",
+      "theme": "dark",
+      "device": "narrow",
+      "width": 320,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-minutas-dark-narrow.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 126,
+        "width": 288,
+        "height": 130.640625,
+        "right": 304,
+        "bottom": 256.640625
+      },
+      "media": {
+        "x": 220,
+        "y": 126,
+        "width": 84,
+        "height": 47.25,
+        "right": 304,
+        "bottom": 173.25
+      },
+      "title": {
+        "x": 16,
+        "y": 126,
+        "width": 288,
+        "height": 47.25,
+        "right": 304,
+        "bottom": 173.25
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 208.9768829345703,
+        "y": 116.31806182861328,
+        "width": 106.34397888183594,
+        "height": 59.818504333496094,
+        "right": 315.32086181640625,
+        "bottom": 176.13656616210938
+      },
+      "source": "/editorial/generated/escritura-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "minutas",
+      "artwork": "writing",
+      "theme": "light",
+      "device": "narrow",
+      "width": 320,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-minutas-light-narrow.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 126,
+        "width": 288,
+        "height": 130.640625,
+        "right": 304,
+        "bottom": 256.640625
+      },
+      "media": {
+        "x": 220,
+        "y": 126,
+        "width": 84,
+        "height": 47.25,
+        "right": 304,
+        "bottom": 173.25
+      },
+      "title": {
+        "x": 16,
+        "y": 126,
+        "width": 288,
+        "height": 47.25,
+        "right": 304,
+        "bottom": 173.25
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 208.9768829345703,
+        "y": 116.31806182861328,
+        "width": 106.34397888183594,
+        "height": 59.818504333496094,
+        "right": 315.32086181640625,
+        "bottom": 176.13656616210938
+      },
+      "source": "/editorial/generated/escritura-gpt-v1.webp",
+      "opacity": "1",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "minutas",
+      "artwork": "writing",
+      "theme": "dark",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-minutas-dark-desktop.png",
+      "overflow": false,
+      "heading": {
+        "x": 284,
+        "y": 142,
+        "width": 931.296875,
+        "height": 116.125,
+        "right": 1215.296875,
+        "bottom": 258.125
+      },
+      "media": {
+        "x": 1047.296875,
+        "y": 152.8125,
+        "width": 168,
+        "height": 94.5,
+        "right": 1215.296875,
+        "bottom": 247.3125
+      },
+      "title": {
+        "x": 284,
+        "y": 142,
+        "width": 617.921875,
+        "height": 49.75,
+        "right": 901.921875,
+        "bottom": 191.75
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 1025.2506103515625,
+        "y": 133.44862365722656,
+        "width": 212.68798828125,
+        "height": 119.63699340820312,
+        "right": 1237.9385986328125,
+        "bottom": 253.0856170654297
+      },
+      "source": "/editorial/generated/escritura-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "minutas",
+      "artwork": "writing",
+      "theme": "dark",
+      "device": "mobile",
+      "width": 360,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-minutas-dark-mobile.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 126,
+        "width": 328,
+        "height": 131.984375,
+        "right": 344,
+        "bottom": 257.984375
+      },
+      "media": {
+        "x": 257.609375,
+        "y": 126,
+        "width": 86.390625,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "title": {
+        "x": 16,
+        "y": 126,
+        "width": 328,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 246.2725372314453,
+        "y": 116.04270935058594,
+        "width": 109.37052917480469,
+        "height": 61.51969909667969,
+        "right": 355.64306640625,
+        "bottom": 177.56240844726562
+      },
+      "source": "/editorial/generated/escritura-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "sites/cmw6nprmz00b5owz3qvjq5xva",
+      "artwork": "workflows",
+      "theme": "dark",
+      "device": "narrow",
+      "width": 320,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-sites-cmw6nprmz00b5owz3qvjq5xva-dark-narrow.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 126,
+        "width": 288,
+        "height": 229.28125,
+        "right": 304,
+        "bottom": 355.28125
+      },
+      "media": {
+        "x": 220,
+        "y": 178,
+        "width": 84,
+        "height": 47.25,
+        "right": 304,
+        "bottom": 225.25
+      },
+      "title": {
+        "x": 40,
+        "y": 178,
+        "width": 264,
+        "height": 116.625,
+        "right": 304,
+        "bottom": 294.625
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 219.59744262695312,
+        "y": 177.5060577392578,
+        "width": 84.92401123046875,
+        "height": 47.769744873046875,
+        "right": 304.5214538574219,
+        "bottom": 225.2758026123047
+      },
+      "source": "/editorial/generated/flujos-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "tareas",
+      "artwork": "tasks",
+      "theme": "dark",
+      "device": "mobile",
+      "width": 360,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-tareas-dark-mobile.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 126,
+        "width": 328,
+        "height": 108.1875,
+        "right": 344,
+        "bottom": 234.1875
+      },
+      "media": {
+        "x": 257.609375,
+        "y": 126,
+        "width": 86.390625,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "title": {
+        "x": 16,
+        "y": 126,
+        "width": 328,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 251.41529846191406,
+        "y": 122.06521606445312,
+        "width": 98.91728210449219,
+        "height": 55.63984680175781,
+        "right": 350.33258056640625,
+        "bottom": 177.70506286621094
+      },
+      "source": "/editorial/generated/tareas-gpt-v1.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "clientes",
+      "artwork": "clients",
+      "theme": "light",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-clientes-light-desktop.png",
+      "overflow": false,
+      "heading": {
+        "x": 284,
+        "y": 142,
+        "width": 930.796875,
+        "height": 116.125,
+        "right": 1214.796875,
+        "bottom": 258.125
+      },
+      "media": {
+        "x": 1046.796875,
+        "y": 152.8125,
+        "width": 168,
+        "height": 94.5,
+        "right": 1214.796875,
+        "bottom": 247.3125
+      },
+      "title": {
+        "x": 284,
+        "y": 142,
+        "width": 617.921875,
+        "height": 49.75,
+        "right": 901.921875,
+        "bottom": 191.75
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 1043.56689453125,
+        "y": 149.25131225585938,
+        "width": 174.216064453125,
+        "height": 97.99650573730469,
+        "right": 1217.782958984375,
+        "bottom": 247.24781799316406
+      },
+      "source": "/editorial/generated/clientes-gpt-v1.webp",
+      "opacity": "1",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": null
+    },
+    {
+      "route": "facturacion",
+      "artwork": "billing",
+      "theme": "dark",
+      "device": "mobile",
+      "width": 360,
+      "height": 900,
+      "role": "staff",
+      "status": 200,
+      "file": "staff-facturacion-dark-mobile.png",
+      "overflow": false,
+      "heading": {
+        "x": 16,
+        "y": 126,
+        "width": 328,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "media": {
+        "x": 257.609375,
+        "y": 126,
+        "width": 86.390625,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "title": {
+        "x": 16,
+        "y": 126,
+        "width": 328,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "titleOverlapsArt": false,
+      "imageLoaded": true,
+      "image": {
+        "x": 257.609375,
+        "y": 126,
+        "width": 86.390625,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      },
+      "source": "/editorial/generated/libro-contable-flow-v1-poster.webp",
+      "opacity": "0.9",
+      "background": "rgba(0, 0, 0, 0)",
+      "button": {
+        "x": 257.609375,
+        "y": 126,
+        "width": 86.390625,
+        "height": 48.59375,
+        "right": 344,
+        "bottom": 174.59375
+      }
+    }
+  ],
+  "errors": []
+}

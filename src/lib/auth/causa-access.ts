@@ -243,7 +243,8 @@ function directDocumentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereIn
   const confidential = can(user, "doc.confidential.read");
   const privilege = confidential && can(user, "doc.privileged.read");
   const scoped = confidential && canSome(user, "doc.privileged.read");
-  return { AND: [relatedCausaWhere(user), confidential ? {} : { confidencial: false }, privilege ? {} : scoped ? { OR: [{ privilegio: false }, { autorId: user.id }, { causa: privilegedMatterWhere(user) }] } : { privilegio: false }] };
+  // Legacy minute documents may predate propagation of the confidential flag.
+  return { AND: [relatedCausaWhere(user), confidential ? {} : { confidencial: false, minutas: { none: { confidencial: true } } }, privilege ? {} : scoped ? { OR: [{ privilegio: false }, { autorId: user.id }, { causa: privilegedMatterWhere(user) }] } : { privilegio: false }] };
 }
 
 export function documentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereInput {

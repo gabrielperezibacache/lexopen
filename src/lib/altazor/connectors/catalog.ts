@@ -443,6 +443,7 @@ export const CONNECTOR_CATALOG = [
     "platform": "gateway",
     "oauth": "microsoft",
     "fieldNames": [
+      "token",
       "client_id",
       "client_secret"
     ],

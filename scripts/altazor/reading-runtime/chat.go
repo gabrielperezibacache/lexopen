@@ -3,13 +3,13 @@ package chat
 import (
 	"context"
 	"encoding/json"
-	"github.com/madkoding/kitties/internal/desktop"
 	"github.com/madkoding/kitties/internal/provider"
 	"strings"
 )
 
-func lexopenSemanticReading(ctx context.Context, runner desktop.Runner, ref string) (provider.Message, bool) {
-	output, err := desktop.Run(ctx, runner, ref, desktop.Action{Name: "page_read", Args: map[string]any{}})
+func lexopenSemanticReading(ctx context.Context, read func(context.Context) (string, error)) (provider.Message, bool) {
+	// The caller supplies the same bound policy gate used for explicit model actions.
+	output, err := read(ctx)
 	var reading struct {
 		Version string `json:"version"`
 		Source  string `json:"source"`

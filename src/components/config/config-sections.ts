@@ -10,6 +10,7 @@ export const CONFIG_CATEGORIES = [
     sections: [
       { id: "cuenta-personal", label: "Cuenta", labelEn: "Account" },
       { id: "preferencias-altazor", label: "Altazor", labelEn: "Altazor" },
+      { id: "autorizaciones-escritorio", label: "Escritorio de Altazor", labelEn: "Altazor desktop" },
     ],
   },
   {
@@ -31,11 +32,12 @@ export const CONFIG_CATEGORIES = [
   },
   {
     id: "conexiones-ia", label: "Conexiones e IA", labelEn: "Connections and AI",
-    description: "Conexiones del estudio: proveedor de IA, Google y seguimiento judicial. Tu cuenta personal de Codex se gestiona en Mi cuenta.",
-    descriptionEn: "Firm connections: AI provider, Google and court monitoring. Manage your personal Codex account under My account.",
+    description: "Cuentas conectadas y servicios compartidos del estudio. Tu cuenta personal de Codex se gestiona en Mi cuenta.",
+    descriptionEn: "Connected accounts and shared firm services. Manage your personal Codex account under My account.",
     sections: [
+      { id: "cuentas-conectadas", label: "Cuentas conectadas", labelEn: "Connected accounts" },
       { id: "llm-settings", label: "IA", labelEn: "AI" },
-      { id: "google-settings", label: "Google", labelEn: "Google" },
+      { id: "google-settings", label: "Google del estudio", labelEn: "Firm Google" },
       { id: "pjud-settings", label: "PJUD", labelEn: "PJUD" },
       { id: "integraciones-overview", label: "APIs", labelEn: "APIs" },
     ],
@@ -65,6 +67,7 @@ export const CONFIG_CATEGORIES = [
     sections: [
       { id: "idioma", label: "Idioma", labelEn: "Language" },
       { id: "apariencia", label: "Apariencia", labelEn: "Appearance" },
+      { id: "apartados-visibles", label: "Apartados visibles", labelEn: "Visible sections" },
       { id: "runtime-settings", label: "Entorno", labelEn: "Environment" },
       { id: "host-status", label: "Host", labelEn: "Host" },
       { id: "purge-demo", label: "Demo", labelEn: "Demo" },
@@ -75,9 +78,10 @@ export const CONFIG_CATEGORIES = [
 export const CONFIG_SECTIONS: readonly ConfigSection[] = CONFIG_CATEGORIES.flatMap<ConfigSection>(category => [...category.sections]);
 export function configCategoriesForMode(mode: "manual" | "pjud_cl", visibility: SettingsVisibility) {
   return CONFIG_CATEGORIES.map(category => ({ ...category, sections: category.sections.filter(section => {
-    if (section.id === "preferencias-altazor") return visibility.assistant;
+    if (section.id === "preferencias-altazor" || section.id === "autorizaciones-escritorio" || section.id === "cuentas-conectadas") return visibility.assistant;
     if (section.id === "comunicaciones") return visibility.communications;
     if (section.id === "work-country") return visibility.canSetCountry;
+    if (section.id === "apartados-visibles") return visibility.canSetCountry;
     if (["cuenta-personal", "idioma", "apariencia"].includes(section.id)) return true;
     if (!visibility.canManage) return false;
     return mode === "pjud_cl" || !["pjud-settings", "pjud-log"].includes(section.id);

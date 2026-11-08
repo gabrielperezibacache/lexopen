@@ -4,6 +4,31 @@
   "contains_application_data": false,
   "assets": [
     {
+      "file": "expedientes-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/expedientes.png",
+      "sha256": "e5d9127e56308611441932fcd6363181949a4298259ce13fa69aa797ba4c3f15",
+      "dimensions": [
+        720,
+        480
+      ],
+      "transparent": true,
+      "prompt": "Use case: illustration-story. Asset type: transparent editorial engraving for the case-file workspace header in LexOpen, a sophisticated legal research app. Create one isolated compact still life: a classic thick case dossier lying slightly open, several precisely aligned paper folios peeking out, a slender silver binder clip, one folded paper corner. The dossier is slightly tilted in a graceful three-quarter view. Fine nineteenth-century copperplate / steel engraving, intricate crosshatching, tactile paper edge lines, confident hand-engraved strokes, like an antique scholarly book frontispiece. Palette strictly cool silver white #f4f3f7, slate indigo #313958 and deep ink #0d1022; very restrained iris #aab5ff detail on the folder ribbon. Clear coherent silhouette, readable when rendered at 144px wide, elegant and uncluttered. Center subject, ample transparent margin, no background, no drop shadow outside the object. Genuine alpha transparency. NO text, lettering, numbers, logos, scales of justice, gavels, clip-art outlines, gradients, glowing effects, mockups or UI.",
+      "refinement": "Remove only the broad grey haze, glow, smoky shadow and dark atmospheric vignette behind and around this engraved object. Keep the entire object, exact composition, silver/indigo linework and iris detail unchanged. Output a crisp clean cutout with real alpha transparency around the object and in all gaps. Background must be entirely transparent right up to the actual engraved outlines. No halos, no atmospheric illumination, no added cast shadows, no backdrop. Preserve fine crosshatching and the elegant original illustration.",
+      "supersededBy": "expedientes-v2.webp"
+    },
+    {
+      "file": "consulta-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/consulta.png",
+      "sha256": "50149445c0bdfbab96b1515c04bd8f1a324953c476b49c443303dabb6c8beee5",
+      "dimensions": [
+        720,
+        480
+      ],
+      "transparent": true,
+      "prompt": "Use case: illustration-story. Asset type: transparent editorial engraving for the clients workspace header in LexOpen, a sophisticated legal app. Create one isolated compact still life representing a thoughtful personal consultation: two elegant classic wooden chairs facing one another in three-quarter view, a very small round consultation table between them holding one closed thin notebook. Furniture only, no people, no room, no floor. Fine nineteenth-century copperplate / steel engraving, exquisite tightly drawn crosshatching, confident hand-engraved lines, antique scholarly frontispiece sensibility. Palette strictly cool silver white #f4f3f7, slate indigo #313958 and deep ink #0d1022; tiny restrained iris #aab5ff notebook detail. One compact legible silhouette, considered proportions, readable at 144px wide. Center subject, generous transparent margin. Genuine alpha transparency, no background or cast drop shadow outside the furniture. NO text, lettering, numbers, logos, scales of justice, gavels, generic people icon, clip-art, gradients, glowing effects, UI or mockup.",
+      "refinement": "Remove only the broad grey haze, glow, smoky shadow and dark atmospheric vignette behind and around this engraved object. Keep the entire object, exact composition, silver/indigo linework and iris detail unchanged. Output a crisp clean cutout with real alpha transparency around the object and in all gaps. Background must be entirely transparent right up to the actual engraved outlines. No halos, no atmospheric illumination, no added cast shadows, no backdrop. Preserve fine crosshatching and the elegant original illustration."
+    },
+    {
       "file": "libro-contable-v1.webp",
       "source": "docs/estetica-editorial-2026-11-07/media-sources/libro-contable.png",
       "sha256": "19958f30799e9a472ce9c3dd6a97b6f27c5c301962df3897f7b9f6d2c4727cfd",
@@ -29,6 +54,20 @@
       "prompt": "Create a refined editorial spot illustration for LexOpen, a legal work application. A real documentary case folder lying OPEN on a flat surface, viewed from a fixed three-quarter angle, with a small orderly stack of three loose paper folios inside and a simple restrained metal paper fastener on the LEFT spine. Thin rigid archival grey-blue cardboard cover, straight clean structural edges, papers clearly separate from the cover. No book binding, no decorative ribbon, no bow, no gift packaging. Fine nineteenth-century silver steel engraving and precise crosshatching, cool silver white #f4f3f7, indigo ink #313958, one restrained iris #aab5ff tab. Entire folder and every paper edge fully visible, compact horizontal silhouette occupying only the middle 65 percent of a 16:9 image. At least 15 percent empty safe margin on all sides, nothing cropped. Perfectly plain uniform deep indigo #0d1022 background, no horizon, no scene, no smoke, no surrounding glow, no dramatic shadows. Paper contains only subtle non-readable engraved ruling: absolutely no letters, numbers, writing, labels, text or logos. Elegant, restrained, professional legal publisher engraving, clean and readable at small size."
     },
     {
+      "file": "tareas-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-tareas-v1-original.jpg",
+      "sha256": "a2a1fb46321b131f64e5c389f7e33eb1e9b6917739296c3af0570bd2bf1c74af",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "7ec342f7-c31d-4e8c-8f8d-b008fd2e3133",
+      "prompt": "Create one exquisite editorial spot illustration for LexOpen, a refined legal work application. Subject: a small practical desk notebook lying OPEN in three-quarter view, its left page carrying just five delicate blank horizontal rules and a narrow empty square at the start of each rule, a slender silver mechanical pencil placed diagonally across the lower right page, and one small iris cloth page tab. No readable writing, no symbols inside the squares. A working notebook, NOT an accounting book, no columns. Fine nineteenth-century silver steel engraving, dense precise crosshatching, tactile layered paper edges, elegant professional legal publisher frontispiece. Palette only cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022, a tiny restrained iris #aab5ff detail. Compact coherent object occupying about 78 percent of a horizontal 16:9 canvas; every edge fully visible with clear safe margins. Perfectly flat uniform deep indigo #0d1022 background, no room or floor, no horizon or haze, no cast shadow or glow around the silhouette. Clean strong silhouette readable at 144px wide. Absolutely no letters, numbers, labels, title, logos, scales, gavels, people, hands, decorative borders, gradients, smoke, photorealism or UI.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/nuevos-elementos-flow.json"
+    },
+    {
       "file": "plazos-flow-v1.webp",
       "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-plazos-v1-original.mp4",
       "sha256": "32d2eeaaebd49047a468f947efaab59e2d25667b7d678ef4a6ecef65184539ff",
@@ -40,6 +79,20 @@
       "generator": "Google Flow / Veo 3.1 - Fast (poster at 3 seconds)",
       "flowAssetId": "125322c3-dfd8-43c6-9053-f82822653b96",
       "prompt": "Animate this exact engraved pocket watch as a restrained eight-second editorial still life. LOCKED camera. Preserve the exact original shape, perspective, silver steel-engraved crosshatching, dial, twelve hour marks, winding crown, chain and uniform deep indigo background throughout. The watch case and entire chain remain absolutely stationary. ONLY the existing LONG minute hand advances smoothly CLOCKWISE by a small restrained angle, about twelve degrees over the whole eight seconds. Its pivot remains fixed at the center. The short hour hand remains still. Do not add a second hand. No spinning or full revolutions, no wobbling, no stretching, no melting metal, no deformation of the dial or rim. Preserve all original safe margins, keep the whole watch and chain inside frame. No zoom, orbit, pan, camera shake, new props, letters, numerals, logos, characters, light flares, smoke or sparkles. Elegant subtly accelerated passage of time, professional scholarly engraving, not a realistic photograph. Silent video, no music, voices or sound effects.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/nuevos-elementos-flow.json"
+    },
+    {
+      "file": "correspondencia-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-correspondencia-v1-original.jpg",
+      "sha256": "b50a30ea76ac198368ff2b5659a0ff5eca2e65eeb8c4b61e45fda880a9f3ffc2",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "2a39c267-5251-4b1d-86b8-541819b8c461",
+      "prompt": "Create one exquisite editorial spot illustration for LexOpen, a refined legal work application. A compact still life of correspondence: one large elegant OPEN paper envelope in three-quarter view with its triangular flap standing cleanly behind, one blank folded letter emerging just halfway, and a second smaller closed envelope lying flat beside it. Perfectly coherent paper folds, crisp fine edges, no wax seal and no ribbons. The letter has three extremely faint short rules without any characters. Fine nineteenth-century silver steel engraving, delicate dense crosshatching, tactile cotton paper grain, considered antique scholarly publisher composition. Palette ONLY cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022, a restrained tiny iris #aab5ff accent along the smaller envelope edge. Entire objects and all paper corners fully visible, one compact horizontal silhouette occupying 78 percent of a 16:9 canvas with generous clear safe margins. Perfectly flat uniform deep indigo #0d1022 background, no floor or room, no horizon, no haze or halo, no cast shadow, no vignette. Readable and elegant at 144px wide. Absolutely no stamps, lettering, addresses, numbers, symbols, logos, people, hands, birds, gavels, scales, sparkles, gradients, ornamental frame, photorealism or UI.",
       "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/nuevos-elementos-flow.json"
     },
     {
@@ -55,6 +108,111 @@
       "generator": "Google Flow / Nano Banana 2.1",
       "flowAssetId": "d1f19d6b-70be-4f8b-83e1-117303fdf910",
       "prompt": "Subject: a large elegant handheld magnifying glass lying at a three-quarter angle across three neatly layered blank archival index slips. A coherent thin silver lens rim, dark slender handle, transparent clear lens showing the blank ruled slip underneath without distortion. Each slip carries only two faint horizontal rules. No writing or symbols. A tiny iris tab on the bottom slip. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "escritura-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-escritura-v1-original.jpg",
+      "sha256": "966ad57614fe0341f05752d6be195c4e08e492d59389201cf6f21f10e7c7190a",
+      "originalSha256": "e584dde743fa17a18e7a1a7da94df1b260887b80d5615e66054452946760be86",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "54a08c6d-28f9-435a-80fb-f0a615af2328",
+      "prompt": "Subject: a small classic clear faceted glass inkwell, a slender silver fountain pen with its pointed nib visible resting diagonally beside it, and two carefully aligned loose manuscript folios with a gently folded upper corner. Blank paper with only three faint engraved rules, absolutely no writing. A tiny iris cloth bookmark under the lower sheet. A compact balanced still life about preparing a written argument. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "audiencias-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-audiencias-v1-original.jpg",
+      "sha256": "531044feb09f206466e0f8cae8addafb27e495ee5d650159d979b369853aa0c4",
+      "originalSha256": "4333a6960f4a9b2177972618eb7014c108c10e09988bed47d98c3c13edd54688",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "57c1ffae-a119-4900-8a8b-eb3a598682c6",
+      "prompt": "Subject: a single elegant tabletop gooseneck microphone with a compact round weighted silver base, a slim gently curved neck and small oval mesh microphone head, placed beside a thin closed notepad with an iris page tab. The microphone must be mechanically coherent and entirely visible. Engraved professional oral hearing instrument, quiet and dignified, no studio scene or cables. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "personas-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-personas-v1-original.jpg",
+      "sha256": "060e2ffd95a52da399a60d4909cb3ea01840f50f29ef8133dbc800de00f7776b",
+      "originalSha256": "cee12a69d50475047c4b7429144eed2661ace011db73cae41aff5d2293f58954",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "64d4a108-9332-455f-bdca-8d48f7cab3d1",
+      "prompt": "Subject: a small open desktop card index box with three tidy blank paper dividers visible inside and one blank contact card leaning lightly against its front. Fine silver engraved construction, crisp paper edges, no portraits, no writing, no people icons. Restrained iris detail on the middle divider tab. Compact compact scholarly contact register. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "flujos-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-flujos-v1-original.jpg",
+      "sha256": "740f10879fb912ff1afd9f295c3464c47bdae2f8f70b31ec84bdad2778cdf1f4",
+      "originalSha256": "b2f66487564fb1d386d55abd709d3a205dcca2c7de7cceb9a9b69f19046747f5",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "1823b8c4-ef4a-401e-8db8-0f7c946c6c0e",
+      "prompt": "Subject: three crisp blank rectangular paper work cards laid out in a graceful stepped sequence on a flat plane, connected by a single continuous slender silk thread passing through one small eyelet in the top corner of each card. Paper and thread are real tangible objects, no diagram arrows or UI. Each card has two faint short horizontal rules and no other content. A tiny iris thread segment. Coherent simple pathway from one paper to the next. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "conexiones-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-conexiones-v1-original.jpg",
+      "sha256": "69e190d82cc86d8b63997e0b8bb6f53e1d1d515b1fd00a482f6575fa7f1c6675",
+      "originalSha256": "7cfcd5301f716a6aba4a908bc8aac667635576f5bcdb865d86c7523a2197f2fa",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "a068c416-a723-437f-ace5-86b7aacfc7d1",
+      "prompt": "Subject: two beautifully crafted large oval silver chain links interlocked naturally at a three-quarter angle, resting beside one small closed archival document wallet. The links are realistically joined, elegant narrow metal with delicate crosshatching, a strong coherent silhouette. Tiny iris tab on the wallet. No padlock, no chain extending out of frame, no digital icons or arrows. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "avisos-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-avisos-v1-original.jpg",
+      "sha256": "ab221dab66e69e3d7925811d377d8328479ac85d3173949f7c3b46cbc3fe9528",
+      "originalSha256": "38837fccaa77bd63f1925828724de86b53347db073e7a375785b487fa2861c2d",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "f694acfe-ce02-41aa-8abc-bcbe6fbc10e1",
+      "prompt": "Subject: a small elegant handheld silver desk bell with a narrow upright turned handle and a clean flared bell mouth, standing beside two lightly overlapping blank reminder slips. Coherent classic metal construction, fine crosshatching, an iris corner tab on one slip. A dignified compact notification still life, no hotel counter, no sound waves, no pictograms. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "configuracion-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-configuracion-v1-original.jpg",
+      "sha256": "b699d1173f5b7367c3e0b7f5f9ea65cfa89659c73cbb16435ef09311213a33b9",
+      "originalSha256": "80db951bd21a085ed43199969605808039862395f03c4dd2541399aaea372604",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "6e35d124-1ef7-4fc5-97e0-8319574e8871",
+      "prompt": "Subject: a precision antique metal divider compass with two slim hinged legs slightly open, resting across a small flat silver adjustment wheel with a knurled rim and three short finely engraved parallel guide marks on a blank drafting slip underneath. The compass is mechanically coherent with a single pivot and exactly two legs. Compact considered composition of tools for careful adjustment. One tiny iris highlight at the hinge. No readable measurement scale or numerals. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
       "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
     },
     {
@@ -473,6 +631,41 @@
       },
       "processing": "Scale 640x360, H.264 CRF25, yuv420p, faststart; audio removed. Original Google Flow movement preserved.",
       "review": "Reviewed in 16 frames at 2 fps. Magnifying glass scans more broadly than the two-percent prompt; circular lens and handle stay coherent, paper slips and camera stay fixed, the object remains within frame and returns to its original arrangement."
+    }
+  ],
+  "supersededVideos": [
+    {
+      "name": "expedientes",
+      "provider": "Google Flow",
+      "model": "Veo 3.1 - Fast",
+      "flowAssetId": "1418501b-af2a-429b-bcb3-ae2b5d144376",
+      "flowUrl": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79/edit/1418501b-af2a-429b-bcb3-ae2b5d144376",
+      "prompt": "Animate this exact editorial steel engraving as an elegant eight-second still-life film for the header of a refined legal application. Preserve the illustrated dossier, silver crosshatching, indigo shadows, iris ribbon and exact silhouette. Locked-off camera. Only the top paper corners lift almost imperceptibly, the ribbon settles gently and the metal clip catches one restrained glint. Return to the original arrangement for a quiet seamless loop. Uniform deep indigo #0d1022 background. No horizon, smoke, glow, props, hands, writing, text or logos. Preserve the engraving style; no photorealistic conversion. Silent, no voices, music or effects.",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-original.mp4",
+      "originalSha256": "a37eb8ea3207afbc5c954e7e7975572ccf5cd10bf32ab7bc71f2c223069ba942",
+      "file": "expedientes-flow-v1.mp4",
+      "sha256": "c10194437764a131bfee3e1f97f7c3e93568ddf6266de305be4fe4314190a291",
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 640,
+            "height": 360,
+            "r_frame_rate": "24/1",
+            "duration": "7.916667"
+          }
+        ],
+        "format": {
+          "duration": "7.916667",
+          "size": "771375"
+        }
+      },
+      "processing": "FFmpeg: scale=640:360, H.264 CRF 25, yuv420p, faststart, audio removed; original Flow animation unchanged.",
+      "status": "superseded",
+      "supersededBy": "expedientes-flow-v2.mp4"
     }
   ],
   "productionPolicy": {

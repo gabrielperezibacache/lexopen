@@ -23,7 +23,8 @@ export default async function CuentaPage() {
 
   return (
     <div className={`${styles.area} space-y-6`}>
-      <ModuleHeader artwork="settings"
+      <ModuleHeader
+        artwork="settings"
         eyebrow={h.eyebrow}
         title={h.title}
         subtitle={`${user.name} · ${user.email}`}

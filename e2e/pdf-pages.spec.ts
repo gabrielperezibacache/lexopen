@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { randomUUID, createHash } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { putObject } from "../src/lib/storage";
 
@@ -32,11 +32,39 @@ test.afterAll(async()=>{
   } finally { await db.$disconnect(); }
 });
 
+test("carga de PDF mixto: prepara el texto en orden y conserva el original",async({page})=>{
+  await loginAs(page,"socio@estudio.cl");
+  await authenticateApiRequests(page);
+  let uploadedId="",uploadedKey="";
+  try {
+    const response=await apiRequest(page).post("/api/documentos",{multipart:{nombre:`Carga OCR ${prefix}.pdf`,causaId:causeId,file:{name:`Carga OCR ${prefix}.pdf`,mimeType:"application/pdf",buffer:bytes}}});
+    expect(response.status(),await response.text()).toBe(201);
+    const uploaded=await response.json();uploadedId=uploaded.id;uploadedKey=uploaded.storageKey;
+    await expect.poll(async()=> (await db.documento.findUniqueOrThrow({where:{id:uploadedId}})).extractionStatus,{timeout:20_000}).toBe("completed");
+    const prepared=await db.documento.findUniqueOrThrow({where:{id:uploadedId}});
+    const metadata=JSON.parse(prepared.extractionJson!);
+    expect(metadata.partial).toBe(false);
+    expect(metadata.ocrPagesProcessed).toEqual([1]);
+    expect(metadata.ocrPagesFailed).toEqual([]);
+    expect(metadata.pages.map((p:{pageNumber:number;status:string})=>[p.pageNumber,p.status])).toEqual([[1,"completed"],[2,"completed"],[3,"empty"]]);
+    const text=await page.request.get(`/api/documentos/${uploadedId}/markdown`);
+    expect(text.ok()).toBe(true);
+    expect((await text.text()).match(/^## Página \d+$/gm)).toEqual(["## Página 1","## Página 2"]);
+    const original=await page.request.get(`/api/documentos/${uploadedId}/content`);
+    expect(original.ok()).toBe(true);
+    expect(digest(await original.body())).toBe(digest(bytes));
+  } finally {
+    if(uploadedId){await db.auditEvent.deleteMany({where:{entityId:uploadedId}});await db.documento.deleteMany({where:{id:uploadedId}});}
+    if(uploadedKey)await rm(path.join(storageRoot,uploadedKey),{force:true});
+  }
+});
+
 test("PDF físico: página, OCR, original y cita conservan su versión y permisos",async({page,browser},testInfo)=>{
   test.setTimeout(90_000);
   // Exercise the actual manual-copy fallback rather than the OS clipboard.
   await page.addInitScript(()=>Object.defineProperty(navigator,"clipboard",{value:undefined,configurable:true}));
   await loginAs(page,"socio@estudio.cl");
+  await authenticateApiRequests(page);
   await page.goto(`/documentos/${documentId}/fuentes`);
   await expect(page.getByRole("heading",{name,exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Preparar fuentes",exact:true}).click();
@@ -61,7 +89,8 @@ test("PDF físico: página, OCR, original y cita conservan su versión y permiso
   await expect(reference).toBeVisible();expect(await reference.inputValue()).toContain("Página 2");expect(await reference.inputValue()).toContain("page=2");
   await page.getByRole("button",{name:"Cerrar referencia",exact:true}).click();
   const pdfPage2=await page.request.get(`/api/documentos/${documentId}/evidence?version=${version}&page=2`);const fragments=await pdfPage2.json();
-  const verification=await page.request.post(`/api/evidence/fragments/${fragments.fragments[0].id}/verify`,{data:{quote:fragments.fragments[0].text}});
+  const verification=await apiRequest(page).post(`/api/evidence/fragments/${fragments.fragments[0].id}/verify`,{data:{quote:fragments.fragments[0].text}});
+  expect(verification.status(),await verification.text()).toBe(200);
   const verified=await verification.json();expect(verified.verified).toBe(true);expect(verified.pageNumber).toBe(2);expect(verified.href).toContain("page=2");
   await page.setViewportSize({width:1366,height:900});await selector.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath("pdf-pages-desktop.png")});
   await page.setViewportSize({width:360,height:800});await selector.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath("pdf-pages-mobile.png")});
@@ -93,7 +122,7 @@ test("PDF físico: página, OCR, original y cita conservan su versión y permiso
   await expect(page.getByRole("img",{name:`Página 2 de ${name}`,exact:true})).toBeVisible();
   const portal=await browser.newContext();
   try {
-    const client=await portal.newPage();await loginAs(client,"cliente@andes.cl");
+    const client=await portal.newPage();await loginAs(client,"cliente@andes.cl");await authenticateApiRequests(client);
     expect([403,404]).toContain((await client.request.get(`/api/evidence/versions/${version}/pages/2`)).status());
     expect([403,404]).toContain((await client.request.get(`/api/documentos/${documentId}/evidence?version=${version}&page=2`)).status());
     expect([403,404]).toContain((await client.request.post(`/api/evidence/fragments/${fragments.fragments[0].id}/verify`,{data:{quote:fragments.fragments[0].text}})).status());

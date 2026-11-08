@@ -59,6 +59,7 @@ export async function resolveOutboxDestination(row: Pick<MensajeSaliente, "canal
   })) return null;
   const plain = await decryptCanalDestino(row.canalUsuarioId, client);
   if (!plain) return null;
+  if (plain.canal === "whatsapp") return { kind: "whatsapp", e164: plain.e164 };
   return plain.canal === "telegram" ? { kind: "telegram", chatId: plain.chatId } : { kind: "push", subscription: plain.subscription };
 }
 

@@ -1,0 +1,93 @@
+name: Browser check
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        type: string
+        required: true
+      compiled:
+        type: boolean
+        default: false
+      shard-index:
+        type: number
+        default: 1
+      shard-total:
+        type: number
+        default: 1
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lexopen
+          POSTGRES_PASSWORD: lexopen
+          POSTGRES_DB: lexopen_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lexopen -d lexopen_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://lexopen:lexopen@localhost:5432/lexopen_e2e
+      E2E_DATABASE_URL: postgresql://lexopen:lexopen@localhost:5432/lexopen_e2e
+      E2E_SERVER_MODE: ${{ inputs.compiled && 'production' || 'development' }}
+      STORAGE_PATH: ${{ github.workspace }}/.tmp/ci-browser-storage
+      SESSION_SECRET: ci-browser-fixture-secret-more-than-32-characters
+      HERMES_ALLOW_DEMO: "0"
+      LLM_ALLOW_PRIVATE_URL: "1"
+      LEXOPEN_PDF_REQUIRE_TOOLS: "1"
+      CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
+      CODEX_DATA_DIR: /tmp/lexopen-codex-e2e
+      PLAYWRIGHT_PROJECT: ${{ inputs.project }}
+      PLAYWRIGHT_SHARD_INDEX: ${{ inputs.shard-index }}
+      PLAYWRIGHT_SHARD_TOTAL: ${{ inputs.shard-total }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Validate the fixed browser and shard selection
+        shell: bash
+        run: |
+          case "$PLAYWRIGHT_PROJECT" in chromium|chromium-audio|firefox|webkit) ;; *) exit 1 ;; esac
+          test "$PLAYWRIGHT_SHARD_INDEX" -ge 1
+          test "$PLAYWRIGHT_SHARD_INDEX" -le "$PLAYWRIGHT_SHARD_TOTAL"
+      - run: npm ci
+      - run: npm ci --prefix desktop --ignore-scripts
+      - name: Local PDF rendering and OCR
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
+      - name: Install the matching browser and system libraries
+        shell: bash
+        run: npx playwright install --with-deps "${PLAYWRIGHT_PROJECT%-audio}"
+      - name: Restore the exact compiled application
+        if: ${{ inputs.compiled }}
+        uses: actions/download-artifact@v8
+        with:
+          name: application-build-${{ github.run_id }}
+          path: .next
+      # The fault injector intentionally cuts real HTTP streams. It does not
+      # proxy HMR, so offline and audio scenarios use the compiled server.
+      - name: Run the selected regression
+        shell: bash
+        run: npx playwright test --project="$PLAYWRIGHT_PROJECT" --shard="$PLAYWRIGHT_SHARD_INDEX/$PLAYWRIGHT_SHARD_TOTAL"
+      - name: Retain browser evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-${{ inputs.compiled && 'compiled' || 'general' }}-${{ inputs.project }}-${{ inputs.shard-index }}-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          overwrite: true
+          retention-days: 7

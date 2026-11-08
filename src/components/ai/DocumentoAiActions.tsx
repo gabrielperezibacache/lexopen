@@ -9,9 +9,11 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 export function DocumentoAiActions({
   documentoId,
   causaId,
+  version,
 }: {
   documentoId: string;
   causaId?: string | null;
+  version?: number;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -34,6 +36,7 @@ export function DocumentoAiActions({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        expectedVersion: version,
         ...(data.tipo ? { tipo: data.tipo } : {}),
         ...(typeof data.confidencial === "boolean"
           ? { confidencial: data.confidencial }

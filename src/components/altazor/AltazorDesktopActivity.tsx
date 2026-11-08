@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRight, Monitor } from "lucide-react";
+import { ArrowUpRight, FileCheck2, Monitor } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import type { ComputerActivity, ComputerActivityState, ComputerReview } from "@/lib/altazor/computer/types";
+import type { ComputerActivity, ComputerActivityState, ComputerReview, VerifiedComputerFile } from "@/lib/altazor/computer/types";
+import { computerConnectionLabel } from "@/lib/altazor/computer/activity-detail";
 import styles from "./AltazorDesktopActivity.module.css";
 
 const endpoint = "/api/altazor/computer";
@@ -23,7 +24,7 @@ const stateLabel: Record<ComputerActivityState, string> = {
 };
 const frameStates: ReadonlySet<ComputerActivityState> = new Set(["ready", "working", "approval", "help"]);
 
-export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | null; onOpen: (sessionId: string | null, sessionCaseId: string | null, review?: ComputerReview) => void }) {
+export function AltazorDesktopActivity({ causaId, refreshKey, onOpen }: { causaId: string | null; refreshKey?: string; onOpen: (sessionId: string | null, sessionCaseId: string | null, review?: ComputerReview) => void }) {
   const heading = useId(), container = useRef<HTMLElement>(null);
   const sessionPin = useRef<{ id: string; causaId: string | null } | null>(null);
   const [activity, setActivity] = useState<ComputerActivity | null>(null);
@@ -50,6 +51,8 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
       const controller = new AbortController();
       request = controller;
       const { signal } = controller;
+      let timedOut = false;
+      const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 15_000);
       let delay = 25_000;
       try {
         const query = causaId ? `?${new URLSearchParams({ causaId })}` : "";
@@ -82,10 +85,11 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
         const blob = await image.blob();
         if (!signal.aborted) replaceFrame({ url: URL.createObjectURL(blob), sessionId: next.sessionId });
       } catch {
-        if (!signal.aborted) { replaceFrame(null); setActivity({ state: "unavailable", sessionId: null, monitor: true }); }
+        if (!signal.aborted || timedOut) { replaceFrame(null); setActivity({ state: "unavailable", sessionId: null, monitor: true }); }
       } finally {
+        window.clearTimeout(timeout);
         if (request === controller) request = undefined;
-        if (running && !signal.aborted) timer = window.setTimeout(() => void poll(), delay);
+        if (running) timer = window.setTimeout(() => void poll(), timedOut ? 5_000 : delay);
       }
     }
     const synchronize = () => {
@@ -97,7 +101,7 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
     document.addEventListener("visibilitychange", synchronize);
     if (!observer) synchronize();
     return () => { disposed = true; pause(); observer?.disconnect(); document.removeEventListener("visibilitychange", synchronize); };
-  }, [causaId]);
+  }, [causaId, refreshKey]);
 
   const label = activity ? stateLabel[activity.state] : "Consultando escritorio…";
   const needsPreparation = activity?.state === "unconfigured" || activity?.state === "disabled";
@@ -108,12 +112,37 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
       <Monitor aria-hidden="true" size={20} />
       <div className={styles.heading}><h2 id={heading}>Escritorio de Altazor</h2><p role="status">{label}</p></div>
       <button type="button" className={review ? "btn btn-primary" : "btn btn-ghost"} onClick={() => onOpen(activity?.sessionId ?? null, activity?.causaId === undefined ? causaId : activity.causaId, review)}>
-        {review === "help" ? "Revisar solicitud" : review === "approval" ? "Revisar autorización" : needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
+        {activity?.consultation ? "Revisar acción" : review === "help" ? "Revisar solicitud" : review === "approval" ? "Revisar autorización" : needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
       </button>
     </header>
+    {activity?.consultation && <p className={styles.consultation}>{activity.consultation.reason}</p>}
+    {activity?.outcomeUnknown && <p className={styles.consultation}>Una acción quedó sin confirmar. Revisa el monitor y toma el control si lo necesitas. Para continuar con nuevos encargos, detén este escritorio y abre uno nuevo.</p>}
+    {activity?.detail && <div className={styles.progress}>
+      {activity.detail.connections.length > 0 && <p>Aplicaciones de este escritorio: <strong>{activity.detail.connections.map(computerConnectionLabel).join(" · ")}</strong></p>}
+      {activity.detail.step && <p className={styles.step}>{activity.detail.step.label}{Number.isFinite(Date.parse(activity.detail.step.at)) && <time dateTime={activity.detail.step.at}>{new Date(activity.detail.step.at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</time>}</p>}
+    </div>}
+    {activity?.verifiedFiles?.length ? <VerifiedComputerFiles files={activity.verifiedFiles} /> : null}
     {visibleFrame && <div className={styles.screen}>
       <span className={styles.live}>Vista en directo</span>
       <Image src={visibleFrame.url} unoptimized width={1280} height={800} alt="Vista actual del escritorio privado de Altazor" />
     </div>}
+  </section>;
+}
+
+/** Render only server-verified receipts. File text stays literal source data. */
+export function VerifiedComputerFiles({ files }: { files: readonly VerifiedComputerFile[] }) {
+  if (!files.length) return null;
+  return <section className={styles.files} aria-label="Archivos descargados y verificados">
+    <h3><FileCheck2 size={18} aria-hidden="true" />Descargas verificadas</h3>
+    <ul>{files.map(file => <li key={`${file.requestId}:${file.sha256}`}>
+      <p className={styles.fileName}>{file.name}</p>
+      <p>{computerConnectionLabel(file.connector)} · {file.bytes.toLocaleString("es-CL")} bytes{file.pages !== undefined ? ` · ${file.pages} ${file.pages === 1 ? "página" : "páginas"}` : ""}</p>
+      {file.firstLine !== undefined && <p className={styles.firstLine}><span>Primera línea del archivo</span><q>{file.firstLine}</q></p>}
+      <details><summary>Origen y verificación</summary><dl>
+        <dt>Archivo en el escritorio</dt><dd>{file.localPath}</dd>
+        <dt>Origen</dt><dd>{file.kind === "google-workspace" ? `Google Drive · ${file.target.id}` : file.kind === "dropbox" ? `Dropbox · ${file.target.path}` : `${file.target.repo} · ${file.target.path}${file.target.ref ? ` · ${file.target.ref}` : ""}`}</dd>
+        <dt>SHA-256</dt><dd>{file.sha256}</dd>
+      </dl></details>
+    </li>)}</ul>
   </section>;
 }

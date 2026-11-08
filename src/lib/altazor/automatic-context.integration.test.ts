@@ -52,13 +52,30 @@ async function main() {
     const dottedWithCourt = await prepare({ text: "Resume el ROL 12.345-2026 del Tribunal ROL ficticio." });
     assert.ok("conversation" in dottedWithCourt); assert.equal(dottedWithCourt.conversation!.causaId, dotted.id, "aliases are one identifier and the court disambiguates it");
     await assert.rejects(prepare({ routeCausaId: hidden.id, text: "Resume esta causa" }), status(404));
-    const [selected, concurrent] = await Promise.all([
+    const preparations = await Promise.allSettled([
       prepare({ text: "Prepara C-7821-2026 del Primer Tribunal Ficticio", routeCausaId: duplicate.id }),
       prepare({ text: "Resume esta causa", routeCausaId: first.id }),
     ]);
+    // Drain both operations before cleanup, even if one fails. An in-flight
+    // retry must not recreate a conversation after the fixtures were deleted.
+    const failure = preparations.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    const [selected, concurrent] = preparations.map(result => {
+      assert.equal(result.status, "fulfilled");
+      return result.value;
+    });
     assert.ok("conversation" in selected); assert.equal(selected.conversation!.causaId, first.id, "unambiguous text takes precedence over page context");
     assert.ok("conversation" in concurrent); assert.equal(concurrent.conversation!.id, selected.conversation!.id, "concurrent preparations converge within a scope");
     assert.equal(await db.altazorConversation.count({ where: { ownerId: owner.id, causaId: first.id } }), 1);
+    const contendedCase = await createCase("LOAD-2026-001", "Concurrent preparation fixture");
+    const burst = await Promise.allSettled(Array.from({ length: 12 }, () => prepare({ text: "Resume esta causa", routeCausaId: contendedCase.id })));
+    for (const result of burst) {
+      if (result.status === "rejected") throw result.reason;
+      assert.ok("conversation" in result.value);
+      assert.equal(result.value.conversation!.causaId, contendedCase.id);
+    }
+    assert.equal(new Set(burst.map(result => result.status === "fulfilled" && result.value.conversation!.id)).size, 1, "a contended burst reuses one private conversation");
+    assert.equal(await db.altazorConversation.count({ where: { ownerId: owner.id, causaId: contendedCase.id } }), 1);
     const alternate = (await createAltazorConversation({ requestId: randomUUID(), title: "Conversación explícita", causaId: first.id }, owner, db)).conversation;
     assert.notEqual(alternate.id, selected.conversation!.id, "the explicit creation API keeps separate conversations");
     await patchAltazorConversation(alternate.id, { status: "archived", expectedRevision: alternate.revision }, owner, db);

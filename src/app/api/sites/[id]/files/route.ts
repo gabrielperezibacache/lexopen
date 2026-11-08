@@ -1,3 +1,9 @@
+import { executeCommand, requestCommandKey } from "@/lib/command-execution";
+import { currentStaffActor } from "@/lib/auth/staff-actor";
+import { loadFileSource, authorizeFileWrite } from "@/lib/offline/file-sources";
+import { retainSiteFile, siteRevisionSnapshot, authorizeFileFlags } from "@/lib/offline/file-service";
+import { writeAuditStrict } from "@/lib/audit";
+import { httpError } from "@/lib/auth/access";
 import { assertCsrf, canReadFlagged, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { clientVisibleFileWhere, requireSiteMutationAccess } from "@/lib/auth/access";
 import { siteFileReadWhere as scopedsiteFileReadWhere } from "@/lib/auth/causa-access";
@@ -228,51 +234,23 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "new-version" && body.fileId) {
-      const existing = await prisma.siteFile.findFirst({ where: { AND: [scopedsiteFileReadWhere(user), { id: body.fileId, siteId: id }] } });
-      if (!existing) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
-      if (!canReadFlagged(user, existing)) {
-        return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
-      }
-      if (body.contenido === undefined && body.contenidoBase64 === undefined) {
-        return NextResponse.json(
-          { error: "Una nueva versión requiere contenido" },
-          { status: 400 }
-        );
-      }
-      const version = existing.version + 1;
-      const prepared = await prepareFileBody(id, body.name || existing.name, {
-        ...body,
-        mimeType: body.mimeType || existing.mimeType,
-      });
-      const file = await prisma.siteFile.update({
-        where: { id: existing.id },
-        data: {
-          version,
-          contenido: prepared.contenido,
-          storageKey: prepared.storageKey,
-          sizeBytes: prepared.sizeBytes,
-          confidencial:
-            body.confidencial !== undefined ? Boolean(body.confidencial) : existing.confidencial,
-          privilegio:
-            body.privilegio !== undefined ? Boolean(body.privilegio) : existing.privilegio,
-          versions: {
-            create: {
-              version,
-              contenido: prepared.contenido,
-              note: body.note || `Versión ${version}`,
-              authorId: user.id,
-            },
-          },
-        },
-        select: {
-          ...siteFileListSelect,
-          versions: {
-            orderBy: { version: "desc" },
-            select: fileVersionListSelect,
-          },
+      if (body.contenido === undefined && body.contenidoBase64 === undefined) throw httpError("Una nueva versión requiere contenido", 400);
+      let prepared: ReturnType<typeof prepareFileBody> | undefined;
+      const result = await executeCommand({ key: requestCommandKey(req, "site-file.version"), ownerId: user.id, input: { siteId: id, body },
+        authorize: async tx => { const actor = await currentStaffActor(user, tx), source = await loadFileSource("adjunto", body.fileId, actor, tx); if (source.kind !== "adjunto" || source.row.siteId !== id) throw httpError("Archivo no encontrado", 404); await authorizeFileWrite(source, actor, tx); },
+        run: async tx => {
+          const actor = await currentStaffActor(user, tx), source = await loadFileSource("adjunto", body.fileId, actor, tx); if (source.kind !== "adjunto") throw httpError("Archivo no encontrado", 404);
+          const existing = source.row;
+          if (body.expectedVersion !== undefined && body.expectedVersion !== existing.version) throw httpError("El adjunto cambió en otra sesión. Compare las versiones", 409);
+          await authorizeFileFlags({ name: existing.name, type: "otro", path: null, tags: existing.tags, confidential: body.confidencial ?? existing.confidencial, privileged: body.privilegio ?? existing.privilegio }, actor, source, tx, undefined, true);
+          prepared ||= prepareFileBody(id, body.name || existing.name, { ...body, mimeType: body.mimeType || existing.mimeType }); const content = await prepared;
+          await retainSiteFile(existing, tx);
+          const row = await tx.siteFile.update({ where: { id: existing.id, version: existing.version, updatedAt: existing.updatedAt }, data: { version: { increment: 1 }, contenido: content.contenido, storageKey: content.storageKey, sizeBytes: content.sizeBytes, mimeType: content.mimeType, confidencial: body.confidencial ?? existing.confidencial, privilegio: body.privilegio ?? existing.privilegio } });
+          await tx.fileVersion.create({ data: { fileId: row.id, version: row.version, contenido: row.contenido, storageKey: row.storageKey, mimeType: row.mimeType, sizeBytes: row.sizeBytes, snapshotJson: await siteRevisionSnapshot(row, tx), note: body.note || `Versión ${row.version}`, authorId: actor.id } });
+          await writeAuditStrict({ actorId: actor.id, action: "adjunto.update", entityType: "SiteFile", entityId: row.id, after: { version: row.version } }, tx); return { id: row.id };
         },
       });
-      return NextResponse.json(file);
+      return NextResponse.json(await prisma.siteFile.findUniqueOrThrow({ where: { id: result.id }, select: { ...siteFileListSelect, versions: { orderBy: { version: "desc" }, select: fileVersionListSelect } } }), { headers: { "Cache-Control": "private, no-store" } });
     }
 
     if (body.action === "add-comment" && body.fileId) {

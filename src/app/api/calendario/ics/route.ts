@@ -1,5 +1,7 @@
 import { handleRouteError, requireStaff } from "@/lib/api";
 import { relatedCausaWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { parseDateInput } from "@/lib/date-input";
+import { httpError } from "@/lib/auth/access";
 import { buildIcs } from "@/lib/calendario/ics";
 import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
@@ -16,10 +18,12 @@ export async function GET(req: NextRequest) {
     const user = await requireStaff();
     const sp = new URL(req.url).searchParams;
     const causaId = sp.get("causaId");
+    for (const field of ["desde", "hasta"]) if (sp.has(field) && !parseDateInput(sp.get(field)!)) throw httpError("Rango de fechas inválido", 400);
     const now = new Date();
     const desde = sp.get("desde") ? new Date(sp.get("desde")!) : new Date(now.getTime() - DEFAULT_WINDOW_DAYS * 86_400_000);
     const hasta = sp.get("hasta") ? new Date(sp.get("hasta")!) : new Date(now.getTime() + DEFAULT_WINDOW_DAYS * 86_400_000);
 
+    if (desde > hasta) throw httpError("El inicio del rango debe preceder al fin", 400);
     const eventos = await prisma.evento.findMany({
       where: { AND: [scopedrelatedCausaWhere(user), {
         estado: { not: "cancelado" },

@@ -198,7 +198,8 @@ export default function MonitoreoCausasPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader artwork="connections"
+      <PageHeader
+        artwork="connections"
         title="Cartera PJUD"
         actions={
           <>

@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-07",
+  "source": "Compilación local de producción; datos ficticios de prisma/seed.ts; cambios de interfaz sin commit.",
+  "screenshots": [
+    {
+      "file": "antes-clientes.png",
+      "sha256": "129b0c324145fa0e2d456cc94a796592b6ca4e29c6903fcd150db9c7373ce223"
+    },
+    {
+      "file": "antes-facturacion.png",
+      "sha256": "5eef529b90a08b74d8f5095ff0b70cc94edb8fb10bf895c8645f0e1c91714ddc"
+    },
+    {
+      "file": "antes-configuracion.png",
+      "sha256": "d3fbb5bb5e2d3a58702fcca3150602b7d50459272eed903fe0117d9ff6547491"
+    },
+    {
+      "file": "clientes-light-desktop.png",
+      "sha256": "f417bf40198c821e00995e0b1a0e14dd39e584a31f802b40415c2fb3d67d87ef"
+    },
+    {
+      "file": "facturacion-light-desktop.png",
+      "sha256": "fb047e5d3b38b4bfffdec880361d95becfd3d535150e65bb0f296dbf84b30395"
+    },
+    {
+      "file": "facturacion-dark-mobile.png",
+      "sha256": "3871f8f035facd5fb93db738e6924985e368d4854f0be79c629c09a072771f1f"
+    },
+    {
+      "file": "configuracion-light-desktop.png",
+      "sha256": "ec5b6806be55e18a7c4f1a5132307ddab11a181c93a2cf7d319ac86573bd79bf"
+    },
+    {
+      "file": "configuracion-dark-mobile.png",
+      "sha256": "98e18c18743ce85b83095975263e1093113ffad19986549f9bf837a9495d122b"
+    },
+    {
+      "file": "vacio-light-desktop.png",
+      "sha256": "c195add47f54317922e5289e32eb566e07b8ce4b9d0a2d1a25144bd5d3f3846e"
+    }
+  ]
+}

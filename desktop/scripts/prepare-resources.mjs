@@ -2,12 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { copyResourceTree, parseTargetArgs, privateResourcePath, sha256, trackedPublicFiles, verifyDesktopSourceResource, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
+import { copyResourceTree, parseTargetArgs, privateResourcePath, sha256, stageDistributedOAuthProfile, trackedPublicFiles, verifyDesktopSourceResource, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), repo = path.dirname(desktop);
 export function copyTrackedRuntimeResources(sourceRepo, output, { stripped = [] } = {}) {
   const app = path.join(output, "app-standalone");
-  const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "LICENSE"]);
+  const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "desktop/oauth-clients.cjs", "LICENSE"]);
   for (const file of trackedPublicFiles(sourceRepo)) {
     if (!(file.startsWith("src/") || file.startsWith("public/") || file.startsWith("prisma/") || runtimeFiles.has(file)) || privateResourcePath(file)) continue;
     const source = path.join(sourceRepo, file), stat = fs.lstatSync(source);
@@ -41,10 +41,11 @@ export function prepareReleaseResources(target) {
   for (const name of ["playwright", "playwright-core"]) copyResourceTree(path.join(repo, "node_modules", name), path.join(app, "node_modules", name), { stripped });
   copyResourceTree(cache, path.join(app, "playwright-browsers"), { stripped });
   copyResourceTree(desktopSource, path.join(output, "altazor-desktop-source"), { stripped });
+  const distributedOAuth = stageDistributedOAuthProfile(output);
   const buildId = fs.readFileSync(path.join(repo, ".next/BUILD_ID"), "utf8").trim();
   if (!/^[\w.-]{1,256}$/.test(buildId)) throw new Error("Invalid Next build identity");
   const version = JSON.parse(fs.readFileSync(path.join(desktop, "package.json"), "utf8")).version;
-  const metadata = { format: 1, version, platform: target.platform, arch: target.arch, sourceRevision: revision.stdout.trim(), sourceDirty: Boolean(dirty.stdout.trim()), buildId, sourceIconSha256: sha256(path.join(repo, "docs/assets/lexopen-lockup.png")) };
+  const metadata = { format: 1, version, platform: target.platform, arch: target.arch, sourceRevision: revision.stdout.trim(), sourceDirty: Boolean(dirty.stdout.trim()), buildId, sourceIconSha256: sha256(path.join(repo, "docs/assets/lexopen-lockup.png")), ...(distributedOAuth ? { distributedOAuthSha256: distributedOAuth.sha256 } : {}) };
   fs.writeFileSync(path.join(app, "lexopen-release.json"), JSON.stringify(metadata, null, 2));
   const verified = verifyReleaseResources(output, path.join(desktop, "node_modules"), target);
   verifyCanaryAbsent(output, process.env.LEXOPEN_RELEASE_CANARY);

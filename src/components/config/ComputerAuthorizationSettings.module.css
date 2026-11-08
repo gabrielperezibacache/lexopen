@@ -1,0 +1,28 @@
+.root { padding: 1.25rem; color: var(--ink); min-width: 0; }
+.root header h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+.root p { margin: .5rem 0; max-width: 70ch; color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.7; }
+.root form { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
+.root fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
+.root legend { font-size: var(--text-sm); font-weight: 600; margin-bottom: .5rem; }
+.scope { display: grid; gap: .5rem; margin-top: 1rem; }
+.scope label, .limits label { font-size: var(--text-sm); font-weight: 500; }
+.root select, .root input[type="number"] { width: 100%; min-height: 44px; padding: .75rem .9rem; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-solid); color: var(--ink); font: inherit; }
+.current { margin-top: 1.25rem; padding-block: 1rem; border-block: 1px solid var(--line); font-size: var(--text-sm); }
+.modes { display: grid; }
+.modes > label { display: flex; gap: .75rem; padding-block: .9rem; min-height: 44px; cursor: pointer; }
+.modes > label + label { border-top: 1px solid var(--line); }
+.modes input, .check input { flex: 0 0 auto; width: 18px; height: 18px; margin-top: .2rem; accent-color: var(--sea); }
+.modes label > span { min-width: 0; display: grid; gap: .35rem; font-size: var(--text-sm); color: var(--ink-soft); line-height: 1.6; }
+.modes strong { color: var(--ink); font-weight: 600; }
+.modes small { margin-inline-start: .75rem; color: var(--sea); font-size: .8125rem; font-weight: 400; }
+.check { display: flex; align-items: start; gap: .75rem; padding-block: .4rem; font-size: var(--text-sm); line-height: 1.7; }
+.root fieldset:disabled { opacity: .65; }
+.root fieldset:disabled label { cursor: default; }
+.limits summary { width: fit-content; cursor: pointer; min-height: 44px; padding-block: .6rem; color: var(--sea); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: .2em; }
+.limits > div { display: grid; gap: .5rem; max-width: 24rem; padding-top: .5rem; }
+.actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.actions > * { max-width: 100%; min-height: 44px; }
+.root .error { color: var(--danger); }
+.root .notice { color: var(--sea); }
+.root .warning { color: var(--warn); }
+.root :is(input,select,summary,button):focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }

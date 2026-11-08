@@ -9,11 +9,19 @@ import {
   OLLAMA_LOCAL_ORIGIN,
   type LocalModelProfile,
 } from "./local-model-profiles";
+import {
+  canonicalLocalModelState,
+  collectLocalModelHardware,
+  localModelInventory,
+  localModelRecommendation,
+  sanitizeInstalledLocalModels,
+} from "./local-model-hardware";
 
 const REGISTRY = "https://registry.ollama.ai";
 const MANIFEST_TYPE = "application/vnd.docker.distribution.manifest.v2+json";
 const MANIFEST_ACCEPT = `application/vnd.ollama.manifest.list.v2+json, ${MANIFEST_TYPE}`;
-const MAX_MODEL_BYTES = 3_000_000_000;
+// Still bounded by the pinned catalog and each exact manifest size, including larger editions.
+const MAX_MODEL_BYTES = Math.max(...LOCAL_MODELS.map(profile => profile.bytes)) + 1;
 const MAX_INPUT_BYTES = 12_000;
 const MAX_INPUT_MESSAGES = 24;
 const MAX_JSON_BYTES = 256 * 1024;
@@ -21,7 +29,7 @@ const MAX_PROGRESS_BYTES = 4 * 1024 * 1024;
 
 const daemonStatus = z.object({ cloud: z.object({ disabled: z.boolean() }) });
 const installedModels = z.object({
-  models: z.array(z.object({ name: z.string(), digest: z.string(), size: z.number().int().nonnegative() })).max(1000),
+  models: z.array(z.unknown()).max(1000),
 });
 const layer = z.object({
   digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
@@ -119,7 +127,7 @@ async function readInstalled(signal?: AbortSignal) {
       await response.body?.cancel();
       throw new Error("No se pudo consultar Ollama");
     }
-    return installedModels.parse(JSON.parse(await readText(response))).models;
+    return sanitizeInstalledLocalModels(installedModels.parse(JSON.parse(await readText(response))).models);
   } catch {
     signal?.throwIfAborted();
     throw httpError("No se pudo verificar la lista de modelos de Ollama.", 503);
@@ -127,17 +135,24 @@ async function readInstalled(signal?: AbortSignal) {
 }
 
 function stateFor(profile: LocalModelProfile, models: Awaited<ReturnType<typeof readInstalled>>): InstallState {
-  const model = models.find((candidate) => candidate.name.toLowerCase() === profile.tag.toLowerCase());
-  if (!model) return "missing";
-  return model.digest.replace(/^sha256:/, "") === profile.sha256 && model.size === profile.bytes ? "ready" : "different";
+  return canonicalLocalModelState(profile, models);
 }
 
 export async function localModelsStatus(signal?: AbortSignal) {
-  const runtime = await runtimeState(signal);
-  const models = runtime === "ready" ? await readInstalled(signal) : [];
+  const [initialRuntime, hardware] = await Promise.all([runtimeState(signal), collectLocalModelHardware(signal)]);
+  let runtime = initialRuntime;
+  let models: Awaited<ReturnType<typeof readInstalled>> = [];
+  if (runtime === "ready") {
+    try { models = await readInstalled(signal); }
+    catch { signal?.throwIfAborted(); runtime = "unavailable"; }
+  }
+  const readyIds = LOCAL_MODELS.filter(profile => stateFor(profile, models) === "ready").map(profile => profile.id);
   return {
     runtime,
     message: runtime === "ready" ? "" : runtimeMessages[runtime],
+    hardware,
+    recommendation: localModelRecommendation(hardware, readyIds),
+    ...localModelInventory(models),
     models: LOCAL_MODELS.map((profile) => ({
       id: profile.id,
       state: runtime === "ready" ? stateFor(profile, models) : null,
@@ -229,7 +244,7 @@ export async function downloadLocalModel(profile: LocalModelProfile, signal?: Ab
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: profile.tag, stream: true }),
-        signal: timeout(20 * 60_000, signal),
+        signal: timeout(2 * 60 * 60_000, signal),
       });
       if (!response.ok) {
         await response.body?.cancel();
@@ -274,8 +289,8 @@ export async function completeLocalModel(profile: LocalModelProfile, messages: L
         keep_alive: 0,
         truncate: false,
         shift: false,
-        ...(profile.id !== "gemma-small" ? { think: false } : {}),
-        options: { num_ctx: LOCAL_CONTEXT_TOKENS, num_predict: LOCAL_OUTPUT_TOKENS, temperature: 0.2 },
+        ...(profile.thinking === "level" ? { think: "low" } : profile.thinking === "toggle" ? { think: false } : {}),
+        options: { num_ctx: LOCAL_CONTEXT_TOKENS, num_predict: profile.thinking === "level" ? 2048 : LOCAL_OUTPUT_TOKENS, temperature: 0.2 },
       }),
       signal: timeout(Math.min(options?.timeoutMs ?? 90_000, 120_000), signal),
     }).catch(() => {

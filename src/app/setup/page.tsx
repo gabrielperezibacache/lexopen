@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
 import { FolioSymbol } from "@/components/ui/FolioSymbol";
+import { HostSectionChoices } from "@/components/config/HostSectionChoices";
+import { HOST_NAVIGATION_SECTIONS, type HostNavigationSection } from "@/lib/navigation/host-sections";
 
 function SetupForm() {
   const [error, setError] = useState("");
   const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [visibleSections, setVisibleSections] = useState<HostNavigationSection[]>([...HOST_NAVIGATION_SECTIONS]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,6 +38,7 @@ function SetupForm() {
           name: form.get("name"),
           email: form.get("email"),
           password,
+          visibleSections,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -69,10 +73,8 @@ function SetupForm() {
     <form onSubmit={submit} className="panel space-y-4 rounded-3xl p-6">
       <div>
         <h1 className="display text-3xl">Configurar LexOpen</h1>
-        <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-          Cree el primer administrador del estudio. Este paso solo funciona
-          durante la primera ejecución del Host. El token viaja en cookie
-          httpOnly (no en la barra de direcciones).
+        <p className="mt-2 text-sm text-[var(--ink-soft)]">
+          Crea tu cuenta de administrador y elige los apartados que quieres ver en el menú.
         </p>
       </div>
       <label className="block text-sm">
@@ -107,11 +109,16 @@ function SetupForm() {
           autoComplete="new-password"
         />
       </label>
-      <details className="text-sm text-[var(--ink-soft)]/75">
-        <summary className="cursor-pointer">Token manual (servidor sin Desktop)</summary>
+      <section aria-labelledby="setup-sections-title" className="space-y-2 border-t border-[var(--line)] pt-4">
+        <h2 id="setup-sections-title" className="text-lg font-semibold">Apartados visibles</h2>
+        <p className="text-sm text-[var(--ink-soft)]">Puedes cambiarlos después en Configuración del Host.</p>
+        <HostSectionChoices visible={visibleSections} onChange={setVisibleSections} disabled={busy} />
+      </section>
+      <details className="text-sm text-[var(--ink-soft)]">
+        <summary className="cursor-pointer">Código de instalación manual</summary>
         <label className="mt-2 block">
           <span className="mb-1 block text-[var(--ink-soft)]/70">
-            LEXOPEN_BOOTSTRAP_TOKEN
+            Código de instalación
           </span>
           <input
             className="input"
@@ -121,6 +128,7 @@ function SetupForm() {
             autoComplete="off"
           />
         </label>
+        <p className="mt-2 text-xs">Si administras un servidor sin LexOpen Desktop, usa el código definido al preparar el Host.</p>
       </details>
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
@@ -130,10 +138,6 @@ function SetupForm() {
       <button className="btn btn-primary w-full" disabled={busy} type="submit">
         {busy ? "Configurando…" : "Crear administrador"}
       </button>
-      <p className="text-xs text-[var(--ink-soft)]/60">
-        Abra esta pantalla desde LexOpen Desktop o con un enlace de un solo uso;
-        el proxy convierte <code>?token=</code> en cookie y limpia la URL.
-      </p>
     </form>
   );
 }
@@ -141,10 +145,9 @@ function SetupForm() {
 export default function SetupPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute -right-24 top-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(196,122,58,0.22),transparent_70%)]" />
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
+      <div className="relative mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4 py-10">
         <Link href="/" className="mb-8 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white">
+          <span className="grid h-11 w-11 place-items-center">
             <FolioSymbol className="h-8 w-8" />
           </span>
           <div>

@@ -1,0 +1,209 @@
+{
+  "status": "published",
+  "version": "1.1.0-preview.8",
+  "tag": "v1.1.0-preview.8",
+  "release_url": "https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.8",
+  "published_at": "2026-11-08T00:40:56Z",
+  "source_revision": "c0becb63cf49b00a920acedfd5c6c564c3707e43",
+  "main_merge_revision": "9ac94bbc2cb7bb8453ad9480a49990c677a18c98",
+  "platforms": [
+    [
+      "darwin",
+      "arm64"
+    ],
+    [
+      "darwin",
+      "x64"
+    ],
+    [
+      "linux",
+      "x64"
+    ],
+    [
+      "win32",
+      "x64"
+    ]
+  ],
+  "asset_count": 30,
+  "manifest_files": 28,
+  "github_digests_verified": 30,
+  "checksums": 29,
+  "readme_downloads_verified": [
+    "LexOpen-1.1.0-preview.8-linux-amd64.deb",
+    "LexOpen-1.1.0-preview.8-linux-x86_64.AppImage",
+    "LexOpen-1.1.0-preview.8-mac-arm64.dmg",
+    "LexOpen-1.1.0-preview.8-mac-x64.dmg",
+    "LexOpen-1.1.0-preview.8-win-x64.exe"
+  ],
+  "assets": [
+    {
+      "name": "LexOpen-1.1.0-preview.8-linux-amd64.deb",
+      "size": 497634032,
+      "digest": "sha256:a5c70d566567cfd6044e65b0f0c4d413d3a9f43eb79e3048e85e106f720eb33f"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-linux-x86_64.AppImage",
+      "size": 595092780,
+      "digest": "sha256:5cffdc8b09a3ad5ee432dc95019a55ec20b861ec7bda4ddada95e0e4d62f020e"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-arm64.dmg",
+      "size": 961633526,
+      "digest": "sha256:40205938e42d7fcd9f1445281d5d1e56d6896be6a189c97af2d4a2aff09b0735"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-arm64.dmg.blockmap",
+      "size": 997588,
+      "digest": "sha256:6acc0edce84eb2e8de74d756440e3d8b2087dd10156e0ccfc3543b90277907c4"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-arm64.zip",
+      "size": 965729304,
+      "digest": "sha256:2ed25ef8acd05bca1288ba5b1cbd632815e91bf90a9bfa17d1ec0b638e15d02b"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-arm64.zip.blockmap",
+      "size": 998511,
+      "digest": "sha256:1438f651e1db30a52c57904560598ff2134c1ffe14b36a8a873c1138211461d2"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-x64.dmg",
+      "size": 990739467,
+      "digest": "sha256:6d6446d48f9d0e26a7ec4de321012d417568fe56e0e2e9b087117eb564607b92"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-x64.dmg.blockmap",
+      "size": 1030523,
+      "digest": "sha256:78c17aa50b028cd087804a28cb113cc19889dea31a36f9f62c6533d7a25c0a31"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-x64.zip",
+      "size": 995164030,
+      "digest": "sha256:a1bc699e55fea8192561ad0ba95d4a6685d50eca8e817149257e6b6d74063095"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-mac-x64.zip.blockmap",
+      "size": 1027743,
+      "digest": "sha256:d3db59fcdd5fb54ec72e73c94497823befd0b3bab6e8a5cceaec4fae61b33252"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-win-x64.exe",
+      "size": 496686375,
+      "digest": "sha256:bae9d49a4d7a80d943b4abf8b3277956deada7d1b71daba680795f2d347e090a"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-win-x64.exe.blockmap",
+      "size": 512328,
+      "digest": "sha256:5de8afca213381cfe9e2c7b2238970dc59d64f754406527d4994ff33ec76e418"
+    },
+    {
+      "name": "LexOpen-1.1.0-preview.8-win-x64.zip",
+      "size": 647828184,
+      "digest": "sha256:67ae29ec4f64c0200a93ac87624dce556f6879a8128c0dbc3f8028861e2e958e"
+    },
+    {
+      "name": "lexopen-packaged-darwin-arm64.json",
+      "size": 510,
+      "digest": "sha256:75a132036f41a2411e52bef9b0269d79bcc1823dbfea2914c160128f4d70a67f"
+    },
+    {
+      "name": "lexopen-packaged-darwin-x64.json",
+      "size": 500,
+      "digest": "sha256:3fc59b4d61f524507a51d8f7aaf445e401724f81c5213ba416a5dfa9a7372eed"
+    },
+    {
+      "name": "lexopen-packaged-linux-x64.json",
+      "size": 497,
+      "digest": "sha256:4cc18ac04d8bab9ac9a232f01d10d4826527abaf4cb5b072a9340dfa307dc846"
+    },
+    {
+      "name": "lexopen-packaged-win32-x64.json",
+      "size": 497,
+      "digest": "sha256:e380bcb9d93bd99d9f549945c11cca086a1bf30334d1786af80bedf22e1b8b96"
+    },
+    {
+      "name": "lexopen-signature-darwin-arm64.json",
+      "size": 180,
+      "digest": "sha256:c7b27e671bdd77b1d8bfa1c81dcc50eb2711754cbcbec03639e1c1af1d4375d1"
+    },
+    {
+      "name": "lexopen-signature-darwin-x64.json",
+      "size": 178,
+      "digest": "sha256:623d791c119710f7bfe7be6d7be7ed01c2cc4f92a07a88388bd11b62ebb4ff43"
+    },
+    {
+      "name": "lexopen-signature-linux-x64.json",
+      "size": 175,
+      "digest": "sha256:274cb6c0c72849593a654218c1e89199ccda9499586870242ed4c4e14d5316c8"
+    },
+    {
+      "name": "lexopen-signature-win32-x64.json",
+      "size": 177,
+      "digest": "sha256:efc3ab80cbb9e7dc2d63bd1a518133ae14912f77e7ef7f3c8bb7272a461bc0cf"
+    },
+    {
+      "name": "lexopen-smoke-darwin-arm64.json",
+      "size": 476,
+      "digest": "sha256:c3f880cdae9250314758c5908c20a55beaf4f0969639973610243cdfee0a8ca1"
+    },
+    {
+      "name": "lexopen-smoke-darwin-x64.json",
+      "size": 474,
+      "digest": "sha256:4b57989983f42683cf744cb09ab2ece974ce8fe4ab1e7d4ae3625fc0a96586b1"
+    },
+    {
+      "name": "lexopen-smoke-linux-x64.json",
+      "size": 473,
+      "digest": "sha256:662efd05f7c05afc3afcc575b6d1828577c1ed6c624041ad06163edd1d7e277f"
+    },
+    {
+      "name": "lexopen-smoke-win32-x64.json",
+      "size": 473,
+      "digest": "sha256:d54b984b925b039d5e80b4c7c543cf835787f23234b6d4d7466ab267a6cf78a7"
+    },
+    {
+      "name": "preview-linux.yml",
+      "size": 698,
+      "digest": "sha256:5b476225812ebeb7b0e388314a5aa4bcc47677cf7b2241830038a26661cba660"
+    },
+    {
+      "name": "preview-mac.yml",
+      "size": 1042,
+      "digest": "sha256:0705b8eafd2d962ed427842830508c670eee6361fab9dbc1c3a164ac14e32ba2"
+    },
+    {
+      "name": "preview.yml",
+      "size": 447,
+      "digest": "sha256:440b2916176e602ba798102d0432bbc72561842ac369db255e51d5233a1f815c"
+    },
+    {
+      "name": "release-manifest.json",
+      "size": 8812,
+      "digest": "sha256:12d9326c50e1bd004b2d305396a1887ef963de0edefa5535c2654aeb8cdbf691"
+    },
+    {
+      "name": "SHA256SUMS",
+      "size": 2905,
+      "digest": "sha256:7cb449af6e72fca129a72789b4293cc4a72c421ae1add03d47cb4455d1c76a6f"
+    }
+  ],
+  "workflow": {
+    "url": "https://github.com/gabrielperezibacache/lexopen/actions/runs/42428286136",
+    "conclusion": "success"
+  },
+  "pull_request": {
+    "url": "https://github.com/gabrielperezibacache/lexopen/pull/252",
+    "merged": true,
+    "ci_conclusion": "success"
+  },
+  "local_validation": {
+    "production_build": "passed",
+    "typescript": "passed in production build",
+    "lint": "passed",
+    "unit_suite": "passed",
+    "integration_suite": "passed",
+    "production_audit_vulnerabilities": 0,
+    "production_chromium_checks": 6
+  },
+  "original_checkout_preserved": true
+}

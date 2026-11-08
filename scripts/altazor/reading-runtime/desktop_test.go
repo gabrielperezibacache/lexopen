@@ -31,3 +31,18 @@ func TestLexOpenBoundedReading(t *testing.T) {
 		t.Fatalf("semantic JSON was cut: %d %v", len(out), err)
 	}
 }
+
+func TestLexOpenReadingPreservesComputerUsePolicy(t *testing.T) {
+ page := Action{Name:"page_read",Args:map[string]any{"query":"needle","offset":6000.0,"elementOffset":1200.0}}
+ decision,err := ClassifyComputerUse(page,ComputerUsePolicy{Mode:"supervised"})
+ if err != nil || !decision.Observation || !decision.Automatic {t.Fatalf("bounded page observation: %+v %v",decision,err)}
+ document := Action{Name:"document_read",Args:map[string]any{"path":"uploads/selected.pdf","query":"needle"}}
+ decision,err = ClassifyComputerUse(document,ComputerUsePolicy{Mode:"supervised"})
+ if err != nil || !decision.LocalRead || decision.Automatic {t.Fatalf("supervised document escaped confirmation: %+v %v",decision,err)}
+ decision,err = ClassifyComputerUse(document,ComputerUsePolicy{Mode:"intelligent"})
+ if err != nil || !decision.LocalRead || !decision.Automatic {t.Fatalf("bounded local read: %+v %v",decision,err)}
+ decision,err = ClassifyComputerUse(Action{Name:"page_click",Args:map[string]any{"ref":1500.0}},ComputerUsePolicy{Mode:"supervised"})
+ if err != nil || decision.Automatic || decision.Category!="input" {t.Fatalf("paginated reference bypassed input gate: %+v %v",decision,err)}
+ document.Args["path"]=".browser/Cookies"
+ if _,err=ClassifyComputerUse(document,ComputerUsePolicy{Mode:"autonomous"});err==nil{t.Fatal("hidden path accepted by policy")}
+}

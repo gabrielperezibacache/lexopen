@@ -107,6 +107,9 @@ Los expedientes se guardan en el servidor del estudio y se comparten según los 
 - [Guía de contribución](CONTRIBUTING.md) y [configuración de ejemplo](.env.example).
 - [Preparar el servidor desde el código](docs/WEB-HOST.md) y [comprobaciones automáticas](https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml).
 - [Plan de desarrollo](docs/PLAN-DESARROLLO-2026-11-05.md) e [identidad visual](docs/REFERENCIAS-GRAFICAS-2026-11-05.md).
+- [Correcciones de auditoría y pendientes vigentes](docs/CORRECCIONES-AUDITORIA-2026-11-07.md).
+- [Activar WhatsApp](docs/WHATSAPP-Y-OFFLINE.md).
+- [Trabajo sin conexión: escritos, Clientes y tareas](docs/TRABAJO-SIN-CONEXION.md).
 - [Cobertura funcional de Altazor](docs/COBERTURA-ALTAZOR.md).
 
 </details>

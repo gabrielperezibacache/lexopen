@@ -1,0 +1,1 @@
+ALTER TABLE "MinutaAccion" ADD COLUMN "tipoComputo" TEXT, ADD COLUMN "esFatal" BOOLEAN, ADD COLUMN "orden" INTEGER;

@@ -35,9 +35,13 @@ import { AltazorPreferencesPanel } from "@/components/config/AltazorPreferencesP
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { firmFormSelect } from "@/lib/config/firm-form-fields";
 import { PersonalSettingsIndex } from "@/components/config/PersonalSettingsIndex";
+import { ConnectedAccountsPanel } from "@/components/config/ConnectedAccountsPanel";
+import { ComputerAuthorizationSettings } from "@/components/config/ComputerAuthorizationSettings";
+import { HostSectionSettings } from "@/components/config/HostSectionSettings";
+import { getHostNavigationSections } from "@/lib/config/host-navigation-sections";
 
 async function adminSections(userId: string, mode: CaseManagementMode, country: WorkCountry | null, locale: "es" | "en", canSetCountry: boolean): Promise<Record<string, ReactNode>> {
-  const [organization, hostStatus, users, groups] = await Promise.all([
+  const [organization, hostStatus, users, groups, visibleSections] = await Promise.all([
     prisma.organization.findFirst({ select: firmFormSelect }),
     getHostStatus(),
     prisma.user.findMany({
@@ -53,6 +57,7 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
       select: { id: true, name: true, description: true, members: { select: { user: { select: { id: true, name: true } } } } },
       orderBy: { name: "asc" },
     }),
+    canSetCountry ? getHostNavigationSections() : null,
   ]);
   const settingsOrganization = organization ?? {
     name: "Estudio LexOpen", rut: null, email: null, telefono: null, direccion: null, settings: null,
@@ -97,6 +102,7 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
 
   return {
     estudio: <FirmSettingsForm organization={settingsOrganization} />,
+    "apartados-visibles": visibleSections ? <HostSectionSettings initial={visibleSections} locale={locale} /> : undefined,
     "work-country": canSetCountry ? <WorkCountrySettings initial={country} locale={locale} options={workCountryOptions(locale)} /> : undefined,
     "case-management-settings": <CaseManagementSettings initialMode={mode} />,
     usuarios: <UsersAdminPanel
@@ -164,6 +170,8 @@ export default async function ConfiguracionPage() {
     </section>,
     "cuenta-personal": <PersonalSettingsIndex locale={locale} />,
     "preferencias-altazor": visibility.assistant ? <AltazorPreferencesPanel locale={locale} /> : undefined,
+    "autorizaciones-escritorio": visibility.assistant ? <ComputerAuthorizationSettings /> : undefined,
+    "cuentas-conectadas": visibility.assistant ? <ConnectedAccountsPanel locale={locale} canManage={canManage} /> : undefined,
     comunicaciones: visibility.communications ? <section id="comunicaciones" className="panel space-y-3 p-5">
       <h3 className="text-lg font-semibold">{tr("Correo y mensajes", "Mail and messages")}</h3>
       <p className="max-w-prose text-sm text-[var(--ink-soft)]">{tr("Conecta tu buzón para revisar avisos judiciales y vincularlos a tus causas.", "Connect your mailbox to review court notices and link them to your matters.")}</p>
@@ -177,7 +185,8 @@ export default async function ConfiguracionPage() {
 
   return (
     <div className={`${styles.area} space-y-6`} data-settings-workspace>
-      <ModuleHeader artwork="settings"
+      <ModuleHeader
+        artwork="settings"
         eyebrow={h.eyebrow}
         title={canManage ? h.title : dict.nav.settings}
         subtitle={canManage ? h.subtitle : tr("Ajusta tu cuenta, tus avisos y las herramientas que usas.", "Adjust your account, notifications and tools.")}

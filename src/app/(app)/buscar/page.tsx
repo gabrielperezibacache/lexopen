@@ -128,7 +128,8 @@ export default function SearchPage() {
 
   return (
     <div className="unified-search-page">
-      <ModuleHeader artwork="research"
+      <ModuleHeader
+        artwork="research"
         eyebrow={h.eyebrow}
         title={h.title}
         subtitle={h.subtitle}

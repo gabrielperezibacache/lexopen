@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { WhatsAppLinkPanel } from "./WhatsAppLinkPanel";
 import { apiMutation } from "@/lib/api-mutation";
 
 type MatrizRow = {
@@ -170,6 +171,7 @@ export function NotificationPreferencesPanel() {
         </label>
       </section>
 
+      <WhatsAppLinkPanel active={state.canales.some(c => c.canal === "whatsapp" && c.estado === "activo")} onChanged={load} />
       <section className="panel space-y-3 rounded-3xl p-5">
         <h2 className="font-semibold">Matriz evento × canal</h2>
         <div className="overflow-x-auto">
@@ -180,6 +182,7 @@ export function NotificationPreferencesPanel() {
                 <th className="py-2 pr-3 font-medium">Email</th>
                 <th className="py-2 pr-3 font-medium">Telegram</th>
                 <th className="py-2 font-medium">Push</th>
+                <th className="py-2 font-medium">WhatsApp</th>
               </tr>
             </thead>
             <tbody>
@@ -193,7 +196,7 @@ export function NotificationPreferencesPanel() {
                       </span>
                     )}
                   </td>
-                  {(["email", "telegram", "push"] as const).map((canal) => (
+                  {(["email", "telegram", "push", "whatsapp"] as const).map((canal) => (
                     <td key={canal} className="py-2 pr-3">
                       <select
                         className="select min-w-[9rem]"
@@ -209,7 +212,7 @@ export function NotificationPreferencesPanel() {
                         }}
                       >
                         {MODOS.filter(
-                          (m) => row.apagable || m.value !== "off"
+                          (m) => canal === "whatsapp" || row.apagable || m.value !== "off"
                         ).map((m) => (
                           <option key={m.value} value={m.value}>
                             {m.label}

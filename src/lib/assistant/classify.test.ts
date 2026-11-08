@@ -78,12 +78,27 @@ async function testExplicitAltazorDesktopReadWinsBeforeModel() {
   }
 }
 
+async function testAltazorPromptHonorsSourceScope() {
+  const prompts: string[] = [];
+  const capturingModel: typeof askLlm = async (input) => {
+    prompts.push(input.messages[1].content);
+    return { source: "llm", content: JSON.stringify({ intents: [{ toolId: "respuesta.libre", confidence: 1, slots: {} }] }), requireApproval: false, provider: "custom", model: "scope-fixture" };
+  };
+  const input = normalizeAssistantInput("Explica el argumento del pasaje seleccionado", NOW);
+  await classifyIntents(input, { altazorContext: true, askLlm: capturingModel, assistantLlmMode: "remote_allowed" });
+  await classifyIntents(input, { askLlm: capturingModel, assistantLlmMode: "remote_allowed" });
+  assert.match(prompts[0], /Restricciones del ámbito de esta conversación de Altazor/);
+  assert.match(prompts[0], /buscar, causa.buscar, documento.resumir, documento.clasificar y jurisprudencia.brief no son lecturas operativas disponibles/);
+  assert.doesNotMatch(prompts[1], /Restricciones del ámbito de esta conversación de Altazor/, "source-selection restrictions do not disable legacy planner capabilities globally");
+}
+
 async function main() {
   await testLocalOnlyNeverCallsLlm();
   await testForceLocalNeverCallsLlm();
   await testRemoteAllowedStillCallsLlm();
   await testPromptAlwaysReturned();
   await testExplicitAltazorDesktopReadWinsBeforeModel();
+  await testAltazorPromptHonorsSourceScope();
   console.log("assistant/classify.test.ts OK");
 }
 

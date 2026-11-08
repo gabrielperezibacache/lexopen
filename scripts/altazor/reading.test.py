@@ -1,5 +1,6 @@
 """Offline regressions for bounded workspace extraction; never reads user data."""
 import importlib.util
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -60,6 +61,19 @@ class WorkspaceReading(unittest.TestCase):
                 archive.writestr('word/document.xml', '<!DOCTYPE foo [<!ENTITY x SYSTEM "file:///etc/passwd">]><document><t>&x;</t></document>')
             with self.assertRaises(reader.ReadingError):
                 reader.read_document(options('external.docx'), root)
+
+    def test_imported_documents_keep_their_verified_hash_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data = b'Verified selected file'
+            digest = hashlib.sha256(data).hexdigest()
+            folder = root / 'imports' / digest; folder.mkdir(parents=True)
+            file = folder / 'fixture.txt'; file.write_bytes(data)
+            relative = f'imports/{digest}/fixture.txt'
+            self.assertEqual(reader.read_document(options(relative), root)['text'], data.decode())
+            file.write_bytes(b'CHANGED_CONTENT_MUST_NOT_BE_RETURNED')
+            with self.assertRaises(reader.ReadingError):
+                reader.read_document(options(relative), root)
 
 
 if __name__ == '__main__':

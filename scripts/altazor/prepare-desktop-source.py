@@ -68,15 +68,16 @@ def prepare_desktop_source(checkout, output, profile=PROFILE):
         recipe = recipe.replace(step, "", 1)
     recipe = "# Desktop recipe modified by LexOpen on 2026-11-05. See licenses/changes.txt.\n" + recipe
     files["Dockerfile"] = (recipe.encode() + b"\n" + (RECIPE / "Dockerfile.suffix").read_bytes(), 0o644)
-    for name in ("check.py", "managed-install.sh", "reading.py", "browser-read.js"):
+    for name in ("check.py", "managed-install.sh", "reading.py", "browser-read.js", "desktop-items-0.conf"):
         files[f".lexopen-desktop-profile/{name}"] = ((RECIPE / name).read_bytes(), 0o644)
+    files[".lexopen-desktop-profile/wallpaper.png"] = ((REPO / "public/branding/lexopen-desktop-midnight-2560.png").read_bytes(), 0o644)
     files["licenses/original.Dockerfile"] = (original, 0o644)
     files["licenses/lexopen.txt"] = ((REPO / "LICENSE").read_bytes(), 0o644)
     files["licenses/changes.txt"] = (
         (f"Original desktop source revision {profile['sourceCommit']}\n"
          "Recipe modified by LexOpen on 2026-11-05. The original license and Dockerfile are retained here.\n"
          "This context includes the desktop source recipe and scripts. It substitutes Debian system fonts and adds\n"
-         "office tools, OCR, PDF inspection, audio conversion and a local smoke check. Docker fetches dependencies\n"
+         "office tools, OCR, PDF inspection, audio conversion, the LexOpen wallpaper and a local smoke check. Docker fetches dependencies\n"
          "during the local build. This context does not contain a compiled desktop image or gateway.\n").encode(),
         0o644,
     )

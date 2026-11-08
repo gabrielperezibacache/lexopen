@@ -1,0 +1,107 @@
+{
+  "views": 20,
+  "engines": [
+    "Chromium",
+    "WebKit"
+  ],
+  "noInteractionBeforePlayback": true,
+  "allPlaying": true,
+  "allMuted": true,
+  "allInline": true,
+  "allAtRate08": true,
+  "desktopControlHidden": true,
+  "overflow": [],
+  "javascriptErrors": [],
+  "backgroundChecks": [
+    {
+      "file": "chromium-mis-causas-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-mis-causas-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-mis-causas-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-mis-causas-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-dark-mobile.png",
+      "backgroundDelta": 0
+    }
+  ],
+  "functionalTests": "10 passed (Chromium)",
+  "typeScript": "global noEmit passed",
+  "eslint": "affected components and tests passed",
+  "timing": {
+    "initialDelayMs": 900,
+    "restBetweenCyclesMs": 14000,
+    "fadeMs": 240
+  },
+  "scope": "Local dummy-data browser verification; visibility, data saving and blocked autoplay are simulated in the functional tests.",
+  "deployed": false
+}

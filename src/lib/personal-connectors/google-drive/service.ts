@@ -7,7 +7,7 @@ import { isAdmin } from "@/lib/auth/rbac";
 import type { GoogleConfig } from "@/lib/integrations/google";
 import type { ConnectorActor } from "../linkedin/account";
 import { ConnectorError, constantEqual, digest, randomToken, seal, unseal } from "../core";
-import { personalDriveConfig, requirePersonalDriveConfig, driveOrigin, PERSONAL_DRIVE_PROVIDER as provider, PERSONAL_DRIVE_SCOPES as scopes, PERSONAL_DRIVE_CALLBACK, type DriveOptions } from "./config";
+import { canReuseWorkspaceGoogleApp, personalDriveConfig, requirePersonalDriveConfig, driveOrigin, PERSONAL_DRIVE_PROVIDER as provider, PERSONAL_DRIVE_SCOPES as scopes, PERSONAL_DRIVE_CALLBACK, type DriveOptions } from "./config";
 import { driveProviderJson, driveIdentity, driveToken, driveExpiry, exactDriveScopes } from "./transport";
 type Db=Prisma.TransactionClient;
 type Binding={state:string;verifier:string;nonce:string;configurationBinding:string;accountVersion:string|null};
@@ -35,9 +35,18 @@ export async function personalDriveConnectionStatus(ownerId:string,options:Drive
   if(config.configured&&row)try{const grant=grantFor(row,config,actor.sessionVersion);connected=row.status==="connected"||row.status==="refreshing"&&Date.now()-row.updatedAt.getTime()<30_000;id=connected?connectionId(row,grant):null;if(!connected)reason="La renovación no se completó. Vuelva a conectar su cuenta.";}catch{reason="Vuelva a conectar su cuenta para renovar el permiso de lectura.";}
   return{connected,configured:config.configured,label:connected?row?.name||"Mi cuenta de Google":"Mi cuenta de Google",email:connected?row?.email||null:null,connectionId:id,scopes:connected?[...scopes]:[],reason:connected?null:reason,lastVerifiedAt:connected?row?.lastVerifiedAt?.toISOString()||null:null,canAdmin:operator(actor)};
 }
-export async function personalDriveSetupStatus(actor:ConnectorActor,options:DriveOptions={}){
-  const current=await sessionActor(actor,options.client||prisma);if(!operator(current))throw new ConnectorError("forbidden","La aplicación de Google la prepara el administrador una sola vez.",403);
-  const config=await personalDriveConfig(options);return{configured:config.configured,source:config.source,canEdit:config.source!=="environment",callbackUri:config.redirectUri||null,callbackPath:PERSONAL_DRIVE_CALLBACK,reason:config.reason,registrationUrl:"https://console.cloud.google.com/auth/clients"};
+export async function personalDriveSetupStatus(actor:ConnectorActor,options:DriveOptions={},displayOrigin?:string){
+  const db = options.client || prisma;
+  const current = await sessionActor(actor, db);
+  if (!operator(current)) throw new ConnectorError("forbidden", "La aplicación de Google la prepara el administrador una sola vez.", 403);
+  const config = await personalDriveConfig(options, db);
+  const canEdit = config.source !== "environment";
+  const canReuseAltazorApp = canEdit && await canReuseWorkspaceGoogleApp(options, db, displayOrigin);
+  return {
+    configured: config.configured, source: config.source, canEdit, canReuseAltazorApp,
+    callbackUri: config.redirectUri || (displayOrigin ? displayOrigin + PERSONAL_DRIVE_CALLBACK : null),
+    callbackPath: PERSONAL_DRIVE_CALLBACK, reason: config.reason, registrationUrl: "https://console.cloud.google.com/auth/clients",
+  };
 }
 export async function savePersonalDriveSetup(actor:ConnectorActor,input:{useAltazorApp:boolean;clientId?:string;clientSecret?:string;confirmed:true},origin:string,options:DriveOptions={}){
   const db=options.client||prisma,current=await sessionActor(actor,db),appUrl=driveOrigin(origin);if(!operator(current))throw new ConnectorError("forbidden","Sólo el administrador puede preparar la aplicación de Google.",403);
@@ -45,8 +54,16 @@ export async function savePersonalDriveSetup(actor:ConnectorActor,input:{useAlta
   if(input.confirmed!==true)throw new ConnectorError("confirmation_required","Confirme la aplicación y su dirección de retorno.");
   if(!input.useAltazorApp&&(!input.clientId?.trim()||!input.clientSecret?.trim()||input.clientId.length>1000||input.clientSecret.length>4000||/[\r\n]/.test(input.clientId+input.clientSecret)))throw new ConnectorError("setup_invalid","Complete los datos de la aplicación de Google.");
   const value=input.useAltazorApp?{useAltazorApp:true,appUrl}:{credentialsEnc:seal({clientId:input.clientId!.trim(),clientSecret:input.clientSecret!.trim(),appUrl},"google-drive:operator:v1")};
-  await db.$transaction(async tx=>{const live=await sessionActor(actor,tx);if(!operator(live))throw new ConnectorError("forbidden","Sus permisos cambiaron.",403);await tx.integrationConfig.upsert({where:{provider:"personal-drive-oauth"},create:{provider:"personal-drive-oauth",enabled:true,configJson:JSON.stringify(value)},update:{enabled:true,configJson:JSON.stringify(value)}});await tx.personalOAuthAttempt.updateMany({where:{provider,phase:{in:["pending","exchanging","ready"]}},data:{phase:"cancelled",resultEnc:null,errorCode:"configuration_changed"}});});
-  return personalDriveSetupStatus(actor,options);
+  await db.$transaction(async tx => {
+    const live = await sessionActor(actor, tx);
+    if (!operator(live)) throw new ConnectorError("forbidden", "Sus permisos cambiaron.", 403);
+    if (input.useAltazorApp && !await canReuseWorkspaceGoogleApp(options, tx, appUrl)) {
+      throw new ConnectorError("drive_shared_app_unavailable", "Prepara primero Google Workspace para esta dirección o usa una aplicación de Drive independiente.", 409);
+    }
+    await tx.integrationConfig.upsert({ where: { provider: "personal-drive-oauth" }, create: { provider: "personal-drive-oauth", enabled: true, configJson: JSON.stringify(value) }, update: { enabled: true, configJson: JSON.stringify(value) } });
+    await tx.personalOAuthAttempt.updateMany({ where: { provider, phase: { in: ["pending", "exchanging", "ready"] } }, data: { phase: "cancelled", resultEnc: null, errorCode: "configuration_changed" } });
+  });
+  return personalDriveSetupStatus(actor, options, appUrl);
 }
 export async function startPersonalDriveOAuth(actor:ConnectorActor,input:{confirmed:true;requestId:string},origin:string,options:DriveOptions={}){
   const db=options.client||prisma;await sessionActor(actor,db);const config=requirePersonalDriveConfig(await personalDriveConfig(options)),id=digest(`${provider}:${actor.id}:${input.requestId}`);

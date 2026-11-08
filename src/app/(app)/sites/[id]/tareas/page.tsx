@@ -80,7 +80,7 @@ export default async function SiteTasksPage({ params }: Params) {
                 <p className="mt-2 text-sm text-[var(--ink-soft)]/80">{task.description}</p>
               )}
             </div>
-            <TaskStatusButton taskId={task.id} siteId={site.id} status={task.status} />
+            <TaskStatusButton taskId={task.id} siteId={site.id} status={task.status} updatedAt={task.updatedAt.toISOString()} />
           </div>
         ))}
         {tasks.length === 0 && (

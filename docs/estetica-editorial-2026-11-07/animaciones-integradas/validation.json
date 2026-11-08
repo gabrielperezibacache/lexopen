@@ -1,0 +1,165 @@
+{
+  "animatedViews": 16,
+  "staticViews": 8,
+  "webkitViews": 2,
+  "imageFailures": [],
+  "overflow": [],
+  "javascriptErrors": [],
+  "prematureVideoRequests": 0,
+  "allMuted": true,
+  "allControlsAtLeast44px": true,
+  "cornerChecks": [
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "light",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "light",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "light",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "light",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "dark",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "dark",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "light",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "mobile",
+      "videoCornerDelta": 0,
+      "posterCornerDelta": 0
+    },
+    {
+      "engine": "WebKit",
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "videoCornerDelta": 0
+    },
+    {
+      "engine": "WebKit",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "videoCornerDelta": 0
+    }
+  ],
+  "originalFlowVideosUnchanged": {
+    "expedientes-flow-v2.mp4": true,
+    "libro-contable-flow-v1.mp4": true,
+    "plazos-flow-v1.mp4": true,
+    "investigacion-motion-flow-v1.mp4": true
+  },
+  "typeScript": "passed (global noEmit)",
+  "eslint": "passed (affected TSX components)",
+  "playbackTests": "5 passed (Chromium)",
+  "deployment": "not performed"
+}

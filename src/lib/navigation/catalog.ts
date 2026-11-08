@@ -4,8 +4,9 @@ import { isClientAllowedPagePath } from "../auth/client-paths";
 import { isRole, PORTAL_ROLES, STAFF_ROLES } from "../auth/roles";
 import { isAdmin } from "../auth/rbac";
 import { COMMUNICATIONS_SETTINGS_PATH, MAIL_SETTINGS_PATH } from "../mail/settings-location";
+import { HOST_NAVIGATION_SECTIONS, type HostNavigationSection } from "./host-sections";
 
-export type NavigationAreaId = "jornada" | "causas" | "agenda" | "biblioteca" | "academico" | "clientes" | "estudio";
+export type NavigationAreaId = "jornada" | HostNavigationSection;
 export type NavigationIcon = "home" | "cases" | "calendar" | "library" | "clients" | "inbox" | "studio" | "files" | "minutes" | "deadlines" | "tasks" | "hearings" | "research" | "portal" | "messages" | "billing" | "people" | "spaces" | "workflows" | "settings" | "integrations" | "audit" | "assistant" | "search" | "notifications" | "account" | "monitor";
 export type NavigationEntry = {
   id: string;
@@ -72,17 +73,19 @@ const ENTRIES: readonly CatalogEntry[] = [
 ];
 
 /** Discovery only: pages and APIs remain responsible for enforcing access and scope. */
-export function buildNavigation(subject: PermissionSubject | null | undefined, options: { caseManagementMode?: CaseManagementMode; communicationsAvailable?: boolean } = {}): NavigationModel {
+export function buildNavigation(subject: PermissionSubject | null | undefined, options: { caseManagementMode?: CaseManagementMode; communicationsAvailable?: boolean; visibleSections?: readonly HostNavigationSection[] } = {}): NavigationModel {
   if (!subject || !isRole(subject.role)) return { mode: "none", areas: [], entries: [], utilities: [], shortcuts: [] };
   const role = subject.role;
   const pjudEnabled = options.caseManagementMode === "pjud_cl";
   const staff = (STAFF_ROLES as readonly string[]).includes(role);
   const portal = (PORTAL_ROLES as readonly string[]).includes(role);
+  const visibleSections = new Set(options.visibleSections ?? HOST_NAVIGATION_SECTIONS);
   const allowed = ENTRIES.filter(entry => {
     if (["pjud", "monitoreo", "mis-causas"].includes(entry.id) && !pjudEnabled) return false;
     if (entry.id === "mail-settings" && !options.communicationsAvailable) return false;
     if (portal) return (entry.access === "signed-in" || entry.access === "portal") && isClientAllowedPagePath(entry.href);
     if (!staff || entry.access === "portal" || (entry.access === "admin" && !isAdmin(subject))) return false;
+    if (entry.area && entry.area !== "jornada" && !visibleSections.has(entry.area)) return false;
     return !entry.capability || canSome(subject, entry.capability);
   }).map(({ id, href, labelKey, icon, area, groupKey, keywords }) => ({ id, href, labelKey: id === "causas" && pjudEnabled ? "nav.manualCases" : labelKey, icon, area, groupKey, keywords }));
   const utilities = allowed.filter(entry => !entry.area);

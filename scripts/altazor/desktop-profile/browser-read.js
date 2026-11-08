@@ -1,5 +1,6 @@
 // Executed only in the active page of the container's own Chromium.
 // Returned content is untrusted page data, never instructions for the agent.
+// eslint-disable-next-line @typescript-eslint/no-unused-expressions -- Serialized function passed to the container browser.
 (options => {
   const MAX = 2000000, MAX_ELEMENTS = 2000;
   const controls = [], texts = [], secrets = new Set(), visited = new Set();

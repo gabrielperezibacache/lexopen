@@ -1,3 +1,4 @@
+import { getWorkCountry } from "@/lib/config/work-country";
 /**
  * Orquestación del turno del asistente: normalize → classify → resolve
  * entidades → plan ordenado → (confirmación humana en escrituras) → execute.
@@ -17,6 +18,7 @@ import { resolveAcademicToolInput } from "./tools/academic";
 import { resolveWorkflowToolInput } from "./tools/workflow";
 import { resolveLibrarySyncInput } from "./tools/library-sync";
 import { resolveIcaroToolInput } from "./tools/icaro";
+import { resolveDriveToolInput } from "./tools/drive";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import type { PermissionSubject } from "@/lib/auth/permissions";
 import type {
@@ -99,6 +101,9 @@ function buildToolInput(
   switch (toolId) {
     case "icaro.listar": return {};
     case "icaro.delegar": return { icaroId: slots.icaroId, icaroName: slots.icaroName, instruction: slots.instruction || texto, useMemory: slots.useMemory === true };
+    case "drive.estado": return {};
+    case "drive.crearCarpeta": return { nombre: slots.nombre };
+    case "drive.guardarDocumento": return { documentoId: slots.documentoId, documento: slots.documento };
     case "academia.listar": return {};
     case "academia.crear": return { titulo: slots.titulo, tipo: slots.tipo || "research" };
     case "academia.preparar": return { trabajoId: slots.trabajoId, mode: slots.mode || "synthesis", instruction: slots.instruction || texto };
@@ -257,7 +262,7 @@ export async function runAssistantTurn(
   const streamEvents: AssistantStreamEvent[] = [];
   streamEvents.push({ type: "status", message: "Analizando su solicitud…" });
 
-  const normalized = normalizeAssistantInput(input.text, input.now);
+  const normalized = normalizeAssistantInput(input.text, input.now, await getWorkCountry());
   const policy = await getAssistantFirmPolicy();
   const classification = await classifyIntents(normalized, {
     userId: input.user.id,
@@ -314,6 +319,7 @@ export async function runAssistantTurn(
     const academic = intent.toolId.startsWith("academia."), workflow = intent.toolId.startsWith("audiencia.") || intent.toolId.startsWith("escrito.");
     try {
       if (intent.toolId === "icaro.delegar") toolInput = await resolveIcaroToolInput(toolInput, ctx, input.text);
+      if (intent.toolId.startsWith("drive.")) toolInput = await resolveDriveToolInput(intent.toolId, toolInput, ctx);
       if (academic) toolInput = await resolveAcademicToolInput(intent.toolId, toolInput, ctx);
       if (workflow) toolInput = await resolveWorkflowToolInput(intent.toolId, toolInput, ctx);
       if (intent.toolId === "biblioteca.listar" || intent.toolId === "sincronizacion.estado") toolInput = await resolveLibrarySyncInput(intent.toolId,toolInput,ctx);

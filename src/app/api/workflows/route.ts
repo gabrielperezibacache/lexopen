@@ -1,10 +1,10 @@
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
-import { requireSiteMutationAccess } from "@/lib/auth/access";
-import { siteAccessWhere as scopedsiteAccessWhere, siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
+import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import { requestCommandKey } from "@/lib/command-execution";
+import { workflowCommandSchema, startWorkflowCommand, advanceWorkflowCommand, createWorkflowCommand } from "@/lib/workflows/commands";
 
 export async function GET() {
   try {
@@ -30,123 +30,14 @@ export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
     const user = await requireStaff();
-    const body = await req.json();
-
-    if (body.action === "start" && body.workflowId) {
-      const workflow = await prisma.workflow.findFirst({
-        where: { AND: [scopedsiteRelatedWhere(user), { id: body.workflowId }] },
-        select: { id: true },
-      });
-      if (!workflow) {
-        return NextResponse.json({ error: "Workflow no encontrado" }, { status: 404 });
-      }
-      const instance = await prisma.workflowInstance.create({
-        data: {
-          workflowId: body.workflowId,
-          status: "pending",
-          currentStep: 0,
-          payloadJson: JSON.stringify(body.payload || {}),
-          actorId: user.id,
-        },
-      });
-      return NextResponse.json(instance, { status: 201 });
-    }
-
-    if (body.action === "advance" && body.instanceId) {
-      const inst = await prisma.workflowInstance.findUnique({
-        where: { id: body.instanceId },
-        include: { workflow: true },
-      });
-      if (!inst) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-      await requireSiteMutationAccess(inst.workflow.siteId, user);
-      if (inst.status === "approved" || inst.status === "rejected") {
-        return NextResponse.json({ error: "El workflow ya terminó" }, { status: 409 });
-      }
-      let steps: Array<{ name: string; role?: string }> = [];
-      try {
-        const parsed = JSON.parse(inst.workflow.stepsJson);
-        steps = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return NextResponse.json(
-          { error: "Definición de workflow inválida" },
-          { status: 400 }
-        );
-      }
-      const current = steps[inst.currentStep];
-      if (!current) {
-        return NextResponse.json({ error: "Paso de workflow inválido" }, { status: 409 });
-      }
-      // Administering the Host does not replace the professional role required
-      // by a workflow step. Existing explicit admin steps remain admin-only.
-      if (current.role && current.role !== user.role) {
-        return NextResponse.json(
-          { error: "Este paso requiere otro rol" },
-          { status: 403 }
-        );
-      }
-      const next = inst.currentStep + 1;
-      const done = next >= steps.length || body.decision === "reject";
-      const updated = await prisma.workflowInstance.update({
-        where: { id: inst.id },
-        data: {
-          currentStep: done ? inst.currentStep : next,
-          status:
-            body.decision === "reject"
-              ? "rejected"
-              : done
-                ? "approved"
-                : "running",
-          actorId: user.id,
-        },
-      });
-      await writeAuditStrict({
-        actorId: user.id,
-        action: "workflow.advance",
-        entityType: "WorkflowInstance",
-        entityId: updated.id,
-        after: {
-          workflowId: inst.workflowId,
-          status: updated.status,
-          currentStep: updated.currentStep,
-          decision: body.decision,
-        },
-      });
-      return NextResponse.json(updated);
-    }
-
-    if (body.action === "create") {
-      if (typeof body.name !== "string" || !body.name.trim() || !body.siteId) {
-        return NextResponse.json(
-          { error: "Nombre y site son obligatorios" },
-          { status: 400 }
-        );
-      }
-      const site = await prisma.site.findFirst({
-        where: { AND: [scopedsiteAccessWhere(user), { id: body.siteId }] },
-        select: { id: true },
-      });
-      if (!site) {
-        return NextResponse.json({ error: "Site no encontrado" }, { status: 404 });
-      }
-      await requireSiteMutationAccess(String(body.siteId), user);
-      const wf = await prisma.workflow.create({
-        data: {
-          name: body.name,
-          description: body.description || null,
-          siteId: body.siteId,
-          triggerType: body.triggerType || "manual",
-          stepsJson: JSON.stringify(
-            body.steps || [
-              { name: "Revisión abogado", role: "abogado" },
-              { name: "Aprobación socio", role: "socio" },
-            ]
-          ),
-        },
-      });
-      return NextResponse.json(wf, { status: 201 });
-    }
-
-    return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
+    const body = await parseBody(req, workflowCommandSchema);
+    const key = requestCommandKey(req, `workflow.${body.action}`);
+    const result = body.action === "start"
+      ? await startWorkflowCommand(user, body, key)
+      : body.action === "advance"
+        ? await advanceWorkflowCommand(user, body, key)
+        : await createWorkflowCommand(user, body, key);
+    return NextResponse.json(result, { status: body.action === "advance" ? 200 : 201 });
   } catch (e) {
     return handleRouteError(e);
   }

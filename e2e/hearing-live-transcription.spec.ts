@@ -1,10 +1,11 @@
-import { chromium, expect, test, type APIResponse, type Locator, type Page } from "@playwright/test";
+import { chromium, expect, test, type APIResponse, type Locator, type Page, type Browser } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { loginAs } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import type { HearingLiveAudioView } from "../src/lib/audio/live-types";
 import type { HearingLiveMutation } from "../src/lib/hearings/live-types";
@@ -24,7 +25,7 @@ async function json<T>(response: Pick<APIResponse, "status" | "text" | "json">, 
   expect(response.status(), (await response.text()).slice(0, 1000)).toBe(status); return response.json();
 }
 async function createDesk(page: Page, title: string) {
-  return json<{ id: string }>(await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title } }), 201);
+  return json<{ id: string }>(await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title } }), 201);
 }
 async function openLive(page: Page, workspaceId: string) {
   await page.goto(`/causas/${causaId}/audiencias?mesa=${workspaceId}`);
@@ -43,11 +44,13 @@ async function screenshot(page: Page, element: Locator, file: string, mobile = f
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.screenshot({ path: file, animations: "disabled" });
 }
-async function microphonePage() {
+async function microphonePage(profile?: string) {
   // Native Chromium MediaRecorder and synthetic input device: no real microphone
   // and no claim to test recognition accuracy. The local HTTP fixture supplies text.
-  const browser = await chromium.launch({ args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] });
-  const context = await browser.newContext({ baseURL, permissions: ["microphone"], locale: "es-CL", viewport: { width: 1440, height: 1100 }, reducedMotion: "reduce" });
+  const args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"];
+  const options = { baseURL, permissions: ["microphone"], locale: "es-CL", viewport: { width: 1440, height: 1100 }, reducedMotion: "reduce" as const };
+  const browser = profile ? undefined : await chromium.launch({ args });
+  const context = profile ? await chromium.launchPersistentContext(profile, { ...options, args }) : await browser!.newContext(options);
   await context.addInitScript(() => {
     const media = navigator.mediaDevices;
     if (!media) return;
@@ -59,7 +62,7 @@ async function microphonePage() {
       return stream;
     };
   });
-  return { browser, page: await context.newPage() };
+  return { browser: { close: () => browser ? browser.close() : context.close(), newContext: (options?: Parameters<Browser["newContext"]>[0]) => (browser || context.browser()!).newContext(options) }, page: await context.newPage() };
 }
 async function microphoneEnded(page: Page) {
   await expect.poll(() => page.evaluate(() => {
@@ -105,7 +108,7 @@ test.afterAll(async () => {
     await Promise.all(storedKeys.map(key => rm(path.join(process.env.STORAGE_PATH || "storage", key), { force: true })));
     if (priorConfig) await db.integrationConfig.upsert({ where: { provider: "transcription" }, create: { provider: "transcription", ...priorConfig }, update: priorConfig });
     else await db.integrationConfig.deleteMany({ where: { provider: "transcription" } });
-  } finally { if (provider) await new Promise<void>(resolve => provider.close(() => resolve())); await db.$disconnect(); }
+  } finally { if (provider) { provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve())); } await db.$disconnect(); }
 });
 
 test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y escrito con citas", async ({ browserName }, info) => {
@@ -113,9 +116,9 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
   expect(browserName).toBe("chromium");
   const { browser, page } = await microphonePage();
   try {
-    await loginAs(page, email);
+    await loginAs(page, email); await authenticateApiRequests(page);
     const desk = await createDesk(page, "Transcripción y revisión ficticias");
-    const reference = await json<{ book: { id: string } }>(await page.request.post("/api/books", { multipart: {
+    const reference = await json<{ book: { id: string } }>(await apiRequest(page).post("/api/books", { multipart: {
       requestId: randomUUID(), title: "Fuente ficticia para continuidad de captura", author: "Material de prueba", preserveOriginal: "true",
       file: { name: "continuidad-ficticia.txt", mimeType: "text/plain", buffer: Buffer.from("El comprobante ficticio es un antecedente que debe contrastarse con la declaración. Este texto no es una obra jurídica publicada.") },
     } }), 201);
@@ -167,7 +170,9 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
     expect((await verified).status()).toBe(200);
     await fragment.getByRole("button", { name: "Conversar", exact: true }).click();
     await page.getByLabel("Qué quiere revisar", { exact: true }).fill("Contrastar el comprobante ficticio con lo escuchado");
+    const savedPassages = page.waitForResponse(response => response.url().endsWith(`${live(desk.id).replace(/\/live$/, "")}/chat`) && response.request().method() === "POST");
     await page.getByRole("button", { name: "Guardar pasajes", exact: true }).click();
+    expect((await savedPassages).status()).toBe(200);
     await expect(page.locator(".hearing-turn")).toContainText("sin llamada a IA");
     await captureContinues();
     await expect(page.getByTestId("hearing-capture-status").getByRole("button", { name: "Detener captura", exact: true })).toBeVisible();
@@ -216,7 +221,7 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
       const converting = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === `${live(desk.id)}/promotions`);
       await promotion.getByRole("button", { name: "Confirmar conversión", exact: true }).click();
       const response = await converting, result = await json<HearingPromotionResult>(response, 201); results.push(result);
-      const replay = await json<HearingPromotionResult>(await page.request.post(`${live(desk.id)}/promotions`, { data: response.request().postDataJSON() }), 201);
+      const replay = await json<HearingPromotionResult>(await apiRequest(page).post(`${live(desk.id)}/promotions`, { data: response.request().postDataJSON() }), 201);
       expect(replay.id).toBe(result.id); expect(replay.reused).toBeTruthy();
       if (target !== "writing") await promotion.getByRole("button", { name: "Volver al registro", exact: true }).click();
     }
@@ -253,13 +258,14 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
 
 test("protege enlaces y Atrás detiene la captura con recuperación del tramo sin envío automático", async () => {
   test.setTimeout(120_000);
-  const { browser, page } = await microphonePage();
+  const profile = await mkdtemp(path.join(tmpdir(), "lexopen-audio-profile-"));
+  let { browser, page } = await microphonePage(profile);
   try {
-    await loginAs(page, email); const desk = await createDesk(page, "Retorno ficticio a captura pendiente");
+    await loginAs(page, email); await authenticateApiRequests(page); const desk = await createDesk(page, "Retorno ficticio a captura pendiente");
     await page.goto(`/causas/${causaId}`);
     await page.getByRole("link", { name: "Abrir mesa de audiencia", exact: true }).click();
     await page.getByRole("button", { name: "En vivo", exact: true }).click();
-    const audio = page.getByTestId("hearing-live-audio");
+    let audio = page.getByTestId("hearing-live-audio");
     await startCapture(audio, "Tramo ficticio aún sin enviar");
     // Produce native audio before leaving, without waiting for the 15 s upload.
     await page.waitForTimeout(1200);
@@ -277,17 +283,34 @@ test("protege enlaces y Atrás detiene la captura con recuperación del tramo si
     await expect(audio.getByRole("button", { name: "Descargar audio pendiente", exact: true })).toBeVisible();
     expect(providerCalls).toBe(calls);
     expect(await db.hearingLiveAudioClip.count({ where: { session: { workspaceId: desk.id } } })).toBe(0);
+    // A real reload discards module memory; recovery must come from IndexedDB.
+    page.once("dialog", dialog => void dialog.accept());
+    await page.reload();
+    await page.getByRole("button", { name: "En vivo", exact: true }).click();
+    await expect(audio.getByText(/Se recuperó audio pendiente/)).toBeVisible();
+    await expect(audio.getByRole("button", { name: "Descargar audio pendiente", exact: true })).toBeVisible();
+    expect(providerCalls).toBe(calls);
+    await expect(audio.getByRole("button", { name: "Detener captura", exact: true })).toHaveCount(0);
+    // Closing the browser and reopening the same temporary profile also loses
+    // all JS memory, while retaining only the durable pending recording.
+    await browser.close();
+    ({ browser, page } = await microphonePage(profile));
+    await loginAs(page, email); await authenticateApiRequests(page); await openLive(page, desk.id);
+    audio = page.getByTestId("hearing-live-audio");
+    await expect(audio.getByText(/Se recuperó audio pendiente/)).toBeVisible();
+    expect(providerCalls).toBe(calls);
+    await expect(audio.getByRole("button", { name: "Detener captura", exact: true })).toHaveCount(0);
     await audio.getByRole("button", { name: "Guardar tramo pendiente", exact: true }).click();
     await expect(audio.getByTestId("live-audio-clip").filter({ hasText: transcript }).first()).toBeVisible({ timeout: 30_000 });
-    expect(await page.evaluate(() => (window as unknown as { __lexopenSyntheticStreams: MediaStream[] }).__lexopenSyntheticStreams.length)).toBe(1);
-  } finally { await browser.close(); }
+    expect(await page.evaluate(() => (window as unknown as { __lexopenSyntheticStreams: MediaStream[] }).__lexopenSyntheticStreams.length)).toBe(0);
+  } finally { await browser.close(); await rm(profile, { recursive: true, force: true }); }
 });
 
 test("fallo del transcriptor: conserva audio, detiene el micrófono y permite reintentar", async () => {
   test.setTimeout(120_000); rejectProvider = true;
   const { browser, page } = await microphonePage();
   try {
-    await loginAs(page, email); const desk = await createDesk(page, "Recuperación ficticia de transcripción");
+    await loginAs(page, email); await authenticateApiRequests(page); const desk = await createDesk(page, "Recuperación ficticia de transcripción");
     await openLive(page, desk.id); const audio = page.getByTestId("hearing-live-audio");
     await startCapture(audio, "Captura ficticia con interrupción");
     const failed = audio.getByTestId("live-audio-clip").filter({ hasText: "Reintentar transcripción" }).first();
@@ -299,4 +322,53 @@ test("fallo del transcriptor: conserva audio, detiene el micrófono y permite re
     await expect(audio.getByTestId("live-audio-clip").filter({ hasText: transcript }).first()).toBeVisible();
     expect(await db.caseAudio.count({ where: { causaId, liveSessionId: { not: null } } })).toBe(before);
   } finally { rejectProvider = false; await browser.close(); }
+});
+
+test("almacenamiento local denegado mantiene el aviso y permite conservar el tramo en la causa", async () => {
+  test.setTimeout(60_000);
+  const { browser, page } = await microphonePage();
+  try {
+    await page.addInitScript(() => { Object.defineProperty(window, "indexedDB", { get() { throw new DOMException("Fictitious storage denial", "SecurityError"); } }); });
+    await loginAs(page, email); await authenticateApiRequests(page);
+    const desk = await createDesk(page, "Fallo ficticio de almacenamiento local"); await openLive(page, desk.id);
+    const audio = page.getByTestId("hearing-live-audio");
+    await expect(audio.getByRole("alert")).toContainText("La recuperación local no está disponible");
+    await startCapture(audio, "Tramo ficticio sin copia local");
+    await page.waitForTimeout(1200);
+    await audio.getByRole("button", { name: "Detener captura", exact: true }).click();
+    await expect(audio.getByRole("button", { name: "Descargar audio pendiente", exact: true })).toBeVisible();
+    await expect(audio.getByRole("alert")).toContainText("No se pudo conservar el tramo");
+    await audio.getByRole("button", { name: "Actualizar transcripción", exact: true }).click();
+    await expect(audio.getByRole("alert")).toContainText("No se pudo conservar el tramo");
+    await expect(audio.getByText(/La copia local no está confirmada/)).toBeVisible();
+    await audio.getByRole("button", { name: "Guardar tramo pendiente", exact: true }).click();
+    await expect(audio.getByTestId("live-audio-clip").filter({ hasText: transcript })).toBeVisible({ timeout: 30_000 });
+    expect(await db.hearingLiveAudioClip.count({ where: { session: { workspaceId: desk.id } } })).toBe(1);
+    await microphoneEnded(page);
+  } finally { await browser.close(); }
+});
+
+test("sesión cerrada oculta el tramo y permite recuperarlo al autenticarse de nuevo", async () => {
+  test.setTimeout(60_000);
+  const { browser, page } = await microphonePage();
+  try {
+    await loginAs(page, email); await authenticateApiRequests(page);
+    const desk = await createDesk(page, "Reautenticación ficticia de audio"); await openLive(page, desk.id);
+    const audio = page.getByTestId("hearing-live-audio");
+    await startCapture(audio, "Tramo ficticio previo al cierre de sesión");
+    await page.waitForTimeout(1200);
+    expect((await apiRequest(page).post("/api/auth/logout")).ok()).toBe(true);
+    const deniedUpload = page.waitForResponse(response => response.url().endsWith("/clips") && response.request().method() === "POST" && response.status() === 401);
+    await audio.getByRole("button", { name: "Detener captura", exact: true }).click();
+    await deniedUpload;
+    await expect(audio).not.toBeVisible();
+    expect(await db.hearingLiveAudioClip.count({ where: { session: { workspaceId: desk.id } } })).toBe(0);
+    const calls = providerCalls;
+    await loginAs(page, email); await authenticateApiRequests(page); await openLive(page, desk.id);
+    await expect(audio.getByText(/Se recuperó audio pendiente/)).toBeVisible();
+    expect(providerCalls).toBe(calls);
+    await audio.getByRole("button", { name: "Guardar tramo pendiente", exact: true }).click();
+    await expect(audio.getByTestId("live-audio-clip").filter({ hasText: transcript })).toBeVisible({ timeout: 30_000 });
+    expect(await db.hearingLiveAudioClip.count({ where: { session: { workspaceId: desk.id } } })).toBe(1);
+  } finally { await browser.close(); }
 });

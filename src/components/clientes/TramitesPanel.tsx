@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { labelTramiteEstado } from "@/lib/tramites";
 import {
@@ -11,12 +12,13 @@ import {
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiMutation } from "@/lib/api-mutation";
+import { operationKey, createSubmissionKeys } from "@/lib/client-submission-key";
 import { civilDateKey } from "@/lib/chile-time";
-import { calcularVencimiento } from "@/lib/plazos";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
 type Tramite = {
   id: string;
+  updatedAt?: string | Date;
   titulo: string;
   detalle: string | null;
   estado: string;
@@ -30,7 +32,7 @@ type Responsable = { id: string; name: string };
 function fmt(d: string | Date | null) {
   if (!d) return null;
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("es-CL");
+  return new Intl.DateTimeFormat("es-CL", { timeZone: "UTC" }).format(new Date(civilDateKey(date) + "T12:00:00.000Z"));
 }
 
 function toDateInput(d: string | Date | null) {
@@ -56,6 +58,12 @@ export function TramitesPanel({
 }) {
   const { t, dict } = useI18n();
   const router = useRouter();
+  const [aiError, setAiError] = useState("");
+  const keys = useRef(new Map<string, string>());
+  const createKeys = useRef(createSubmissionKeys(undefined, `tramite.create:${causaId}`));
+  const pendingCreate = useRef<{ body: string; key: string } | null>(null);
+  const [retryCreate, setRetryCreate] = useState(false);
+  function keyFor(value: unknown) { const k = JSON.stringify(value); if (!keys.current.has(k)) keys.current.set(k, operationKey()); return keys.current.get(k)!; }
   const [busy, setBusy] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -87,19 +95,21 @@ export function TramitesPanel({
     setBusy(true);
     const fd = new FormData(e.currentTarget);
     const form = e.currentTarget;
-    const result = await apiMutation(`/api/causas/${causaId}/tramites`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    if (!pendingCreate.current) {
+      const body = JSON.stringify({
         titulo: fd.get("titulo"),
         detalle: fd.get("detalle") || null,
         fechaLimite: fd.get("fechaLimite") || null,
         responsableId: String(fd.get("responsableId") || "") || null,
         estado: "pendiente",
-      }),
-    });
+      });
+      pendingCreate.current = { body, key: createKeys.current.forPayload(JSON.parse(body)) };
+    }
+    const result = await apiMutation(`/api/causas/${causaId}/tramites`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": pendingCreate.current.key }, body: pendingCreate.current.body });
     setBusy(false);
-    if (!result.ok) return;
+    if (!result.ok) { const uncertain = result.status === 0 || result.status >= 500; if (!uncertain) pendingCreate.current = null; setRetryCreate(uncertain); setAiError(result.error + (uncertain ? ". Reintente el mismo envío para comprobar su resultado." : "")); return; }
+    createKeys.current.complete(JSON.parse(pendingCreate.current.body));
+    pendingCreate.current = null; setRetryCreate(false); setAiError("");
     form.reset();
     router.refresh();
   }
@@ -108,14 +118,17 @@ export function TramitesPanel({
     id: string,
     body: Record<string, unknown>
   ) {
+    const version = tramites.find(t => t.id === id)?.updatedAt;
+    body = { ...body, ...(version ? { expectedUpdatedAt: new Date(version).toISOString() } : {}) };
     setBusy(true);
     const result = await apiMutation(`/api/tramites/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Idempotency-Key": keyFor({id,body}) },
       body: JSON.stringify(body),
     });
     setBusy(false);
-    if (!result.ok) return;
+    if (!result.ok) { setAiError(result.error); return; }
+    setAiError("");
     setEditingId(null);
     router.refresh();
   }
@@ -128,21 +141,27 @@ export function TramitesPanel({
     if (!pendingDeleteId) return;
     setBusy(true);
     const result = await apiMutation(`/api/tramites/${pendingDeleteId}`, {
-      method: "DELETE",
+      method: "DELETE", headers: { "Idempotency-Key": keyFor({delete:pendingDeleteId}) },
     });
     setBusy(false);
     setPendingDeleteId(null);
-    if (!result.ok) return;
+    if (!result.ok) { setAiError(result.error); return; }
+    setAiError("");
     router.refresh();
   }
 
   async function saveEdit(e: FormEvent<HTMLFormElement>, id: string) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const previous = tramites.find(item => item.id === id);
+    const enteredDate = String(fd.get("fechaLimite") || "");
+    const fechaLimite = previous && enteredDate === toDateInput(previous.fechaLimite)
+      ? previous.fechaLimite ? new Date(previous.fechaLimite).toISOString() : null
+      : enteredDate || null;
     await patchTramite(id, {
       titulo: fd.get("titulo"),
       detalle: fd.get("detalle") || null,
-      fechaLimite: fd.get("fechaLimite") || null,
+      fechaLimite,
       responsableId: String(fd.get("responsableId") || "") || null,
     });
   }
@@ -152,11 +171,12 @@ export function TramitesPanel({
     setBusy(true);
     const result = await apiMutation(`/api/causas/${causaId}/tramites`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Idempotency-Key": keyFor({templateId}) },
       body: JSON.stringify({ action: "apply-template", templateId }),
     });
     setBusy(false);
-    if (!result.ok) return;
+    if (!result.ok) { setAiError(result.error); return; }
+    keys.current.delete(JSON.stringify({templateId})); setAiError("");
     setTemplateId("");
     router.refresh();
   }
@@ -167,21 +187,17 @@ export function TramitesPanel({
     } | null;
     const items = data?.tramites?.filter((t) => t.titulo?.trim()) || [];
     if (!items.length) return;
-    setBusy(true);
+    setBusy(true); setAiError("");
     for (const item of items) {
-      const fechaLimite =
-        typeof item.diasLimite === "number" && item.diasLimite > 0
-          ? calcularVencimiento({
-              desde: new Date(),
-              dias: item.diasLimite,
-              tipoComputo: "habiles",
-            })
-              .toISOString()
-              .slice(0, 10)
-          : null;
-      await apiMutation(`/api/causas/${causaId}/tramites`, {
+      let fechaLimite: string | null = null;
+      if (typeof item.diasLimite === "number" && item.diasLimite > 0) {
+        const estimate = await apiMutation<{ vencimiento: string }>("/api/integrations/hermes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "estimate-plazo", desde: civilDateKey(new Date()), dias: item.diasLimite, tipoComputo: "habiles" }) });
+        if (!estimate.ok) { setAiError(estimate.error); setBusy(false); return; }
+        fechaLimite = estimate.data.vencimiento;
+      }
+      const created = await apiMutation(`/api/causas/${causaId}/tramites`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": keyFor({ai:result, item}) },
         body: JSON.stringify({
           titulo: item.titulo,
           detalle: item.detalle || null,
@@ -189,6 +205,7 @@ export function TramitesPanel({
           estado: "pendiente",
         }),
       });
+      if (!created.ok) { setAiError(created.error); setBusy(false); router.refresh(); return; }
     }
     setBusy(false);
     router.refresh();
@@ -197,6 +214,7 @@ export function TramitesPanel({
   function rowActions(t: Tramite) {
     return (
       <div className="flex flex-wrap gap-1">
+        <Link className="btn btn-ghost text-xs" href={`/offline.html?kind=tramite&record=${encodeURIComponent(t.id)}`}>Preparar sin conexión</Link>
         {t.estado === "pendiente" && (
           <button
             type="button"
@@ -278,6 +296,7 @@ export function TramitesPanel({
           <span>Trámite</span>
           <input
           className="input"
+          disabled={busy}
           name="titulo"
           required
           defaultValue={t.titulo}
@@ -287,6 +306,7 @@ export function TramitesPanel({
           <span>Fecha límite</span>
           <input
           className="input"
+          disabled={busy}
           type="date"
           name="fechaLimite"
           defaultValue={toDateInput(t.fechaLimite)}
@@ -296,6 +316,7 @@ export function TramitesPanel({
           <span>Responsable</span>
           <select
           className="select"
+          disabled={busy}
           name="responsableId"
           defaultValue={t.responsable?.id || ""}
         >
@@ -311,6 +332,7 @@ export function TramitesPanel({
           <span>Detalle opcional</span>
           <input
           className="input"
+          disabled={busy}
           name="detalle"
           defaultValue={t.detalle || ""}
           placeholder="Detalle opcional"
@@ -335,6 +357,7 @@ export function TramitesPanel({
 
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
+      {aiError && <p role="alert" className="text-sm text-[var(--danger)]">{aiError}</p>}
       <AiAssist
         action="causa.sugerir_tramites"
         causaId={causaId}
@@ -461,20 +484,21 @@ export function TramitesPanel({
           <input
           className="input"
           name="titulo"
+          disabled={busy || retryCreate}
           required
           placeholder="Nuevo trámite pendiente"
         />
         </label>
         <label className="block space-y-2 text-sm font-medium">
           <span>Fecha límite</span>
-          <input className="input" type="date" name="fechaLimite" />
+          <input className="input" type="date" name="fechaLimite" disabled={busy || retryCreate} />
         </label>
         <button className="btn btn-primary" disabled={busy} type="submit">
-          Agregar
+          {retryCreate ? "Reintentar envío" : "Agregar"}
         </button>
         <label className="block space-y-2 text-sm font-medium sm:col-span-2">
           <span>Responsable</span>
-          <select className="select" name="responsableId" defaultValue="">
+          <select className="select" name="responsableId" defaultValue="" disabled={busy || retryCreate}>
           <option value="">Responsable (yo por defecto)</option>
           {responsables.map((u) => (
             <option key={u.id} value={u.id}>
@@ -488,6 +512,7 @@ export function TramitesPanel({
           <input
           className="input"
           name="detalle"
+          disabled={busy || retryCreate}
           placeholder="Detalle opcional"
         />
         </label>

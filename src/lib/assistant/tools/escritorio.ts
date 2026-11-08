@@ -5,6 +5,8 @@ import { STAFF_ROLES } from "@/lib/auth/roles";
 import { canonicalJson } from "@/lib/command-execution";
 import { digest } from "@/lib/personal-connectors/core";
 import { sendComputerMessage } from "@/lib/altazor/computer/service";
+import { prepareExplicitMetadataTask } from "@/lib/altazor/computer/metadata-task";
+import { metadataRequest } from "@/lib/altazor/computer/file-metadata-task";
 import { desktopScope, desktopSession, listDesktopSessions } from "./escritorio-access";
 import type { AssistantPlan, ToolContext } from "../types";
 import type { AssistantTool } from "./types";
@@ -24,7 +26,15 @@ export async function resolveDesktopTaskInput(input: Record<string, unknown>, ct
 }
 async function taskPreview(input: Task, ctx: ToolContext) {
   const access = await desktopSession(ctx, input.sessionId, true);
-  return `Enviar este encargo al escritorio existente ${access.session.id}.\nGateway local dedicado: espacio ${access.session.workspace.id}.\nProveedor de IA independiente del chat: ${access.session.workspace.providerName}. Puede ser remoto; esta confirmación autoriza enviar el texto a ese entorno.\nAplicaciones autorizadas en esa sesión: ${access.connectors.join(", ") || "ninguna"}.\nSe enviará únicamente el siguiente texto, completo; sin adjuntos y sin incorporar memoria ni secretos automáticamente:\n\n${input.texto}\n\nCada uso de una conexión pedirá una autorización aparte en el escritorio. El encargo continúa allí hasta completarse o detenerlo desde ese panel.`;
+  const metadata = prepareExplicitMetadataTask(input.texto, access.actor.id, access.session.workspace.id, access.connectors);
+  if (metadata) {
+    const request = metadataRequest(input.texto);
+    const provider = metadata.kind === "dropbox" ? "Dropbox" : "OneDrive";
+    const items = request?.pdfOnly ? "archivos PDF" : request?.filesOnly ? "archivos" : "elementos";
+    return `Consultar hasta ${metadata.args.limit} nombres de ${items} en tu cuenta de ${provider}.\n\n${input.texto}\n\nRevisarás el criterio y autorizarás la consulta antes de acceder a tu cuenta. Sólo se consultan nombres y metadatos de una página de resultados; no se abre ni descarga su contenido. El resultado se mostrará en el escritorio de Altazor y no representa un inventario completo de la cuenta. No se modificarán archivos ni se copiarán documentos, memoria o secretos automáticamente.`;
+  }
+  const apps = access.connectors.map(name => /^altazor-google-[a-f0-9]{16}$/.test(name) ? "Google Drive" : /^altazor-github-[a-f0-9]{16}$/.test(name) ? "GitHub (repositorios públicos)" : /^altazor-dropbox-[a-f0-9]{16}$/.test(name) ? "Dropbox (archivos)" : /^altazor-microsoft-[a-f0-9]{16}$/.test(name) ? "Microsoft 365 / OneDrive (archivos)" : name);
+  return `Altazor realizará este encargo en su escritorio, con el modelo ${access.session.workspace.providerName}. Es un entorno de IA independiente del chat; puede usar un proveedor remoto.\nAplicaciones elegidas: ${apps.join(", ") || "ninguna"}.\n\n${input.texto}\n\nLas conexiones de archivos de Google Drive, GitHub, Dropbox y OneDrive elegidas para este escritorio sólo permiten consultar o descargar los archivos solicitados, sin editar, publicar ni eliminar. OneDrive no incluye correo ni calendario; GitHub se limita a repositorios públicos. Cada acceso esperará su autorización. Podrá ver el avance y detener el trabajo desde la conversación. No se adjuntarán documentos ni se copiarán memoria o secretos automáticamente.`;
 }
 async function confirmedTask(input: Task, ctx: ToolContext) {
   if (!ctx.commandKey || !ctx.authorizeContext) throw httpError("Confirme el plan desde la conversación de ALTAZOR antes de enviar el encargo.", 409);

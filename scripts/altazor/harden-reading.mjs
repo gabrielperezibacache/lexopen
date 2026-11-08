@@ -3,14 +3,14 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, realpath, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { rewriteConnectorGate } from "./harden-connectors.mjs";
 
 const pin = "6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3";
 const hashes = {
-  "internal/gateway/gateway.go": "d39393bbb377e15cbdf01fdc2650524128c81fe91fabff19f68ca5b668f3a740",
+  "internal/gateway/gateway.go": "1229d94fd706462c3c02351ec45ec28e10776ae3684da5e52528582645c7b6cc",
   "internal/desktop/desktop.go": "785f366126f1a9bb914cecb03c793f9935c283f68aa3bb46c7bc229ea696fa67",
-  "internal/chat/actions.go": "bf701758879cf6d1c50677fdab26f6c7f98af8c2359d8ea1d664bcfb50972db5",
-  "internal/chat/chat.go": "f2d95a708969c3fe74a93b1e6527c82dc98a7b29202fef926e9d55cb3910565c",
+  "internal/chat/actions.go": "315944ac00aa2e423676819fca6bcdd7a649b7fdfca4bf19a3a58245466ef310",
+  "internal/chat/chat.go": "3a81a435bce645d89075f031003050dec98dbb71ee95ea90ae739588f81c76fc",
+  "internal/desktop/lexopen_computer_use.go": "8584cf686688f2855d032b2f66111a1cadeec9674218663fb14c79b06357e59b",
 };
 const sha = text => createHash("sha256").update(text).digest("hex");
 const once = (text, old, replacement) => {
@@ -38,7 +38,13 @@ export function rewriteReading(path, source) {
     source = once(source, '\t\tlooked := false', '\t\tlooked := false\n\t\tforceScreenshot := false');
     source = once(source, '\t\t\tlooked = looked || da.Visual()', '\t\t\tforceScreenshot = forceScreenshot || da.Name == "screenshot"\n\t\t\tlooked = looked || da.Visual()');
     const old = '\t\t\tif looked {\n\t\t\t\tpng, err := runner.Screenshot(ctx, k.ID)\n\t\t\t\tif err == nil && st.watchScreen(png) {\n\t\t\t\t\textra = s.unstick(ctx, runner, id, index, k, png)\n\t\t\t\t} else {\n\t\t\t\t\textra = s.screenMessage(id, index, png, err)\n\t\t\t\t}\n\t\t\t}';
-    return once(source, old, '\t\t\tif looked {\n\t\t\t\tsemantic, available := provider.Message{}, false\n\t\t\t\tif !forceScreenshot { semantic, available = lexopenSemanticReading(ctx, runner, k.ID) }\n\t\t\t\tif available { extra = semantic } else {\n\t\t\t\t\tpng, err := runner.Screenshot(ctx, k.ID)\n\t\t\t\t\tif err == nil && st.watchScreen(png) { extra = s.unstick(ctx, runner, id, index, k, png) } else { extra = s.screenMessage(id, index, png, err) }\n\t\t\t\t}\n\t\t\t}');
+    return once(source, old, '\t\t\tif looked {\n\t\t\t\tsemantic, available := provider.Message{}, false\n\t\t\t\tif !forceScreenshot && !p.fileFocus { semantic, available = lexopenSemanticReading(ctx, func(readContext context.Context)(string,error){return s.lexopenRunComputer(readContext,id,index,k,desktop.Action{Name:"page_read",Args:map[string]any{}})}) }\n\t\t\t\tif available { extra = semantic } else {\n\t\t\t\t\tpng, err := runner.Screenshot(ctx, k.ID)\n\t\t\t\t\tif err == nil && st.watchScreen(png) { extra = s.unstick(ctx, runner, id, index, k, png) } else { extra = s.screenMessage(id, index, png, err) }\n\t\t\t\t}\n\t\t\t}');
+  }
+  if (path === "internal/desktop/lexopen_computer_use.go") {
+    source = once(source, 'case "screenshot", "read_screen", "page_read", "windows":', 'case "screenshot", "read_screen", "windows":');
+    source = once(source, '\tcase "wait":', '\tcase "page_read":\n\t\t_,e := LexopenReadArgv("browser",a.Args); valid=e==nil\n\t\td = ComputerDecision{Category:"observation",Reason:"computer_observation",Automatic:true,Observation:true}\n\tcase "document_read":\n\t\t_,e := LexopenReadArgv("document",a.Args); valid=e==nil\n\t\td = ComputerDecision{Category:"local_read",Reason:"computer_workspace_document_read",LocalRead:true,Automatic:p.Mode=="intelligent"||p.Mode=="autonomous"}\n\tcase "wait":');
+    source = source.replaceAll('computerInteger(a.Args["ref"], 1, 1000)', 'computerInteger(a.Args["ref"], 1, 2000)');
+    return once(source, 'func ReadComputerLocal(ctx context.Context, r Runner, ref string, a Action) (string, error) {', 'func ReadComputerLocal(ctx context.Context, r Runner, ref string, a Action) (string, error) {\n if a.Name=="document_read" {\n argv,e:=LexopenReadArgv("document",a.Args);if e!=nil{return "",ErrComputerActionInvalid}\n readContext,cancel:=context.WithTimeout(ctx,30*time.Second);defer cancel()\n out,e:=r.Exec(readContext,ref,argv...);if e!=nil||len(out)>256*1024{return "",errors.New("computer-use: workspace document could not be read or verified")}\n return out,nil\n }');
   }
   throw new Error("Unknown pinned semantic-reading source file");
 }
@@ -46,16 +52,13 @@ export function rewriteReading(path, source) {
 export async function hardenReading(directory) {
   const root = await realpath(directory);
   if ((await readFile(join(root, ".lexopen-source-commit"), "utf8")).trim() !== pin) throw new Error("Semantic reader requires the pinned public source archive");
+  if ((await readFile(join(root, ".lexopen-drive-management"), "utf8")).trim() !== "v1") throw new Error("Semantic reader requires the complete gateway.17 recipe first");
+  if (await lstat(join(root, ".lexopen-semantic-reading")).catch(error => { if (error.code === "ENOENT") return null; throw error; })) throw new Error("Semantic reading was already applied");
   const changes = [];
   for (const [path, expected] of Object.entries(hashes)) {
     const file = join(root, path), stat = await lstat(file), source = await readFile(file, "utf8");
     if (!stat.isFile() || stat.isSymbolicLink() || await realpath(file) !== file) throw new Error("Semantic reader source must be a regular owned archive file");
-    if (sha(source) !== expected) {
-      // The existing connector patch is intentionally applied first in the release recipe.
-      if (path !== "internal/gateway/gateway.go" || !source.includes('"lexopen_connector_gate": "v1"')) throw new Error("Pinned semantic-reading source hash changed");
-      const original = source.replace('\t"runtime"\n', '').replace('"lexopen_connector_gate": "v1", "lexopen_connector_platform": runtime.GOOS, "lexopen_dropbox_read_gate": true, ', '');
-      if (sha(original) !== expected || rewriteConnectorGate(path, original) !== source) throw new Error("Unknown gateway changes before semantic reading adaptation");
-    }
+    if (sha(source) !== expected) throw new Error("Pinned post-recipe semantic-reading source hash changed: " + path);
     changes.push([file, rewriteReading(path, source)]);
   }
   const templates = fileURLToPath(new URL("./reading-runtime/", import.meta.url));

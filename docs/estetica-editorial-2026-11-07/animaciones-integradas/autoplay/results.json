@@ -1,0 +1,405 @@
+{
+  "results": [
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "desktop",
+      "file": "chromium-mis-causas-light-desktop.png",
+      "box": {
+        "x": 860.796875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.654956,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "chromium-mis-causas-dark-desktop.png",
+      "box": {
+        "x": 860.796875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.663537,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "light",
+      "device": "desktop",
+      "file": "chromium-facturacion-light-desktop.png",
+      "box": {
+        "x": 490.109375,
+        "y": 142,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.655802,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "chromium-facturacion-dark-desktop.png",
+      "box": {
+        "x": 490.109375,
+        "y": 142,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.655949,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "light",
+      "device": "desktop",
+      "file": "chromium-plazos-light-desktop.png",
+      "box": {
+        "x": 959.25,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.66184,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "chromium-plazos-dark-desktop.png",
+      "box": {
+        "x": 959.25,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.663126,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "file": "chromium-buscar-light-desktop.png",
+      "box": {
+        "x": 736.671875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.652641,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "chromium-buscar-dark-desktop.png",
+      "box": {
+        "x": 736.671875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.666183,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "mobile",
+      "file": "chromium-mis-causas-light-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.630381,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "chromium-mis-causas-dark-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.627725,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "light",
+      "device": "mobile",
+      "file": "chromium-facturacion-light-mobile.png",
+      "box": {
+        "x": 151.6875,
+        "y": 126,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.634653,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "chromium-facturacion-dark-mobile.png",
+      "box": {
+        "x": 151.6875,
+        "y": 126,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.62956,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "light",
+      "device": "mobile",
+      "file": "chromium-plazos-light-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.632641,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "plazos",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "chromium-plazos-dark-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.633517,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "light",
+      "device": "mobile",
+      "file": "chromium-buscar-light-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.625675,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "Chromium",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "chromium-buscar-dark-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.638747,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "WebKit",
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "file": "webkit-buscar-light-desktop.png",
+      "box": {
+        "x": 736.6875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.6619002093411271,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "WebKit",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "webkit-buscar-dark-desktop.png",
+      "box": {
+        "x": 736.6875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "overflow": false,
+      "controlOpacity": "0",
+      "paused": false,
+      "time": 0.67148317676002,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "WebKit",
+      "route": "buscar",
+      "theme": "light",
+      "device": "mobile",
+      "file": "webkit-buscar-light-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.6644468105449843,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    },
+    {
+      "engine": "WebKit",
+      "route": "buscar",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "webkit-buscar-dark-mobile.png",
+      "box": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "overflow": false,
+      "controlOpacity": "0.65",
+      "paused": false,
+      "time": 0.6523405757712261,
+      "muted": true,
+      "playbackRate": 0.8,
+      "inline": true
+    }
+  ],
+  "errors": []
+}

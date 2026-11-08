@@ -1,0 +1,65 @@
+{
+  "results": [
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "duration": 4.916667,
+      "width": 640,
+      "height": 360,
+      "paused": true,
+      "muted": true,
+      "currentTime": 2.426598,
+      "file": "plazos-light-desktop-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "duration": 4.916667,
+      "width": 640,
+      "height": 360,
+      "paused": true,
+      "muted": true,
+      "currentTime": 2.42303,
+      "file": "plazos-light-mobile-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "duration": 4.916667,
+      "width": 640,
+      "height": 360,
+      "paused": true,
+      "muted": true,
+      "currentTime": 2.419314,
+      "file": "plazos-dark-desktop-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "duration": 4.916667,
+      "width": 640,
+      "height": 360,
+      "paused": true,
+      "muted": true,
+      "currentTime": 2.422042,
+      "file": "plazos-dark-mobile-video.png"
+    }
+  ],
+  "errors": []
+}

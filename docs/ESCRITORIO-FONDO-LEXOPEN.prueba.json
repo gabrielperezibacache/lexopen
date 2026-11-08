@@ -1,0 +1,50 @@
+{
+  "kind": "isolated-lexopen-wallpaper-overlay",
+  "createdAt": "2026-11-07T20:41:53.667924+00:00",
+  "baseImageId": "sha256:02d362bdf995a9cac9f3ff162fe11ef0d7ee87e0d0dd0f3452a351275134ba26",
+  "imageId": "sha256:bb64ff77f5dabce9fa3f94975e0862c55f43f717646b9760d5fc35725c6c835a",
+  "baseImagePreserved": true,
+  "workflow": {
+    "ok": true,
+    "checks": [
+      "docx",
+      "libreoffice-pdf",
+      "pdf-pages",
+      "ocr-spa-eng",
+      "xlsx",
+      "epub",
+      "bibliography",
+      "local-search",
+      "audio-16khz",
+      "lexopen-wallpaper"
+    ]
+  },
+  "smokeRuntime": {
+    "network": "none",
+    "user": "kitty",
+    "rootReadOnly": true,
+    "hostBindMounts": [],
+    "memoryBytes": 1610612736,
+    "cpus": 1,
+    "capabilitiesDropped": [
+      "ALL"
+    ],
+    "noNewPrivileges": true
+  },
+  "smokeContainerRemoved": true,
+  "files": {
+    "wallpaper.png": {
+      "sha256": "7632edf03eeabbf6e714efd71400e3e207bc72121459be1bc601f0fc41802309",
+      "bytes": 827771
+    },
+    "desktop-items-0.conf": {
+      "sha256": "dee853bbf24099e5437a1da2d93289713be42498b67c0461f199c2013cdf794a",
+      "bytes": 249
+    },
+    "check.py": {
+      "sha256": "3e979fcbf6c533b43e93b2d31e8b93c822613ceb1ba9a148949ede276a5ef815",
+      "bytes": 4922
+    }
+  },
+  "scope": "Isolated local image validation; not installer publication or desktop session activation."
+}

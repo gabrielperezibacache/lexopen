@@ -29,6 +29,7 @@ const {
   rewriteDatabaseUrlPassword,
   writeEnvKey,
 } = require("./config.cjs");
+const { applyDistributedOAuthProfile } = require("./oauth-clients.cjs");
 
 const repoRoot = process.env.LEXOPEN_APP_ROOT
   ? path.resolve(process.env.LEXOPEN_APP_ROOT)
@@ -146,6 +147,7 @@ export const HOST_ENV_FILE_WINS = [
   "ALTAZOR_GITHUB_CLIENT_SECRET",
   "ALTAZOR_DROPBOX_CLIENT_ID",
   "ALTAZOR_DROPBOX_CLIENT_SECRET",
+  "ALTAZOR_DISTRIBUTED_OAUTH",
   "NEXT_PUBLIC_APP_NAME",
   "LEXOPEN_TRUSTED_ORIGINS",
   "LEXOPEN_BOOTSTRAP_TOKEN",
@@ -516,6 +518,12 @@ export function hostResourcesPath() {
   const inferred = path.basename(__dirname) === "app.asar.unpacked" ? path.dirname(__dirname) : null;
   return [process.resourcesPath, inferred, process.env.LEXOPEN_RESOURCES_PATH]
     .filter(Boolean).find(directory => fs.existsSync(path.join(directory, "app.asar"))) || null;
+}
+
+/** Only the validated public release profile may fill an unconfigured Host. */
+export function loadBundledOAuthProfile(resources, targetEnv = process.env) {
+  if (!resources) return null;
+  return applyDistributedOAuthProfile(path.join(resources, "oauth-clients.json"), targetEnv);
 }
 
 function packagedHost() { return process.env.LEXOPEN_PACKAGED === "1" || Boolean(hostResourcesPath()); }
@@ -907,6 +915,7 @@ export async function startHost(options = {}, overrides = {}) {
   loadEnvFile(host.envFile);
   // Data-dir .env owns Host identity (never migrate/serve against a shell DATABASE_URL).
   preferEnvFileKeys(host.envFile, HOST_ENV_FILE_WINS, process.env);
+  loadBundledOAuthProfile(hostResourcesPath());
   // Strip CI/shell relaxations that would fail instrumentation in NODE_ENV=production.
   applyHostFailClosedEnv(process.env);
   ensureHostToolPath(process.env);

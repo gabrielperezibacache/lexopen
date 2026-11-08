@@ -2,7 +2,7 @@
 
 ## Mi Google Drive
 
-1. Abre **Causas → Sincronización → Mi Google Drive**.
+1. Abre **Configuración → Conexiones e IA → Cuentas conectadas → Google Drive**.
 2. Pulsa **Conectar con Google**, revisa el permiso y continúa en la página oficial. La conexión se completa en la ventana original de LexOpen.
 3. Abre una causa y su apartado de Drive. Elige **Mi cuenta personal**, busca la carpeta por nombre y confirma la raíz. También puedes pegar el enlace de una carpeta.
 4. Activa las actualizaciones automáticas y elige una frecuencia. La elección de carpeta queda inicialmente pausada; seleccionarla no empieza a descargar.
@@ -16,7 +16,7 @@ Una nueva versión conserva la copia anterior. Los archivos no admitidos o inacc
 
 ### Preparación administrativa, una vez
 
-El administrador prepara una aplicación OAuth en Google y registra el retorno que muestra LexOpen en **Preparar conexión · administración**. Puede reutilizar explícitamente la identidad de la aplicación ya preparada para ALTAZOR, agregando el nuevo retorno, o configurar otra aplicación.
+El administrador prepara una aplicación en Google y registra el retorno que muestra LexOpen en **Preparar conexión para el estudio**. Si ya preparó Google Workspace para Altazor, puede añadir este segundo retorno en la misma aplicación de Google. Cada profesional autoriza por separado el acceso a sus carpetas.
 
 El retorno personal es `/api/personal-connectors/google-drive/oauth/callback` sobre la dirección configurada de LexOpen. Se solicita exclusivamente `https://www.googleapis.com/auth/drive.readonly`, con acceso offline para renovación. Google puede exigir verificación y restricciones de usuarios de prueba para este alcance. Registrar los datos en LexOpen no acredita que Google haya aprobado la aplicación.
 

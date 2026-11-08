@@ -74,7 +74,8 @@ function extractMentions(raw: string): string[] {
  */
 export function normalizeAssistantInput(
   text: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  computationCountry: string | null = "CL"
 ): NormalizedAssistantInput {
   const raw = text.trim();
   const flat = normalizeSearch(raw);
@@ -98,7 +99,7 @@ export function normalizeAssistantInput(
 
   const enDiasHabilesMatch = flat.match(/\ben\s+(\d{1,4})\s+dias\s+habiles\b/);
   if (enDiasHabilesMatch) {
-    dates.push(
+    if (computationCountry === "CL") dates.push(
       calcularVencimientoYmd({
         desde: todayYmd,
         dias: Number(enDiasHabilesMatch[1]),

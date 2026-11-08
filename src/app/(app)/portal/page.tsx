@@ -92,7 +92,8 @@ export default async function PortalPage() {
 
   return (
     <div className={`${styles.area} space-y-6`}>
-      <PageHeader artwork="people"
+      <PageHeader
+        artwork="people"
         eyebrow={t("portal.eyebrow")}
         title={t("portal.title")}
         subtitle={

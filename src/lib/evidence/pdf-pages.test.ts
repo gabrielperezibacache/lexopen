@@ -48,10 +48,17 @@ async function main() {
   assert.equal(limited.pages[0].text, native.pages[0].text);
   assert.deepEqual(limited.pages.slice(1).map(p=>[p.status,p.reason,p.text]), [["limit","page_limit",""],["limit","page_limit",""]]);
   assert.equal(limited.partial, true);
+  const noOcrBudget = await extractPdfPages(bytes, { maxOcrPages: 0 });
+  assert.equal(noOcrBudget.pages[0].text, native.pages[0].text);
+  assert.equal(noOcrBudget.pages[1].reason, "ocr_page_limit");
+  assert.equal(noOcrBudget.pages[1].status, "needs_ocr");
+  assert.equal(noOcrBudget.pages[2].status, "empty");
+  assert.equal(noOcrBudget.partial, true);
   const textLimited = await extractPdfPages(bytes, { maxTextCharacters: 64, ocr: false });
   assert.equal(textLimited.pages[0].reason, "text_limit");
   assert.equal(textLimited.pages[0].text, "");
   await assert.rejects(extractPdfPages(bytes, { maxPages: 0 }), RangeError);
+  await assert.rejects(extractPdfPages(bytes, { maxOcrPages: -1 }), RangeError);
   await assert.rejects(extractPdfPages(bytes, { maxTextCharacters: Infinity }), RangeError);
   await assert.rejects(extractPdfPages(Buffer.alloc(PDF_MAX_BYTES+1)), status(413));
   await assert.rejects(extractPdfPages(Buffer.from("not a PDF")), status(422));
@@ -82,7 +89,7 @@ async function main() {
     assert.equal(noTesseract.partial,true);
     const previous=process.env.OCR_ENABLED;delete process.env.OCR_ENABLED;
     let ocr;
-    try { ocr=await extractPdfPages(bytes,{language:"eng",expectedSourceSha256:native.sourceSha256}); }
+    try { ocr=await extractPdfPages(bytes,{language:"eng",maxOcrPages:1,expectedSourceSha256:native.sourceSha256}); }
     finally { if(previous===undefined)delete process.env.OCR_ENABLED;else process.env.OCR_ENABLED=previous; }
     if (ocr.pages[1].status==="completed") {
       assert.equal(ocr.pages[1].method,"ocr");

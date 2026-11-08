@@ -57,7 +57,7 @@ export default async function WorkflowsGlobalPage() {
                     {steps.map((s) => s.name).join(" → ")}
                   </div>
                 </div>
-                <WorkflowActions workflowId={w.id} />
+                <WorkflowActions workflowId={w.id} active={w.active} />
               </div>
               <div className="mt-4 space-y-2">
                 {w.instances.map((i) => (
@@ -69,7 +69,7 @@ export default async function WorkflowsGlobalPage() {
                       {i.actor?.name || "—"} · {i.currentStep + 1} ·{" "}
                       {formatDate(i.createdAt)}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <StatusBadge
                         estado={
                           i.status === "approved"
@@ -80,7 +80,7 @@ export default async function WorkflowsGlobalPage() {
                         }
                       />
                       {(i.status === "pending" || i.status === "running") && (
-                        <WorkflowActions instanceId={i.id} advance />
+                        <WorkflowActions instanceId={i.id} currentStep={i.currentStep} advance />
                       )}
                     </div>
                   </div>

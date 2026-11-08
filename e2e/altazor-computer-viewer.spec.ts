@@ -33,7 +33,9 @@ async function fixture(page: Page, working = false) {
   await loginAs(page, "abogado@estudio.cl");
   await page.getByRole("region", { name: "Escritorio de Altazor", exact: true }).getByRole("button", { name: "Abrir escritorio", exact: false }).click();
   const panel = page.getByTestId("altazor-computer-panel");
-  await expect(panel.getByRole("region", { name: "Visor del escritorio", exact: true })).toBeVisible();
+  const viewer = panel.getByRole("region", { name: "Visor del escritorio", exact: true });
+  await expect(viewer).toBeVisible();
+  await viewer.scrollIntoViewIfNeeded();
   await expect.poll(() => panel.getByRole("img", { name: "Captura del escritorio privado en contenedor" }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   return { panel, reads, captures: () => captures, fail: (value: boolean) => { failFrame = value; }, addMessage: () => turns.push({ index: turns.length, from: "assistant", working: false, needsHelp: false, actionCount: 0, text: "Nuevo resultado ficticio.", steps: [] }) };
 }
@@ -91,11 +93,16 @@ test("los pasos quedan resumidos y el sondeo conserva la posición de lectura", 
   expect(await log.evaluate(element => element.scrollTop)).toBeLessThan(10);
   await view.panel.getByRole("button", { name: "Ver mensajes nuevos", exact: true }).click();
   await expect(log).toContainText("Nuevo resultado ficticio.");
+  // Captures intentionally stop while the user reads the offscreen chat.
+  const viewer = view.panel.getByRole("region", { name: "Visor del escritorio", exact: true });
+  await viewer.scrollIntoViewIfNeeded();
+  await expect(viewer.getByRole("img", { name: "Captura del escritorio privado en contenedor" })).toBeVisible();
   const before = view.captures();
   await page.clock.fastForward(8500);
   await expect.poll(() => view.captures()).toBeGreaterThan(before);
   await view.panel.getByRole("button", { name: "Tomar control", exact: true }).click();
   await expect(view.panel).toContainText("Control manual · actualización automática pausada");
+  await viewer.scrollIntoViewIfNeeded();
   await expect(view.panel.getByRole("img", { name: "Captura del escritorio privado en contenedor" })).toBeVisible();
   const heldCaptures = view.captures();
   await page.clock.fastForward(20_000);
