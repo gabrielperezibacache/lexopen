@@ -76,11 +76,9 @@ export async function POST(req: NextRequest) {
       if (!current) {
         return NextResponse.json({ error: "Paso de workflow inválido" }, { status: 409 });
       }
-      if (
-        current.role &&
-        current.role !== user.role &&
-        user.role !== "admin"
-      ) {
+      // Administering the Host does not replace the professional role required
+      // by a workflow step. Existing explicit admin steps remain admin-only.
+      if (current.role && current.role !== user.role) {
         return NextResponse.json(
           { error: "Este paso requiere otro rol" },
           { status: 403 }
@@ -140,7 +138,7 @@ export async function POST(req: NextRequest) {
           stepsJson: JSON.stringify(
             body.steps || [
               { name: "Revisión abogado", role: "abogado" },
-              { name: "Aprobación socio", role: "admin" },
+              { name: "Aprobación socio", role: "socio" },
             ]
           ),
         },

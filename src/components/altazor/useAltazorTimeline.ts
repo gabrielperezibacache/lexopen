@@ -15,7 +15,7 @@ type TimelineState = { status: "ready" | "unavailable"; cursor: string | null; p
 async function readPage(signal: AbortSignal, before?: string | null): Promise<TimelinePage> {
   const query = before ? `?${new URLSearchParams({ before })}` : "";
   const response = await fetch(`/api/altazor/timeline${query}`, { signal, cache: "no-store" });
-  if (!response.ok) throw new Error("Timeline unavailable");
+  if (!response.ok) throw Object.assign(new Error("Timeline unavailable"), { status: response.status });
   return response.json();
 }
 
@@ -39,8 +39,11 @@ export function useAltazorTimeline(enabled: boolean, version: string, working: b
       try {
         const page = await readPage(controller.signal, cursor);
         if (!controller.signal.aborted) setState({ status: "ready", page, cursor });
-      } catch {
-        if (!controller.signal.aborted) setState({ status: "unavailable", page: null, cursor });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          const restricted = [401, 403, 404].includes((error as { status?: number }).status || 0);
+          setState(previous => ({ status: "unavailable", page: !restricted && previous?.cursor === cursor ? previous.page : null, cursor }));
+        }
       } finally {
         if (request === controller) request = null;
         if (!controller.signal.aborted) timer = window.setTimeout(refresh, !cursor && working ? 2_000 : 15_000);

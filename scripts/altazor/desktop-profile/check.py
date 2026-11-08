@@ -26,7 +26,7 @@ def verify():
     for command in ("chromium", "soffice", "localc", "loimpress", "lodraw", "ffprobe"):
         assert shutil.which(command), f"Executable missing: {command}"
 
-    with tempfile.TemporaryDirectory(prefix="lexopen-tools-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="lexopen-tools-", dir="/home/kitty/work") as temporary:
         root = pathlib.Path(temporary)
         paragraph = "Documento ficticio para verificar el escritorio"
         document = Document()
@@ -40,6 +40,12 @@ def verify():
         run("qpdf", "--check", str(pdf))
         assert len(PdfReader(pdf).pages) == 1
         assert paragraph in run("pdftotext", str(pdf), "-")
+        selected = str(root.relative_to(pathlib.Path('/home/kitty/work')) / 'fixture.docx')
+        semantic = json.loads(run('lexopen-read', 'document', '--path=' + selected))
+        assert semantic['method'] == 'office-text' and paragraph in semantic['text']
+        selected_pdf = str(root.relative_to(pathlib.Path('/home/kitty/work')) / 'fixture.pdf')
+        semantic_pdf = json.loads(run('lexopen-read', 'document', '--path=' + selected_pdf))
+        assert semantic_pdf['method'] == 'pdf-text' and paragraph in semantic_pdf['text']
         run("pdftoppm", "-f", "1", "-l", "1", "-r", "160", "-png", "-singlefile", str(pdf), str(root / "page"))
         assert {"eng", "spa"}.issubset(run("tesseract", "--list-langs").splitlines())
         recognized = run("tesseract", str(root / "page.png"), "stdout", "-l", "spa", "--psm", "3")
@@ -80,7 +86,7 @@ def verify():
         with wave.open(str(audio), "rb") as recording:
             assert recording.getframerate() == 16_000 and recording.getnchannels() == 1
 
-    print(json.dumps({"ok": True, "checks": ["docx", "libreoffice-pdf", "pdf-pages", "ocr-spa-eng",
+    print(json.dumps({"ok": True, "checks": ["docx", "libreoffice-pdf", "pdf-pages", "semantic-office-text", "semantic-pdf-text", "ocr-spa-eng",
                                              "xlsx", "epub", "bibliography", "local-search", "audio-16khz"]}))
 
 

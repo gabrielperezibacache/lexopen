@@ -14,7 +14,7 @@ type Binding={state:string;verifier:string;nonce:string;configurationBinding:str
 type Grant={version:1;generation:string;configurationBinding:string;actorSessionVersion:number;accessToken:string;refreshToken:string;expiresAt:number;refreshExpiresAt:number|null;subject:string};
 const accountWhere=(ownerId:string)=>({ownerId_provider:{ownerId,provider}}),accountContext=(ownerId:string,id:string)=>`google-drive:content:account:${ownerId}:${id}`,attemptContext=(ownerId:string,id:string)=>`google-drive:content:attempt:${ownerId}:${id}`;
 const unavailable=()=>new ConnectorError("drive_reconnect_required","Conecte de nuevo su cuenta de Google para leer documentos de Drive.",409);
-const operator=(actor:{role:string;capabilityGrants?:string|null;capabilityRevokes?:string|null})=>actor.role==="admin"&&isAdmin(actor);
+const operator=(actor:{role:string;capabilityGrants?:string|null;capabilityRevokes?:string|null})=>isAdmin(actor);
 async function actorFor(ownerId:string,db:Db=prisma){return altazorActor({id:ownerId,role:"abogado"},db);}
 async function sessionActor(actor:ConnectorActor,db:Db=prisma){const current=await actorFor(actor.id,db);if(current.sessionVersion!==actor.sessionVersion||!/^[a-f0-9]{64}$/.test(actor.sessionHash))throw new ConnectorError("session_required","Vuelva a iniciar sesión en LexOpen.",401);return current;}
 /** Lock the exact session observed above; a concurrent logout must abort the transaction. */

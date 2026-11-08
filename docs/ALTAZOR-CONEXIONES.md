@@ -107,6 +107,15 @@ La construcción del servicio usa una revisión fija, identificada en el [flujo 
 
 Para compilar manualmente, reproduce esos pasos en directorios nuevos, sin archivos ni credenciales del usuario. El refuerzo valida las huellas de la revisión, desactiva los cambios de permisos solicitados por el modelo y exige confirmación por operación. No lo apliques sobre los datos de una instalación existente.
 
+Tras archivar la revisión fijada y escribir su marcador `.lexopen-source-commit`, aplica ambos adaptadores antes de compilar:
+
+```sh
+node scripts/altazor/harden-connectors.mjs /ruta/al/codigo-archivado
+node scripts/altazor/harden-reading.mjs /ruta/al/codigo-archivado
+```
+
+El segundo habilita `page_read` paginado y `document_read` al modelo, además del endpoint de lectura restringida usado por LexOpen. Requiere reconstruir el perfil `lexopen-desktop-tools-2`. El perfil anterior no contiene el lector: si la lectura no está disponible, actualiza el ejecutable y reconstruye la imagen; no basta con reiniciar una imagen antigua.
+
 La respuesta de salud de la compilación reforzada debe incluir `lexopen_connector_gate: "v1"` y `lexopen_connector_platform` con su sistema real. LexOpen exige esa capacidad antes de habilitar conexiones; un gateway sin el refuerzo puede seguir ofreciendo el escritorio sin conectores. El indicador es una capacidad del ejecutable administrado localmente, no una certificación externa.
 
 Prepara la imagen y una configuración nueva siguiendo la [guía del escritorio](ESCRITORIO-ALTAZOR.md). Usa un motor local disponible, directorios dedicados, una dirección local, puerto propio y autorización independiente. Revisa los registros del servicio antes de compartirlos: su salida puede contener datos de acceso.

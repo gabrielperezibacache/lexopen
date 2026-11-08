@@ -8,9 +8,10 @@ import { createSmtpProvider } from "./smtp";
 import { createTelegramProvider } from "./telegram";
 import { createWebPushProvider } from "./webpush";
 import {
-  createWhatsAppMetaStub,
+  createWhatsAppMetaProvider,
   createWhatsAppTwilioStub,
 } from "./whatsapp";
+import { getWhatsAppMetaConfig } from "@/lib/altazor/help/config";
 import type { ChannelProvider, ProviderId } from "./types";
 
 export async function resolveEmailProvider(): Promise<ChannelProvider | null> {
@@ -41,7 +42,7 @@ export async function getProvider(
     const wp = await getWebPushConfig();
     return wp.enabled && wp.config ? createWebPushProvider(wp.config) : null;
   }
-  if (id === "whatsapp_meta") return createWhatsAppMetaStub();
+  if (id === "whatsapp_meta") { const config = await getWhatsAppMetaConfig(); return config ? createWhatsAppMetaProvider(config) : null; }
   if (id === "whatsapp_twilio") return createWhatsAppTwilioStub();
   return null;
 }
@@ -57,10 +58,7 @@ export async function providersHealth() {
     getProvider("webpush").then(async (p) =>
       p ? { id: p.id, ...(await p.health()) } : { id: "webpush", ok: false, detail: "no configurado" }
     ),
-    Promise.resolve(createWhatsAppMetaStub()).then(async (p) => ({
-      id: p.id,
-      ...(await p.health()),
-    })),
+    getProvider("whatsapp_meta").then(async p => p ? { id: p.id, ...(await p.health()) } : { id: "whatsapp_meta", ok: false, detail: "no configurado" }),
     Promise.resolve(createWhatsAppTwilioStub()).then(async (p) => ({
       id: p.id,
       ...(await p.health()),

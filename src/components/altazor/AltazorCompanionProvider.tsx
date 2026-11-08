@@ -7,9 +7,10 @@ import { AltazorMark } from "./AltazorMark";
 import { AltazorHome } from "./AltazorHome";
 import { useAltazorUpdates } from "./AltazorUpdates";
 import { useAltazorCompanionState } from "./useAltazorCompanionState";
+import { useAltazorHelpReconciliation } from "./useAltazorHelpReconciliation";
 import "./AltazorCompanion.css";
 
-type CompanionState = ReturnType<typeof useAltazorCompanionState> & { updates: ReturnType<typeof useAltazorUpdates> };
+type CompanionState = ReturnType<typeof useAltazorCompanionState> & { updates: ReturnType<typeof useAltazorUpdates>; reconcileHelp: () => Promise<unknown> };
 const Context = createContext<CompanionState | null>(null);
 export function useAltazorCompanion() {
   const state = useContext(Context);
@@ -23,8 +24,9 @@ export function AltazorCompanionProvider({ userId, children }: { userId: string;
 }
 function UserCompanion({ children }: { children: ReactNode }) {
   const state = useAltazorCompanionState(), updates = useAltazorUpdates(), pathname = usePathname();
+  const reconcile = useAltazorHelpReconciliation();
   const atHome = pathname === "/inicio";
-  return <Context.Provider value={{ ...state, updates }}><Suspense fallback={null}><CompanionLocationObserver /></Suspense>{children}{!atHome && <CompanionPanel key={pathname} />}</Context.Provider>;
+  return <Context.Provider value={{ ...state, updates, reconcileHelp: () => reconcile(true) }}><Suspense fallback={null}><CompanionLocationObserver /></Suspense>{children}{!atHome && <CompanionPanel key={pathname} />}</Context.Provider>;
 }
 /** Observe query changes without making the conversation UI depend on a prerendered URL. */
 function CompanionLocationObserver(){
@@ -35,7 +37,7 @@ function CompanionLocationObserver(){
 }
 function CompanionPanel() {
   const state = useAltazorCompanion(), [open,setOpen] = useState(false);
-  const running = state.data?.turns.some(turn => ["queued", "running"].includes(turn.status));
+  const running = state.data?.turns.some(turn => ["queued", "running", "delegating"].includes(turn.status));
   const params=new URLSearchParams();if(state.activeId)params.set("conversacion",state.activeId);else if(state.scope)params.set("causaId",state.scope);
   const homeHref=`/inicio${params.size?`?${params}`:""}`;
   return <>

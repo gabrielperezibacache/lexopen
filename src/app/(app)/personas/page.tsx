@@ -2,17 +2,19 @@ import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { requireStaff } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/rbac";
+import { siteAccessWhere } from "@/lib/auth/causa-access";
 import { PeopleManager } from "@/components/PeopleManager";
 import { getI18n } from "@/lib/i18n/server";
 
 export default async function PeoplePage() {
   const me = await requireStaff();
+  const canManage = isAdmin(me);
   const { dict } = await getI18n();
   const h = dict.hubs.personas;
   const [users, groups] = await Promise.all([
     prisma.user.findMany({
       include: {
-        siteMemberships: { include: { site: true } },
+        siteMemberships: { where: { site: siteAccessWhere(me) }, include: { site: true } },
         groupMembers: { include: { group: true } },
       },
       orderBy: { name: "asc" },
@@ -27,7 +29,7 @@ export default async function PeoplePage() {
     <div>
       <ModuleHeader artwork="people" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       <PeopleManager
-        canManage={isAdmin(me.role)}
+        canManage={canManage}
         currentUserId={me.id}
         initialUsers={users.map((u) => ({
           id: u.id,
@@ -36,6 +38,7 @@ export default async function PeoplePage() {
           role: u.role,
           title: u.title,
           avatarColor: u.avatarColor,
+          ...(canManage ? { capabilityGrants: u.capabilityGrants, capabilityRevokes: u.capabilityRevokes } : {}),
           siteMemberships: u.siteMemberships.map((m) => ({
             site: { id: m.site.id, name: m.site.name },
           })),

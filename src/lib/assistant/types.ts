@@ -45,6 +45,8 @@ export const ASSISTANT_TOOL_IDS = [
   "escrito.guardar",
   "biblioteca.listar",
   "sincronizacion.estado",
+  "icaro.listar",
+  "icaro.delegar",
 ] as const;
 
 export type AssistantIntentId = (typeof ASSISTANT_TOOL_IDS)[number];

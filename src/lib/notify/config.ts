@@ -231,8 +231,8 @@ export async function notifyProvidersSnapshot() {
       hasPrivateKey: Boolean(wpRaw.privateKey),
     },
     whatsapp: {
-      enabled: false,
-      note: "WhatsApp Cloud API / Twilio en LexOpen 1.2 (solo interfaz en 1.1).",
+      enabled: (await import("@/lib/altazor/help/config").then(module => module.whatsAppMetaSnapshot())).enabled,
+      note: "Meta Cloud API está disponible para avisos y respuestas de ayuda de Altazor. Configura la conexión del Host y vincula tu número desde la ayuda de Altazor. Twilio continúa sin configurar.",
     },
   };
 }

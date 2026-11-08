@@ -6,9 +6,64 @@ import { assertSessionLive, computerEnabled, endpointFor, inputSchema, inspectSe
 import { assertComputerPolicy, computerPolicyAllowed } from "./privacy";
 import { computerOperationHash } from "./operation-hash";
 import { createHash } from "node:crypto";
+import { computerReadSchema, computerReadingSchema } from "./reading";
 
 const token = "gateway-fixture-token-only";
 const kitty = { id: "kitty-fixture", name: "altazor-fixture", provider: "model-fixture", desktop: true, container: "kitty-altazor-fixture", status: "running", connectors: ["-"], approvals: "ask", backup: "" };
+test("semantic reads use a bounded fixed endpoint and reject access-bearing links", async () => {
+  const reading = { version: "v1", source: "browser", title: "Fixture", url: "https://fixture.invalid/page", text: "Synthetic DOM", totalChars: 13, offset: 0, nextOffset: null, items: [{ ref: 1, role: "button", label: "Continue" }], elementOffset: 0, nextElementOffset: null, method: "dom", redacted: true };
+  const requests: string[] = [];
+  const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method, body) => {
+    requests.push(path); assert.equal(path, `/v1/kitties/${kitty.id}/read`); assert.equal(method, "POST");
+    assert.deepEqual(body, { source: "browser", offset: 0, limit: 6000, query: "", elementOffset: 0, elementLimit: 40 });
+    return reading;
+  }));
+  assert.deepEqual(await client.read(kitty.id, { source: "browser" }), reading);
+  assert.equal(requests.some(path => path.endsWith("/exec") || path.endsWith("/screenshot")), false);
+  for (const path of ["../secret.txt", "/etc/passwd", ".browser/Cookies", "uploads/.env", "a\\b"]) assert.equal(computerReadSchema.safeParse({ source: "document", path }).success, false);
+  assert.equal(computerReadSchema.safeParse({ source: "browser", limit: 12001 }).success, false);
+  assert.equal(computerReadSchema.safeParse({ source: "browser", argv: ["cat"] }).success, false);
+  for (const url of ["https://fixture.invalid/page?token=secret", "https://user:secret@fixture.invalid/page", "file:///private", "https://fixture.invalid/#secret"]) assert.equal(computerReadingSchema.safeParse({ ...reading, url }).success, false);
+  const malformed = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ ...reading, redacted: false })));
+  await assert.rejects(malformed.read(kitty.id, { source: "browser" }), error => (error as { code: string }).code === "computer_read_contract");
+});
+test("help replies target only the currently waiting turn, never a new message", async () => {
+  const requests: string[] = []; let waiting = true;
+  const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method, body) => {
+    requests.push(path);
+    if (path === "/v1/chats/chat-fixture") return { chat: { id: "chat-fixture", members: [kitty.id], turns: [{ from: "assistant", text: "Needs a decision", working: waiting, steps: [...Array.from({ length: 70 }, () => ({ action: "click" })), { action: "ask_help" }] }] } };
+    assert.equal(path, "/v1/chats/chat-fixture/turns/0/help"); assert.equal(method, "POST");
+    assert.deepEqual(body, { text: "Continue with the draft", secret: false, enter: false, save: "" }); return { ok: true };
+  }));
+  assert.equal((await client.chat("chat-fixture", kitty.id)).turns[0].actionCount, 71);
+  await client.replyHelp("chat-fixture", kitty.id, 0, "Continue with the draft");
+  waiting = false;
+  const before = requests.length;
+  await assert.rejects(client.replyHelp("chat-fixture", kitty.id, 0, "Late answer"), error => (error as { code: string }).code === "computer_help_stale");
+  assert.equal(requests.length, before + 1);
+  assert.equal(requests.some(path => path.endsWith("/messages") || path.endsWith("/cancel")), false);
+});
+test("help metadata identifies the current raw ask_help step and its actual question", async () => {
+  let working = true, from = "model-fixture";
+  const steps: Record<string, unknown>[] = [...Array.from({ length: 70 }, () => ({ action: "click" })), { action: "ask_help", args: { reason: "¿Elijo el primer documento?", password: "ARGUMENT_SECRET_SENTINEL" }, result: "¿Elijo el primer documento?" }];
+  const client = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ chat: { id: "chat-fixture", members: [kitty.id], turns: [{ from, text: "The same original turn text", working, needs_help: true, steps }] } })));
+  const first = (await client.chat("chat-fixture", kitty.id)).turns[0];
+  assert.deepEqual(first.help, { stepIndex: 70, question: "¿Elijo el primer documento?" });
+  assert.equal(first.steps.length, 60);
+  assert.equal(JSON.stringify(first).includes("ARGUMENT_SECRET_SENTINEL"), false);
+  steps.push({ action: "helped" }, { action: "click" }, { action: "ask_help", args: { reason: "¿Confirmo la segunda selección?" }, result: "¿Confirmo la segunda selección?" });
+  const second = (await client.chat("chat-fixture", kitty.id)).turns[0];
+  assert.equal(second.index, first.index); assert.equal(second.text, first.text);
+  assert.deepEqual(second.help, { stepIndex: 73, question: "¿Confirmo la segunda selección?" });
+  steps.push({ action: "helped" }, { action: "ask_help", result: "Pregunta guardada sólo en el resultado Go" });
+  assert.deepEqual((await client.chat("chat-fixture", kitty.id)).turns[0].help, { stepIndex: 75, question: "Pregunta guardada sólo en el resultado Go" });
+  steps.push({ action: "helped" }, { action: "ask_help", result: "Pregunta guardada sólo en el resultado Go" });
+  assert.deepEqual((await client.chat("chat-fixture", kitty.id)).turns[0].help, { stepIndex: 77, question: "Pregunta guardada sólo en el resultado Go" }, "repetir la misma pregunta en el mismo turno conserva una identidad de paso distinta");
+  working = false;
+  assert.equal((await client.chat("chat-fixture", kitty.id)).turns[0].help, undefined, "needs_help terminal no se presenta como espera activa");
+  working = true; from = "user";
+  assert.equal((await client.chat("chat-fixture", kitty.id)).turns[0].help, undefined, "un turno del usuario nunca contiene ayuda pendiente del agente");
+});
 test("manual Unicode typing is bounded by the pinned gateway's UTF-8 byte limit", () => {
   assert.equal(inputSchema.safeParse({ action: "type", args: { text: "é".repeat(1000) } }).success, true);
   assert.equal(inputSchema.safeParse({ action: "type", args: { text: "é".repeat(1001) } }).success, false);

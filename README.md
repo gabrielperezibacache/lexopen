@@ -39,6 +39,10 @@ Google Drive, correo y la integración judicial chilena se activan cuando el est
 
 En **Configuración** se reúnen tus preferencias y los ajustes del estudio. **Comunicaciones** aparece allí al elegir Chile como país de trabajo o al activar las herramientas del PJUD.
 
+En **Mi cuenta → Mi rol y permisos** puedes consultar el alcance de tu rol y los permisos adicionales o revocados. La administración técnica del Host y las atribuciones jurídicas del socio son responsabilidades distintas. Un permiso explícito de administración permite delegar los ajustes compartidos a otro integrante del equipo; las cuentas de cliente y externo siguen limitadas al portal. Nadie puede ampliar sus propios permisos ni dejar el Host sin un administrador efectivo.
+
+Las preferencias, conexiones de Codex y autorizaciones personales pertenecen a cada usuario. La política de IA del estudio se aplica también a las conexiones personales. **Cuenta conectada** indica autorización; **Probar conexión** comprueba una respuesta del modelo seleccionado.
+
 La **campanita** muestra los avisos recientes y los que quedan por leer. Desde allí puedes revisar un aviso o abrir el historial. Los avisos críticos mantienen su confirmación de recepción por separado.
 
 ## Recorrido por la aplicación
@@ -70,6 +74,8 @@ Crea un trabajo para investigar, escribir o enseñar. Reúne bibliografía y pas
 Habla con Altazor desde **Inicio** o desde el acompañante lateral. Comparte el archivo de la causa que quieres revisar y retoma el trabajo desde el mismo hilo. Altazor recupera el contexto al que tienes acceso y te pide revisar los cambios que prepara. Debajo del chat puedes observar el escritorio cuando haya una sesión activa. [Guía de Altazor](docs/ALTAZOR.md) · [Conexiones y secretos](docs/ALTAZOR-CONEXIONES.md)
 
 Puedes pegar un documento directamente en el chat, abrir una solicitud de ayuda del escritorio y activar desde **Mi cuenta** un resumen privado de plazos y correo judicial recibido.
+
+Altazor resume el plan y cuenta sus acciones, con los detalles bajo demanda. El escritorio puede leer texto del navegador y documentos antes de recurrir a capturas. **Ícaros** permite delegar análisis a especialistas con modelo y memoria propios; **Ayuda a distancia** conserva las esperas y recibe respuestas por ntfy o WhatsApp conectado. Consulta la preparación del perfil de escritorio, los canales y el worker en la [guía de Altazor](docs/ALTAZOR.md).
 
 <details>
 <summary>Más capturas de la aplicación</summary>

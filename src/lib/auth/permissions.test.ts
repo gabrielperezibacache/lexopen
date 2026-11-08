@@ -4,11 +4,13 @@ import {
   canSome,
   capabilityLevel,
   CAPABILITIES,
+  effectiveCapabilities,
   FOUNDER_ADMIN_GRANTS,
   parseCapabilityCsv,
   presetLevel,
 } from "./permissions";
 import { ROLES } from "./roles";
+import { isAdmin } from "./rbac";
 
 // Matriz §3.3 — muestras clave admin ≠ socio
 assert.equal(presetLevel("admin", "host.admin"), "all");
@@ -58,6 +60,38 @@ assert.equal(can("abogado", "causa.team.manage", { causaRol: "colaborador" }), f
 assert.equal(can("abogado", "causa.team.manage", { causaRol: "responsable" }), true);
 assert.equal(canSome("abogado", "causa.write"), true);
 assert.equal(canSome("cliente", "causa.write"), false);
+
+// El rol de causa limita el alcance sin sustituir el rol del estudio.
+for (const [role, cap] of [
+  ["asistente", "escrito.draft"],
+  ["asistente", "plazo.edit"],
+  ["abogado", "billing.manage"],
+  ["procurador", "task.assign"],
+  ["externo", "time.log"],
+] as const) {
+  assert.equal(can(role, cap, { causaRol: "lectura" }), false, `${role}/${cap}: lectura no muta`);
+  assert.equal(can(role, cap, { causaRol: "lectura", own: true }), false, `${role}/${cap}: ser autor no eleva una membresía de lectura`);
+  assert.equal(can(role, cap, { causaRol: "desconocido" }), false, `${role}/${cap}: membresía desconocida`);
+  assert.equal(can(role, cap, { causaRol: "colaborador" }), true, `${role}/${cap}: colaborador conserva su alcance`);
+}
+assert.equal(can("contabilidad", "causa.read", { causaRol: "lectura" }), true);
+assert.equal(can("abogado", "doc.privileged.read", { causaRol: "lectura" }), true);
+assert.equal(can("abogado", "escrito.approve", { causaRol: "supervisor" }), true);
+assert.equal(can("abogado", "escrito.approve", { causaRol: "colaborador", own: true }), false);
+assert.equal(can("abogado", "causa.team.manage", { own: true }), false);
+assert.equal(can("abogado", "evento.manage", { own: true }), true);
+assert.equal(can("abogado", "evento.manage", { causaRol: "desconocido", own: true }), false);
+assert.equal(can({ role: "abogado", capabilityRevokes: "causa.write" }, "causa.write", { causaRol: "responsable" }), false);
+
+assert.equal(isAdmin("admin"), true);
+assert.equal(isAdmin("socio"), false);
+assert.equal(isAdmin({ role: "abogado", capabilityGrants: "host.admin" }), true);
+assert.equal(isAdmin({ role: "admin", capabilityRevokes: "host.admin" }), false);
+for (const role of ["cliente", "externo", "desconocido"]) {
+  assert.equal(isAdmin({ role, capabilityGrants: "host.admin" }), false, `${role} no administra el Host con un grant`);
+  assert.equal(can({ role, capabilityGrants: "host.admin" }, "host.admin"), false);
+  assert.equal(effectiveCapabilities({ role, capabilityGrants: "host.admin" }).find(item => item.cap === "host.admin")?.level, "none");
+}
 
 assert.ok(FOUNDER_ADMIN_GRANTS.includes("causa.override_walls"));
 assert.deepEqual(parseCapabilityCsv(" a,b , causa.read,x "), ["causa.read"]);

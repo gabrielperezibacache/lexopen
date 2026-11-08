@@ -20,9 +20,9 @@ export function isStaff(role: string) {
   return (STAFF_ROLES as readonly string[]).includes(role);
 }
 
-/** Admin técnico del Host (rol `admin` o grant `host.admin`). */
+/** Staff con administración efectiva del Host (rol `admin` o grant, sin revoke). */
 export function isAdmin(subject: Subject) {
-  return can(subject, "host.admin");
+  return isStaff(roleOf(subject)) && can(subject, "host.admin");
 }
 
 /** Roles de portal (`cliente` y `externo`): fail-closed fuera del portal. */

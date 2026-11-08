@@ -8,6 +8,26 @@ import {
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { sendGmailMessage } from "@/lib/integrations/gmail";
 import { emitNotification } from "@/lib/notify/emit";
+import { causaAccessWhere } from "@/lib/auth/causa-access";
+import { can, canSome } from "@/lib/auth/permissions";
+import { isAdmin, isStaff } from "@/lib/auth/rbac";
+import { STAFF_ROLES } from "@/lib/auth/roles";
+import type { Prisma } from "@prisma/client";
+
+const recipientSelect = { id: true, email: true, name: true, role: true, capabilityGrants: true, capabilityRevokes: true } as const;
+
+/** Re-read the recipient and matter access before each delivery; cached assignment is not authorization. */
+export async function authorizedPjudDigestRecipient(userId: string, items: readonly DigestItem[], client: Pick<Prisma.TransactionClient, "user" | "causa"> = prisma) {
+  const user = await client.user.findUnique({ where: { id: userId }, select: recipientSelect });
+  if (!user || !isStaff(user.role) || !canSome(user, "causa.read")) return null;
+  const causes = await client.causa.findMany({
+    where: { AND: [{ id: { in: items.map(item => item.causaId) }, pjudMonitoreoActivo: true, estado: "activa" }, causaAccessWhere(user)] },
+    select: { id: true },
+  });
+  const readable = new Set(causes.map(cause => cause.id));
+  const permitted = items.filter(item => readable.has(item.causaId));
+  return permitted.length ? { user, items: permitted } : null;
+}
 
 export type DigestItem = {
   causaId: string;
@@ -72,7 +92,7 @@ export async function buildPjudDigest(opts?: { since?: Date }) {
   const causas = await prisma.causa.findMany({
     where: { pjudMonitoreoActivo: true, estado: "activa" },
     include: {
-      abogado: { select: { id: true, email: true, name: true, role: true } },
+      abogado: { select: recipientSelect },
       movimientos: {
         orderBy: { fecha: "desc" },
         take: 1,
@@ -127,7 +147,7 @@ export async function buildPjudDigest(opts?: { since?: Date }) {
     };
     items.push(item);
 
-    if (c.abogado && c.abogado.role !== "cliente" && c.abogado.email) {
+    if (c.abogado && isStaff(c.abogado.role) && canSome(c.abogado, "causa.read") && c.abogado.email) {
       const bucket = byAbogado.get(c.abogado.id) || {
         email: c.abogado.email,
         name: c.abogado.name,
@@ -273,8 +293,12 @@ function escapeHtml(value: string) {
 
 async function staffRecipients() {
   return prisma.user.findMany({
-    where: { role: { in: ["admin", "abogado"] } },
-    select: { id: true, email: true, name: true, role: true },
+    where: { role: { in: [...STAFF_ROLES] }, OR: [
+      { role: { in: ["admin", "socio", "abogado"] } },
+      { capabilityGrants: { contains: "host.admin" } },
+      { capabilityGrants: { contains: "causa.override_walls" } },
+    ] },
+    select: recipientSelect,
     take: 20,
   });
 }
@@ -294,20 +318,22 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
   const notified: string[] = [];
   let paused = false;
 
-  // Route unassigned causas to admins (or first staff).
+  // Supervisors/Host managers receive only the unassigned matters they may read.
   if (built.unassigned.length) {
-    const staff = await staffRecipients();
-    const admins = staff.filter((u) => u.role === "admin");
-    const targets = (admins.length ? admins : staff).filter((u) => u.email);
+    const staff = (await staffRecipients()).filter(user => isStaff(user.role) && canSome(user, "causa.read"));
+    const supervisors = staff.filter(user => isAdmin(user) || can(user, "causa.override_walls"));
+    const targets = (supervisors.length ? supervisors : staff.filter(user => user.role === "abogado")).filter(user => user.email);
     for (const user of targets) {
+      const permitted = await authorizedPjudDigestRecipient(user.id, built.unassigned);
+      if (!permitted) continue;
       const bucket = built.byAbogado.get(user.id) || {
-        email: user.email,
-        name: user.name,
+        email: permitted.user.email,
+        name: permitted.user.name,
         items: [],
       };
       // Avoid duplicating causas already assigned to this user.
       const existingIds = new Set(bucket.items.map((i) => i.causaId));
-      for (const item of built.unassigned) {
+      for (const item of permitted.items) {
         if (!existingIds.has(item.causaId)) bucket.items.push(item);
       }
       built.byAbogado.set(user.id, bucket);
@@ -318,29 +344,30 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
     for (const [userId, bucket] of built.byAbogado) {
       if (await getCaseManagementMode() !== "pjud_cl") { paused = true; break; }
       if (!bucket.items.length) continue;
-      const subject = `LexOpen PJUD · ${bucket.items.length} causa(s) con novedades`;
       if (canEmail) {
+        const delivery = await authorizedPjudDigestRecipient(userId, bucket.items);
+        if (!delivery) continue;
         try {
           await sendGmailMessage({
-            to: bucket.email,
-            subject,
-            text: formatDigestText(bucket.items, appUrl),
-            html: formatDigestHtml(bucket.name, bucket.items, appUrl),
+            to: delivery.user.email,
+            subject: `LexOpen PJUD · ${delivery.items.length} causa(s) con novedades`,
+            text: formatDigestText(delivery.items, appUrl),
+            html: formatDigestHtml(delivery.user.name, delivery.items, appUrl),
           });
-          sent.push(bucket.email);
+          sent.push(delivery.user.email);
         } catch {
-          emailFailed.push(bucket.email);
+          emailFailed.push(delivery.user.email);
         }
       }
       if (await getCaseManagementMode() !== "pjud_cl") { paused = true; break; }
+      if (!await authorizedPjudDigestRecipient(userId, bucket.items)) continue;
       await emitNotification({
         tipo: "pjud.digest",
         userId,
-        title: subject,
-        body: bucket.items
-          .slice(0, 3)
-          .map((i) => i.rit || i.titulo)
-          .join(" · "),
+        title: "LexOpen PJUD · resumen de novedades",
+        // The aggregate has no single source to re-authorize when opened later.
+        // Keep matter names out of its persisted copy after future access changes.
+        body: "Revisa las novedades de las causas a las que tienes acceso.",
         href: "/causas/monitoreo",
         dedupeKey: `pjud.digest:${userId}:${new Date().toISOString().slice(0, 10)}`,
       });

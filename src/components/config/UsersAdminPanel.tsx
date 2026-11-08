@@ -8,6 +8,8 @@ type UserRow = {
   role: string;
   title: string | null;
   avatarColor: string;
+  capabilityGrants?: string;
+  capabilityRevokes?: string;
   siteMemberships: Array<{ site: { id: string; name: string } }>;
   groupMembers: Array<{ group: { id: string; name: string } }>;
 };
@@ -37,8 +39,10 @@ export function UsersAdminPanel({
       <div className="panel rounded-3xl p-5 md:p-6">
         <h2 className="text-lg font-semibold">Usuarios del estudio</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          Crear, editar y eliminar usuarios y grupos del estudio. Los clientes
-          usan el portal; admin, abogado y asistente acceden a LexOpen interno.
+          El administrador del Host gestiona cuentas e integraciones. Socios,
+          abogados, procuradores, asistentes y contabilidad trabajan con los
+          permisos de su rol; externos y clientes usan el portal. Las excepciones
+          personales se revisan al editar cada usuario.
           También disponible en{" "}
           <Link href="/personas" className="text-[var(--sea)]">
             Personas

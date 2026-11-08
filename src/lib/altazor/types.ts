@@ -3,6 +3,7 @@ import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import type { LlmHistoryMessage } from "@/lib/ai/chat-history";
 import type { AssistantTurnInput, AssistantTurnResult } from "@/lib/assistant/pipeline";
 import type { AltazorSourceSnapshot } from "./resources";
+export type { AltazorProgress } from "./progress";
 
 export type AltazorClient = PrismaClient | Prisma.TransactionClient;
 export type AltazorDestination = { provider: string; model: string; endpoint: string; endpointHash: string; remote: boolean; permitted: boolean; key: string };

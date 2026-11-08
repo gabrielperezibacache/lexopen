@@ -8,6 +8,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dialog } from "@/components/ui/Dialog";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
+import { CAPABILITIES, CAPABILITY_LABELS, parseCapabilityCsv, presetLevel } from "@/lib/auth/permissions";
+import { ROLE_LABELS } from "@/lib/auth/roles";
 
 type UserRow = {
   id: string;
@@ -29,19 +31,44 @@ type GroupRow = {
   members: Array<{ user: { id: string; name: string } }>;
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin del Host",
-  socio: "Socio/a",
-  abogado: "Abogado/a",
-  procurador: "Procurador/a",
-  asistente: "Asistente / secretaria",
-  contabilidad: "Contabilidad",
-  externo: "Externo",
-  cliente: "Cliente",
-};
+const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 function PeopleField({ label, children }: { label: string; children: ReactNode }) {
   return <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]"><span>{label}</span>{children}</label>;
+}
+
+function UserPermissionFields({ user, self }: { user: UserRow; self: boolean }) {
+  const [role, setRole] = useState(user.role);
+  const [grants, setGrants] = useState(parseCapabilityCsv(user.capabilityGrants));
+  const [revokes, setRevokes] = useState(parseCapabilityCsv(user.capabilityRevokes));
+  const known = user.capabilityGrants !== undefined && user.capabilityRevokes !== undefined;
+  const levelLabels = { all: "permitido", scoped: "limitado a sus causas o recursos", none: "sin permiso" };
+  return <>
+    <PeopleField label="Rol"><select className="select" name="role" value={role} onChange={event => setRole(event.target.value)}>
+      {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+    </select></PeopleField>
+    {known ? <>
+      <input type="hidden" name="capabilityGrants" value={grants.join(",")} />
+      <input type="hidden" name="capabilityRevokes" value={revokes.join(",")} />
+      <details className="rounded-2xl border border-[var(--line)] p-3">
+        <summary className="cursor-pointer font-medium">Permisos del rol y excepciones personales</summary>
+        <p className="my-3 text-sm text-[var(--ink-soft)]">Heredar aplica el rol. Conceder amplía ese permiso; revocar lo impide aunque el rol lo incluya. Los grupos no cambian los permisos del rol.</p>
+        {self && <p className="mb-3 text-sm text-[var(--ink-soft)]">Otro administrador debe autorizar cualquier ampliación de sus propios permisos.</p>}
+        <div className="grid gap-3">
+          {CAPABILITIES.map(capability => <PeopleField key={capability} label={CAPABILITY_LABELS[capability]}>
+            <select className="select" value={revokes.includes(capability) ? "revoke" : grants.includes(capability) ? "grant" : "inherit"} onChange={event => {
+              setGrants(previous => event.target.value === "grant" ? [...previous.filter(value => value !== capability), capability] : previous.filter(value => value !== capability));
+              setRevokes(previous => event.target.value === "revoke" ? [...previous.filter(value => value !== capability), capability] : previous.filter(value => value !== capability));
+            }}>
+              <option value="inherit">Heredar: {levelLabels[presetLevel(role, capability)]}</option>
+              <option value="grant">Conceder permiso completo</option>
+              <option value="revoke">Revocar permiso</option>
+            </select>
+          </PeopleField>)}
+        </div>
+      </details>
+    </> : <p className="text-sm text-[var(--ink-soft)]">Los permisos personales se conservarán. Actualice el listado para consultarlos.</p>}
+  </>;
 }
 
 export function PeopleManager({
@@ -127,8 +154,8 @@ export function PeopleManager({
         email: fd.get("email"),
         role: fd.get("role"),
         title: fd.get("title") || null,
-        capabilityGrants: String(fd.get("capabilityGrants") || ""),
-        capabilityRevokes: String(fd.get("capabilityRevokes") || ""),
+        ...(fd.has("capabilityGrants") ? { capabilityGrants: String(fd.get("capabilityGrants")) } : {}),
+        ...(fd.has("capabilityRevokes") ? { capabilityRevokes: String(fd.get("capabilityRevokes")) } : {}),
         ...(password ? { password } : {}),
       }),
     });
@@ -297,7 +324,7 @@ export function PeopleManager({
             Crear usuario
           </button>
         )}
-        <button
+        {canManage && <button
           className="btn btn-secondary"
           type="button"
           onClick={() => {
@@ -306,7 +333,7 @@ export function PeopleManager({
           }}
         >
           Nuevo grupo
-        </button>
+        </button>}
         {!compact && canManage && (
           <Link href="/configuracion#usuarios" className="btn btn-ghost text-sm">
             Ver en Configuración
@@ -339,6 +366,7 @@ export function PeopleManager({
               {users.map((u) => (
                 <div
                   key={u.id}
+                  data-testid="studio-user"
                   className="rounded-2xl border border-[var(--line)] px-4 py-3"
                 >
                   <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -443,13 +471,13 @@ export function PeopleManager({
                 title="Sin grupos"
                 description="Agrupe abogados o equipos para compartir acceso a espacios."
                 action={
-                  <button
+                  canManage ? <button
                     className="btn btn-primary"
                     type="button"
                     onClick={() => setGroupOpen(true)}
                   >
                     Nuevo grupo
-                  </button>
+                  </button> : undefined
                 }
               />
             </div>
@@ -504,8 +532,7 @@ export function PeopleManager({
             className="space-y-4"
           >
             <p className="text-sm text-[var(--ink-soft)]">
-              Roles: admin (Host), socio, abogado, procurador, asistente,
-              contabilidad, externo o cliente (portal). Admin ≠ socio.
+              Admin del Host gestiona cuentas e integraciones; socio dirige el trabajo jurídico. Los nuevos administradores no reciben permisos jurídicos adicionales automáticamente. Externos y clientes usan el portal.
             </p>
             <PeopleField label="Nombre completo"><input
               className="input"
@@ -579,31 +606,7 @@ export function PeopleManager({
               placeholder="Cargo (opcional)"
               defaultValue={editing.title || ""}
             /></PeopleField>
-            <PeopleField label="Rol"><select className="select" name="role" defaultValue={editing.role}>
-              {Object.entries(ROLE_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select></PeopleField>
-            <label className="block text-sm text-[var(--ink-soft)]">
-              Capacidades extra (CSV)
-              <input
-                className="input mt-1"
-                name="capabilityGrants"
-                defaultValue={editing.capabilityGrants || ""}
-                placeholder="p. ej. host.admin,causa.override_walls"
-              />
-            </label>
-            <label className="block text-sm text-[var(--ink-soft)]">
-              Capacidades revocadas (CSV)
-              <input
-                className="input mt-1"
-                name="capabilityRevokes"
-                defaultValue={editing.capabilityRevokes || ""}
-                placeholder="p. ej. voice.use"
-              />
-            </label>
+            <UserPermissionFields key={editing.id} user={editing} self={editing.id === currentUserId} />
             <PeopleField label="Nueva contraseña (opcional, mín. 12)"><input
               className="input"
               name="password"
@@ -613,8 +616,8 @@ export function PeopleManager({
               autoComplete="new-password"
             /></PeopleField>
             <p className="text-sm text-[var(--ink-soft)]">
-              Si cambia el rol, grants o la contraseña, se invalidan las sesiones
-              activas del usuario.
+              Los cambios de rol, permisos, correo o contraseña invalidan las
+              sesiones activas del usuario. Editar sólo el perfil conserva su sesión.
             </p>
             <div className="flex justify-end gap-2">
               <button

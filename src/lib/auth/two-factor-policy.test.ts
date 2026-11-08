@@ -41,6 +41,15 @@ assert.equal(
   }),
   false
 );
+
+assert.equal(mustEnrollTwoFactor({ role: "abogado", capabilityGrants: "host.admin", totpEnabled: false, policyEnabled: true }), true, "administrar el Host por delegación también requiere 2FA");
+assert.equal(mustEnrollTwoFactor({ role: "abogado", capabilityGrants: "host.admin", capabilityRevokes: "host.admin", totpEnabled: false, policyEnabled: true }), false, "un permiso revocado no activa el privilegio");
+assert.equal(mustEnrollTwoFactor({ role: "admin", capabilityRevokes: "host.admin", totpEnabled: false, policyEnabled: true }), true, "la exigencia del rol privilegiado se conserva");
+assert.equal(mustEnrollTwoFactor({ role: "abogado", capabilityGrants: "host.admin", totpEnabled: true, policyEnabled: true }), false);
+assert.equal(mustEnrollTwoFactor({ role: "abogado", capabilityGrants: "host.admin", totpEnabled: false, policyEnabled: false }), false);
+for (const role of ["cliente", "externo", "desconocido"]) {
+  assert.equal(mustEnrollTwoFactor({ role, capabilityGrants: "host.admin", totpEnabled: false, policyEnabled: true }), false, `${role}: un grant no abre la administración interna`);
+}
 assert.equal(
   mustEnrollTwoFactor({
     role: "admin",

@@ -11,6 +11,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 import { isClientAllowedPath } from "@/lib/auth/client-paths";
 import { PORTAL_ROLES, VALID_ROLE_SET } from "@/lib/auth/roles";
+import type { PermissionSubject } from "@/lib/auth/permissions";
 import {
   isTwoFactorExemptPath,
   mustEnrollTwoFactor,
@@ -60,7 +61,7 @@ async function lookupSessionVersion(userId: string) {
     const { prisma } = await import("@/lib/db");
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { sessionVersion: true, role: true, totpEnabled: true },
+      select: { sessionVersion: true, role: true, capabilityGrants: true, capabilityRevokes: true, totpEnabled: true },
     });
   } catch (error) {
     console.warn("[proxy] session lookup failed", error);
@@ -95,7 +96,7 @@ async function lookupTwoFactorPolicy() {
 
 async function verifyToken(
   token: string
-): Promise<{ userId: string; role: string; totpEnabled: boolean } | null> {
+): Promise<(PermissionSubject & { userId: string; totpEnabled: boolean }) | null> {
   const secret = sessionSecret();
   if (!secret) return null;
   if (!token.includes(".")) return null;
@@ -125,7 +126,7 @@ async function verifyToken(
   const matched = sessionVersionMatches(row, sessionVersion, VALID_ROLES);
   if (!matched.ok) return null;
   // Prefer DB role so ACL tracks role changes after session minting.
-  return { userId, role: matched.role, totpEnabled: Boolean(row?.totpEnabled) };
+  return { userId, role: matched.role, capabilityGrants: row?.capabilityGrants, capabilityRevokes: row?.capabilityRevokes, totpEnabled: Boolean(row?.totpEnabled) };
 }
 
 function cookieSecureFlag() {
@@ -265,6 +266,9 @@ export async function proxy(req: NextRequest) {
     return pass();
   }
 
+  // Meta verifies its own challenge/signature; no other help route is public.
+  if (pathname === "/api/altazor/help/whatsapp" && (req.method === "GET" || req.method === "POST")) return pass();
+
   // Host schedulers authenticate with x-cron-secret (no session cookie).
   if (
     isAuthorizedCronRequest(pathname, req.headers.get("x-cron-secret"))
@@ -306,6 +310,8 @@ export async function proxy(req: NextRequest) {
     !isTwoFactorExemptPath(pathname) &&
     mustEnrollTwoFactor({
       role: session.role,
+      capabilityGrants: session.capabilityGrants,
+      capabilityRevokes: session.capabilityRevokes,
       totpEnabled: session.totpEnabled,
       policyEnabled: await lookupTwoFactorPolicy(),
     })

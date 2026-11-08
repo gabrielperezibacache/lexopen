@@ -37,9 +37,31 @@ async function main(){
     const owner=await prisma.user.create({data:{email:`${tag}@personal-drive.invalid`,name:"Titular ficticio",role:"abogado",password:"not-a-login"}});users.push(owner.id);
     const other=await prisma.user.create({data:{email:`${tag}-other@personal-drive.invalid`,name:"Otro ficticio",role:"abogado",password:"not-a-login"}});users.push(other.id);
     const actor={id:owner.id,sessionVersion:owner.sessionVersion,sessionHash:sessionHash("fixture-session")},stranger={id:other.id,sessionVersion:other.sessionVersion,sessionHash:sessionHash("other-fixture-session")};
-    await prisma.user.update({where:{id:other.id},data:{role:"socio",capabilityGrants:"host.admin"}});assert.equal((await personalDriveConnectionStatus(other.id)).canAdmin,false);await assert.rejects(personalDriveSetupStatus(stranger),status(403));
-    await prisma.user.update({where:{id:other.id},data:{role:"admin",capabilityGrants:""}});
-    const prepared=await savePersonalDriveSetup(stranger,{useAltazorApp:true,confirmed:true},process.env.APP_URL!,{env:{APP_URL:process.env.APP_URL,ALTAZOR_GOOGLE_CLIENT_ID:"fixture-shared-app",ALTAZOR_GOOGLE_CLIENT_SECRET:"fixture-shared-secret"}});assert.equal(prepared.configured,true);assert.equal(prepared.source,"altazor");const storedSetup=await prisma.integrationConfig.findUniqueOrThrow({where:{provider:"personal-drive-oauth"}});assert.ok(!storedSetup.configJson.includes("fixture-shared-secret"),"an operator alias never copies tokens or secret material");
+    const setupInput={useAltazorApp:true,confirmed:true as const},setupOptions={env:{APP_URL:process.env.APP_URL,ALTAZOR_GOOGLE_CLIENT_ID:"fixture-shared-app",ALTAZOR_GOOGLE_CLIENT_SECRET:"fixture-shared-secret"}};
+    assert.equal((await personalDriveConnectionStatus(other.id)).canAdmin,false);
+    await assert.rejects(personalDriveSetupStatus(stranger),status(403));
+    await assert.rejects(savePersonalDriveSetup(stranger,setupInput,process.env.APP_URL!,setupOptions),status(403));
+    await prisma.user.update({where:{id:other.id},data:{role:"socio",capabilityGrants:"host.admin"}});
+    assert.equal((await personalDriveConnectionStatus(other.id)).canAdmin,true,"staff can receive delegated Host administration");
+    assert.equal((await personalDriveSetupStatus(stranger)).configured,true);
+    const prepared=await savePersonalDriveSetup(stranger,setupInput,process.env.APP_URL!,setupOptions);assert.equal(prepared.configured,true);assert.equal(prepared.source,"altazor");const storedSetup=await prisma.integrationConfig.findUniqueOrThrow({where:{provider:"personal-drive-oauth"}});assert.ok(!storedSetup.configJson.includes("fixture-shared-secret"),"an operator alias never copies tokens or secret material");
+    await prisma.user.update({where:{id:other.id},data:{capabilityRevokes:"host.admin"}});
+    assert.equal((await personalDriveConnectionStatus(other.id)).canAdmin,false,"revocation wins over the delegated grant");
+    await assert.rejects(personalDriveSetupStatus(stranger),status(403));
+    await assert.rejects(savePersonalDriveSetup(stranger,setupInput,process.env.APP_URL!,setupOptions),status(403));
+    await prisma.user.update({where:{id:other.id},data:{capabilityRevokes:"assistant.use"}});
+    await assert.rejects(personalDriveSetupStatus(stranger),status(403));
+    await assert.rejects(savePersonalDriveSetup(stranger,setupInput,process.env.APP_URL!,setupOptions),status(403));
+    for(const role of ["cliente","externo"]){
+      await prisma.user.update({where:{id:other.id},data:{role,capabilityGrants:"host.admin,assistant.use",capabilityRevokes:""}});
+      await assert.rejects(personalDriveConnectionStatus(other.id),status(403));
+      await assert.rejects(personalDriveSetupStatus(stranger),status(403));
+      await assert.rejects(savePersonalDriveSetup(stranger,setupInput,process.env.APP_URL!,setupOptions),status(403));
+    }
+    assert.deepEqual(await prisma.integrationConfig.findUniqueOrThrow({where:{provider:"personal-drive-oauth"}}),storedSetup,"denied actors do not change the shared app configuration");
+    await prisma.user.update({where:{id:other.id},data:{role:"admin",capabilityGrants:"",capabilityRevokes:""}});
+    await assert.rejects(personalDriveSetupStatus({...stranger,sessionVersion:stranger.sessionVersion+1}),status(401));
+    await assert.rejects(savePersonalDriveSetup({...stranger,sessionVersion:stranger.sessionVersion+1},setupInput,process.env.APP_URL!,setupOptions),status(401));
     assert.equal((await personalDriveConnectionStatus(owner.id)).connected,false);
     async function start(){const value=await startPersonalDriveOAuth(actor,{requestId:randomUUID(),confirmed:true},process.env.APP_URL!),url=new URL(value.authUrl);assert.equal(url.searchParams.get("access_type"),"offline");assert.equal(url.searchParams.get("scope"),scopes[0]);assert.equal(url.searchParams.get("include_granted_scopes"),"false");const attempt=await prisma.personalOAuthAttempt.findUniqueOrThrow({where:{id:value.attemptId}}),binding=unseal<{verifier:string}>(attempt.resultEnc!,`google-drive:content:attempt:${owner.id}:${attempt.id}`);assert.equal(url.searchParams.get("code_challenge"),createHash("sha256").update(binding.verifier).digest("base64url"));assert.ok(!value.authUrl.includes("fixture-personal-drive-secret"));return{...value,state:url.searchParams.get("state")!};}
     wrongScope=true;const denied=await start();await assert.rejects(receivePersonalDriveCallback({state:denied.state,code:"fixture-code"}),status(409));assert.equal(await prisma.personalConnectorAccount.count({where:{ownerId:owner.id,provider}}),0);wrongScope=false;

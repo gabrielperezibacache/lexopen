@@ -16,5 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --chmod=0555 .lexopen-desktop-profile/check.py /usr/local/bin/lexopen-desktop-check
 COPY --chmod=0555 .lexopen-desktop-profile/managed-install.sh /usr/local/bin/kitty-install
+COPY --chmod=0555 .lexopen-desktop-profile/reading.py /usr/local/lib/lexopen-reading/reading.py
+COPY --chmod=0444 .lexopen-desktop-profile/browser-read.js /usr/local/lib/lexopen-reading/browser-read.js
+RUN ln -s /usr/local/lib/lexopen-reading/reading.py /usr/local/bin/lexopen-read
 USER kitty
 RUN --network=none lexopen-desktop-check

@@ -109,6 +109,32 @@ La Mesa de documentos por causa sigue disponible para su receta local de Word y 
 
 Las instrucciones del adaptador, el contrato fijado y las limitaciones de cierre y caducidad están en [Computadora: operación y pruebas](../src/lib/altazor/computer/README.md).
 
+## Texto del navegador y de documentos
+
+El perfil de escritorio **tools-2** ofrece `page_read` y `document_read` al agente del contenedor. Lee primero el texto del navegador activo y los controles numerados; los documentos PDF, DOCX, ODT, PPTX, XLSX y de texto se consultan dentro de su carpeta de trabajo. Las lecturas largas admiten búsqueda y bloques sucesivos. No devuelven valores de formularios ni autorizan acciones por el contenido de una página o archivo.
+
+Cuando hay texto del navegador, la observación automática usa ese texto en lugar de adjuntar una captura. La imagen sigue disponible cuando el contenido es visual o no existe una capa de texto útil. Un PDF escaneado puede necesitar reconocimiento o revisión visual. El panel **Leer como texto** permite comprobar lo leído, buscar y avanzar por bloques sin enviarlo automáticamente al chat.
+
+Al actualizar una instalación con el perfil anterior, reconstruye la imagen del escritorio siguiendo la guía del adaptador. La aplicación detecta un lector incompatible; no muestra texto ficticio como si hubiera leído el contenedor.
+
+## Planes e Ícaros
+
+Cada encargo muestra un resumen y la cantidad de acciones. Los pasos y resultados detallados se abren a petición; las acciones pendientes o delegadas no se cuentan como análisis terminados. El visor permite ampliar, entrar y salir de pantalla completa y conservar la posición de lectura del chat.
+
+En **Ícaros** puedes crear especialistas privados para el ámbito actual y elegir el proveedor y modelo de cada uno. Comparten las restricciones del estudio y tus permisos, no credenciales ni acceso adicional. La memoria de cada Ícaro está separada y requiere activarla y conservar recuerdos expresamente. Olvidar una fuente o un recuerdo invalida los resultados que dependan de él.
+
+Puedes pedir «Delega al Ícaro Revisor: compara estas fuentes». Altazor prepara un plan con el modelo, destino y fuentes seleccionadas antes de delegar. Los encargos se conservan en una cola, sus resultados se reúnen en la conversación y puedes continuar escribiendo mientras trabajan. No se copia automáticamente el historial, la memoria ni los adjuntos del padre. La cancelación y los cambios de acceso se comprueban también durante el trabajo. Hay límites de dos trabajos simultáneos por usuario, diez en cola y un nivel de subdelegación.
+
+## Ayuda a distancia
+
+**Ayuda a distancia** configura ntfy por usuario mediante un servidor HTTPS, un token y temas separados para los avisos y las respuestas. WhatsApp requiere que la administración prepare Meta Cloud API y su plantilla aprobada, y que cada persona verifique su propio número. El webhook configurado es `/api/altazor/help/whatsapp`. Los secretos sólo se guardan cifrados en el Host.
+
+Cuando el escritorio entra en una espera real, Altazor conserva la pregunta y envía un aviso mínimo por los canales conectados. La respuesta de ntfy o WhatsApp usa el código de esa pregunta. Cada nueva petición de ayuda tiene su propia identidad, aunque aparezca dentro de la misma tarea. Una respuesta autenticada reanuda únicamente esa espera: no concede permisos ni aprueba operaciones de conectores.
+
+La aplicación comprueba ayudas mientras está visible. Para atenderlas con el navegador cerrado, mantén el Host activo con su worker de jornada: `LEXOPEN_JORNADA_INTERVAL_MINUTES=1` y `CRON_SECRET` configurado. Desktop ya prepara ese worker. El mismo worker procesa los encargos de Ícaros y respeta la preferencia personal de trabajo en segundo plano. Un envío de resultado incierto se conserva para revisión y no se repite automáticamente.
+
+La actualización añade una migración de base de datos: ejecuta `npm run db:migrate` en el proceso habitual de actualización del Host. Las pruebas de ntfy, Meta y modelos usan proveedores ficticios; la entrega a tu teléfono depende de los canales y permisos reales que conectes.
+
 ## Evidencia de esta entrega
 
 Las pruebas separan persistencia, permisos, protocolo, uso de proveedores y ejecución de contenedores. Los fixtures de IA y servicios externos no se presentan como cuentas reales ni como razonamiento autónomo probado. Las capturas de la aplicación utilizan datos ficticios. Las comprobaciones públicas de los índices académicos se describen por separado en su guía.

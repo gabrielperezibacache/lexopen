@@ -5,7 +5,7 @@ import {
   type PermissionScope,
 } from "@/lib/auth/permissions";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { canImpersonate, isStaff } from "@/lib/auth/rbac";
+import { canImpersonate, isAdmin, isStaff } from "@/lib/auth/rbac";
 import { VALID_ROLE_SET } from "@/lib/auth/roles";
 import { prisma } from "@/lib/db";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
@@ -99,7 +99,7 @@ export async function requireUser() {
   const path = h.get("x-lexopen-pathname") || "";
   if (!isTwoFactorExemptPath(path) && !user.totpEnabled) {
     const settings = await prisma.firmSettings.findFirst({ select: { require2faPrivileged: true } });
-    if (mustEnrollTwoFactor({ role: user.role, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
+    if (mustEnrollTwoFactor({ role: user.role, capabilityGrants: user.capabilityGrants, capabilityRevokes: user.capabilityRevokes, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
       throw Object.assign(new Error("Active la verificación en dos pasos en Mi cuenta"), { status: 403 });
     }
   }
@@ -118,7 +118,7 @@ export async function requireStaff() {
 
 export async function requireRole(...roles: string[]) {
   const user = await requireUser();
-  if (roles.length === 1 && roles[0] === "admin" ? !can(user, "host.admin") : !roles.includes(user.role)) {
+  if (roles.length === 1 && roles[0] === "admin" ? !isAdmin(user) : !roles.includes(user.role)) {
     const err = new Error("Prohibido") as Error & { status: number };
     err.status = 403;
     throw err;

@@ -18,6 +18,7 @@ export function CaseManagementSettings({ initialMode }: { initialMode: CaseManag
   }
   return <section id="case-management-settings" className={`panel ${styles.panel}`}>
     <h2>Gestión de causas</h2>
+    <p>Esta modalidad se aplica a todo el estudio. Los permisos sobre cada causa se conservan.</p>
     <fieldset className={styles.options} disabled={busy} aria-describedby="case-management-description">
       <legend className="sr-only">Modalidad de gestión de causas</legend>
       <label><input type="radio" name="case-management-mode" value="manual" checked={mode === "manual"} onChange={() => setMode("manual")} /><span><strong>Gestión manual</strong><small>Organiza expedientes de cualquier país.</small></span></label>

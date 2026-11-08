@@ -37,6 +37,7 @@ export function WorkCountrySettings({ initial, locale, options }: {
 
   return <form id="work-country" className="panel space-y-4 p-5" onSubmit={save}>
     <h3 className="text-lg font-semibold">{tr("País de trabajo", "Work country")}</h3>
+    <p className="text-sm text-[var(--ink-soft)]">{tr("Este ajuste se aplica a todos los usuarios del estudio.", "This setting applies to every user in the firm.")}</p>
     <p className="max-w-prose text-sm text-[var(--ink-soft)]">
       {tr("Seleccionar Chile habilita Comunicaciones. La conexión al Poder Judicial se activa por separado en Gestión de causas.", "Selecting Chile makes Communications available. Connect to the Chilean judiciary separately under Matter management.")}
     </p>

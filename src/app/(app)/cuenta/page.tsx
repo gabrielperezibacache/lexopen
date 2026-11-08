@@ -11,6 +11,7 @@ import { isStaff } from "@/lib/auth/rbac";
 import { CodexConnection } from "@/components/config/CodexConnection";
 import { AltazorDailyBriefSettings } from "@/components/altazor/AltazorDailyBriefSettings";
 import { readDailyBriefState } from "@/lib/altazor/daily-brief";
+import { MyPermissions } from "@/components/config/MyPermissions";
 
 export default async function CuentaPage() {
   const user = await requireUser();
@@ -49,8 +50,9 @@ export default async function CuentaPage() {
         <PasswordChangeForm />
         <TotpSettingsPanel />
       </div>
+      <MyPermissions user={user} locale={locale} />
       {dailyBrief && <AltazorDailyBriefSettings key={`daily-brief:${user.id}`} initial={dailyBrief} locale={locale} />}
-      {staff && canSome(user, "assistant.use") && <CodexConnection key={user.id} />}
+      {staff && <CodexConnection key={user.id} />}
     </div>
   );
 }

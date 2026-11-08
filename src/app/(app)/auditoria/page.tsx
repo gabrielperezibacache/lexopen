@@ -1,7 +1,9 @@
 import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/auth/session";
+import { requireStaff } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
+import { redirect } from "next/navigation";
 import { formatDateTime } from "@/components/ui";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import {
@@ -17,7 +19,8 @@ type Props = {
 };
 
 export default async function AuditoriaPage({ searchParams }: Props) {
-  await requireRole("admin");
+  const user = await requireStaff();
+  if (!can(user, "audit.read")) redirect("/cuenta#permisos");
   const { dict } = await getI18n();
   const h = dict.hubs.auditoria;
   const sp = await searchParams;

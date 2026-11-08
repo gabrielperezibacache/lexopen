@@ -30,7 +30,7 @@ async function main() {
     const tag = randomUUID();
     const admin = await db.user.create({ data: { name: "Admin fixture", email: `${tag}-admin@country.invalid`, role: "admin", password: "not-a-login" } });
     users.push(admin.id);
-    const staff = await db.user.create({ data: { name: "Staff fixture", email: `${tag}-staff@country.invalid`, role: "socio", capabilityGrants: "host.admin", password: "not-a-login" } });
+    const staff = await db.user.create({ data: { name: "Staff fixture", email: `${tag}-staff@country.invalid`, role: "socio", password: "not-a-login" } });
     users.push(staff.id);
     await assert.rejects(updateWorkCountry("CL", staff, db), statusIs(403));
     await assert.rejects(updateWorkCountry("ZZ" as WorkCountry, admin, db), statusIs(400));
@@ -45,6 +45,13 @@ async function main() {
     assert.equal(await db.auditEvent.count({ where: auditWhere }), 1);
 
     organizationId = (await db.organization.findFirstOrThrow({ select: { id: true } })).id;
+    await db.user.update({ where: { id: staff.id }, data: { capabilityGrants: "host.admin" } });
+    assert.deepEqual(await updateWorkCountry("PE", staff, db), { country: "PE" }, "delegated Host administrators manage shared settings");
+    await db.user.update({ where: { id: staff.id }, data: { capabilityRevokes: "host.admin" } });
+    await assert.rejects(updateWorkCountry("CL", staff, db), statusIs(403));
+    const portal = await db.user.create({ data: { name: "Portal fixture", email: `${tag}-portal@country.invalid`, role: "cliente", capabilityGrants: "host.admin", password: "not-a-login" } });
+    users.push(portal.id);
+    await assert.rejects(updateWorkCountry("CL", portal, db), statusIs(403));
     await db.firmSettings.update({
       where: { organizationId },
       data: { caseManagementMode: "pjud_cl", claveUnicaEnabled: true, claveUnicaPasswordEnc: "fictitious-kept-value" },
@@ -60,7 +67,7 @@ async function main() {
 
     await db.user.update({ where: { id: admin.id }, data: { capabilityRevokes: "host.admin" } });
     await assert.rejects(updateWorkCountry("CL", admin, db), statusIs(403));
-    console.log("Work country passed: safe default, ISO catalog, Chile/PJUD visibility, admin permission, concurrent updates, audit and PJUD settings preservation.");
+    console.log("Work country passed: safe default, ISO catalog, Chile/PJUD visibility, delegated staff administration, revocation, portal isolation, concurrent updates, audit and PJUD settings preservation.");
   } finally {
     await db.auditEvent.deleteMany({ where: { actorId: { in: users } } });
     await db.user.deleteMany({ where: { id: { in: users } } });

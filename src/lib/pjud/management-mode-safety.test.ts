@@ -4,6 +4,10 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import type { PjudCausaRef, PjudFetchResult } from "./types";
+import { causaAccessWhere } from "@/lib/auth/causa-access";
+import { can, canSome } from "@/lib/auth/permissions";
+import { isAdmin, isStaff } from "@/lib/auth/rbac";
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 const nativeRequire = createRequire(import.meta.url);
 /** Execute the actual module with controlled boundaries, never a browser, DB or network. */
@@ -85,9 +89,15 @@ async function digestRetainsUndeliveredWindow() {
     "@/lib/notify/emit": { emitNotification: async ({ dedupeKey }: { dedupeKey: string }) => {
       deliveries.add(dedupeKey); if (pauseAfterNotification) active = false;
     } },
+    "@/lib/auth/causa-access": { causaAccessWhere },
+    "@/lib/auth/permissions": { can, canSome },
+    "@/lib/auth/rbac": { isAdmin, isStaff },
+    "@/lib/auth/roles": { STAFF_ROLES },
     "@/lib/db": { prisma: {
       organization: { findFirst: async () => ({ settings }) },
-      causa: { findMany: async () => causes }, causaMovimiento: { findMany: async () => causes.map(row => movement(row.id)) },
+      user: { findUnique: async ({ where }: { where: { id: string } }) => causes.find(row => row.abogado.id === where.id)?.abogado || null },
+      causa: { findMany: async ({ include, where }: { include?: unknown; where: { AND?: [{ id: { in: string[] } }] } }) => include ? causes : causes.filter(row => where.AND?.[0].id.in.includes(row.id)).map(row => ({ id: row.id })) },
+      causaMovimiento: { findMany: async () => causes.map(row => movement(row.id)) },
       firmSettings: { updateMany: async ({ where, data }: { where: { caseManagementMode: string }; data: Partial<typeof settings> }) => {
         assert.equal(where.caseManagementMode, "pjud_cl");
         if (raceAtCommit) active = false;
@@ -114,9 +124,86 @@ async function digestRetainsUndeliveredWindow() {
   assert.equal(settings.pjudDigestLastAt, completedAt); assert.equal(commits, 1, "the final settings write checks the current modality too");
 }
 
+async function digestRespectsCurrentRecipientAccess() {
+  const users = [
+    { id: "technical", role: "admin", capabilityGrants: "", capabilityRevokes: "" },
+    { id: "partner", role: "socio", capabilityGrants: "", capabilityRevokes: "" },
+    { id: "delegated", role: "abogado", capabilityGrants: "host.admin", capabilityRevokes: "" },
+    { id: "revoked", role: "admin", capabilityGrants: "", capabilityRevokes: "causa.read" },
+    { id: "external", role: "externo", capabilityGrants: "host.admin,causa.override_walls", capabilityRevokes: "" },
+  ].map(user => ({ ...user, email: `${user.id}@example.test`, name: user.id }));
+  const movement = (causaId: string) => ({ causaId, titulo: `Movement ${causaId}`, fecha: new Date(), tipo: "resolucion", esReceptor: false, relevante: true });
+  const causes = [
+    { id: "public", acceso: "estudio", abogadoId: null, abogado: null },
+    { id: "private", acceso: "equipo", abogadoId: null, abogado: null },
+    { id: "portal-assignment", acceso: "equipo", abogadoId: "external", abogado: users.find(user => user.id === "external") },
+  ].map(cause => ({ ...cause, rit: `RIT-${cause.id}`, titulo: `Title ${cause.id}`, tribunal: "Fixture", pjudMonitoreoActivo: true, estado: "activa", miembros: [], movimientos: [movement(cause.id)] }));
+  // Evaluate the Prisma predicate produced by the real shared access policy.
+  const matches = (row: Record<string, unknown>, where: Record<string, unknown>): boolean => Object.entries(where).every(([key, expected]) => {
+    if (key === "AND") return (expected as Record<string, unknown>[]).every(part => matches(row, part));
+    if (key === "OR") return (expected as Record<string, unknown>[]).some(part => matches(row, part));
+    const actual = row[key];
+    if (expected && typeof expected === "object") {
+      const rule = expected as Record<string, unknown>;
+      if ("in" in rule) return (rule.in as unknown[]).includes(actual);
+      if ("some" in rule) return (actual as Record<string, unknown>[]).some(item => matches(item, rule.some as Record<string, unknown>));
+      if ("lte" in rule) return actual instanceof Date && actual <= (rule.lte as Date);
+      if ("gt" in rule) return actual instanceof Date && actual > (rule.gt as Date);
+    }
+    return actual === expected;
+  });
+  const emails: { to: string; text: string; html: string }[] = [], notifications: { userId: string; title: string; body: string }[] = [];
+  const lookups = new Map<string, number>();
+  let revokeBeforeEmail = false, revokeAfterEmail = false;
+  const { runPjudDigest } = loadModule<{ runPjudDigest: () => Promise<{ unassigned: number }> }>("./digest.ts", {
+    "@/lib/auth/causa-access": { causaAccessWhere },
+    "@/lib/auth/permissions": { can, canSome },
+    "@/lib/auth/rbac": { isAdmin, isStaff },
+    "@/lib/auth/roles": { STAFF_ROLES },
+    "@/lib/causas/management-mode": { assertPjudManagementEnabled: async () => undefined, getCaseManagementMode: async () => "pjud_cl" },
+    "@/lib/pjud/classify": { diasEntre: () => 0, semaforoPorDiasSinMovimiento: () => "verde" },
+    "@/lib/integrations/google": { getGoogleConfig: async () => ({ accessToken: "fixture-only" }) },
+    "@/lib/integrations/gmail": { sendGmailMessage: async (message: typeof emails[number]) => {
+      emails.push(message);
+      if (revokeAfterEmail && message.to === "delegated@example.test") users.find(user => user.id === "delegated")!.capabilityRevokes = "causa.read";
+    } },
+    "@/lib/notify/emit": { emitNotification: async (input: typeof notifications[number]) => { notifications.push(input); } },
+    "@/lib/db": { prisma: {
+      organization: { findFirst: async () => ({ settings: { id: "settings", pjudDigestLastAt: new Date(0) } }) },
+      user: {
+        findMany: async () => users,
+        findUnique: async ({ where }: { where: { id: string } }) => {
+          const count = (lookups.get(where.id) || 0) + 1; lookups.set(where.id, count);
+          const user = users.find(item => item.id === where.id);
+          if (revokeBeforeEmail && user?.id === "technical" && count === 2) user.capabilityRevokes = "causa.read";
+          return user || null;
+        },
+      },
+      causa: { findMany: async ({ include, where }: { include?: unknown; where: Record<string, unknown> }) => include ? causes : causes.filter(cause => matches(cause, where)).map(cause => ({ id: cause.id })) },
+      causaMovimiento: { findMany: async () => causes.map(cause => movement(cause.id)) },
+      firmSettings: { updateMany: async () => ({ count: 1 }) },
+    } },
+  });
+  assert.equal((await runPjudDigest()).unassigned, 3, "portal assignments do not become staff recipients");
+  assert.deepEqual(emails.map(mail => mail.to).sort(), ["delegated@example.test", "partner@example.test", "technical@example.test"]);
+  for (const mail of emails) {
+    assert.match(mail.text, /RIT-public/);
+    if (mail.to !== "partner@example.test") {
+      assert.doesNotMatch(mail.text + mail.html, /RIT-private|RIT-portal-assignment|Movement private|Movement portal-assignment/);
+    } else assert.match(mail.text, /RIT-private/);
+  }
+  for (const notification of notifications) assert.doesNotMatch(notification.title + notification.body, /RIT-|Title |Movement /, "persisted aggregate notices contain no matter-specific content");
+  emails.length = 0; notifications.length = 0; lookups.clear(); revokeBeforeEmail = true; revokeAfterEmail = true;
+  await runPjudDigest();
+  assert.equal(emails.some(mail => mail.to === "technical@example.test"), false, "revocation after aggregation prevents email");
+  assert.equal(notifications.some(notice => notice.userId === "technical" || notice.userId === "delegated"), false, "access is checked again between external email and in-app delivery");
+  assert.equal(notifications.some(notice => notice.userId === "partner"), true);
+}
+
 async function main() {
   await providerStopsBetweenChannels();
   await digestRetainsUndeliveredWindow();
-  console.log("PJUD mode safety: transport phases stop and interrupted digests retain the undelivered window (no network/DB).");
+  await digestRespectsCurrentRecipientAccess();
+  console.log("PJUD mode safety: paused windows, recipient walls/revokes/portal isolation and per-channel reauthorization OK (no network/DB).");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

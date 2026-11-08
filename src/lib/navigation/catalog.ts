@@ -2,6 +2,7 @@ import type { CaseManagementMode } from "../causas/management-mode";
 import { canSome, type PermissionSubject } from "../auth/permissions";
 import { isClientAllowedPagePath } from "../auth/client-paths";
 import { isRole, PORTAL_ROLES, STAFF_ROLES } from "../auth/roles";
+import { isAdmin } from "../auth/rbac";
 import { COMMUNICATIONS_SETTINGS_PATH, MAIL_SETTINGS_PATH } from "../mail/settings-location";
 
 export type NavigationAreaId = "jornada" | "causas" | "agenda" | "biblioteca" | "academico" | "clientes" | "estudio";
@@ -34,7 +35,7 @@ const AREAS: readonly NavigationArea[] = [
   { id: "estudio", labelKey: "nav.areas.estudio", href: "/dashboard", icon: "studio" },
 ];
 
-type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "portal" | "admin"; capability?: "assistant.use" };
+type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "portal" | "admin"; capability?: "assistant.use" | "audit.read" };
 const ENTRIES: readonly CatalogEntry[] = [
   { id: "inicio", href: "/inicio", labelKey: "nav.home", icon: "home", area: "jornada", access: "staff" },
   { id: "causas", href: "/causas", labelKey: "nav.caseFiles", icon: "cases", area: "causas", access: "staff", keywords: "expediente cartera RIT ROL" },
@@ -61,7 +62,7 @@ const ENTRIES: readonly CatalogEntry[] = [
   { id: "sites", href: "/sites", labelKey: "nav.sites", icon: "spaces", area: "estudio", groupKey: "nav.secondary.collaboration", access: "signed-in" },
   { id: "flujos", href: "/flujos", labelKey: "nav.workflows", icon: "workflows", area: "estudio", groupKey: "nav.secondary.collaboration", access: "staff" },
   { id: "integraciones", href: "/integraciones", labelKey: "nav.integrations", icon: "integrations", area: "estudio", groupKey: "nav.secondary.administration", access: "staff" },
-  { id: "auditoria", href: "/auditoria", labelKey: "nav.audit", icon: "audit", area: "estudio", groupKey: "nav.secondary.administration", access: "admin" },
+  { id: "auditoria", href: "/auditoria", labelKey: "nav.audit", icon: "audit", area: "estudio", groupKey: "nav.secondary.administration", access: "staff", capability: "audit.read" },
   { id: "buscar", href: "/buscar", labelKey: "nav.search", icon: "search", access: "signed-in" },
   { id: "notificaciones", href: "/notificaciones", labelKey: "nav.notifications", icon: "notifications", access: "signed-in" },
   { id: "cuenta", href: "/cuenta", labelKey: "nav.account", icon: "account", access: "signed-in" },
@@ -81,7 +82,7 @@ export function buildNavigation(subject: PermissionSubject | null | undefined, o
     if (["pjud", "monitoreo", "mis-causas"].includes(entry.id) && !pjudEnabled) return false;
     if (entry.id === "mail-settings" && !options.communicationsAvailable) return false;
     if (portal) return (entry.access === "signed-in" || entry.access === "portal") && isClientAllowedPagePath(entry.href);
-    if (!staff || entry.access === "portal" || (entry.access === "admin" && role !== "admin")) return false;
+    if (!staff || entry.access === "portal" || (entry.access === "admin" && !isAdmin(subject))) return false;
     return !entry.capability || canSome(subject, entry.capability);
   }).map(({ id, href, labelKey, icon, area, groupKey, keywords }) => ({ id, href, labelKey: id === "causas" && pjudEnabled ? "nav.manualCases" : labelKey, icon, area, groupKey, keywords }));
   const utilities = allowed.filter(entry => !entry.area);

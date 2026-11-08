@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { writeAuditStrict } from "@/lib/audit";
 import { httpError } from "@/lib/auth/access";
-import { canSome } from "@/lib/auth/permissions";
+import { isAdmin } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
 import { isWorkCountry, type WorkCountry } from "./countries";
 
@@ -26,7 +26,7 @@ export async function updateWorkCountry(country: WorkCountry | null, user: { id:
           where: { id: user.id },
           select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
         });
-        if (!actor || actor.role !== "admin" || !canSome(actor, "host.admin")) {
+        if (!actor || !isAdmin(actor)) {
           throw httpError("Sólo la administración puede cambiar el país de trabajo.", 403);
         }
         const existing = await firstSettings(tx);

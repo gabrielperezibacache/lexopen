@@ -2,7 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { AltazorCompanionProvider } from "@/components/altazor/AltazorCompanionProvider";
 import { enforceAppAccess } from "@/lib/auth/access";
 import { canSome } from "@/lib/auth/permissions";
-import { isStaff } from "@/lib/auth/rbac";
+import { isAdmin, isStaff } from "@/lib/auth/rbac";
 import { getCaseManagementMode, type CaseManagementMode } from "@/lib/causas/management-mode";
 import { buildNavigation } from "@/lib/navigation/catalog";
 import { showCommunications } from "@/lib/config/countries";
@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     staff ? getCaseManagementMode() : Promise.resolve<CaseManagementMode>("manual"),
     staff ? getWorkCountry() : null,
   ]);
-  const canSelfUpdate = user.role === "admin";
+  const canSelfUpdate = isAdmin(user);
   return (
     <AppShell
       navigation={buildNavigation(user, { caseManagementMode, communicationsAvailable: staff && showCommunications(workCountry, caseManagementMode) })}

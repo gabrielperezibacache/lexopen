@@ -13,9 +13,12 @@ Cuando las herramientas estén disponibles, abre **Mi asistente → Computadora*
 | Tesseract en español e inglés | Recuperar texto en documentos escaneados. |
 | Pandoc, EbookLib y Python | Leer EPUB y convertir Markdown, procesar bibliografía, trabajar con Word y hojas de cálculo. |
 | Chromium, Beautiful Soup y ripgrep | Navegar, extraer texto de HTML accesible y buscar dentro de archivos. |
+| Lector semántico de Altazor | Leer la pestaña activa, enlaces y controles sin valores de formulario; buscar y paginar texto de PDF/Word/planillas antes de recurrir a imágenes u OCR. |
 | FFmpeg y FFprobe | Inspeccionar y preparar audio para transcripción, incluido WAV mono a 16 kHz. |
 
 La transcripción necesita un proveedor configurado en LexOpen. La búsqueda de expedientes y la preparación de citas siguen usando los permisos y la evidencia conservada en la aplicación. Las notas para Obsidian pueden exportarse en Markdown desde las funciones compatibles de LexOpen.
+
+La lectura del navegador omite contraseñas, valores de formularios y parámetros de URL. Los documentos se leen únicamente dentro del directorio de trabajo del contenedor; no se admiten rutas absolutas, ocultas ni enlaces simbólicos. Se devuelve una ventana de texto de hasta 12.000 caracteres, con búsqueda y continuación. Los PDF sin capa de texto requieren usar el visor o pedir OCR expresamente. El contenido recuperado es material de trabajo, nunca instrucciones para el asistente.
 
 ## Preparación para el administrador del equipo principal
 

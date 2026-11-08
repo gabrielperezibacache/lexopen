@@ -1,10 +1,11 @@
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import { endpointFor } from "./policy";
-import type { ComputerFile, ComputerTurn } from "./types";
+import { computerTurnNeedsHelp, type ComputerFile, type ComputerTurn } from "./types";
 import type { PersonInput } from "./policy";
 import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
 import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
 import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
+import { computerReadSchema, computerReadingSchema, type ComputerReadRequest, type ComputerReading } from "./reading";
 
 type Fetcher = typeof fetch;
 export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
@@ -133,13 +134,49 @@ export class KittiesGateway {
   }
   async chat(id: string, kittyId: string): Promise<{ working: boolean; turns: ComputerTurn[] }> {
     const result = await this.json(`/v1/chats/${safeId(id)}`), chat = this.validateChat(result.chat, kittyId, true, id);
-    return { working: chat.turns.some(turn => turn.working === true), turns: chat.turns.slice(-80).map((turn, index) => ({ index: Math.max(0, chat.turns.length - 80) + index, from: turn.from === "user" ? "user" : turn.from === "system" ? "system" : "assistant", text: typeof turn.text === "string" ? turn.text.slice(0, 24000) : "", working: turn.working === true, needsHelp: turn.needs_help === true, steps: Array.isArray(turn.steps) ? turn.steps.slice(-60).map(step => ({ action: typeof step.action === "string" ? step.action.slice(0, 80) : "acción", at: typeof step.at === "string" ? step.at.slice(0, 60) : "" })) : [] })) };
+    return { working: chat.turns.some(turn => turn.working === true), turns: chat.turns.slice(-80).map((turn, index) => {
+      const from = turn.from === "user" ? "user" : turn.from === "system" ? "system" : "assistant";
+      const rawSteps = Array.isArray(turn.steps) ? turn.steps : [];
+      const last = rawSteps.at(-1);
+      const args = last && typeof last === "object" && last.args && typeof last.args === "object" && !Array.isArray(last.args) ? last.args as Record<string, unknown> : {};
+      // Go's askHelp keeps Turn.Text unchanged. Its question lives in the last
+      // Step.Args.reason, also copied to Step.Result as a string by the pinned runtime.
+      const fallback = typeof last?.result === "string" ? last.result : last?.result && typeof last.result === "object" ? last.result.reason : undefined;
+      const question = (typeof args.reason === "string" && args.reason.trim() ? args.reason : typeof fallback === "string" && fallback.trim() ? fallback : "El asistente solicita tu intervención en el escritorio.").trim().slice(0, 4000);
+      const help = from === "assistant" && turn.working === true && last?.action === "ask_help" ? { stepIndex: rawSteps.length - 1, question } : undefined;
+      return {
+        index: Math.max(0, chat.turns.length - 80) + index, from,
+        text: typeof turn.text === "string" ? turn.text.slice(0, 24000) : "", working: turn.working === true, needsHelp: turn.needs_help === true,
+        actionCount: rawSteps.length, ...(help ? { help } : {}),
+        steps: rawSteps.slice(-60).map(step => ({ action: typeof step?.action === "string" ? step.action.slice(0, 80) : "acción", at: typeof step?.at === "string" ? step.at.slice(0, 60) : "" })),
+      };
+    }) };
   }
   async send(chatId: string, text: string, files: ComputerFile[]) { await this.json(`/v1/chats/${safeId(chatId)}/messages`, "POST", { text, files }); return { accepted: true }; }
+  async replyHelp(chatId: string, kittyId: string, turnIndex: number, text: string) {
+    if (!Number.isSafeInteger(turnIndex) || turnIndex < 0 || turnIndex > 100000 || !text.trim() || text.length > 2000) throw new ConnectorError("computer_help_input", "La respuesta de ayuda debe indicar el turno y contener entre 1 y 2000 caracteres.", 400);
+    const chat = await this.chat(chatId, kittyId), turn = chat.turns.find(item => item.index === turnIndex);
+    if (!turn?.working || !computerTurnNeedsHelp(turn)) throw new ConnectorError("computer_help_stale", "Ese turno ya no espera una respuesta de ayuda.", 409);
+    const result = await this.json(`/v1/chats/${safeId(chatId)}/turns/${turnIndex}/help`, "POST", { text: text.trim(), secret: false, enter: false, save: "" });
+    if (result.ok !== true) throw new ConnectorError("computer_help_contract", "El escritorio no confirmó la respuesta al turno de ayuda.", 502);
+    return { accepted: true };
+  }
   async cancel(chatId: string) { const result = await this.json(`/v1/chats/${safeId(chatId)}/cancel`, "POST", {}); return { cancelled: result.cancelled === true }; }
   async control(kittyId: string, hold: boolean) { const result = await this.json(`/v1/kitties/${safeId(kittyId)}/control`, "POST", { hold }); if (typeof result.held !== "boolean") throw new ConnectorError("control_contract", "El gateway no confirmó el control manual.", 502); return { held: result.held }; }
   async input(kittyId: string, input: PersonInput) { await this.json(`/v1/kitties/${safeId(kittyId)}/input`, "POST", input); return { accepted: true }; }
   async stop(kittyId: string) { await this.json(`/v1/kitties/${safeId(kittyId)}/stop`, "POST", {}); return { stopped: true }; }
+  async read(kittyId: string, input: ComputerReadRequest): Promise<ComputerReading> {
+    const request = computerReadSchema.parse(input);
+    let response: Record<string, unknown>;
+    try { response = await this.json(`/v1/kitties/${safeId(kittyId)}/read`, "POST", request); }
+    catch (error) {
+      if (error instanceof ConnectorError && error.code === "gateway_rejected") throw new ConnectorError("computer_read_unavailable", "La lectura semántica no está disponible. Comprueba el archivo y actualiza el gateway y la imagen al perfil lexopen-desktop-tools-2; una imagen anterior debe reconstruirse.", 409);
+      throw error;
+    }
+    const result = computerReadingSchema.safeParse(response);
+    if (!result.success || result.data.source !== request.source || result.data.text.length > request.limit || result.data.items.length > request.elementLimit) throw new ConnectorError("computer_read_contract", "Actualiza el perfil de lectura del escritorio: el gateway no confirmó una lectura semántica compatible.", 502);
+    return result.data;
+  }
   async screenshot(kittyId: string) {
     const result = await this.response(`/v1/kitties/${safeId(kittyId)}/screenshot`, "GET", undefined, 8 * 1024 * 1024), bytes = result.bytes;
     if (!result.contentType.startsWith("image/png") || bytes.length < 33 || bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" || bytes.readUInt32BE(16) > 10000 || bytes.readUInt32BE(20) > 10000) throw new ConnectorError("screenshot_invalid", "El gateway no entregó una captura PNG válida.", 502);

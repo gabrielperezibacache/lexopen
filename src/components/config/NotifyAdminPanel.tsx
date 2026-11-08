@@ -5,6 +5,7 @@ import { apiMutation } from "@/lib/api-mutation";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { tipoDef } from "@/lib/notify/catalog";
+import Link from "next/link";
 
 type Snapshot = {
   smtp: {
@@ -454,11 +455,12 @@ export function NotifyAdminPanel() {
       </Dialog>
 
       <section className="panel space-y-2 rounded-3xl p-5 opacity-80">
-        <h3 className="font-medium">WhatsApp (1.2)</h3>
+        <h3 className="font-medium">WhatsApp Meta · ayuda de Altazor</h3>
         <p className="text-sm text-[var(--ink-soft)]/70">
           {snapshot?.whatsapp.note ||
-            "Interfaz ChannelProvider lista; envío en la siguiente fase."}
+            "Configura Meta Cloud API y vincula tu número para recibir y responder solicitudes de ayuda de Altazor."}
         </p>
+        <Link className="btn btn-ghost" href="/inicio?altazor=help">Configurar avisos de ayuda</Link>
       </section>
 
       {message && <p role="status" className="text-sm text-[var(--ink-soft)]">{message}</p>}

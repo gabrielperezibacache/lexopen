@@ -15,6 +15,7 @@ import { assertDesktopToolInputAccess } from "./tools/escritorio-access";
 import { assertAcademicToolInputAccess } from "./tools/academic-access";
 import { assertWorkflowToolInputAccess, authorizeWorkflowResult } from "./tools/workflow-access";
 import { assertLibrarySyncToolInputAccess } from "./tools/library-sync-access";
+import { assertIcaroToolInputAccess, authorizeIcaroResult } from "./tools/icaro-access";
 
 class RejectedResult extends Error {
   constructor(readonly result: ToolResult) { super(result.message); }
@@ -46,6 +47,7 @@ export async function assertToolInputAccess(
   db: Prisma.TransactionClient = prisma,
 ) {
   ctx.signal?.throwIfAborted();
+  if (id === "icaro.listar" || id === "icaro.delegar") return assertIcaroToolInputAccess(id, input, ctx, write, db);
   if (id === "escritorio.listar" || id === "escritorio.encargar") return assertDesktopToolInputAccess(id, input, ctx, write, db);
   if (id.startsWith("academia.")) return assertAcademicToolInputAccess(id, input, ctx, write, db);
   if (id.startsWith("audiencia.") || id.startsWith("escrito.")) return assertWorkflowToolInputAccess(id, input, ctx, write, db);
@@ -139,6 +141,7 @@ export async function authorizeCommittedResult(
   id: string, input: Record<string, unknown>, result: ToolResult | undefined,
   actor: ToolContext, tx: Prisma.TransactionClient,
 ) {
+  if (id === "icaro.delegar" && result) return authorizeIcaroResult(input, result, actor, tx);
   if (id === "escritorio.encargar") return assertDesktopToolInputAccess(id, input, actor, false, tx);
   if (id.startsWith("academia.")) return assertAcademicToolInputAccess(id, input, actor, false, tx);
   if ((id.startsWith("audiencia.") || id.startsWith("escrito.")) && result) return authorizeWorkflowResult(id, input, result, actor, tx);

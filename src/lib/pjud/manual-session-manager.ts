@@ -48,7 +48,7 @@ async function authorize(owner: ManualOjvOwner) {
     prisma.user.findUnique({ where: { id: owner.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true, sessionVersion: true, totpEnabled: true } }),
     prisma.firmSettings.findFirst({ select: { require2faPrivileged: true } }),
   ]);
-  if (!user || user.sessionVersion !== owner.sessionVersion || !manualMisCausasAllowed(user) || mustEnrollTwoFactor({ role: user.role, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
+  if (!user || user.sessionVersion !== owner.sessionVersion || !manualMisCausasAllowed(user) || mustEnrollTwoFactor({ role: user.role, capabilityGrants: user.capabilityGrants, capabilityRevokes: user.capabilityRevokes, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
     throw new ManualOjvUiError("La autorización cambió. Cierre esta conexión y vuelva a ingresar en LexOpen.", 403);
   }
 }

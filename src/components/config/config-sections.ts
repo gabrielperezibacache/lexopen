@@ -14,8 +14,8 @@ export const CONFIG_CATEGORIES = [
   },
   {
     id: "estudio-equipo", label: "Estudio y equipo", labelEn: "Firm and team",
-    description: "Datos del estudio, políticas de IA y personas que trabajan en él.",
-    descriptionEn: "Firm details, AI policies and the people who work here.",
+    description: "Configuración compartida de todo el estudio, administrada por quienes tienen permiso de administrar el Host.",
+    descriptionEn: "Settings shared by the whole firm, managed by people with Host administration permission.",
     sections: [
       { id: "estudio", label: "Estudio", labelEn: "Firm" },
       { id: "work-country", label: "País de trabajo", labelEn: "Work country" },
@@ -31,8 +31,8 @@ export const CONFIG_CATEGORIES = [
   },
   {
     id: "conexiones-ia", label: "Conexiones e IA", labelEn: "Connections and AI",
-    description: "Proveedor de IA, Google y seguimiento judicial.",
-    descriptionEn: "AI provider, Google and court monitoring.",
+    description: "Conexiones del estudio: proveedor de IA, Google y seguimiento judicial. Tu cuenta personal de Codex se gestiona en Mi cuenta.",
+    descriptionEn: "Firm connections: AI provider, Google and court monitoring. Manage your personal Codex account under My account.",
     sections: [
       { id: "llm-settings", label: "IA", labelEn: "AI" },
       { id: "google-settings", label: "Google", labelEn: "Google" },

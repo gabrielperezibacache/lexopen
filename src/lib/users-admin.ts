@@ -3,10 +3,14 @@ import { hashPassword } from "@/lib/auth/password";
 import { writeAuditStrict } from "@/lib/audit";
 import { toPublicUser } from "@/lib/auth/public-user";
 import {
-  FOUNDER_ADMIN_GRANTS,
+  CAPABILITIES,
+  capabilityLevel,
+  isCapability,
   serializeCapabilityCsv,
 } from "@/lib/auth/permissions";
+import { isAdmin } from "@/lib/auth/rbac";
 import { ROLES, type Role } from "@/lib/auth/roles";
+import { Prisma } from "@prisma/client";
 
 export type UserRole = Role;
 
@@ -29,14 +33,40 @@ function httpError(message: string, status: number) {
   return err;
 }
 
-export async function assertCanChangeAdminRole(opts: {
-  beforeRole: string;
-  nextRole: string;
-}) {
-  if (opts.beforeRole !== "admin" || opts.nextRole === "admin") return;
-  const adminCount = await prisma.user.count({ where: { role: "admin" } });
-  if (adminCount <= 1) {
-    throw httpError("No se puede degradar al único administrador", 409);
+/** All administrative user changes share one serializable boundary, including audit. */
+async function userTransaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try { return await prisma.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 }); }
+    catch (error) {
+      if ((error as { code?: string }).code !== "P2034" || attempt >= 3) throw error;
+    }
+  }
+}
+
+function normalizeOverrides(raw: string | null | undefined) {
+  const values = (raw || "").split(",").map(value => value.trim()).filter(Boolean);
+  if (values.some(value => !isCapability(value))) throw httpError("Hay capacidades desconocidas. Seleccione permisos del catálogo.", 400);
+  return serializeCapabilityCsv(values);
+}
+
+async function administrativeActor(tx: Prisma.TransactionClient, actorId: string) {
+  const actor = await tx.user.findUnique({ where: { id: actorId } });
+  if (!actor || !isAdmin(actor)) throw httpError("Prohibido: se requiere administrar el Host", 403);
+  return actor;
+}
+
+/** Role names alone cannot protect a Host: grants and revokes also determine access. */
+async function preserveHostAdministrator(tx: Prisma.TransactionClient, userId: string, next?: { role: string; capabilityGrants: string; capabilityRevokes: string }) {
+  const users = await tx.user.findMany({ select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+  if (!users.some(user => user.id === userId ? next && isAdmin(next) : isAdmin(user))) {
+    throw httpError("Debe conservar al menos un usuario interno con permiso para administrar el Host", 409);
+  }
+}
+
+export function assertNoSelfEscalation(before: { role: string; capabilityGrants?: string | null; capabilityRevokes?: string | null }, next: typeof before) {
+  const order = { none: 0, scoped: 1, all: 2 };
+  if (CAPABILITIES.some(capability => order[capabilityLevel(next, capability)] > order[capabilityLevel(before, capability)])) {
+    throw httpError("No puede ampliar sus propios permisos. Otro administrador del Host debe autorizar el cambio", 403);
   }
 }
 
@@ -51,45 +81,41 @@ export async function createStudioUser(opts: {
   capabilityRevokes?: string | null;
 }) {
   const email = opts.email.trim().toLowerCase();
-  const exists = await prisma.user.findUnique({ where: { email } });
-  if (exists) throw httpError("Ya existe un usuario con ese email", 409);
-
+  // Founder grants belong only to setup/seed and existing accounts, never every new admin.
+  const grants = normalizeOverrides(opts.capabilityGrants);
+  const revokes = normalizeOverrides(opts.capabilityRevokes);
   const password = await hashPassword(opts.password);
-  const grants =
-    opts.capabilityGrants !== undefined && opts.capabilityGrants !== null
-      ? serializeCapabilityCsv(opts.capabilityGrants.split(","))
-      : opts.role === "admin"
-        ? FOUNDER_ADMIN_GRANTS.join(",")
-        : "";
-  const revokes = opts.capabilityRevokes
-    ? serializeCapabilityCsv(opts.capabilityRevokes.split(","))
-    : "";
-
-  const user = await prisma.user.create({
-    data: {
-      name: opts.name.trim(),
-      email,
-      role: opts.role,
-      title: opts.title || null,
-      password,
-      avatarColor: pickAvatarColor(opts.name),
-      capabilityGrants: grants,
-      capabilityRevokes: revokes,
-    },
+  return userTransaction(async tx => {
+    await administrativeActor(tx, opts.actorId);
+    const exists = await tx.user.findUnique({ where: { email } });
+    if (exists) throw httpError("Ya existe un usuario con ese email", 409);
+    const user = await tx.user.create({
+      data: {
+        name: opts.name.trim(),
+        email,
+        role: opts.role,
+        title: opts.title || null,
+        password,
+        avatarColor: pickAvatarColor(opts.name),
+        capabilityGrants: grants,
+        capabilityRevokes: revokes,
+      },
+    });
+    await writeAuditStrict({
+      actorId: opts.actorId,
+      action: "user.create",
+      entityType: "User",
+      entityId: user.id,
+      after: {
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        capabilityGrants: user.capabilityGrants,
+        capabilityRevokes: user.capabilityRevokes,
+      },
+    }, tx);
+    return toPublicUser(user);
   });
-  await writeAuditStrict({
-    actorId: opts.actorId,
-    action: "user.create",
-    entityType: "User",
-    entityId: user.id,
-    after: {
-      email: user.email,
-      role: user.role,
-      name: user.name,
-      capabilityGrants: user.capabilityGrants,
-    },
-  });
-  return toPublicUser(user);
 }
 
 export async function updateStudioUser(opts: {
@@ -103,89 +129,98 @@ export async function updateStudioUser(opts: {
   capabilityGrants?: string | null;
   capabilityRevokes?: string | null;
 }) {
-  const before = await prisma.user.findUnique({ where: { id: opts.userId } });
-  if (!before) throw httpError("Usuario no encontrado", 404);
+  const password = opts.password ? await hashPassword(opts.password) : undefined;
+  return userTransaction(async tx => {
+    await administrativeActor(tx, opts.actorId);
+    const before = await tx.user.findUnique({ where: { id: opts.userId } });
+    if (!before) throw httpError("Usuario no encontrado", 404);
 
-  const data: {
-    name?: string;
-    email?: string;
-    title?: string | null;
-    role?: string;
-    password?: string;
-    sessionVersion?: { increment: number };
-    avatarColor?: string;
-    capabilityGrants?: string;
-    capabilityRevokes?: string;
-  } = {};
+    const data: {
+      name?: string;
+      email?: string;
+      title?: string | null;
+      role?: string;
+      password?: string;
+      sessionVersion?: { increment: number };
+      avatarColor?: string;
+      capabilityGrants?: string;
+      capabilityRevokes?: string;
+    } = {};
 
-  if (opts.name !== undefined) {
-    data.name = opts.name.trim();
-    data.avatarColor = pickAvatarColor(opts.name);
-  }
-  if (opts.email !== undefined) {
-    const email = opts.email.trim().toLowerCase();
-    if (email !== before.email) {
-      const clash = await prisma.user.findUnique({ where: { email } });
-      if (clash) throw httpError("Ya existe un usuario con ese email", 409);
-      data.email = email;
+    if (opts.name !== undefined) {
+      data.name = opts.name.trim();
+      data.avatarColor = pickAvatarColor(opts.name);
     }
-  }
-  if (opts.title !== undefined) data.title = opts.title || null;
-  if (opts.role !== undefined && opts.role !== before.role) {
-    await assertCanChangeAdminRole({
-      beforeRole: before.role,
-      nextRole: opts.role,
+    if (opts.email !== undefined) {
+      const email = opts.email.trim().toLowerCase();
+      if (email !== before.email) {
+        const clash = await tx.user.findUnique({ where: { email } });
+        if (clash) throw httpError("Ya existe un usuario con ese email", 409);
+        data.email = email;
+        data.sessionVersion = { increment: 1 };
+      }
+    }
+    if (opts.title !== undefined) data.title = opts.title || null;
+    if (opts.role !== undefined && opts.role !== before.role) {
+      data.role = opts.role;
+      data.sessionVersion = { increment: 1 };
+    }
+    if (password) {
+      data.password = password;
+      data.sessionVersion = data.sessionVersion || { increment: 1 };
+    }
+    if (opts.capabilityGrants !== undefined) {
+      const grants = normalizeOverrides(opts.capabilityGrants);
+      if (grants !== before.capabilityGrants) {
+        data.capabilityGrants = grants;
+        data.sessionVersion = data.sessionVersion || { increment: 1 };
+      }
+    }
+    if (opts.capabilityRevokes !== undefined) {
+      const revokes = normalizeOverrides(opts.capabilityRevokes);
+      if (revokes !== before.capabilityRevokes) {
+        data.capabilityRevokes = revokes;
+        data.sessionVersion = data.sessionVersion || { increment: 1 };
+      }
+    }
+
+    if (data.role !== undefined || data.capabilityGrants !== undefined || data.capabilityRevokes !== undefined) {
+      const next = { role: data.role ?? before.role, capabilityGrants: data.capabilityGrants ?? before.capabilityGrants, capabilityRevokes: data.capabilityRevokes ?? before.capabilityRevokes };
+      if (opts.actorId === opts.userId) assertNoSelfEscalation(before, next);
+      await preserveHostAdministrator(tx, opts.userId, next);
+    }
+
+    const user = await tx.user.update({
+      where: { id: opts.userId },
+      data,
     });
-    data.role = opts.role;
-    data.sessionVersion = { increment: 1 };
-  }
-  if (opts.password) {
-    data.password = await hashPassword(opts.password);
-    data.sessionVersion = data.sessionVersion || { increment: 1 };
-  }
-  if (opts.capabilityGrants !== undefined) {
-    data.capabilityGrants = serializeCapabilityCsv(
-      (opts.capabilityGrants || "").split(",")
-    );
-    data.sessionVersion = data.sessionVersion || { increment: 1 };
-  }
-  if (opts.capabilityRevokes !== undefined) {
-    data.capabilityRevokes = serializeCapabilityCsv(
-      (opts.capabilityRevokes || "").split(",")
-    );
-    data.sessionVersion = data.sessionVersion || { increment: 1 };
-  }
 
-  const user = await prisma.user.update({
-    where: { id: opts.userId },
-    data,
+    await writeAuditStrict({
+      actorId: opts.actorId,
+      action: "user.update",
+      entityType: "User",
+      entityId: user.id,
+      before: {
+        email: before.email,
+        role: before.role,
+        name: before.name,
+        title: before.title,
+        capabilityGrants: before.capabilityGrants,
+        capabilityRevokes: before.capabilityRevokes,
+      },
+      after: {
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        title: user.title,
+        passwordReset: Boolean(opts.password),
+        capabilityGrants: user.capabilityGrants,
+        capabilityRevokes: user.capabilityRevokes,
+      },
+    }, tx);
+
+    return toPublicUser(user);
   });
-
-  await writeAuditStrict({
-    actorId: opts.actorId,
-    action: "user.update",
-    entityType: "User",
-    entityId: user.id,
-    before: {
-      email: before.email,
-      role: before.role,
-      name: before.name,
-      title: before.title,
-      capabilityGrants: before.capabilityGrants,
-      capabilityRevokes: before.capabilityRevokes,
-    },
-    after: {
-      email: user.email,
-      role: user.role,
-      name: user.name,
-      title: user.title,
-      passwordReset: Boolean(opts.password),
-      capabilityGrants: user.capabilityGrants,
-      capabilityRevokes: user.capabilityRevokes,
-    },
-  });
-
-  return toPublicUser(user);
 }
 
 /**
@@ -199,126 +234,122 @@ export async function deleteStudioUser(opts: {
   if (opts.actorId === opts.userId) {
     throw httpError("No puede eliminar su propio usuario", 409);
   }
-  const before = await prisma.user.findUnique({ where: { id: opts.userId } });
-  if (!before) throw httpError("Usuario no encontrado", 404);
+  return userTransaction(async tx => {
+    await administrativeActor(tx, opts.actorId);
+    const before = await tx.user.findUnique({ where: { id: opts.userId } });
+    if (!before) throw httpError("Usuario no encontrado", 404);
 
-  if (before.role === "admin") {
-    const adminCount = await prisma.user.count({ where: { role: "admin" } });
-    if (adminCount <= 1) {
-      throw httpError("No se puede eliminar al único administrador", 409);
-    }
-  }
+    await preserveHostAdministrator(tx, opts.userId);
 
-  const timeEntries = await prisma.timeEntry.count({
-    where: { userId: opts.userId },
-  });
-  if (timeEntries > 0) {
-    throw httpError(
-      `No se puede eliminar: tiene ${timeEntries} registro(s) de horas. Reasígnelos o elimínelos en Facturación primero.`,
-      409
-    );
-  }
-
-  const userId = opts.userId;
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.causa.updateMany({
-        where: { abogadoId: userId },
-        data: { abogadoId: null },
-      });
-      await tx.plazo.updateMany({
-        where: { responsableId: userId },
-        data: { responsableId: null },
-      });
-      await tx.task.updateMany({
-        where: { assigneeId: userId },
-        data: { assigneeId: null },
-      });
-      await tx.task.updateMany({
-        where: { creatorId: userId },
-        data: { creatorId: null },
-      });
-      await tx.documento.updateMany({
-        where: { autorId: userId },
-        data: { autorId: null },
-      });
-      await tx.minuta.updateMany({
-        where: { autorId: userId },
-        data: { autorId: null },
-      });
-      await tx.minutaAccion.updateMany({
-        where: { responsableId: userId },
-        data: { responsableId: null },
-      });
-      await tx.activity.updateMany({
-        where: { userId },
-        data: { userId: null },
-      });
-      await tx.agentChat.updateMany({
-        where: { userId },
-        data: { userId: null },
-      });
-      await tx.message.deleteMany({
-        where: { OR: [{ senderId: userId }, { receiverId: userId }] },
-      });
-      await tx.timeEntry.updateMany({
-        where: { approverId: userId },
-        data: { approverId: null },
-      });
-      await tx.expense.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.invoice.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.feeArrangement.updateMany({
-        where: { ownerId: userId },
-        data: { ownerId: null },
-      });
-      await tx.fileVersion.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.qaPost.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.wikiPage.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.comment.updateMany({
-        where: { authorId: userId },
-        data: { authorId: null },
-      });
-      await tx.workflowInstance.updateMany({
-        where: { actorId: userId },
-        data: { actorId: null },
-      });
-
-      await tx.user.delete({ where: { id: userId } });
+    const timeEntries = await tx.timeEntry.count({
+      where: { userId: opts.userId },
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("Foreign key") || msg.includes("constraint")) {
+    if (timeEntries > 0) {
       throw httpError(
-        "No se puede eliminar: el usuario aún tiene registros vinculados. Revise facturación, causas o auditoría.",
+        `No se puede eliminar: tiene ${timeEntries} registro(s) de horas. Reasígnelos o elimínelos en Facturación primero.`,
         409
       );
     }
-    throw e;
-  }
 
-  await writeAuditStrict({
-    actorId: opts.actorId,
-    action: "user.delete",
-    entityType: "User",
-    entityId: userId,
-    before: { email: before.email, role: before.role, name: before.name },
+    const userId = opts.userId;
+
+    try {
+        await tx.causa.updateMany({
+          where: { abogadoId: userId },
+          data: { abogadoId: null },
+        });
+        await tx.plazo.updateMany({
+          where: { responsableId: userId },
+          data: { responsableId: null },
+        });
+        await tx.task.updateMany({
+          where: { assigneeId: userId },
+          data: { assigneeId: null },
+        });
+        await tx.task.updateMany({
+          where: { creatorId: userId },
+          data: { creatorId: null },
+        });
+        await tx.documento.updateMany({
+          where: { autorId: userId },
+          data: { autorId: null },
+        });
+        await tx.minuta.updateMany({
+          where: { autorId: userId },
+          data: { autorId: null },
+        });
+        await tx.minutaAccion.updateMany({
+          where: { responsableId: userId },
+          data: { responsableId: null },
+        });
+        await tx.activity.updateMany({
+          where: { userId },
+          data: { userId: null },
+        });
+        await tx.agentChat.updateMany({
+          where: { userId },
+          data: { userId: null },
+        });
+        await tx.message.deleteMany({
+          where: { OR: [{ senderId: userId }, { receiverId: userId }] },
+        });
+        await tx.timeEntry.updateMany({
+          where: { approverId: userId },
+          data: { approverId: null },
+        });
+        await tx.expense.updateMany({
+          where: { authorId: userId },
+          data: { authorId: null },
+        });
+        await tx.invoice.updateMany({
+          where: { authorId: userId },
+          data: { authorId: null },
+        });
+        await tx.feeArrangement.updateMany({
+          where: { ownerId: userId },
+          data: { ownerId: null },
+        });
+        await tx.fileVersion.updateMany({
+          where: { authorId: userId },
+          data: { authorId: null },
+        });
+        await tx.qaPost.updateMany({
+          where: { authorId: userId },
+          data: { authorId: null },
+        });
+        await tx.wikiPage.updateMany({
+          where: { authorId: userId },
+          data: { authorId: null },
+        });
+        await tx.comment.updateMany({
+          where: { authorId: userId },
+          data: { authorId: null },
+        });
+        await tx.workflowInstance.updateMany({
+          where: { actorId: userId },
+          data: { actorId: null },
+        });
+
+        await tx.user.delete({ where: { id: userId } });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("Foreign key") || msg.includes("constraint")) {
+        throw httpError(
+          "No se puede eliminar: el usuario aún tiene registros vinculados. Revise facturación, causas o auditoría.",
+          409
+        );
+      }
+      throw e;
+    }
+
+    await writeAuditStrict({
+      actorId: opts.actorId,
+      action: "user.delete",
+      entityType: "User",
+      entityId: userId,
+      before: { email: before.email, role: before.role, name: before.name },
+    }, tx);
+
+    return { ok: true as const, id: userId };
   });
-
-  return { ok: true as const, id: userId };
 }

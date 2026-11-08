@@ -5,7 +5,7 @@ export type ComputerStatus = {
   runtime: "container"; sessions: ComputerSessionSummary[];
 };
 export type ComputerSessionSummary = { id: string; state: string; expiresAt: string; renewableUntil: string; canRenew: boolean; requiresStop?: boolean; held: boolean; createdAt: string; connectors: string[] };
-export type ComputerTurn = { index: number; from: "user" | "assistant" | "system"; text: string; working: boolean; needsHelp: boolean; steps: { action: string; at: string }[] };
+export type ComputerTurn = { index: number; from: "user" | "assistant" | "system"; text: string; working: boolean; needsHelp: boolean; actionCount?: number; help?: { stepIndex: number; question: string }; steps: { action: string; at: string }[] };
 export function computerTurnNeedsHelp(turn?: ComputerTurn) {
   // A live request pauses inside a working turn. The terminal help flag is set
   // separately when a turn finishes without being able to continue.
