@@ -90,6 +90,56 @@ test("a failed native download exposes no receipt or provider detail and does no
   assert.equal(JSON.stringify(result).includes("private provider detail"), false);
 });
 
+test("approved Dropbox and OneDrive metadata preserve the exact original task for one continuation", async () => {
+  const goal = "Muestra sólo cinco nombres de archivos, sin abrir ni modificar su contenido.";
+  for (const target of [
+    { kind: "dropbox", connector: "altazor-dropbox-0123456789abcdef", action: "list", args: { limit: "5" } },
+    { kind: "dropbox", connector: "altazor-dropbox-0123456789abcdef", action: "search", args: { query: "PDF", limit: "5" } },
+    { kind: "microsoft-365", connector: "altazor-microsoft-0123456789abcdef", action: "list", args: { limit: "5" } },
+    { kind: "microsoft-365", connector: "altazor-microsoft-0123456789abcdef", action: "search", args: { query: "PDF", limit: "5" } },
+    { kind: "microsoft-365", connector: "altazor-microsoft-0123456789abcdef", action: "request", args: { method: "GET", path: "/v1.0/me/drive/root/children" } },
+  ]) {
+    for (const outcome of ["approved", "failed", "rejected"] as const) {
+      let decisions = 0, chats = 0;
+      const client = new KittiesGateway("http://127.0.0.1:7494", "synthetic-token", async (url, init) => {
+        const path = new URL(String(url)).pathname;
+        if (path === "/v1/health") return Response.json({ ok: true, lexopen_connector_gate: "v1", lexopen_async_messages: "v1" });
+        if (path === "/v1/approvals") return Response.json({ approvals: [{ ...target, id: "metadata-approval", kitty: binding.kittyId, chat: binding.chatId, status: "pending", args: { action: target.action, ...target.args } }] });
+        if (path === `/v1/chats/${binding.chatId}`) {
+          chats++;
+          return Response.json({ chat: { id: binding.chatId, members: [binding.kittyId], turns: [{ from: "user", text: goal }, { from: "altazor", kitty: binding.kittyId, approvals: [{ id: "metadata-approval" }] }] } });
+        }
+        assert.ok(path.endsWith(outcome === "rejected" ? "/reject" : "/approve"));
+        assert.equal(init?.method, "POST"); assert.deepEqual(JSON.parse(String(init.body)), outcome === "rejected" ? { reason: "La persona rechazó esta operación en LexOpen.", always: false } : { always: false });
+        decisions++;
+        return Response.json({ approval: { id: "metadata-approval", kitty: binding.kittyId, chat: binding.chatId, status: outcome === "rejected" ? "rejected" : "approved", always: false, ...(outcome === "failed" ? { error: "Synthetic provider failure" } : {}) } });
+      });
+      const result = await client.decideApproval("metadata-approval", binding.kittyId, binding.chatId, [target.connector], outcome !== "rejected");
+      assert.equal(decisions, 1); assert.equal(chats, outcome === "rejected" ? 0 : 1);
+      assert.equal(result.canContinue, outcome === "approved");
+      assert.equal(result.resumeTask, outcome === "rejected" ? null : goal);
+      assert.equal(result.verifiedFile, undefined, "metadata is never a verified downloaded file");
+    }
+  }
+});
+
+test("cloud continuation never bypasses file-only policy, account selection or generated alias binding", async () => {
+  for (const target of [
+    { kind: "dropbox", connector: "altazor-dropbox-0123456789abcdef", action: "upload", args: { path: "/must-not-write.pdf" } },
+    { kind: "microsoft-365", connector: "altazor-microsoft-0123456789abcdef", action: "request", args: { method: "GET", path: "/v1.0/me/messages" } },
+    { kind: "dropbox", connector: "altazor-microsoft-0123456789abcdef", action: "list", args: { limit: "5" } },
+  ]) {
+    let posts = 0;
+    const client = new KittiesGateway("http://127.0.0.1:7494", "synthetic-token", async (url, init) => {
+      if (init?.method === "POST") posts++;
+      if (new URL(String(url)).pathname === "/v1/health") return Response.json({ ok: true, lexopen_connector_gate: "v1" });
+      return Response.json({ approvals: [{ ...target, id: "blocked-approval", kitty: binding.kittyId, chat: binding.chatId, status: "pending", args: { action: target.action, ...target.args } }] });
+    });
+    await assert.rejects(client.decideApproval("blocked-approval", binding.kittyId, binding.chatId, [target.connector], true), error => (error as { code?: string }).code === "connector_read_only");
+    assert.equal(posts, 0);
+  }
+});
+
 test("Dropbox receipts preserve the exact account path and reject substitutions or unverified summaries", () => {
   const dropbox: FileReceiptBinding = { ...binding, kind: "dropbox", connector: "altazor-dropbox-0123456789abcdef", args: { path: "/Docencia/Programa de teoría.pdf" } };
   const receipt = { ...wire(), connector: dropbox.connector, kind: dropbox.kind, target: { ...dropbox.args } };

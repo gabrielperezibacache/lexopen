@@ -205,7 +205,11 @@ export class KittiesGateway {
     if (approve && selected.kind === "dropbox" && selected.action === "download_file") await this.requireCloudFileOAuth();
     else if (approve && selected.kind === "dropbox" && !(connectorKind("dropbox")?.actions as readonly string[]).includes(selected.action)) throw new ConnectorError("connector_action_unavailable", "Dropbox sólo permite listar, buscar y leer archivos.", 409);
     if (approve && !selected.reviewable) throw new ConnectorError("connector_approval_incomplete", "El detalle contiene datos ocultos o excede el límite de revisión. Rechácelo y revise la operación directamente en la aplicación.", 409);
-    const easyRead = selected.kind === "github" && /^altazor-github-[a-f0-9]{16}$/.test(selected.connector) || selected.kind === "google-workspace" && /^altazor-google-[a-f0-9]{16}$/.test(selected.connector);
+    // Cloud metadata needs a single bounded continuation to explain its result.
+    // Staged complete-file transfers return their receipt below without a model run.
+    const easyRead = selected.kind === "github" && /^altazor-github-[a-f0-9]{16}$/.test(selected.connector) || selected.kind === "google-workspace" && /^altazor-google-[a-f0-9]{16}$/.test(selected.connector)
+      || selected.kind === "dropbox" && /^altazor-dropbox-[a-f0-9]{16}$/.test(selected.connector) && ["list", "search"].includes(selected.action)
+      || selected.kind === "microsoft-365" && /^altazor-microsoft-[a-f0-9]{16}$/.test(selected.connector) && ["list", "search", "request"].includes(selected.action);
     let resumeTask: string | null = null;
     if (approve && easyRead && !staged) {
       await this.requireAsyncMessages();
