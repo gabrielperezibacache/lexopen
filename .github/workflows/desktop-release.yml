@@ -130,6 +130,9 @@ jobs:
         run: |
           node -e 'const fs=require("fs"),c=require("crypto").randomBytes(32).toString("hex");for(const d of ["storage",".tmp","desktop/data"]){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(d+"/release-private-canary.txt",c)}fs.appendFileSync(process.env.GITHUB_ENV,"LEXOPEN_RELEASE_CANARY="+c+"\n")'
       - name: Build native installers and audit resources
+        env:
+          # Type checking exceeds the default 2 GiB V8 heap on macOS arm64.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run desktop:dist -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Exercise packaged Host without external Node or npm
         run: npm run desktop:smoke
