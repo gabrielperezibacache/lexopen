@@ -14,7 +14,7 @@ import { inspectChosenDriveFolder } from "./drive-import";
 import { driveFolderUrl, isRealDriveFolderId, parseGoogleDriveFolderRef } from "./drive-folder";
 
 type Db = typeof prisma | Prisma.TransactionClient;
-type Options = DriveManagementOptions & { account?: ManagedDriveAccount };
+type Options = DriveManagementOptions & { account?: ManagedDriveAccount; authorizeContext?: () => Promise<void>; signal?: AbortSignal };
 const hex = z.string().regex(/^[a-f0-9]{64}$/), identifier = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(180).refine(value => !value.startsWith(".") && Buffer.byteLength(value, "utf8") <= 180 && !/[\/\\\p{Cc}\p{Cf}]/u.test(value), "Usa un nombre de hasta 180 bytes, sin punto inicial, barras ni caracteres de control");
 const common = { requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/), connectionId: identifier, bindingRevision: hex, confirmed: z.literal(true) };
@@ -34,6 +34,11 @@ export type CaseDriveResult = { state: "completed" | "unknown" | "pending" | "fa
 const bindingKey = (causaId: string) => `drive-case-binding:${causaId}`;
 const operationPrefix = (ownerId: string, causaId: string) => `drive-case:${digest(`${ownerId}:${causaId}`)}:`;
 const sourceHash = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
+async function assertCommandAuthorization(options: Options) {
+  options.signal?.throwIfAborted();
+  await options.authorizeContext?.();
+  options.signal?.throwIfAborted();
+}
 async function actor(causaId: string, user: CausaAccessUser, db: Db, write = true) {
   const current = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
   if (write) await assertCausaCapability(causaId, current, "causa.write", db); else await assertCausaAccess(causaId, current, { auditOverride: false }, db);
@@ -204,6 +209,7 @@ export async function runCaseDriveCommand(causaId: string, user: CausaAccessUser
   const command: DriveWriteCommand = { request_id: digest(key), context_key: digest(canonicalJson({ ownerId: user.id, causaId, input, source, binding })), bindingRevision: account.bindingRevision, action: input.action === "create-folder" ? "create_folder" : input.action === "save-version" ? "save_version" : "upload_file", folder_id: input.action === "create-folder" ? input.parentFolderId || "root" : binding!.folderId, name: input.nombre || source!.name, ...(source ? { mime: source.mime, sha256: source.sha256 } : {}), ...(input.action === "save-version" ? { file_id: input.fileId, expected_version: input.expectedVersion } : {}), confirmed: true };
   const [causeBefore, subscriptionBefore] = await Promise.all([db.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } }), db.driveSyncSubscription.findUnique({ where: { causaId }, select: { generation: true } })]);
   const saved: Saved = { version: 1, binding, command, bytes: source?.bytes || 0, caseFolderId: causeBefore.googleDriveFolderId, subscriptionGeneration: subscriptionBefore?.generation ?? null, ...(source ? { source } : {}) };
+  await assertCommandAuthorization(options);
   let claimed;
   try {
     claimed = await db.$transaction(async tx => {
@@ -226,6 +232,9 @@ export async function runCaseDriveCommand(causaId: string, user: CausaAccessUser
       if (input.caseRevision !== await caseDriveRevision(causaId, db)) throw httpError("La carpeta de la causa cambió.", 409);
       if (saved.binding) await assertAltazorDriveFolderBinding(causaId, user, saved.binding, account, db);
       await assertSource(causaId, user, saved, db);
+      // The assistant turn/lease and cancellation signal are checked outside
+      // every transaction, after all preparation and immediately before RPC.
+      await assertCommandAuthorization(options);
     });
     return await commitVerified(claimed.id, saved, receipt);
   } catch (error) {

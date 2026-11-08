@@ -134,6 +134,21 @@ async function main() {
     await assert.rejects(runCaseDriveCommand(second.id, owner, { ...create, requestId: randomUUID(), caseRevision: secondState.caseRevision }), rejected(409));
     assert.equal(commandCalls, beforeRevocation, "revocation between claim and motor POST stops before mutation");
     await prisma.causa.update({ where: { id: second.id }, data: { abogadoId: owner.id } });
+    const preCancelled = new AbortController(); preCancelled.abort();
+    const beforeCancellation = commandCalls, claimsBeforeCancellation = await prisma.commandExecution.count({ where: { ownerId: owner.id } });
+    const cancelInput = { ...create, requestId: randomUUID(), caseRevision: (await caseDriveState(second.id, owner)).caseRevision };
+    await assert.rejects(runCaseDriveCommand(second.id, owner, cancelInput, { signal: preCancelled.signal }));
+    assert.equal(commandCalls, beforeCancellation); assert.equal(await prisma.commandExecution.count({ where: { ownerId: owner.id } }), claimsBeforeCancellation, "pre-cancellation never claims an operation");
+    const midCancelled = new AbortController(); let authorizations = 0;
+    const cancelled = { ...cancelInput, requestId: randomUUID() };
+    await assert.rejects(runCaseDriveCommand(second.id, owner, cancelled, { signal: midCancelled.signal, authorizeContext: async () => {
+      authorizations++;
+      if (authorizations === 1) assert.equal(await prisma.commandExecution.count({ where: { ownerId: owner.id, status: "running" } }), 0, "authorization runs before claiming, outside a transaction");
+      else { assert.equal(await prisma.commandExecution.count({ where: { ownerId: owner.id, status: "running" } }), 1); midCancelled.abort(); }
+    } }), rejected(409));
+    assert.equal(authorizations, 2); assert.equal(commandCalls, beforeCancellation, "cancellation after preparation prevents the motor mutation");
+    const cancelledRecord = await prisma.commandExecution.findFirstOrThrow({ where: { ownerId: owner.id, key: { endsWith: `:${cancelled.requestId}` } } });
+    assert.equal(cancelledRecord.status, "failed", "a cancelled pre-write claim cannot remain unknown");
     malformedRead = true; await assert.rejects((await account.openTransport()).get(`/${folderId}?fields=id,name,mimeType,trashed,parents`, 32768)); malformedRead = false;
     await prisma.causaMiembro.deleteMany({ where: { causaId: cause.id, userId: reader.id } });
     await assert.rejects(caseDriveState(cause.id, reader), rejected(404));

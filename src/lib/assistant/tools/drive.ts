@@ -85,20 +85,24 @@ export function createDriveTools(deps: Dependencies = {}) {
     if (!plan?.needsConfirm || plan.id !== match[1] || !step || step.toolId !== toolId || canonicalJson(step.input) !== canonicalJson(input)) throw httpError("El plan cambió. Revisa nuevamente el archivo y su destino.", 409);
     const turn = await db.altazorTurn.findFirst({ where: { ...(ctx.nativeTurnId ? { id: ctx.nativeTurnId } : {}), planId: plan.id, conversationId: scope.conversationId, ownerId: scope.actor.id, status: "running", cancelRequestedAt: null, leaseToken: { not: null }, leaseExpiresAt: { gt: new Date() } }, select: { id: true } });
     if (!turn) throw httpError("El envío no está confirmado, fue cancelado o perdió su autorización de ejecución.", 409);
-    await ctx.authorizeContext(); ctx.signal?.throwIfAborted();
+    const authorizeEgress = async () => {
+      ctx.signal?.throwIfAborted(); await ctx.authorizeContext!(); ctx.signal?.throwIfAborted();
+      if (!await db.altazorTurn.count({ where: { id: turn.id, planId: plan.id, conversationId: scope.conversationId, ownerId: scope.actor.id, status: "running", cancelRequestedAt: null, leaseToken: { not: null }, leaseExpiresAt: { gt: new Date() } } })) throw httpError("El envío fue cancelado o perdió su autorización de ejecución.", 409);
+    };
+    await authorizeEgress();
     if (step.preview !== await preview(toolId, input, ctx)) throw httpError("La vista previa cambió. Prepara un nuevo plan antes de enviar el archivo.", 409);
-    await ctx.authorizeContext(); ctx.signal?.throwIfAborted();
-    return { scope, requestId: `assistant-drive-${digest(`${scope.actor.id}:${ctx.commandKey}`)}` };
+    await authorizeEgress();
+    return { scope, requestId: `assistant-drive-${digest(`${scope.actor.id}:${ctx.commandKey}`)}`, authorizeContext: authorizeEgress };
   }
   async function send(toolId: "drive.guardarDocumento" | "drive.crearCarpeta", input: FileInput | FolderInput, ctx: ToolContext): Promise<ToolResult> {
-    const { scope, requestId } = await confirmed(toolId, input, ctx);
+    const { scope, requestId, authorizeContext } = await confirmed(toolId, input, ctx);
     const payload: CaseDriveCommand = toolId === "drive.crearCarpeta"
       ? { ...(input as FolderInput), action: "create-folder", requestId, confirmed: true }
       : (() => { const value = input as FileInput; return { connectionId: value.connectionId, bindingRevision: value.bindingRevision, caseRevision: value.caseRevision, documentoId: value.documentoId, documentVersion: value.documentVersion, sourceSha256: value.sourceSha256, nombre: value.nombre, action: value.action, ...(value.action === "save-version" ? { fileId: value.fileId, expectedVersion: value.expectedVersion } : {}), requestId, confirmed: true as const } as CaseDriveCommand; })();
     // The CaseDrive and native ledgers own one-use egress. Never wrap this in a
     // serializable retry or promise that an unknown outcome can be resent.
     try {
-      const result = await command(scope.causaId, scope.actor, payload, { client: db });
+      const result = await command(scope.causaId, scope.actor, payload, { client: db, authorizeContext, signal: ctx.signal });
       const ok = result.state === "completed";
       return { ok, message: result.message, entityId: result.operationId, card: { type: "drive", causaId: scope.causaId, href: href(scope.causaId), state: result.state, operationId: result.operationId, ...(ok && result.file ? { file: result.file } : {}), ...(ok && result.folder ? { folder: result.folder } : {}) } };
     } catch { return { ok: false, message: "No se pudo confirmar el resultado de Drive. Revísalo desde esta causa; el envío no se repetirá automáticamente.", card: { type: "drive", causaId: scope.causaId, href: href(scope.causaId), state: "unknown" } }; }
