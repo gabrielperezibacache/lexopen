@@ -54,7 +54,7 @@ En una instalación existente se utiliza `prisma migrate deploy`; no un reset.
 ## Validación
 
 La versión combinada pasó `npm test`, `npm run typecheck`, ESLint y la compilación
-de producción. Pasaron 46 pruebas de navegador y 145 pruebas de contratos del
+de producción. Pasaron 49 pruebas de navegador y 145 pruebas de contratos del
 escritorio, además de las integraciones PostgreSQL de permisos, autenticación, Drive, workflows, Ícaros,
 conversación, ayuda y WhatsApp general. La suite completa `test:integration` pasó
 en GitHub Actions. La receta real sobre la revisión fijada

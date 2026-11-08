@@ -63,7 +63,8 @@ for (const state of ["help", "approval"] as const) {
     await page.getByRole("button", { name: isHelp ? "Revisar solicitud" : "Revisar autorización" }).click();
     if (isHelp) {
       const request = page.getByRole("article", { name: "Solicitud de ayuda de Altazor" });
-      await expect(request).toContainText("Toma el control del escritorio y devuélveselo a Altazor cuando termines.");
+      await expect(request.getByRole("link", { name: "Responder en Ayuda a distancia", exact: true })).toHaveAttribute("href", "/inicio?altazor=help");
+      await expect(request).toContainText("Si necesitas actuar en la pantalla, toma el control y devuélveselo a Altazor cuando termines.");
       await expect(request).toBeFocused();
       await expect(page.getByRole("button", { name: "Tomar control" })).toBeEnabled();
     } else {
