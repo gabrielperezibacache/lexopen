@@ -4,6 +4,9 @@ import { randomUUID } from "node:crypto";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
 
+// These fixtures intercept provider replies; service-worker fetches bypass page routes.
+test.use({ serviceWorkers: "block" });
+
 // Browser contract fixtures: PostgreSQL and native gateway suites separately verify ACL and actual command semantics.
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 const tag = randomUUID().replaceAll("-", ""), folderId = `Folder_${tag}`, parentId = `Parent_${tag}`, fileId = `File_${tag}`;

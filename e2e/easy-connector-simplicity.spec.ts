@@ -3,6 +3,9 @@ import { CONNECTOR_CATALOG } from "../src/lib/altazor/connectors/catalog";
 import type { ComputerStatus } from "../src/lib/altazor/computer/types";
 import { loginAs } from "./helpers";
 
+// These fixtures intercept provider replies; service-worker fetches bypass page routes.
+test.use({ serviceWorkers: "block" });
+
 // UI contracts only: every application, account and credential below is fictitious.
 const workspaceId = "simple-connections-fixture";
 const oauthApi = "/api/altazor/connectors/oauth";

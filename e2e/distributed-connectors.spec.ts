@@ -4,6 +4,9 @@ import type { EasyOAuthStatus } from "../src/lib/altazor/connectors/easy-oauth";
 import type { ComputerStatus } from "../src/lib/altazor/computer/types";
 import { loginAs } from "./helpers";
 
+// These fixtures intercept provider replies; service-worker fetches bypass page routes.
+test.use({ serviceWorkers: "block" });
+
 // Every application, account and authorization below is fictitious. Provider
 // requests are blocked; these tests exercise the real compiled interface only.
 const workspaceId = "distributed-connections-fixture";
