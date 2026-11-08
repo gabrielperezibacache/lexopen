@@ -114,7 +114,12 @@ async function main() {
     console.log("Audio integration PASS: bounded immutable original, duplicate upload race cleanup, transactional audit rollback, redacted encrypted configuration, local-only no egress, actual local multipart HTTP provider, persistent lease/concurrency/retry, source and role revocation during work, version CAS/history, explicit manual edits clearing alignment, publication v1/v2 with inherited ACL and preserved user edits, malformed/oversize provider rejection; synthetic transport only, no speech-recognition claim.");
   } finally {
     failAudit = false; release.resolve(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
-    await client.caseAudio.deleteMany({ where: { causaId: { in: cases } } }); await client.documento.deleteMany({ where: { causaId: { in: cases } } }); await client.causa.deleteMany({ where: { id: { in: cases } } }); await client.auditEvent.deleteMany({ where: { actorId: { in: users } } }); await client.user.deleteMany({ where: { id: { in: users } } });
+    const fixtureAudioIds = (await client.caseAudio.findMany({ where: { causaId: { in: cases } }, select: { id: true } })).map(audio => audio.id);
+    await client.caseAudioPublication.deleteMany({ where: { audioId: { in: fixtureAudioIds } } });
+    await client.caseAudioTranscriptRevision.deleteMany({ where: { audioId: { in: fixtureAudioIds } } });
+    await client.caseAudio.deleteMany({ where: { id: { in: fixtureAudioIds } } });
+    assert.equal(await client.caseAudio.count({ where: { id: { in: fixtureAudioIds } } }), 0, "fixture audio is removed before its source documents and causes");
+    await client.documento.deleteMany({ where: { causaId: { in: cases } } }); await client.causa.deleteMany({ where: { id: { in: cases } } }); await client.auditEvent.deleteMany({ where: { actorId: { in: users } } }); await client.user.deleteMany({ where: { id: { in: users } } });
     if (priorConfig) await client.integrationConfig.update({ where: { provider: "transcription" }, data: { enabled: priorConfig.enabled, configJson: priorConfig.configJson } }); else await client.integrationConfig.deleteMany({ where: { provider: "transcription" } });
     if (organizationId) await client.organization.delete({ where: { id: organizationId } }); else if (priorFirm) await client.firmSettings.update({ where: { id: priorFirm.id }, data: { assistantLlmMode: priorFirm.assistantLlmMode } });
     await client.$disconnect(); if (previousStorage === undefined) delete process.env.STORAGE_PATH; else process.env.STORAGE_PATH = previousStorage; await rm(root, { recursive: true, force: true });
