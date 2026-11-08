@@ -66,7 +66,7 @@ Las capacidades avanzadas declaradas están sujetas a disponibilidad del runtime
 | Weather | Sin inicio de sesión; configuración del recurso | Consultar pronóstico por localidad | Sin prueba real de extremo a extremo en esta auditoría | src/lib/altazor/connectors/catalog.ts:774 |
 | Spotify | OAuth avanzado / aplicación propia o credencial | Búsqueda, listas y control Premium | Sin prueba con cuenta real en esta auditoría | src/lib/altazor/connectors/catalog.ts:789 |
 | TIDAL | OAuth avanzado / aplicación propia o credencial | Búsqueda y listas; no reproducción remota | Sin prueba con cuenta real en esta auditoría | src/lib/altazor/connectors/catalog.ts:815 |
-| Dropbox | Inicio de sesión guiado PKCE | Listar, buscar y descargar archivos con lectura | Cuenta y descarga real verificadas por root durante esta auditoría; metadatos requieren la corrección de continuación | src/lib/altazor/connectors/catalog.ts:836 |
+| Dropbox | Inicio de sesión guiado PKCE | Listar, buscar y descargar archivos con lectura | Cuenta, descarga completa y consulta real de cinco nombres PDF verificadas en esta auditoría | src/lib/altazor/connectors/catalog.ts:836 |
 | Things (Mac) | Integración macOS | Consultar/crear/completar tareas del Mac del gateway | No disponible en la VM Linux actual; requiere gateway macOS y permisos propios | src/lib/altazor/connectors/catalog.ts:853 |
 | OmniFocus (Mac) | Integración macOS | Consultar/crear/completar tareas del Mac del gateway | No disponible en la VM Linux actual; requiere gateway macOS y permisos propios | src/lib/altazor/connectors/catalog.ts:870 |
 | Facebook Page | OAuth avanzado / aplicación propia o credencial | Gestionar una página y Messenger | Sin prueba con cuenta real en esta auditoría | src/lib/altazor/connectors/catalog.ts:885 |
@@ -91,7 +91,7 @@ Las capacidades avanzadas declaradas están sujetas a disponibilidad del runtime
 
 En la instalación privada se comprobó acceso y descarga completa desde Google Drive, GitHub y Dropbox. Dropbox descargó su PDF de bienvenida: 1.144.386 bytes y 10 páginas, con huella SHA-256 comprobada también mediante lectura independiente dentro del contenedor. No se modificaron archivos externos. Las pruebas de lectura se autorizaron una sola vez y el escritorio de prueba se detuvo al finalizar. Los datos privados de las cuentas y las evidencias locales no se incorporan al repositorio.
 
-El inicio de sesión de Microsoft abre su directorio académico; falta decidir qué directorio administrará la identidad de LexOpen y completar su registro público. Esto no equivale a una cuenta OneDrive conectada. La revisión pública de Google sigue sujeta a la espera del proveedor y al vídeo demostrativo requerido.
+Microsoft queda pendiente por decisión del usuario. El inicio de sesión abrió su directorio académico; no se registró una aplicación ni se cambiaron permisos en esa institución. Esto no equivale a una cuenta OneDrive conectada. La revisión pública de Google sigue sujeta a la espera del proveedor y al vídeo demostrativo requerido.
 
 Las instrucciones de Altazor ahora explican el flujo entre conversación persistente, memoria recuperada, causas, biblioteca, audiencias, escritos, investigación y docencia, escritorio y conectores. El mapa distingue las operaciones disponibles de una respuesta de texto. El ámbito personal o de causa lo aporta el servidor. Las conexiones seleccionadas no conceden permisos implícitos para correo, calendario o escritura. Una tarea pendiente, una captura o un clic no se presentan como resultado completado.
 
@@ -105,9 +105,19 @@ La revalidación de GitHub también reveló que una autorización temporal habí
 
 Las pruebas automáticas comprueban renovación, rotación, concurrencia, reinicio, permisos y rechazo de respuestas inválidas. La validación con cuentas reales distingue guardar el par renovable, reiniciar y consultar del hecho de observar una rotación al vencer: esta última sólo se acredita cuando se alcanza su ventana natural, sin manipular fechas ni credenciales para simularla.
 
+## Cierre de la validación del 8 de noviembre
+
+La consulta real desde la conversación de Altazor preparó una búsqueda literal de `.pdf`, con máximo de cinco resultados y la cuenta de Dropbox elegida para el escritorio. Tras una autorización, devolvió cinco nombres tipados como archivos PDF. Se verificaron la huella y el tamaño del recibo, su pertenencia a esa petición y su origen en el conector. No se abrió ni descargó contenido en esa consulta. El resultado avisa que es una página y no un inventario completo. El escritorio de prueba se detuvo al terminar.
+
+La preparación de las consultas inequívocas de nombres también pasa ahora por código: el modelo no decide los argumentos ni redacta el resultado. Los encargos generales conservan su flujo de IA. Un encargo nuevo espera a que se resuelva la autorización pendiente; la repetición de la misma petición conserva su resultado. Ante una pérdida de confirmación o un fallo al guardar el historial, se bloquea la repetición automática. Los recibos de metadatos y de descargas son contratos distintos.
+
+Google Drive, GitHub y Dropbox respondieron con las cuentas reales tras reiniciar el motor actualizado, sin nuevos inicios de sesión. GitHub conserva su autorización renovable; no se ha esperado al vencimiento natural de su token para observar una rotación real. Ese caso se cubre mediante pruebas automáticas y no se presenta como observado con la cuenta del usuario.
+
+La última compilación pasó 53 pruebas unitarias, cuatro pruebas de receta, cuatro suites de integración con PostgreSQL desechable y 25 pruebas Chromium. El motor pasó 190 casos y subcasos con detector de concurrencia, sin omisiones, y su receta reprodujo 280 archivos Go idénticos. Las pruebas con proveedores simulados y las comprobaciones con cuentas reales se mantienen separadas. La actualización quedó instalada en el entorno privado de validación, conservando cuenta, configuración, archivos y estética; este cierre no acredita publicación en `main` ni nuevos instaladores.
+
 ## Orden de continuidad
 
-1. Completar la identidad de Microsoft y comprobar su cuenta y un archivo seleccionado.
+1. Retomar Microsoft cuando el usuario lo solicite: elegir el directorio administrador de la identidad y comprobar su cuenta y un archivo seleccionado.
 2. Añadir paridad de recibos verificados de OneDrive antes de anunciar descargas equivalentes a las otras tres conexiones.
 3. Completar la revisión pública de Google con evidencia del flujo web y de escritorio.
 4. Priorizar los siguientes proveedores según el uso del estudio; preparar una identidad de publicación y ofrecer inicio de sesión guiado cuando el proveedor lo admita.

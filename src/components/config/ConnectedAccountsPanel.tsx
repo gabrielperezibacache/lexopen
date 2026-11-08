@@ -10,13 +10,13 @@ export function ConnectedAccountsPanel({ locale, canManage = false }: { locale: 
       name: "Google Drive",
       href: "/inicio?altazor=connectors&connector=google",
       icon: Files,
-      description: tr("Permite que Altazor busque y lea los archivos de Drive que autorices.", "Let Altazor find and read the Drive files you authorize."),
+      description: tr("Conecta tus archivos y carpetas de Drive para trabajar con Altazor.", "Connect your Drive files and folders to work with Altazor."),
     },
     {
       name: "GitHub",
       href: "/inicio?altazor=connectors&connector=github",
       icon: GitFork,
-      description: tr("Autoriza tu cuenta para usar GitHub desde Altazor.", "Authorize your account to use GitHub from Altazor."),
+      description: tr("Consulta tu perfil y los archivos de repositorios públicos de GitHub.", "Read your profile and files in public GitHub repositories."),
     },
     {
       name: "Dropbox",

@@ -31,6 +31,7 @@ async function main() {
       assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
       return Response.json({ applied: false, chat_id: path.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
     }
+    if (path === "/v1/approvals") return Response.json({ approvals: [] });
     const snapshot = snapshots.get(target.origin); assert.ok(snapshot);
     if (path === "/v1/health") return Response.json({ ok:true, version:"desktop-tool-fixture", containers:true, lexopen_connector_gate:"v1", lexopen_connector_platform:"linux", lexopen_async_messages:"v1", lexopen_computer_use_policy:"v1" });
     if (path === "/v1/providers") return Response.json({ providers:[{name:"separate-model",kind:"openai"}] });
@@ -65,6 +66,24 @@ async function main() {
     for (const label of ["Google Drive", "GitHub (repositorios públicos)", "Dropbox (archivos)", "Microsoft 365 / OneDrive (archivos)"]) assert.ok(cloudPreview.includes(label));
     assert.equal(aliases.some(alias => cloudPreview.includes(alias)), false, "review uses service names instead of technical account aliases");
     assert.ok(cloudPreview.includes("sin editar, publicar ni eliminar")); assert.ok(cloudPreview.includes("OneDrive no incluye correo ni calendario"));
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: '["clima"]' } });
+    const metadataText = "Comprueba mi conexión de Dropbox y muestra sólo los nombres de hasta cinco archivos PDF disponibles, sin abrir ni modificar su contenido. Usa la cuenta de Dropbox ya conectada.";
+    const metadataAlias = `altazor-dropbox-${digest(`${owner.id}:${workspaceIds[0]}`).slice(0, 16)}`;
+    const metadataPlanId = `altazor-${randomUUID()}`; planIds.push(metadataPlanId);
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: JSON.stringify([metadataAlias]) } });
+    const beforeMetadataPreview = network;
+    const metadataPlan = await runAssistantTurn({ text: metadataText, user: { id: owner.id, role: "abogado" }, chatId: conversation.id, scope: ctx.scope, planId: metadataPlanId });
+    assert.equal(network, beforeMetadataPreview, "a literal metadata preview neither invokes the model nor consults the account");
+    assert.equal(metadataPlan.previewSteps.length, 1); assert.equal(metadataPlan.previewSteps[0].toolId, "escritorio.encargar");
+    assert.equal(metadataPlan.previewSteps[0].input.texto, metadataText, "the exact human request remains the confirmed plan payload");
+    assert.ok(metadataPlan.previewSteps[0].preview.startsWith("Consultar hasta 5 nombres de archivos PDF en tu cuenta de Dropbox."));
+    assert.ok(metadataPlan.previewSteps[0].preview.includes(metadataText));
+    assert.ok(metadataPlan.previewSteps[0].preview.includes("no se abre ni descarga su contenido"));
+    assert.equal(metadataPlan.previewSteps[0].preview.includes("separate-model"), false); assert.equal(metadataPlan.previewSteps[0].preview.includes("proveedor remoto"), false);
+    const foreignMetadataAlias = `altazor-dropbox-${digest(`${other.id}:${workspaceIds[0]}`).slice(0, 16)}`;
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: JSON.stringify([foreignMetadataAlias]) } });
+    const foreignMetadataPreview = await escritorioEncargarTool.preview({ sessionId: sessions[0].id, texto: metadataText }, ctx);
+    assert.equal(foreignMetadataPreview.startsWith("Consultar hasta 5 nombres"), false, "a selected alias from another owner cannot claim the direct metadata path");
     await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: '["clima"]' } });
     const listed=await escritorioListarTool.execute({},ctx);assert.ok(listed.ok);
     assert.equal((listed.card?.sessions as unknown[]).length,1);assert.ok(listed.message.includes(sessions[0].id));assert.equal(listed.message.includes(sessions[1].id),false);assert.equal(JSON.stringify(listed).includes("fictitious-desktop-tool-token"),false);

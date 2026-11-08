@@ -5,34 +5,43 @@ import { prisma } from "@/lib/db";
 import { assertCausaAccess, assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { importSelectedDriveFile, listDriveImportCandidates, type DriveImportDependencies, inspectChosenDriveFolder, listDriveFoldersWithSession } from "./drive-import";
 import { isRealDriveFolderId, parseGoogleDriveFolderRef } from "./drive-folder";
+import { resolveAltazorDriveAccount, type ManagedDriveAccount } from "@/lib/altazor/connectors/drive-management";
+import { assertAltazorDriveFolderBinding, caseDriveRevision, readAltazorDriveFolderBinding } from "./case-drive";
 
 const LEASE_MS = 10 * 60_000;
 const MAX_INSPECTED = 150;
 const MAX_IMPORTED = 20;
 function error(message: string, status = 409) { return Object.assign(new Error(message), { status }); }
-type AccountChoice = "study" | "personal";
+type AccountChoice = "study" | "personal" | "altazor";
 async function studyConnection(client: PrismaClient | Prisma.TransactionClient) {
   const row = await client.integrationConfig.findUnique({ where: { provider: "google" }, select: { id: true, enabled: true, configJson: true } });
   try { const config = JSON.parse(row?.configJson || "{}"); const configured = row?.enabled === true && typeof config.accessToken === "string" && Boolean(config.accessToken) && config.syncDrive !== false; return { configured, connectionId: configured ? createHash("sha256").update(JSON.stringify([row!.id, config.connectedEmail || "study"])).digest("hex") : null }; } catch { return { configured: false, connectionId: null }; }
 }
 async function choices(userId: string, client: PrismaClient) {
   const { personalDriveConnectionStatus } = await import("@/lib/personal-connectors/google-drive/service");
-  const [study, personal] = await Promise.all([studyConnection(client), personalDriveConnectionStatus(userId, { client }).catch(() => ({ connected: false, configured: false, label: "Mi cuenta de Google", connectionId: null, reason: "Conecte su cuenta personal desde Conexiones." }))]);
-  return { study, personal };
+  const [study, personal, altazor] = await Promise.all([studyConnection(client), personalDriveConnectionStatus(userId, { client }).catch(() => ({ connected: false, configured: false, label: "Mi cuenta de Google", connectionId: null, reason: "Conecte su cuenta personal desde Conexiones." })), resolveAltazorDriveAccount({ id: userId, role: "abogado" }, { client }).catch(() => null)]);
+  return { study, personal, altazor };
 }
 function publicState(row: { enabled: boolean; intervalMinutes: number; lastRunAt: Date | null; status: string; note: string | null; ownerId: string; account: string } | null, actorId: string) {
-  return row ? { enabled: row.enabled, intervalMinutes: row.intervalMinutes, lastRunAt: row.lastRunAt?.toISOString() || null, status: row.status, note: row.note, canConfigure: row.ownerId === actorId || !row.enabled, account: row.account === "personal" ? "personal" as const : "study" as const } : { enabled: false, intervalMinutes: 60, lastRunAt: null, status: "idle", note: null, canConfigure: true, account: "study" as const };
+  return row ? { enabled: row.enabled, intervalMinutes: row.intervalMinutes, lastRunAt: row.lastRunAt?.toISOString() || null, status: row.status, note: row.note, canConfigure: row.ownerId === actorId || !row.enabled, account: row.account === "altazor" ? "altazor" as const : row.account === "personal" ? "personal" as const : "study" as const } : { enabled: false, intervalMinutes: 60, lastRunAt: null, status: "idle", note: null, canConfigure: true, account: "study" as const };
+}
+function publicAccounts(accounts: Awaited<ReturnType<typeof choices>>) { return { study: { configured: accounts.study.configured }, personal: { connected: accounts.personal.connected, label: accounts.personal.label, reason: accounts.personal.reason }, altazor: { connected: accounts.altazor?.canRead === true, canManage: accounts.altazor?.canManage === true, label: "Mi cuenta de Altazor", reason: accounts.altazor?.canRead ? null : "Conecta Google Drive y autoriza la lectura desde las aplicaciones de Altazor." } }; }
+async function publicAltazorBinding(row: { causaId: string; ownerId: string; account: string; connectionId: string | null; folderId: string; generation: number } | null, ownerId: string, db: PrismaClient | Prisma.TransactionClient) {
+  if (row?.account !== "altazor" || row.ownerId !== ownerId) return {};
+  const binding = await readAltazorDriveFolderBinding(row.causaId, db);
+  return { connectionId: row.connectionId, bindingRevision: binding?.accountRevision || null, folderId: row.folderId, generation: row.generation };
 }
 export async function getDriveSyncSettings(causaId: string, user: CausaAccessUser, client = prisma) {
   await assertCausaAccess(causaId, user, { auditOverride: false }, client);
   const [row, accounts] = await Promise.all([client.driveSyncSubscription.findUnique({ where: { causaId } }), choices(user.id, client)]);
-  return { ...publicState(row, user.id), accounts: { study: { configured: accounts.study.configured }, personal: { connected: accounts.personal.connected, label: accounts.personal.label, reason: accounts.personal.reason } } };
+  return { ...publicState(row, user.id), ...await publicAltazorBinding(row, user.id, client), accounts: publicAccounts(accounts) };
 }
-export async function configureDriveSync(causaId: string, user: CausaAccessUser, input: { enabled: boolean; intervalMinutes: number; account: AccountChoice }, client = prisma) {
-  if (!["study", "personal"].includes(input.account) || ![15, 30, 60, 180, 360, 1440].includes(input.intervalMinutes)) throw error("Seleccione una frecuencia y una cuenta disponible.", 400);
+export async function configureDriveSync(causaId: string, user: CausaAccessUser, input: { enabled: boolean; intervalMinutes: number; account: AccountChoice; connectionId?: string; bindingRevision?: string; folderId?: string; generation?: number }, client = prisma) {
+  if (!["study", "personal", "altazor"].includes(input.account) || ![15, 30, 60, 180, 360, 1440].includes(input.intervalMinutes)) throw error("Seleccione una frecuencia y una cuenta disponible.", 400);
   const accounts = await choices(user.id, client);
   if (input.enabled && input.account === "personal" && !accounts.personal.connected) throw error("Conecte su Google Drive personal y autorice la lectura de documentos antes de activar esta carpeta.", 409);
-  const connectionId = input.account === "personal" ? accounts.personal.connectionId : accounts.study.connectionId;
+  if (input.enabled && input.account === "altazor" && !accounts.altazor?.canRead) throw error("Conecta Google Drive desde Altazor y autoriza la lectura antes de activar esta carpeta.");
+  const connectionId = input.account === "altazor" ? accounts.altazor?.connectionId || null : input.account === "personal" ? accounts.personal.connectionId : accounts.study.connectionId;
   const row = await client.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
     const actor = await tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
@@ -41,15 +50,31 @@ export async function configureDriveSync(causaId: string, user: CausaAccessUser,
     if (!isRealDriveFolderId(causa.googleDriveFolderId)) throw error("Primero elija una carpeta de Drive para esta causa.");
     const prior = await tx.driveSyncSubscription.findUnique({ where: { causaId } });
     if (prior && prior.ownerId !== user.id && prior.enabled) throw error("La sincronización fue activada por otro profesional. Solicite que la desactive antes de reemplazarla.", 403);
+    if (input.account === "altazor") {
+      const binding = await readAltazorDriveFolderBinding(causaId, tx);
+      if (!prior || prior.account !== "altazor" || prior.ownerId !== user.id || !binding || input.connectionId !== prior.connectionId || input.bindingRevision !== binding.accountRevision || input.folderId !== prior.folderId || input.folderId !== causa.googleDriveFolderId || input.generation !== prior.generation) throw error("La cuenta o la carpeta cambió. Actualiza su configuración antes de continuar.");
+    }
     if (input.enabled && input.account === "personal" && connectionId) { const { assertPersonalDriveConnection } = await import("@/lib/personal-connectors/google-drive/service"); await assertPersonalDriveConnection(user.id, connectionId, tx); }
+    if (input.enabled && input.account === "altazor") {
+      const binding = await readAltazorDriveFolderBinding(causaId, tx);
+      if (!binding || !accounts.altazor) throw error("Vuelve a elegir la carpeta con tu cuenta de Altazor.");
+      await assertAltazorDriveFolderBinding(causaId, actor, binding, accounts.altazor, tx);
+    }
     return tx.driveSyncSubscription.upsert({ where: { causaId }, create: { causaId, ownerId: user.id, account: input.account, connectionId, folderId: causa.googleDriveFolderId!, enabled: input.enabled, intervalMinutes: input.intervalMinutes, nextRunAt: input.enabled ? new Date() : null }, update: { ownerId: user.id, account: input.account, connectionId, enabled: input.enabled, intervalMinutes: input.intervalMinutes, folderId: causa.googleDriveFolderId!, generation: { increment: 1 }, scanCursor: null, nextRunAt: input.enabled ? new Date() : null, leaseToken: null, leaseExpiresAt: null, status: input.enabled ? "idle" : "paused", note: null } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-  return { ...publicState(row, user.id), accounts: { study: { configured: accounts.study.configured }, personal: { connected: accounts.personal.connected, label: accounts.personal.label, reason: accounts.personal.reason } } };
+  return { ...publicState(row, user.id), ...await publicAltazorBinding(row, user.id, client), accounts: publicAccounts(accounts) };
 }
 /** Manual lists/imports use the selected account and never borrow another professional's connection. */
 export async function driveImportDependenciesForActor(causaId: string, user: CausaAccessUser, client = prisma): Promise<DriveImportDependencies> {
   await assertCausaAccess(causaId, user, { auditOverride: false }, client);
   const selected = await client.driveSyncSubscription.findUnique({ where: { causaId } });
+  if (selected?.account === "altazor") {
+    if (selected.ownerId !== user.id || !selected.connectionId) throw error("Esta carpeta utiliza la conexión de otro profesional. Consulta las copias guardadas en la causa.", 403);
+    const account = await resolveAltazorDriveAccount(user, { client });
+    const binding = await readAltazorDriveFolderBinding(causaId, client);
+    if (!account || !binding || account.connectionId !== selected.connectionId) throw error("La cuenta cambió. Vuelve a elegir la carpeta con Altazor.");
+    return { client, openTransport: account.openTransport, assertActive: db => assertAltazorDriveFolderBinding(causaId, user, binding, account, db) };
+  }
   if (selected?.account !== "personal") return { client };
   if (selected.ownerId !== user.id || !selected.connectionId) throw error("La carpeta usa una conexión personal de otro profesional. Sus copias guardadas están disponibles en el expediente.", 403);
   const expected = selected.connectionId;
@@ -66,10 +91,21 @@ export async function driveImportDependenciesForActor(causaId: string, user: Cau
     },
   };
 }
-export async function listPersonalDriveFolders(causaId: string, user: CausaAccessUser, input: { parentId?: string; query?: string; pageToken?: string; connectionId?: string }, options: DriveImportDependencies = {}) {
+export async function listPersonalDriveFolders(causaId: string, user: CausaAccessUser, input: { parentId?: string; query?: string; pageToken?: string; connectionId?: string; bindingRevision?: string; caseRevision?: string }, options: DriveImportDependencies = {}) {
   const client = options.client || prisma;
   const current = await client.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
   await assertCausaCapability(causaId, current, "causa.write", client);
+  const altazor = await resolveAltazorDriveAccount(user, { client });
+  if (altazor) {
+    const revision = await caseDriveRevision(causaId, client);
+    if (input.connectionId && input.connectionId !== altazor.connectionId || input.bindingRevision && input.bindingRevision !== altazor.bindingRevision) throw error("La cuenta cambió. Abre de nuevo el selector de carpetas.");
+    if (input.caseRevision && input.caseRevision !== revision) throw error("La carpeta de la causa cambió. Abre de nuevo el selector.");
+    const data = await listDriveFoldersWithSession(null, input, { ...options, openTransport: altazor.openTransport });
+    await altazor.assertActive(client);
+    if (revision !== await caseDriveRevision(causaId, client)) throw error("La carpeta de la causa cambió durante la consulta.");
+    await assertCausaCapability(causaId, await client.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } }), "causa.write", client);
+    return { ...data, account: "altazor" as const, connectionId: altazor.connectionId, bindingRevision: altazor.bindingRevision, caseRevision: revision, canManage: altazor.canManage };
+  }
   const { requirePersonalDriveSession, assertPersonalDriveConnection } = await import("@/lib/personal-connectors/google-drive/service");
   const session = await requirePersonalDriveSession(user.id, { client });
   if (input.connectionId && input.connectionId !== session.connectionId) throw error("La cuenta de Google cambió. Abra nuevamente el selector de carpetas.");
@@ -80,7 +116,7 @@ export async function listPersonalDriveFolders(causaId: string, user: CausaAcces
   };
   const data = await listDriveFoldersWithSession(session, input, { ...options, client, assertActive: guard });
   await guard(client);
-  return { ...data, connectionId: session.connectionId };
+  return { ...data, account: "personal" as const, connectionId: session.connectionId, bindingRevision: null, canManage: false };
 }
 /** A personal Drive folder can be linked without configuring the study's Google identity. */
 export async function linkPersonalDriveFolder(causaId: string, user: CausaAccessUser, folderRef: string, options: DriveImportDependencies & { connectionId?: string } = {}) {
@@ -97,6 +133,8 @@ export async function linkPersonalDriveFolder(causaId: string, user: CausaAccess
     await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
     const current = await tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
     await assertCausaCapability(causaId, current, "causa.write", tx);
+    const prior = await tx.driveSyncSubscription.findUnique({ where: { causaId } });
+    if (prior?.enabled && prior.ownerId !== user.id) throw error("La sincronización fue activada por otro profesional. Debe pausarla antes de transferir la carpeta.", 403);
     await assertPersonalDriveConnection(user.id, session.connectionId, tx);
     await tx.causa.update({ where: { id: causaId }, data: { googleDriveFolderId: metadata.id, googleDriveFolderName: metadata.name, googleDriveFolderUrl: folder.folderUrl } });
     await tx.driveSyncSubscription.upsert({ where: { causaId }, create: { causaId, ownerId: user.id, folderId: metadata.id, account: "personal", connectionId: session.connectionId, enabled: false, status: "paused" }, update: { ownerId: user.id, folderId: metadata.id, enabled: false, generation: { increment: 1 }, account: "personal", connectionId: session.connectionId, status: "paused", nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null, note: "Carpeta personal elegida. Active su actualización cuando esté listo." } });
@@ -136,12 +174,18 @@ export async function processDueDriveSyncSubscriptions(options: DriveImportDepen
     let note = "", status = "ok";
     try {
       const user = await client.user.findUniqueOrThrow({ where: { id: selected.ownerId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+      let altazor: ManagedDriveAccount | null = null;
+      const altazorBinding = selected.account === "altazor" ? await readAltazorDriveFolderBinding(selected.causaId, client) : null;
+      if (selected.account === "altazor") altazor = await resolveAltazorDriveAccount(user, { client });
       const guard = async (db: PrismaClient | Prisma.TransactionClient) => {
         const row = await db.driveSyncSubscription.findUnique({ where: { id: selected.id }, include: { causa: { select: { googleDriveFolderId: true } } } });
         if (!row || !row.enabled || row.leaseToken !== leaseToken || row.generation !== selected.generation || row.account !== selected.account || row.connectionId !== selected.connectionId || row.folderId !== selected.folderId || row.causa.googleDriveFolderId !== selected.folderId || !row.leaseExpiresAt || row.leaseExpiresAt <= new Date()) throw error("La sincronización cambió o fue pausada. Se conservaron las copias guardadas.");
         const actor = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
         await assertCausaCapability(selected.causaId, actor, "causa.write", db);
-        if (selected.account === "personal") {
+        if (selected.account === "altazor") {
+          if (!altazor || !altazorBinding || selected.connectionId !== altazor.connectionId) throw error("La cuenta de Altazor cambió. Vuelve a elegir la carpeta.");
+          await assertAltazorDriveFolderBinding(selected.causaId, actor, altazorBinding, altazor, db);
+        } else if (selected.account === "personal") {
           if (!selected.connectionId) throw error("Vuelva a activar esta carpeta con su cuenta personal.");
           const { assertPersonalDriveConnection } = await import("@/lib/personal-connectors/google-drive/service");
           await assertPersonalDriveConnection(selected.ownerId, selected.connectionId, db);
@@ -153,7 +197,7 @@ export async function processDueDriveSyncSubscriptions(options: DriveImportDepen
       while (inspected < MAX_INSPECTED && imported < MAX_IMPORTED) {
         await guard(client);
         const session = selected.account === "personal" ? async () => { const { requirePersonalDriveSession } = await import("@/lib/personal-connectors/google-drive/service"); return requirePersonalDriveSession(selected.ownerId, { client }); } : options.session;
-        const deps = { ...options, session, client, assertActive: guard, sourceFolderId: position.folder.id };
+        const deps = { ...options, session, ...(altazor ? { openTransport: altazor.openTransport } : {}), client, assertActive: guard, sourceFolderId: position.folder.id };
         let page;
         try { page = await listDriveImportCandidates(selected.causaId, user, position.pageToken, deps); }
         catch (cause) {
@@ -200,9 +244,11 @@ export async function processDueDriveSyncSubscriptions(options: DriveImportDepen
       status = "attention";
       // Never persist access tokens, signed URLs or provider response bodies.
       note = "No pudimos completar la actualización. Revise la conexión, la carpeta y sus permisos; las copias anteriores se conservan.";
-      const connection = selected.account === "personal" ? (await choices(selected.ownerId, client)).personal : await studyConnection(client);
-      const connected = "connected" in connection ? connection.connected : connection.configured;
-      if ((!options.session || selected.account === "personal") && (!connected || connection.connectionId !== selected.connectionId)) {
+      const connection = selected.account === "altazor" ? null : selected.account === "personal" ? (await choices(selected.ownerId, client)).personal : await studyConnection(client);
+      const altazorCurrent = selected.account === "altazor" ? await resolveAltazorDriveAccount({ id: selected.ownerId, role: "abogado" }, { client }).catch(() => null) : null;
+      const connected = selected.account === "altazor" ? altazorCurrent?.canRead === true : connection && ("connected" in connection ? connection.connected : connection.configured);
+      const currentConnectionId = selected.account === "altazor" ? altazorCurrent?.connectionId : connection?.connectionId;
+      if ((!options.session || selected.account === "personal" || selected.account === "altazor") && (!connected || currentConnectionId !== selected.connectionId || selected.account === "altazor")) {
         await client.driveSyncSubscription.updateMany({ where: { id: selected.id, leaseToken, generation: selected.generation }, data: { enabled: false, generation: { increment: 1 }, status: "paused", note: "La conexión cambió. Elija su cuenta y vuelva a activar esta carpeta.", nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null } });
       }
       if ((cause as { code?: string }).code === "drive_invalid_cursor") { delete position.pageToken; position.index = 0; }

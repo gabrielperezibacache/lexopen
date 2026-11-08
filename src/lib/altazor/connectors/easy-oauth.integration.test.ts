@@ -8,7 +8,7 @@ import { digest, seal, unseal } from "@/lib/personal-connectors/core";
 import { configureComputer } from "../computer/service";
 import { beginConnectorOAuth, configureConnector, removeConnector } from "./service";
 import { CONNECTOR_CATALOG } from "./catalog";
-import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, captureInstalledOAuthReturn, captureExternalOAuthReturn, continueEasyOAuth, pollEasyOAuthDevice, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
+import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, captureInstalledOAuthReturn, captureExternalOAuthReturn, continueEasyOAuth, pollEasyOAuthDevice, resolveGoogleDriveAccountBinding, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
 import { GET as externalOAuthCallback } from "@/app/api/altazor/connectors/oauth/callback/route";
 
 const denied = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
@@ -16,7 +16,7 @@ async function main() {
   assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
   process.env.ALTAZOR_COMPUTER_ENABLED = "1";
   const stamp = randomUUID(), userIds: string[] = [], caseIds: string[] = [], workspaceIds: string[] = [], oldFetch = globalThis.fetch;
-  let googleFiles = false;
+  let googleFiles = false, googleManage = false, driveManagementGate = true, gatewayRequests = 0;
   let persistentGate = true, transientFailure = false, missingRefresh = false, loseNextImport = false;
   let pauseFirstCheck: (() => Promise<void>) | undefined;
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
@@ -32,8 +32,9 @@ async function main() {
   const gatewayTokens = new Map<string, { kind: string; token: string; persistent?: boolean }>();
   const snapshot = () => ({ connector_catalog: CONNECTOR_CATALOG.map(kind => ({ name: kind.id, fields: kind.fieldNames.map(name => ({ name, label: name, secret: /token|secret/.test(name) })) })), connectors: [...gatewayTokens].map(([name, value]) => ({ name, kind: value.kind, settings: {}, secrets_set: ["token"], token_set: true, needs_sign_in: false, auth: "token" })) });
   globalThis.fetch = (async (raw, init) => {
+    gatewayRequests++;
     const url = new URL(String(raw)), method = init?.method || "GET";
-    if (url.origin !== "http://127.0.0.1:18999") { wrongDestination++; throw new Error("Unexpected fictitious gateway destination"); }
+    if (!["http://127.0.0.1:18999", "http://127.0.0.1:18997"].includes(url.origin)) { wrongDestination++; throw new Error("Unexpected fictitious gateway destination"); }
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-easy-oauth-gateway");
     if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(url.pathname)) {
       assert.equal(init?.method || "GET", "GET", "Legacy fixtures never grant computer-use permissions");
@@ -41,7 +42,7 @@ async function main() {
       assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
       return Response.json({ applied: false, chat_id: url.pathname.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
     }
-    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}), ...(githubPersistentGate ? { lexopen_github_persistent_oauth: "v1" } : {}) });
+    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}), ...(githubPersistentGate ? { lexopen_github_persistent_oauth: "v1" } : {}), ...(driveManagementGate ? { lexopen_drive_management: "v1" } : {}) });
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "fixture-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: [] });
     if (url.pathname === "/v1/settings") return Response.json(snapshot());
@@ -54,6 +55,7 @@ async function main() {
     if (url.pathname.startsWith("/v1/lexopen/easy-oauth/")) {
       assert.equal(method, "POST"); const name = decodeURIComponent(url.pathname.split("/").pop()!), body = JSON.parse(String(init?.body));
       assert.ok(body.refresh_token.startsWith("fictitious-")); assert.ok(Date.parse(body.expires_at) > Date.now());
+      if (body.kind === "google-workspace" && body.scopes.includes("https://www.googleapis.com/auth/drive")) assert.equal(driveManagementGate, true);
       if (body.public_client) { assert.equal(body.public_client, true); assert.equal(body.client_secret, undefined); assert.ok(["dropbox", "microsoft-365", "github"].includes(body.kind)); }
       else assert.ok(body.client_secret.includes("fictitious"));
       assert.deepEqual(Object.keys(body).sort(), ["access_token", "account", "client_id", body.public_client ? "public_client" : "client_secret", "expires_at", "kind", "refresh_token", "scopes"].sort());
@@ -98,7 +100,7 @@ async function main() {
       const pause = pauseExchange; pauseExchange = undefined; if (pause) await pause();
       if (url.hostname === "api.dropboxapi.com") { if (body.get("client_id") === "fictitiousDropboxPublic") assert.equal(body.has("client_secret"), false); return Response.json({ access_token: "fictitious-dropbox-consented-access", token_type: "bearer", ...(!missingRefresh ? { refresh_token: "fictitious-dropbox-refresh-token" } : {}), account_id: "dbid:fictitious-account", scope: broadScope ? `${dropboxScopes} files.content.write` : dropboxScopes, expires_in: 14_400 }); }
       const google = url.hostname === "oauth2.googleapis.com";
-      return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? `https://www.googleapis.com/auth/drive.${googleFiles ? "readonly" : "metadata.readonly"}` : "read:user", ...(google ? { expires_in: 3600, ...(!missingRefresh ? { refresh_token: "fictitious-google-refresh-token" } : {}) } : githubRotation()) });
+      return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? googleManage ? "https://www.googleapis.com/auth/drive" : `https://www.googleapis.com/auth/drive.${googleFiles ? "readonly" : "metadata.readonly"}` : "read:user", ...(google ? { expires_in: 3600, ...(!missingRefresh ? { refresh_token: "fictitious-google-refresh-token" } : {}) } : githubRotation()) });
     }
     if (url.href === "https://api.dropboxapi.com/2/users/get_current_account") {
       assert.equal(init?.method, "POST"); assert.equal(init?.body, "null");
@@ -165,6 +167,13 @@ async function main() {
     await assert.rejects(continueEasyOAuth({ ...actor, sessionHash: digest("other-browser") }, native.attemptId, origin, publicOptions), denied(404));
     assert.equal((await continueEasyOAuth(actor, native.attemptId, origin, publicOptions)).state, "completed");
     assert.equal((await easyOAuthStatus(actor, workspaceId, native.attemptId, publicOptions)).providers[0].autoRefresh, true);
+    const installedManage = await startEasyOAuth(actor, { provider: "google", workspaceId, access: "manage", requestId: `native-manage-${stamp}`, confirmed: true }, origin, publicOptions);
+    assert.equal(new URL(installedManage.authUrl).searchParams.get("scope"), "https://www.googleapis.com/auth/drive");
+    googleManage = true;
+    assert.equal(await captureInstalledOAuthReturn({ state: new URL(installedManage.authUrl).searchParams.get("state")!, code: "fictitious-installed-management-consent" }, origin, publicOptions), true);
+    assert.equal((await continueEasyOAuth(actor, installedManage.attemptId, origin, publicOptions)).state, "completed");
+    assert.equal((await easyOAuthStatus(actor, workspaceId, installedManage.attemptId, publicOptions)).providers[0].canManageFiles, true);
+    googleManage = false;
     const device = await startEasyOAuth(actor, { provider: "github", workspaceId, requestId: `device-${stamp}`, confirmed: true }, origin, publicOptions);
     assert.equal(device.flow, "device"); assert.equal(device.authUrl, "https://github.com/login/device");
     const deviceRow = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: device.attemptId } });
@@ -347,6 +356,55 @@ async function main() {
     await receiveEasyOAuth(actor, { state: new URL(files.authUrl).searchParams.get("state")!, code: "fictitious-files-consent" }, origin, options);
     const fileStatus = (await easyOAuthStatus(actor, workspaceId, files.attemptId)).providers[0];
     assert.equal(fileStatus.canReadFiles, true); assert.deepEqual(fileStatus.grantedScopes, ["https://www.googleapis.com/auth/drive.readonly"]);
+    assert.equal(fileStatus.canManageFiles, false);
+    const manageInput = { ...fileInput, access: "manage" as const, requestId: `oauth-${stamp}-manage` };
+    driveManagementGate = false;
+    const beforeManage = { attempts: await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), providerRequests, puts };
+    await assert.rejects(startEasyOAuth(actor, manageInput, origin, options), error => (error as { code?: string }).code === "drive_management_required");
+    assert.deepEqual({ attempts: await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), providerRequests, puts }, beforeManage);
+    assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].canReadFiles, true, "older runtimes preserve an existing read grant");
+    driveManagementGate = true;
+    const manage = await startEasyOAuth(actor, manageInput, origin, options);
+    assert.equal(new URL(manage.authUrl).searchParams.get("scope"), "https://www.googleapis.com/auth/drive");
+    await assert.rejects(startEasyOAuth(actor, { ...manageInput, access: "files" }, origin, options), error => (error as { code?: string }).code === "request_conflict");
+    const roAccount = await prisma.personalConnectorAccount.findUniqueOrThrow({ where: { ownerId_provider: { ownerId: actor.id, provider: `altazor-desktop:${workspaceId}:google` } } });
+    const beforeUnexpectedRead = puts;
+    await receiveEasyOAuth(actor, { state: new URL(manage.authUrl).searchParams.get("state")!, code: "fictitious-wrong-readonly-response" }, origin, options);
+    assert.equal(puts, beforeUnexpectedRead, "a read-only token cannot satisfy a management request");
+    assert.equal((await prisma.personalConnectorAccount.findUniqueOrThrow({ where: { id: roAccount.id } })).credentialsEnc, roAccount.credentialsEnc, "failed upgrades preserve the existing connection");
+    const lostCap = await startEasyOAuth(actor, { ...manageInput, requestId: `oauth-${stamp}-manage-cap-lost` }, origin, options);
+    driveManagementGate = false; const beforeLostCap = providerExchanges;
+    await receiveEasyOAuth(actor, { state: new URL(lostCap.authUrl).searchParams.get("state")!, code: "fictitious-unexchanged-management-code" }, origin, options);
+    assert.equal(providerExchanges, beforeLostCap, "a missing management runtime blocks token exchange");
+    driveManagementGate = true; googleManage = true;
+    const full = await startEasyOAuth(actor, { ...manageInput, requestId: `oauth-${stamp}-manage-complete` }, origin, options);
+    await receiveEasyOAuth(actor, { state: new URL(full.authUrl).searchParams.get("state")!, code: "fictitious-management-consent" }, origin, options);
+    const fullStatus = (await easyOAuthStatus(actor, workspaceId)).providers[0];
+    assert.equal(fullStatus.canManageFiles, true); assert.equal(fullStatus.canReadFiles, true); assert.equal(fullStatus.manageAvailable, true);
+    assert.deepEqual(fullStatus.grantedScopes, ["https://www.googleapis.com/auth/drive"]);
+    driveManagementGate = false;
+    assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].canManageFiles, false);
+    driveManagementGate = true;
+    const personalWorkspace = (await configureComputer(owner, { endpoint: "http://127.0.0.1:18997", token: "fictitious-easy-oauth-gateway", provider: "fixture-model", dedicated: true })).workspaceId!;
+    workspaceIds.push(personalWorkspace);
+    const personalFull = await startEasyOAuth(actor, { ...manageInput, workspaceId: personalWorkspace, requestId: `oauth-${stamp}-personal-manage` }, origin, options);
+    await receiveEasyOAuth(actor, { state: new URL(personalFull.authUrl).searchParams.get("state")!, code: "fictitious-personal-management-consent" }, origin, options);
+    const beforeBinding = { gatewayRequests, providerRequests };
+    const binding = await resolveGoogleDriveAccountBinding(owner, personalWorkspace);
+    assert.deepEqual(binding.scopes, ["https://www.googleapis.com/auth/drive"]); assert.match(binding.revision, /^[a-f0-9]{64}$/); assert.equal(binding.subjectHash, digest("fictitious-google-subject"));
+    assert.equal(JSON.stringify(binding).includes("fictitious-google-subject"), false); assert.equal(JSON.stringify(binding).includes("token"), false);
+    await prisma.personalConnectorAccount.update({ where: { id: binding.accountId }, data: { lastVerifiedAt: new Date() } });
+    assert.equal((await resolveGoogleDriveAccountBinding(owner, personalWorkspace)).revision, binding.revision, "checks and refresh timestamps cannot change identity");
+    assert.deepEqual({ gatewayRequests, providerRequests }, beforeBinding, "binding resolution never calls a provider or gateway");
+    await assert.rejects(resolveGoogleDriveAccountBinding(other, personalWorkspace), denied(404));
+    await assert.rejects(resolveGoogleDriveAccountBinding(owner, workspaceId), denied(404));
+    const personalAccount = await prisma.personalConnectorAccount.findUniqueOrThrow({ where: { id: binding.accountId } });
+    for (const change of [{ clientId: "different-app" }, { status: "disconnected" }, { grantedScopesJson: JSON.stringify(["https://www.googleapis.com/auth/drive.readonly"]) }]) {
+      await prisma.personalConnectorAccount.update({ where: { id: binding.accountId }, data: change });
+      await assert.rejects(resolveGoogleDriveAccountBinding(owner, personalWorkspace), denied(409));
+      await prisma.personalConnectorAccount.update({ where: { id: binding.accountId }, data: { clientId: personalAccount.clientId, status: personalAccount.status, grantedScopesJson: personalAccount.grantedScopesJson } });
+    }
+    googleManage = false;
     googleFiles = false;
     const exchangesAfterConsent = providerExchanges;
     for (let check = 0; check < 3; check++) {
@@ -489,7 +547,7 @@ async function main() {
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: owner.id } });
     await prisma.user.update({ where: { id: owner.id }, data: { sessionVersion: owner.sessionVersion + 1 } });
     await assert.rejects(easyOAuthStatus(actor, workspaceId), denied(401));
-    console.log("Easy OAuth PG PASS: Google, GitHub and Dropbox PKCE, original session, one-use callback, encrypted setup/verifier, exact read-only scopes, confirmed access, invalidation, active desktop denial, configuration rotation and current ACL/session checks. HTTP is simulated.");
+    console.log("Easy OAuth PG PASS: web/installed/device flows, explicit Drive management and preserved read grants, native capability gates before consent/import, personal account binding without RPC, one-use callbacks, exact scopes, current ACL/session checks and configuration rotation. HTTP is simulated.");
   } finally {
     globalThis.fetch = oldFetch;
     await prisma.personalOAuthAttempt.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.personalConnectorAccount.deleteMany({ where: { ownerId: { in: userIds } } });

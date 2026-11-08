@@ -36,6 +36,10 @@ async function fixtures(page: Page) {
       ...entry, available: true, oauthReady: true, fields: [{ name: "token", label: "Token", secret: true, required: false }],
     })), connections: [], gateReady: true, version: "fictitious-chat-connectors",
   } } }));
+  await page.route(`**/api/altazor/connectors/oauth?workspaceId=${workspaceId}`, route => route.fulfill({ json: {
+    workspaceId, causaId: null, canAdmin: false, requiresStop: true,
+    providers: ["google", "github"].map(provider => ({ provider, available: true, state: "idle", connected: false, tested: false, hasStoredConnection: false, canDisconnect: false })),
+  } }));
   return { mutations };
 }
 
@@ -51,7 +55,7 @@ for (const width of [1280, 360]) {
     await expect(apps).toBeVisible();
     await apps.click();
     await expect(page.getByRole("heading", { name: "Aplicaciones", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Google Workspace/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Google Drive Iniciar sesión", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /GitHub/ })).toBeVisible();
     await page.getByRole("button", { name: "Volver a la conversación", exact: true }).click();
     await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);

@@ -22,7 +22,14 @@ async function main() {
     assert.equal(await prisma.plazo.count({ where: { causaId: cause.id } }), 0);
     const key = randomUUID(), [first, replay] = await Promise.all([createPlazoCommand(owner, body, key), createPlazoCommand(owner, body, key)]);
     assert.equal(first.id, replay.id);
-    assert.equal(civilDateKey(first.fechaLimite), "2088-11-24");
+    // Either concurrent caller can replay the JSON receipt, whose dates are ISO strings.
+    const cached = await createPlazoCommand(owner, body, key);
+    const fechaLimite = new Date(first.fechaLimite);
+    for (const result of [first, replay, cached]) {
+      assert.equal(result.id, first.id);
+      assert.equal(civilDateKey(new Date(result.fechaLimite)), "2088-11-24");
+    }
+    assert.equal(await prisma.plazo.count({ where: { causaId: cause.id } }), 1);
     for (const capabilityRevokes of ["plazo.close", "plazo.edit"]) {
       await prisma.user.update({ where: { id: owner.id }, data: { capabilityRevokes } });
       await assert.rejects(updatePlazoCommand(owner, { id: first.id, estado: "cumplido" }, randomUUID()), status(403));
@@ -31,7 +38,7 @@ async function main() {
     await prisma.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "" } });
     // A previously assigned professional has since lost access to the matter.
     await prisma.plazo.update({ where: { id: first.id }, data: { responsableId: outside.id } });
-    const alerts = await createPlazoAlerts(prisma, { from: first.fechaLimite, until: first.fechaLimite, emailEnabled: true });
+    const alerts = await createPlazoAlerts(prisma, { from: fechaLimite, until: fechaLimite, emailEnabled: true });
     assert.equal(alerts.notifications, 1);
     assert.equal(alerts.emailBuckets.has(outside.email), false);
     assert.equal(await prisma.notification.count({ where: { userId: outside.id } }), 0);
@@ -41,14 +48,14 @@ async function main() {
     await updatePlazoCommand(owner, { id: first.id, estado: "cumplido" }, closeKey);
     assert.equal(await prisma.auditEvent.count({ where: { actorId: owner.id, action: "plazo.update" } }), 1);
     await prisma.user.update({ where: { id: outside.id }, data: { role: "cliente" } });
-    const orphan = await prisma.plazo.create({ data: { titulo: "Sin causa, cuenta retirada del equipo", fechaLimite: first.fechaLimite, responsableId: outside.id } });
-    const blocked = await createPlazoAlerts(prisma, { from: first.fechaLimite, until: first.fechaLimite, emailEnabled: true });
+    const orphan = await prisma.plazo.create({ data: { titulo: "Sin causa, cuenta retirada del equipo", fechaLimite, responsableId: outside.id } });
+    const blocked = await createPlazoAlerts(prisma, { from: fechaLimite, until: fechaLimite, emailEnabled: true });
     assert.equal(blocked.notifications, 0);
     assert.equal(blocked.emailBuckets.has(outside.email), false);
     assert.equal((await prisma.plazo.findUniqueOrThrow({ where: { id: orphan.id } })).alertaEnviada, false);
-    await prisma.plazo.createMany({ data: Array.from({ length: 100 }, () => ({ titulo: "Cuenta retirada", fechaLimite: first.fechaLimite, responsableId: outside.id })) });
-    await prisma.plazo.create({ data: { titulo: "Recordatorio válido después de cuentas retiradas", fechaLimite: first.fechaLimite, responsableId: owner.id } });
-    assert.equal((await createPlazoAlerts(prisma, { from: first.fechaLimite, until: first.fechaLimite, emailEnabled: true })).notifications, 1, "Withdrawn accounts cannot consume the whole reminder batch");
+    await prisma.plazo.createMany({ data: Array.from({ length: 100 }, () => ({ titulo: "Cuenta retirada", fechaLimite, responsableId: outside.id })) });
+    await prisma.plazo.create({ data: { titulo: "Recordatorio válido después de cuentas retiradas", fechaLimite, responsableId: owner.id } });
+    assert.equal((await createPlazoAlerts(prisma, { from: fechaLimite, until: fechaLimite, emailEnabled: true })).notifications, 1, "Withdrawn accounts cannot consume the whole reminder batch");
     console.log("Plazos PASS: strict dates, bounded computation, native idempotency, current edit/close permissions and authorized reminders only.");
   } finally {
     await prisma.notification.deleteMany({ where: { userId: { in: users } } });

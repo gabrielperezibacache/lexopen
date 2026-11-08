@@ -1,4 +1,17 @@
 import type { ConnectorField } from "./types";
+
+/** Copy for account sign-in, whose permissions are narrower than the adapter API. */
+const accountPresentation: Record<string, { label: string; description: string }> = {
+  "google-workspace": { label: "Google Drive", description: "Archivos y carpetas de Google Drive para trabajar con Altazor." },
+  github: { label: "GitHub", description: "Consulta tu perfil y los archivos de repositorios públicos de GitHub." },
+  dropbox: { label: "Dropbox", description: "Busca y lee tus archivos autorizados de Dropbox, sin modificarlos." },
+  "microsoft-365": { label: "OneDrive · Microsoft 365", description: "Busca y lee tus archivos de OneDrive, sin modificarlos." },
+};
+export function connectorAccountPresentation(entry: { id: string; label: string; description: string }, account?: { connected: boolean; tested: boolean; canReadFiles?: boolean; canManageFiles?: boolean }) {
+  if (entry.id === "google-workspace" && account?.connected && account.tested) return { label: "Google Drive", description: account.canManageFiles === true && account.canReadFiles === true ? "Lee, crea, edita y organiza archivos en los encargos que autorices." : account.canReadFiles === true ? "Busca y lee tus archivos de Drive, sin modificarlos." : "Consulta nombres y datos básicos de tus archivos de Drive." };
+  return accountPresentation[entry.id] || { label: entry.label, description: entry.description };
+}
+
 const labels: Record<string, string> = {
   access_secret: "Secreto de acceso", access_token: "Token de acceso", account_id: "Identificador de cuenta", addressbook: "Libreta de direcciones", author: "Autor", base: "Base", calendar: "Calendario", channel: "Canal de destino", chat_id: "Identificador del chat", client_id: "Identificador de su aplicación", client_secret: "Secreto de su aplicación", command: "Programa", consumer_key: "Clave de la aplicación", consumer_secret: "Secreto de la aplicación", country: "País", email: "Correo electrónico", feeds: "Fuentes RSS", folder: "Carpeta", from: "Remitente", handle: "Nombre de usuario", headers: "Cabeceras de la petición", host: "Servidor", key: "Clave de acceso", list: "Lista", page_id: "Identificador de página", parent: "Carpeta o elemento superior", password: "Contraseña", phone_id: "Identificador de teléfono", place: "Localidad", project: "Proyecto", repo: "Repositorio", room: "Sala", subdomain: "Subdominio", table: "Tabla", tasks: "Tareas", team: "Equipo", to: "Destinatario", token: "Token de acceso", topic: "Tema", url: "Dirección del servicio", user: "Usuario", user_id: "Identificador de usuario",
 };

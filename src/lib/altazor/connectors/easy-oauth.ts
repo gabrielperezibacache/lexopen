@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { AltazorComputerWorkspace, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { altazorActor, altazorScopeKey } from "@/lib/altazor/access";
-import { assertCausaAccess } from "@/lib/auth/causa-access";
+import { assertCausaAccess, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { canSome } from "@/lib/auth/permissions";
 import { ConnectorError, constantEqual, digest, encryptionKey, randomToken, seal, unseal } from "@/lib/personal-connectors/core";
 import type { ConnectorActor } from "@/lib/personal-connectors/linkedin/account";
@@ -14,7 +14,7 @@ import { configureConnector, configurePersistentEasyOAuth, connectorInventory, t
 import { oauthFailureReason, readOAuthTokenResponse } from "./oauth-token-response";
 import { requestOAuthProviderJson } from "./oauth-provider-response";
 import { checkGithubApplication } from "./github-application-check";
-import { canReadConnectorFiles, easyOAuthScopes, validEasyOAuthScopes, type EasyOAuthAccess } from "./oauth-access";
+import { canManageConnectorFiles, canReadConnectorFiles, easyOAuthScopes, validEasyOAuthScopes, type EasyOAuthAccess } from "./oauth-access";
 import { validatePersistentEasyOAuth } from "./persistent-oauth";
 import { parseDistributedOAuthProfile } from "../../../../desktop/oauth-clients.cjs";
 import { requestGithubDevice, pollGithubDevice } from "./github-device";
@@ -38,7 +38,7 @@ type DeviceBinding = { code: string; userCode: string; verificationUri: string; 
 type Binding = { workspaceId: string; workspaceBinding: string; configurationBinding: string; connectionName: string; causaId: string | null; state: string; verifier: string; nonce: string; persistence?: "offline-v1"; device?: DeviceBinding; installed?: true; external?: true; authorization?: { code?: string; denied?: true } };
 type ConnectionProof = { workspaceBinding: string; connectionName: string; expiresAt: string | null; scopes: string[]; autoRefresh?: boolean };
 export type EasyOAuthAttempt = { id: string; provider: EasyOAuthProvider; state: "pending" | "exchanging" | "completed" | "failed" | "cancelled" | "expired"; reason: string | null; external?: boolean; device?: { userCode: string; verificationUri: string; interval: number; expiresAt: string } };
-export type EasyOAuthStatus = { workspaceId: string; causaId: string | null; canAdmin: boolean; requiresStop: boolean; providers: { provider: EasyOAuthProvider; label: string; available: boolean; reason: string | null; scopes: string[]; grantedScopes: string[]; canReadFiles: boolean; autoRefresh: boolean; persistent: boolean; connectionName: string; state: "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required" | "unavailable"; connected: boolean; tested: boolean; hasStoredConnection: boolean; canDisconnect: boolean; expiresAt: string | null; lastVerifiedAt: string | null }[]; attempt?: EasyOAuthAttempt };
+export type EasyOAuthStatus = { workspaceId: string; causaId: string | null; canAdmin: boolean; requiresStop: boolean; providers: { provider: EasyOAuthProvider; label: string; available: boolean; reason: string | null; scopes: string[]; grantedScopes: string[]; canReadFiles: boolean; canManageFiles?: boolean; manageAvailable?: boolean; autoRefresh: boolean; persistent: boolean; connectionName: string; state: "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required" | "unavailable"; connected: boolean; tested: boolean; hasStoredConnection: boolean; canDisconnect: boolean; expiresAt: string | null; lastVerifiedAt: string | null }[]; attempt?: EasyOAuthAttempt };
 const attemptContext = (ownerId: string, id: string) => `altazor:desktop:oauth:${ownerId}:${id}`;
 const proofContext = (ownerId: string, id: string) => `altazor:desktop:connection:${ownerId}:${id}`;
 const setupContext = (provider: EasyOAuthProvider) => `altazor:desktop:oauth:operator:${provider}`;
@@ -88,6 +88,26 @@ async function configFor(provider: EasyOAuthProvider, options: Options = {}, db:
 function requireConfig(config: Config) { if (!config.configured) throw new ConnectorError("oauth_unconfigured", setupReason, 503); return config; }
 function appBinding(actor: ConnectorActor, workspaceId: string, config: Config) { return computerOperationHash(actor.id, workspaceId, "oauth-app", { clientId: config.clientId, secret: config.clientSecret, redirectUri: config.redirectUri, ...(config.flow !== "web" ? { flow: config.flow } : {}) }); }
 function workspaceBinding(workspace: AltazorComputerWorkspace) { return computerOperationHash(workspace.ownerId, workspace.id, "oauth-workspace", { scope: workspace.scopeKey, causaId: workspace.causaId, endpoint: workspace.endpoint, credentialEnc: workspace.credentialEnc, provider: workspace.providerName }); }
+
+/** Server-only identity proof. This performs no provider request and returns no credentials. */
+export async function resolveGoogleDriveAccountBinding(user: CausaAccessUser, workspaceId: string, db: Client = prisma) {
+  assertComputerEnabled();
+  const actor = await altazorActor(user, db);
+  assertComputerPolicy(normalizeAssistantFirmPolicy(await db.firmSettings.findFirst({ select: { assistantLlmMode: true } })).assistantLlmMode);
+  const workspace = await db.altazorComputerWorkspace.findFirst({ where: { id: workspaceId, ownerId: actor.id, causaId: null, scopeKey: "personal", enabled: true } });
+  if (!workspace?.credentialEnc) throw new ConnectorError("workspace_not_found", "Espacio personal no encontrado o sin acceso actual.", 404);
+  const config = requireConfig(await configFor("google", {}, db));
+  const account = await db.personalConnectorAccount.findUnique({ where: { ownerId_provider: { ownerId: actor.id, provider: accountProvider(workspaceId, "google") } } });
+  try {
+    if (!account || account.status !== "connected" || account.clientId !== config.clientId || !/^[a-f0-9]{64}$/.test(account.externalSubject) || !account.credentialsEnc) throw new Error();
+    const proof = unseal<ConnectionProof>(account.credentialsEnc, proofContext(actor.id, account.id));
+    const binding = workspaceBinding(workspace), connectionName = easyConnectionName(actor.id, workspaceId, "google");
+    if (proof.workspaceBinding !== binding || proof.connectionName !== connectionName || !validEasyOAuthScopes("google", proof.scopes) || JSON.stringify(proof.scopes) !== account.grantedScopesJson || proof.expiresAt !== (account.expiresAt?.toISOString() || null)) throw new Error();
+    // The dedicated motor refreshes renewable grants; its live status is checked by the Drive transport.
+    if (proof.autoRefresh !== true && account.expiresAt && account.expiresAt.getTime() <= Date.now()) throw new Error();
+    return { accountId: account.id, connectionName, scopes: [...proof.scopes], subjectHash: account.externalSubject, revision: digest(JSON.stringify([account.id, account.credentialsEnc, binding])) };
+  } catch { throw new ConnectorError("oauth_reconnect_required", "Conecte su cuenta de Google en Altazor para trabajar con sus archivos.", 409); }
+}
 export async function nativeOAuthActor(actor: ConnectorActor, db: Client = prisma) {
   const user = await db.user.findUnique({ where: { id: actor.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
   if (!user) throw new ConnectorError("session_required", "Vuelva a iniciar sesión en LexOpen.", 401);
@@ -147,6 +167,7 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
   await noActiveSession(workspace);
   const inventory = await connectorInventory(user, workspace.id), name = easyConnectionName(actor.id, workspace.id, input.provider), spec = specifications[input.provider];
   if (!inventory.gateReady || !inventory.catalog.some(kind => kind.id === spec.kind && kind.available && kind.fields.some(field => field.name === "token" && field.secret))) throw new ConnectorError("oauth_gateway_upgrade", "Actualice el computador de ALTAZOR para habilitar esta conexión.", 409);
+  if (canManageConnectorFiles(input.provider, requestedScopes) && inventory.driveManagementReady !== true) throw new ConnectorError("drive_management_required", "Actualiza el escritorio de Altazor antes de permitir la creación y edición de archivos en Drive.", 409);
   const persistence = input.provider === "github" ? undefined : "offline-v1";
   if (persistence && !inventory.persistentOAuthReady) throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409);
   if (config.flow === "public_client" && !inventory.cloudFileOAuthReady) throw new ConnectorError("oauth_cloud_files_required", "Actualice el escritorio de Altazor para conectar esta cuenta pública con lectura y renovación seguras.", 409);
@@ -229,6 +250,7 @@ async function receiveAuthorizedEasyOAuth(actor: ConnectorActor, input: { state:
     const spec = specifications[provider], fetcher = options.fetcher || fetch;
     const requestedScopes: unknown = JSON.parse(attempt.requestedScopesJson);
     if (!validEasyOAuthScopes(provider, requestedScopes)) throw new ConnectorError("oauth_scope_mismatch", "Los permisos de este intento no son válidos.", 409);
+    if (canManageConnectorFiles(provider, requestedScopes) && (await connectorInventory((await access(actor, workspace.id)).user, workspace.id)).driveManagementReady !== true) throw new ConnectorError("drive_management_required", "Actualiza el escritorio de Altazor para guardar esta autorización de Drive.", 409);
     const body = provider === "microsoft" ? microsoftPublicCodeBody({ clientId: config.clientId, redirectUri: config.redirectUri, code: input.code!, verifier: binding.verifier }) : new URLSearchParams({ grant_type: "authorization_code", client_id: config.clientId, ...(config.flow !== "public_client" ? { client_secret: config.clientSecret } : {}), redirect_uri: config.redirectUri, code: input.code!, code_verifier: binding.verifier });
     const tokens = deviceTokens || await requestOAuthProviderJson("token", spec.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body }, fetcher);
     let tokenResponse = tokens;
@@ -243,7 +265,7 @@ async function receiveAuthorizedEasyOAuth(actor: ConnectorActor, input: { state:
     const persistentInput = provider !== "github" || githubExpiring ? validatePersistentEasyOAuth({ kind: specifications[provider].kind, clientId: config.clientId, clientSecret: config.clientSecret, ...(config.flow === "public_client" || provider === "github" && config.flow === "device" ? { publicClient: true } : {}), accessToken, refreshToken: tokens.refresh_token as string, expiresAt: expiresAt!.toISOString(), scopes }) : null;
     const headers = { Authorization: `Bearer ${accessToken}`, Accept: "application/json" };
     const subject = await verifyProviderAccount(provider, headers, fetcher);
-    if ((typeof subject !== "string" && typeof subject !== "number") || !String(subject).trim() || String(subject).length > 200) throw new ConnectorError("oauth_identity_invalid", "No se pudo comprobar esta autorización de lectura.", 409);
+    if ((typeof subject !== "string" && typeof subject !== "number") || !String(subject).trim() || String(subject).length > 200) throw new ConnectorError("oauth_identity_invalid", "No se pudo comprobar esta autorización.", 409);
     if (provider === "dropbox" && (typeof tokens.account_id !== "string" || !constantEqual(tokens.account_id, String(subject)))) throw new ConnectorError("oauth_identity_invalid", "Dropbox no confirmó la misma cuenta autorizada.", 409);
     const currentConfig = requireConfig(await configFor(provider, options)), current = await access(actor, workspace.id);
     if (appBinding(actor, workspace.id, currentConfig) !== binding.configurationBinding || workspaceBinding(current.workspace) !== binding.workspaceBinding) throw new ConnectorError("oauth_binding_changed", "La configuración cambió durante la autorización.", 409);
@@ -389,7 +411,7 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
         grantedScopes = proof.scopes;
         if (!autoRefresh && account.expiresAt && account.expiresAt.getTime() <= Date.now()) { state = "expired"; reason = "La autorización temporal venció. Conecte su cuenta una vez más para mantenerla guardada."; }
         else {
-          if (!inventory || autoRefresh && (!inventory.persistentOAuthReady || provider === "github" && !inventory.githubPersistentOAuthReady)) throw new ConnectorError("oauth_unavailable", "No pudimos comprobar el escritorio que guarda esta conexión.", 503);
+          if (!inventory || autoRefresh && (!inventory.persistentOAuthReady || provider === "github" && !inventory.githubPersistentOAuthReady) || canManageConnectorFiles(provider, proof.scopes) && inventory.driveManagementReady !== true) throw new ConnectorError("oauth_unavailable", "No pudimos comprobar el escritorio que guarda esta conexión.", 503);
           if (!saved?.configured || saved.needsSignIn) throw new ConnectorError("oauth_reconnect_required", "La conexión guardada necesita autorización de su cuenta.", 409);
           const liveCheck = await testConnector(user, workspace.id, name);
           if (!liveCheck.ok || !liveCheck.tested) throw new ConnectorError(liveCheck.code === "oauth_reconnect_required" ? "oauth_reconnect_required" : "oauth_unavailable", "No se pudo comprobar el acceso a esta aplicación.", 409);
@@ -409,7 +431,7 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
     if (attemptView?.provider === provider && ["pending", "exchanging"].includes(attemptView.state) && state !== "connected") state = "pending";
     if (config.configured && !dropboxReady) { state = "blocked"; reason = "Actualice el escritorio de Altazor para conectar Dropbox con permisos de lectura."; }
     if (config.configured && !cloudReady) { state = "blocked"; reason = "Actualice el escritorio de Altazor para conectar esta cuenta pública con lectura y renovación seguras."; }
-    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady && cloudReady, reason, scopes: [...specifications[provider].scopes], grantedScopes, canReadFiles: tested && canReadConnectorFiles(provider, grantedScopes), autoRefresh, persistent, connectionName: name, state, connected: state === "connected", tested: dropboxReady && cloudReady && tested, hasStoredConnection, canDisconnect, expiresAt: autoRefresh ? null : account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
+    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady && cloudReady, reason, scopes: provider === "google" ? easyOAuthScopes("google", "manage") : [...specifications[provider].scopes], grantedScopes, canReadFiles: tested && canReadConnectorFiles(provider, grantedScopes), canManageFiles: tested && inventory?.driveManagementReady === true && canManageConnectorFiles(provider, grantedScopes), manageAvailable: provider === "google" && config.configured && inventory?.driveManagementReady === true, autoRefresh, persistent, connectionName: name, state, connected: state === "connected", tested: dropboxReady && cloudReady && tested, hasStoredConnection, canDisconnect, expiresAt: autoRefresh ? null : account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
   }
   return { workspaceId, causaId: workspace.causaId, canAdmin: canSome(user, "host.admin"), requiresStop: Boolean(active), providers, ...(attemptView ? { attempt: attemptView } : {}) };
 }
