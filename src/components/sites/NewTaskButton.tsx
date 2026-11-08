@@ -107,23 +107,26 @@ export function TaskStatusButton({
   status: string;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   async function setStatus(next: string) {
-    setBusy(true);
+    setLoadingAction(next);
     setError("");
-    const result = await apiMutation(`/api/sites/${siteId}/tasks`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: taskId, status: next }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error || "No se pudo actualizar la tarea");
-      return;
+    try {
+      const result = await apiMutation(`/api/sites/${siteId}/tasks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId, status: next }),
+      });
+      if (!result.ok) {
+        setError(result.error || "No se pudo actualizar la tarea");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
     }
-    router.refresh();
   }
   if (status === "done") {
     return <span className="text-sm text-[var(--ok)]">{STATUS_LABEL.done}</span>;
@@ -135,22 +138,24 @@ export function TaskStatusButton({
           <button
             className="btn btn-ghost"
             type="button"
-            disabled={busy}
+            aria-busy={loadingAction === "in_progress"}
+            disabled={loadingAction !== null}
             onClick={() => setStatus("in_progress")}
           >
-            En curso
+            {loadingAction === "in_progress" ? "Actualizando…" : "En curso"}
           </button>
         )}
         <button
           className="btn btn-ghost"
           type="button"
-          disabled={busy}
+          aria-busy={loadingAction === "done"}
+          disabled={loadingAction !== null}
           onClick={() => setStatus("done")}
         >
-          Marcar hecha
+          {loadingAction === "done" ? "Marcando…" : "Marcar hecha"}
         </button>
       </div>
-      {error && <p className="mt-1 text-sm text-[var(--danger)]">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-sm text-[var(--danger)]">{error}</p>}
     </div>
   );
 }

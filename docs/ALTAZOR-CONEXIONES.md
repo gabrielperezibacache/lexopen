@@ -11,8 +11,8 @@ La revisión `1.1.0-preview.5` incorpora [Drive personal y sincronización de ca
 
 ## Conectar una aplicación
 
-1. Abra **Configuración → Preferencias personales → Altazor → Conexiones y secretos** y elija Google Workspace, GitHub o Dropbox. Una tarjeta del catálogo no concede acceso a una cuenta.
-2. Pulse **Conectar**, revise el acceso solicitado e inicie sesión personalmente en la página oficial. Contraseñas y códigos se introducen allí; no se envían al chat.
+1. Abra **Configuración → Conexiones e IA → Cuentas conectadas** y elija **Google Workspace** o **GitHub**. Para Dropbox, abra **Todas las conexiones y secretos**.
+2. Revise el acceso solicitado y elija iniciar sesión. Introduzca la contraseña y los códigos en la página oficial del servicio.
 3. Vuelva a LexOpen para comprobar el resultado. La conexión sólo se muestra confirmada cuando la autorización y la comprobación del servicio terminaron correctamente. Una denegación o interrupción no se presenta como conexión exitosa.
 4. Al crear un escritorio, elija expresamente las conexiones que podrá usar. Una selección vacía significa ninguna. La selección queda fijada a esa sesión; cambiar la configuración requiere cerrar las sesiones activas o inciertas.
 5. En el escritorio, revise cada solicitud pendiente: aplicación, operación, destino y contenido. Autorice o rechace esa operación concreta. La decisión no concede permiso permanente.
@@ -25,7 +25,7 @@ La conexión personal de Google de ALTAZOR es distinta de **Google del estudio**
 
 ### Inicio de sesión sencillo
 
-La preparación corresponde al administrador del Host, una sola vez por despliegue. En **Preparación del administrador**, abra el registro oficial del servicio y guarde el identificador y secreto en los campos reservados. Se conservan cifrados y no vuelven a mostrarse; los profesionales no necesitan introducirlos. Como alternativa de despliegue, pueden configurarse estas variables reservadas del servidor, que tienen prioridad:
+La preparación corresponde al administrador, una vez por instalación. En la ficha del servicio, abra la guía de preparación, copie la dirección de retorno y regístrela en la consola oficial. Guarde el identificador y secreto de la aplicación en los campos reservados. LexOpen cifra estos datos. Los profesionales pasan directamente al ingreso oficial una vez preparada la aplicación y habilitado el escritorio. También se admiten las siguientes variables del servidor, que tienen prioridad.
 
 | Servicio | Configuración del servidor |
 | --- | --- |

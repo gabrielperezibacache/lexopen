@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Read pinned desktop source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: madkoding/kitties
           ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - name: Archive desktop source and license notices
         run: python3 scripts/altazor/prepare-desktop-source.py .tmp/altazor-desktop-upstream "$RUNNER_TEMP/altazor-desktop-source"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: altazor-desktop-source-context
           path: ${{ runner.temp }}/altazor-desktop-source/
@@ -71,7 +71,7 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/desktop/.release/playwright-browsers
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
@@ -79,7 +79,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             desktop/package-lock.json
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: altazor-desktop-source-context
           path: desktop/.release/altazor-desktop-source
@@ -112,7 +112,7 @@ jobs:
         run: npm run desktop:smoke
       - name: Record actual publisher signature status
         run: node desktop/scripts/signature-report.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           retention-days: 14
@@ -138,19 +138,19 @@ jobs:
     needs: native
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - run: npm ci --prefix desktop --ignore-scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: native-artifacts
       - name: Assemble verified feeds, manifest and checksums
         shell: bash
         run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: verified-release
           path: release/*
@@ -163,14 +163,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - run: npm ci --prefix desktop --ignore-scripts
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: native-artifacts

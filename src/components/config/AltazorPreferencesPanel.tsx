@@ -18,7 +18,7 @@ export function AltazorPreferencesPanel({ locale }: { locale: "es" | "en" }) {
     </label>
     {preferenceError && <p role="alert" className="text-sm text-[var(--danger)]">{preferenceError}</p>}
     <div className="flex flex-wrap gap-2">
-      <Link className="btn btn-secondary" href="/inicio?altazor=connectors">{tr("Conexiones y secretos", "Connections and secrets")}</Link>
+      <a className="btn btn-secondary" href="#cuentas-conectadas">{tr("Cuentas conectadas", "Connected accounts")}</a>
       <Link className="btn btn-ghost" href="/cuenta#resumen-altazor">{tr("Resumen diario", "Daily brief")}</Link>
       <Link className="btn btn-ghost" href="/cuenta#codex">{tr("Cuenta de Codex", "Codex account")}</Link>
     </div>
