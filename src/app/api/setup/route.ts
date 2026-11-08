@@ -19,12 +19,14 @@ import { cookieSecureFlag } from "@/lib/auth/cookie-options";
 import { isLoopbackHttpRequest } from "@/lib/net/loopback-request";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/rbac";
+import { initializeHostNavigationSections, visibleSectionsSchema } from "@/lib/config/host-navigation-sections";
 
 const setupSchema = z.object({
   token: z.string().max(256).optional(),
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(320),
   password: z.string().min(12).max(256),
+  visibleSections: visibleSectionsSchema.optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
           throw httpError("La instalación ya fue configurada", 409);
         }
 
-        return tx.user.create({
+        const account = await tx.user.create({
           data: {
             name: body.name,
             email,
@@ -101,6 +103,8 @@ export async function POST(req: NextRequest) {
             role: true,
           },
         });
+        if (body.visibleSections) await initializeHostNavigationSections(body.visibleSections, tx);
+        return account;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );

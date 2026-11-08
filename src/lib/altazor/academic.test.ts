@@ -30,6 +30,44 @@ test("Word output preserves Unicode and treats markup as inert text",()=>{
   assert.throws(()=>exportAcademicDocx('Texto\u0000inválido'));
   assert.throws(()=>exportAcademicDocx('x'.repeat(100001)));
 });
+test("academic Word uses native outline levels, emphasis, lists and quotation style", () => {
+  const docx = exportAcademicDocx([
+    "# Manuscrito",
+    "## Fundamentos",
+    "### Límites",
+    "**Tesis** y *matiz* con ***énfasis doble*** [R1].",
+    "- Lectura [R2]",
+    "- Contraste",
+    "",
+    "3. Primer paso",
+    "4. Segundo paso",
+    "",
+    "> Pasaje literal [R3].",
+    "[Fuente](https://example.invalid/ficha_(test))",
+    "[R4](https://example.invalid/fuente)",
+    "[Etiqueta](javascript:alert(1))",
+    "\\*Literal\\* y `**código**`",
+  ].join("\n")).toString("utf8");
+  for (const [level, heading] of ["Manuscrito", "Fundamentos", "Límites"].entries()) {
+    assert.ok(docx.includes(`<w:pStyle w:val="Heading${level + 1}"/></w:pPr><w:r><w:t xml:space="preserve">${heading}</w:t>`));
+    assert.ok(docx.includes(`<w:outlineLvl w:val="${level}"/>`));
+  }
+  assert.match(docx, /<w:rPr><w:b\/><\/w:rPr><w:t xml:space="preserve">Tesis<\/w:t>/);
+  assert.match(docx, /<w:rPr><w:i\/><\/w:rPr><w:t xml:space="preserve">matiz<\/w:t>/);
+  assert.match(docx, /<w:rPr><w:b\/><w:i\/><\/w:rPr><w:t xml:space="preserve">énfasis doble<\/w:t>/);
+  assert.equal(docx.match(/<w:numPr><w:ilvl w:val="0"\/><w:numId w:val="1"\/>/g)?.length, 2);
+  assert.equal(docx.match(/<w:numPr><w:ilvl w:val="0"\/><w:numId w:val="2"\/>/g)?.length, 2);
+  assert.match(docx, /<w:num w:numId="1"><w:abstractNumId w:val="0"\/><\/w:num>/);
+  assert.match(docx, /<w:num w:numId="2"><w:abstractNumId w:val="1"\/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="3"\/>/);
+  assert.match(docx, /<w:pStyle w:val="Quote"\/><\/w:pPr><w:r><w:t xml:space="preserve">Pasaje literal \[R3\]\./);
+  assert.match(docx, /Fuente \(https:\/\/example.invalid\/ficha_\(test\)\)/);
+  assert.match(docx, /\[R4\] \(https:\/\/example.invalid\/fuente\)/);
+  assert.match(docx, /\[Etiqueta\]\(javascript:alert\(1\)\)/);
+  assert.doesNotMatch(docx, /<w:hyperlink|TargetMode=/);
+  assert.match(docx, /\[R1\]/);
+  assert.match(docx, /Lectura \[R2\]/);
+  assert.ok(docx.includes("`**código**`"));
+});
 test("literature matrix retains typed cells and rejects conflicting dimensions",()=>{
   const input={expectedRevision:1,title:"Matriz ficticia",brief:{},matrix:{dimensions:[{id:"year",label:"Año",type:"number"}],rows:[{id:"paper-1",title:"Artículo ficticio",included:true,cells:{year:{value:"2026"}}}]}};
   assert.equal(academicWorkspaceSaveSchema.safeParse(input).success,true);

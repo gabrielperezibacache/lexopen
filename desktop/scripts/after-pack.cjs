@@ -26,7 +26,7 @@ module.exports = async function afterPack(context) {
   verifyCanaryAbsent(path.join(resources, "app-standalone"), process.env.LEXOPEN_RELEASE_CANARY);
   verifyCanaryAbsent(path.join(resources, "app.asar"), process.env.LEXOPEN_RELEASE_CANARY);
   verifyCanaryAbsent(path.join(resources, "altazor-desktop-source"), process.env.LEXOPEN_RELEASE_CANARY);
-  for (const file of ["host-runtime.mjs", "config.cjs", "package.json"]) if (!fs.existsSync(path.join(resources, "app.asar.unpacked", file))) throw new Error(`Missing unpacked Host runtime: ${file}`);
+  for (const file of ["host-runtime.mjs", "config.cjs", "oauth-clients.cjs", "package.json"]) if (!fs.existsSync(path.join(resources, "app.asar.unpacked", file))) throw new Error(`Missing unpacked Host runtime: ${file}`);
   const dist = context.outDir;
   const report = { format: 1, platform: target.platform, arch: target.arch, appDirectory: path.relative(dist, appDirectory).split(path.sep).join("/"), ...verified };
   fs.writeFileSync(path.join(dist, `lexopen-packaged-${target.target}.json`), JSON.stringify(report, null, 2));

@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-07",
+  "generator": "built-in image_gen",
+  "images": [
+    {
+      "name": "expedientes",
+      "prompt": "Use case: illustration-story. Asset type: transparent editorial engraving for the case-file workspace header in LexOpen, a sophisticated legal research app. Create one isolated compact still life: a classic thick case dossier lying slightly open, several precisely aligned paper folios peeking out, a slender silver binder clip, one folded paper corner. The dossier is slightly tilted in a graceful three-quarter view. Fine nineteenth-century copperplate / steel engraving, intricate crosshatching, tactile paper edge lines, confident hand-engraved strokes, like an antique scholarly book frontispiece. Palette strictly cool silver white #f4f3f7, slate indigo #313958 and deep ink #0d1022; very restrained iris #aab5ff detail on the folder ribbon. Clear coherent silhouette, readable when rendered at 144px wide, elegant and uncluttered. Center subject, ample transparent margin, no background, no drop shadow outside the object. Genuine alpha transparency. NO text, lettering, numbers, logos, scales of justice, gavels, clip-art outlines, gradients, glowing effects, mockups or UI."
+    },
+    {
+      "name": "consulta",
+      "prompt": "Use case: illustration-story. Asset type: transparent editorial engraving for the clients workspace header in LexOpen, a sophisticated legal app. Create one isolated compact still life representing a thoughtful personal consultation: two elegant classic wooden chairs facing one another in three-quarter view, a very small round consultation table between them holding one closed thin notebook. Furniture only, no people, no room, no floor. Fine nineteenth-century copperplate / steel engraving, exquisite tightly drawn crosshatching, confident hand-engraved lines, antique scholarly frontispiece sensibility. Palette strictly cool silver white #f4f3f7, slate indigo #313958 and deep ink #0d1022; tiny restrained iris #aab5ff notebook detail. One compact legible silhouette, considered proportions, readable at 144px wide. Center subject, generous transparent margin. Genuine alpha transparency, no background or cast drop shadow outside the furniture. NO text, lettering, numbers, logos, scales of justice, gavels, generic people icon, clip-art, gradients, glowing effects, UI or mockup."
+    },
+    {
+      "name": "libro-contable",
+      "prompt": "Use case: illustration-story. Asset type: transparent editorial engraving for the billing workspace header in LexOpen, a sophisticated legal app. Create one isolated compact still life: a classic cloth-bound accounting ledger open at an oblique three-quarter angle, neat faint ruled columns on its pages and a slim traditional fountain pen placed beside it, with one narrow ribbon bookmark. Pages show only delicate horizontal and vertical rules, absolutely no readable characters. Fine nineteenth-century copperplate / steel engraving, intricate crosshatching, tactile paper edges, subtle cloth binding, elegant antique scholarly book frontispiece style. Palette strictly cool silver white #f4f3f7, slate indigo #313958 and deep ink #0d1022, tiny restrained iris #aab5ff bookmark. Strong compact legible silhouette, readable at 144px wide. Center subject with transparent margins, genuine alpha transparency, no scene background and no floating cast shadow. NO text, lettering, numbers, money signs, logos, feather quills, scales of justice, gavels, gradients, glow, mockups or UI."
+    }
+  ],
+  "refinement": "Remove only the broad grey haze, glow, smoky shadow and dark atmospheric vignette behind and around this engraved object. Keep the entire object, exact composition, silver/indigo linework and iris detail unchanged. Output a crisp clean cutout with real alpha transparency around the object and in all gaps. Background must be entirely transparent right up to the actual engraved outlines. No halos, no atmospheric illumination, no added cast shadows, no backdrop. Preserve fine crosshatching and the elegant original illustration.",
+  "flowProject": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79",
+  "videos": [
+    {
+      "name": "expedientes",
+      "version": 2,
+      "status": "completed_in_google_flow",
+      "model": "Veo 3.1 - Fast",
+      "provider": "Google Flow",
+      "prompt": "A restrained eight-second editorial animation of this exact OPEN archival case folder. Use the supplied first and last images exactly. The rigid grey-blue cardboard cover, metal fastener, binding, perspective, object position, silhouette and background stay absolutely FIXED for every frame. The folder is NOT a book and its cover must NEVER bend, peel, open further or turn into paper. Only the free OUTER RIGHT CORNER of the TOP PAPER FOLIO makes one small believable lift of a few millimeters, then gently settles flat on the stack. The paper remains attached at the left fastener. No sheet turns over, no full page flip, no curling the entire paper, no floating loose sheets. Hold the first two seconds still, one very small paper-corner movement in the middle, then hold the final two seconds completely still. Locked-off camera: no zoom, pan, orbit or reframing. Keep the WHOLE folder and every edge inside the frame with the generous existing margins throughout. Preserve the original silver steel-engraving crosshatching and straight ruled lines. Uniform unchanged indigo backdrop, no new objects, hands, text, numbers, logos, sparkles, light sweeps, smoke or glow. Silent, no music or sound effects. Understated and precise, suitable for a professional legal application.",
+      "flowAssetId": "e8846c67-37fd-4228-9105-c6176dc1a933",
+      "flowUrl": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79/edit/e8846c67-37fd-4228-9105-c6176dc1a933",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-v2-original.mp4",
+      "optimizedFile": "public/editorial/generated/expedientes-flow-v2.mp4",
+      "startFrameAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+      "endFrameAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475"
+    },
+    {
+      "name": "libro-contable",
+      "status": "completed_in_google_flow",
+      "model": "Veo 3.1 - Fast",
+      "settings": {
+        "aspectRatio": "16:9",
+        "duration": 8,
+        "resolution": "720p",
+        "outputs": 1,
+        "displayedCreditCost": 20
+      },
+      "prompt": "Animate this exact silver and indigo steel engraving as an eight-second editorial still life. Preserve the open ruled accounting ledger, fountain pen, iris ribbon bookmark and precise crosshatching. One page lifts very slowly, turns gently and settles; the pen and book remain fixed. Locked camera, no zoom, no cuts, no writing or characters appearing. Keep the antique engraved style throughout, no photorealistic conversion. Restrained subtle motion against perfectly uniform deep indigo #0d1022, no room, no horizon, no smoke, no glow, no additional objects or people. Calm beginning and ending, suitable for a sober legal application. Silent video, no voices, no music, no sound effects.",
+      "flowAssetId": "81e16dc8-2adc-42c3-87d1-f8effb592450",
+      "flowUrl": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79/edit/81e16dc8-2adc-42c3-87d1-f8effb592450",
+      "provider": "Google Flow",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-libro-contable-original.mp4",
+      "optimizedFile": "public/editorial/generated/libro-contable-flow-v1.mp4"
+    }
+  ],
+  "providerConstraint": "Google Flow only for video generation",
+  "revisedCaseFileReference": "expedientes-v2.json"
+}

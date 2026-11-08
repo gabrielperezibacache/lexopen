@@ -1,0 +1,117 @@
+{
+  "results": [
+    {
+      "route": "minutas",
+      "theme": "light",
+      "device": "desktop",
+      "file": "minutas-light-desktop-static.png",
+      "box": {
+        "x": 1071.296875,
+        "y": 159.859375,
+        "width": 144,
+        "height": 80.390625
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "minutas",
+      "theme": "light",
+      "device": "mobile",
+      "file": "minutas-light-mobile-static.png",
+      "box": {
+        "x": 280,
+        "y": 179,
+        "width": 64,
+        "height": 35.71875
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "minutas",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "minutas-dark-desktop-static.png",
+      "box": {
+        "x": 1071.296875,
+        "y": 159.859375,
+        "width": 144,
+        "height": 80.390625
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "minutas",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "minutas-dark-mobile-static.png",
+      "box": {
+        "x": 280,
+        "y": 179,
+        "width": 64,
+        "height": 35.71875
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "light",
+      "device": "desktop",
+      "file": "configuracion-light-desktop-static.png",
+      "box": {
+        "x": 692.078125,
+        "y": 146.265625,
+        "width": 144,
+        "height": 80.390625
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "light",
+      "device": "mobile",
+      "file": "configuracion-light-mobile-static.png",
+      "box": {
+        "x": 280,
+        "y": 172.484375,
+        "width": 64,
+        "height": 35.71875
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "dark",
+      "device": "desktop",
+      "file": "configuracion-dark-desktop-static.png",
+      "box": {
+        "x": 692.078125,
+        "y": 146.265625,
+        "width": 144,
+        "height": 80.390625
+      },
+      "imageLoaded": true,
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "dark",
+      "device": "mobile",
+      "file": "configuracion-dark-mobile-static.png",
+      "box": {
+        "x": 280,
+        "y": 172.484375,
+        "width": 64,
+        "height": 35.71875
+      },
+      "imageLoaded": true,
+      "overflow": false
+    }
+  ],
+  "errors": []
+}

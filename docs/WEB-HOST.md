@@ -143,9 +143,9 @@ Use esta lista antes de cargar información real del estudio:
 ## OCR local para PDFs escaneados
 
 El lector de páginas físicas utiliza Poppler (`pdftoppm`) en el Host para mostrar
-el original conservado. El OCR de páginas escaneadas es opcional y requiere
-Tesseract; según la plataforma se utiliza el motor nativo o el procesamiento con
-Poppler. Instale las herramientas en el mismo equipo que ejecuta el Host:
+el original conservado. El OCR de páginas escaneadas es opcional y usa
+Tesseract sobre esas imágenes, tanto para preparar texto como para las citas.
+Instale las herramientas en el mismo equipo que ejecuta el Host:
 
 ```bash
 # Debian/Ubuntu
@@ -155,9 +155,7 @@ sudo apt install poppler-utils tesseract-ocr tesseract-ocr-spa
 brew install poppler tesseract tesseract-lang
 ```
 
-En Windows instale Tesseract y Poppler: el binding OCR nativo actual no publica
-binario Windows y LexOpen usa el fallback `pdftoppm`. Configure
-`OCR_TESSERACT_BIN` y `OCR_PDFTOPPM_BIN` con sus rutas completas. Puede ajustar el
+En Windows configure `OCR_TESSERACT_BIN` y `OCR_PDFTOPPM_BIN` con sus rutas completas. Puede ajustar el
 idioma con `OCR_LANGUAGE=spa+eng` y limitar el consumo con `OCR_MAX_PAGES` y
 `OCR_TIMEOUT_MS`. Si faltan los binarios, el original se conserva y el documento
 queda marcado como `Requiere OCR`.

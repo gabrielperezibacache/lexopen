@@ -1,6 +1,13 @@
 import { academicOutline } from "@/lib/altazor/academic-templates";
 import type { AcademicArtifact, AcademicWorkspace } from "./academic-ui";
 
+export type ReviewDestination =
+  | { kind: "objective" | "sources" | "matrix" | "work" }
+  | { kind: "artifact"; id: string };
+
+type ManuscriptSource = NonNullable<AcademicArtifact["sources"]>[number];
+export type AcademicPassageReference = { id: string; source: ManuscriptSource };
+
 export type AcademicManuscriptReview = {
   artifactId: string;
   title: string;
@@ -8,6 +15,7 @@ export type AcademicManuscriptReview = {
   textSections: number;
   sectionsWithReference: number;
   sectionsWithoutReference: number;
+  linkedSections: { title: string; references: AcademicPassageReference[] }[];
   unlinkedSectionTitles: string[];
   invalidReferenceIds: string[];
 };
@@ -39,7 +47,7 @@ function inspectManuscript(artifact: AcademicArtifact, status: AcademicManuscrip
   const sources = artifact.sources || [], invalidReferenceIds = new Set<string>();
   const body = withoutGeneratedAppendix(normalizedLines(artifact.body || ""), sources), headings = academicOutline(body);
   const unlinkedSectionTitles: string[] = [];
-  let textSections = 0;
+  const linkedSections: AcademicManuscriptReview["linkedSections"] = [];
   const sections = [
     { title: "", text: body.slice(0, headings[0]?.offset ?? body.length) },
     ...headings.map((heading, index) => {
@@ -55,12 +63,20 @@ function inspectManuscript(artifact: AcademicArtifact, status: AcademicManuscrip
       if (Number(id.slice(1)) > sources.length) invalidReferenceIds.add(id);
     }
     if (!/[\p{L}\p{N}]/u.test(text.replace(referenceMarker, ""))) continue;
-    textSections++;
-    if (!textReferenceIds.some(id => Number(id.slice(1)) <= sources.length)) {
-      unlinkedSectionTitles.push(section.title.replace(referenceMarker, "").trim().slice(0, 140) || "Texto inicial");
-    }
+    const title = section.title.replace(referenceMarker, "").trim().slice(0, 140) || "Texto inicial";
+    const references = Array.from(new Set(textReferenceIds)).flatMap(id => {
+      const source = sources[Number(id.slice(1)) - 1];
+      return source ? [{ id, source }] : [];
+    });
+    if (references.length) linkedSections.push({ title, references });
+    else unlinkedSectionTitles.push(title);
   }
-  return { artifactId: artifact.id, title: artifact.title || "Propuesta sin título", status, textSections, sectionsWithReference: textSections - unlinkedSectionTitles.length, sectionsWithoutReference: unlinkedSectionTitles.length, unlinkedSectionTitles, invalidReferenceIds: [...invalidReferenceIds] };
+  return {
+    artifactId: artifact.id, title: artifact.title || "Propuesta sin título", status,
+    textSections: linkedSections.length + unlinkedSectionTitles.length,
+    sectionsWithReference: linkedSections.length, sectionsWithoutReference: unlinkedSectionTitles.length,
+    linkedSections, unlinkedSectionTitles, invalidReferenceIds: [...invalidReferenceIds],
+  };
 }
 
 /** Review the workspace and source snapshots already revalidated by the server. */
@@ -86,4 +102,27 @@ export function academicReview(workspace: AcademicWorkspace) {
     }
   }
   return { objective, sources, matrix, artifacts };
+}
+
+type NextReview = {
+  reason: "missingObjective" | "lostAccess" | "matrixGaps" | "citationGaps" | "pendingReview" | "missingSources" | "noProposals";
+  destination: ReviewDestination;
+};
+
+export function nextAcademicReview(review: ReturnType<typeof academicReview>): NextReview | null {
+  const { objective, sources, matrix, artifacts } = review;
+  if (!objective.defined) return { reason: "missingObjective", destination: { kind: "objective" } };
+  if (sources.unavailable || artifacts.unavailable) return { reason: "lostAccess", destination: { kind: "sources" } };
+  if (matrix.unavailable.length || matrix.withoutEvidence.length) return { reason: "matrixGaps", destination: { kind: "matrix" } };
+
+  const citationGap = artifacts.manuscripts.find(item => item.sectionsWithoutReference || item.invalidReferenceIds.length);
+  if (citationGap) return { reason: "citationGaps", destination: { kind: "artifact", id: citationGap.artifactId } };
+  const pending = artifacts.manuscripts.find(item => item.status === "proposed");
+  if (pending) return { reason: "pendingReview", destination: { kind: "artifact", id: pending.artifactId } };
+  if (!artifacts.manuscripts.length) {
+    return sources.available
+      ? { reason: "noProposals", destination: { kind: "work" } }
+      : { reason: "missingSources", destination: { kind: "sources" } };
+  }
+  return null;
 }

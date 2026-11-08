@@ -66,7 +66,8 @@ export default async function FacturasPage({
 
   return (
     <div className="space-y-6">
-      <ModuleHeader artwork="billing"
+      <ModuleHeader
+        artwork="billing"
         eyebrow="Documentos internos"
         title="Facturas y boletas"
         subtitle="Boleta de honorarios, factura afecta o exenta y nota de crédito, con IVA y retención de Chile. El CSV/XML alimenta un facturador externo: LexOpen no emite DTE del SII."

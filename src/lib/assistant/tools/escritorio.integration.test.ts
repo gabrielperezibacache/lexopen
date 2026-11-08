@@ -25,13 +25,24 @@ async function main() {
     assert.equal(target.hostname, "127.0.0.1");
     if (target.port === "19999") return Response.json({ choices: [{ message: { content: JSON.stringify({ intents: [{ toolId: "escritorio.encargar", confidence: 1, slots: { texto: text } }] }) } }] });
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-desktop-tool-token");
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(path)) {
+      assert.equal(init?.method || "GET", "GET", "legacy fixtures never grant computer-use permission");
+      const binding = target.searchParams.get("binding"), kittyId = target.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: path.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
     const snapshot = snapshots.get(target.origin); assert.ok(snapshot);
-    if (path === "/v1/health") return Response.json({ ok:true, version:"desktop-tool-fixture", containers:true, lexopen_connector_gate:"v1", lexopen_connector_platform:"linux" });
+    if (path === "/v1/health") return Response.json({ ok:true, version:"desktop-tool-fixture", containers:true, lexopen_connector_gate:"v1", lexopen_connector_platform:"linux", lexopen_async_messages:"v1", lexopen_computer_use_policy:"v1" });
     if (path === "/v1/providers") return Response.json({ providers:[{name:"separate-model",kind:"openai"}] });
     if (path === "/v1/kitties") return Response.json({kitties:[snapshot.kitty]});
     if (path === `/v1/kitties/${snapshot.kitty.id}`) return Response.json({kitty:snapshot.kitty});
     if (path === `/v1/chats/${snapshot.chat.id}`) return Response.json({chat:snapshot.chat});
-    if (path.endsWith("/messages")) { assert.deepEqual(body.files,[]); payloads.push(body); return Response.json({turns:[]}); }
+    if (path.endsWith("/messages/async")) {
+      assert.deepEqual(body.files,[]);
+      assert.match(String(body.request_id), /^[A-Za-z0-9_-]{1,100}$/);
+      payloads.push(body);
+      return Response.json({ request_id: body.request_id, chat_id: snapshot.chat.id, status: "accepted", state: "accepted" }, { status: 202 });
+    }
     throw new Error("Unexpected synthetic desktop tool endpoint");
   }) as typeof fetch;
   try {
@@ -48,6 +59,13 @@ async function main() {
       snapshots.set(endpoint,{kitty:{id:session.kittyId,name:session.kittyName,provider:"separate-model",desktop:true,container:`kitty-${session.kittyName}`,status:"running",connectors:["clima"],approvals:"ask",backup:""},chat:{id:session.chatId,members:[session.kittyId],turns:[]}});
     }
     const ctx: ToolContext={userId:owner.id,role:"abogado",chatId:conversation.id,scope:{causaId:cases[0].id}};
+    const aliases = ["google", "github", "dropbox", "microsoft"].map(kind => `altazor-${kind}-${"a".repeat(16)}`);
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: JSON.stringify(aliases) } });
+    const cloudPreview = await escritorioEncargarTool.preview({ sessionId: sessions[0].id, texto: text }, ctx);
+    for (const label of ["Google Drive", "GitHub (repositorios públicos)", "Dropbox (archivos)", "Microsoft 365 / OneDrive (archivos)"]) assert.ok(cloudPreview.includes(label));
+    assert.equal(aliases.some(alias => cloudPreview.includes(alias)), false, "review uses service names instead of technical account aliases");
+    assert.ok(cloudPreview.includes("sin editar, publicar ni eliminar")); assert.ok(cloudPreview.includes("OneDrive no incluye correo ni calendario"));
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: '["clima"]' } });
     const listed=await escritorioListarTool.execute({},ctx);assert.ok(listed.ok);
     assert.equal((listed.card?.sessions as unknown[]).length,1);assert.ok(listed.message.includes(sessions[0].id));assert.equal(listed.message.includes(sessions[1].id),false);assert.equal(JSON.stringify(listed).includes("fictitious-desktop-tool-token"),false);
     await assert.rejects(escritorioListarTool.execute({}, {...ctx,scope:undefined}),denied);

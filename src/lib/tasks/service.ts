@@ -4,15 +4,19 @@ import { assertCausaAccess, plazoAccessWhere, siteAccessWhere, type CausaAccessU
 import { activeDelegadorIds } from "@/lib/auth/delegacion";
 import { can } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
+import { currentStaffActor } from "@/lib/auth/staff-actor";
+import { executeCommand } from "@/lib/command-execution";
+import { parseDateInput } from "@/lib/date-input";
 import { prisma } from "@/lib/db";
 import { emitNotification } from "@/lib/notify/emit";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Task } from "@prisma/client";
 import { z } from "zod";
 import { syncSourcesFromTask } from "./sync-mirrors";
 import { taskWorkspaceAccessWhere } from "./workspace";
+import { applyTaskCompletionEffects } from "./completion";
 
 const nullableId = z.string().min(1).max(100).nullable();
-const date = z.string().max(100).refine((s) => Number.isFinite(new Date(s).getTime()), "Fecha inválida").nullable();
+const date = z.string().max(100).refine((s) => parseDateInput(s) !== null, "Fecha inválida").nullable();
 export const taskChangesSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(), description: z.string().max(20000).nullable().optional(),
   instructions: z.string().max(20000).nullable().optional(), considerations: z.string().max(20000).nullable().optional(),
@@ -25,6 +29,9 @@ export const taskChangesSchema = z.object({
   origen: z.enum(["manual", "minuta", "pjud", "checklist", "tramite", "asistente", "voz", "intake", "aprobacion"]).optional(),
 });
 type Changes = z.infer<typeof taskChangesSchema>;
+const taskCreateSchema = taskChangesSchema.extend({ title: z.string().trim().min(1).max(300) });
+const taskUpdateSchema = taskChangesSchema.extend({ expectedUpdatedAt: z.string().datetime().optional() });
+const taskIdsSchema = z.array(z.string().min(1).max(100)).min(1).max(100);
 type TaskOwner = { assigneeId: string | null; creatorId: string | null };
 
 export function taskMutationPermissions(user: CausaAccessUser, task: TaskOwner, delegatedFrom: string[]) {
@@ -81,11 +88,12 @@ async function transaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, 
 }
 
 export async function createTask(user: CausaAccessUser, input: unknown, client?: Prisma.TransactionClient) {
-  const data = taskChangesSchema.extend({ title: z.string().trim().min(1).max(300) }).parse(input);
-  if (data.assigneeId && data.assigneeId !== user.id && !can(user, "task.assign")) throw httpError("No puede asignar tareas a otros", 403);
+  const data = taskCreateSchema.parse(input);
   return transaction(async (tx) => {
-    const causaId = await references(data, user, tx);
-    const task = await tx.task.create({ data: { ...data, causaId, dueDate: data.dueDate ? new Date(data.dueDate) : null, remindAt: data.remindAt ? new Date(data.remindAt) : null, creatorId: user.id, completedAt: data.status === "done" ? new Date() : null, completedById: data.status === "done" ? user.id : null } });
+    const actor = await currentStaffActor(user, tx);
+    if (data.assigneeId && data.assigneeId !== actor.id && !can(actor, "task.assign")) throw httpError("No puede asignar tareas a otros", 403);
+    const causaId = await references(data, actor, tx);
+    const task = await tx.task.create({ data: { ...data, causaId, dueDate: data.dueDate ? parseDateInput(data.dueDate) : null, remindAt: data.remindAt ? parseDateInput(data.remindAt) : null, creatorId: actor.id, completedAt: data.status === "done" ? new Date() : null, completedById: data.status === "done" ? actor.id : null } });
     await tx.taskHistorial.create({ data: { taskId: task.id, campo: "creada", despues: task.status, actorId: user.id } });
     await writeAuditStrict({ actorId: user.id, action: "task.create", entityType: "Task", entityId: task.id }, tx);
     if (task.assigneeId) await emitNotification({ tipo: "tarea.asignada", userId: task.assigneeId, title: "Nueva tarea asignada", body: task.title, href: "/tareas", entityType: "task", entityId: task.id }, tx);
@@ -95,16 +103,16 @@ export async function createTask(user: CausaAccessUser, input: unknown, client?:
 
 /** One command path for single, bulk, site and delegation mutations. */
 export async function updateTasks(user: CausaAccessUser, ids: string[], input: unknown, siteId?: string, client?: Prisma.TransactionClient) {
-  const changes = taskChangesSchema.parse(input);
-  const { expectedUpdatedAt } = z.object({ expectedUpdatedAt: z.string().datetime().optional() }).parse(input);
-  const uniqueIds = [...new Set(z.array(z.string().min(1).max(100)).min(1).max(100).parse(ids))];
-  const delegators = await activeDelegadorIds(user.id, "task.assign", client);
+  const { expectedUpdatedAt, ...changes } = taskUpdateSchema.parse(input);
+  const uniqueIds = [...new Set(taskIdsSchema.parse(ids))];
   return transaction(async (tx) => {
-    const rows = await tx.task.findMany({ where: { id: { in: uniqueIds }, ...taskWorkspaceAccessWhere(user), ...(siteId ? { siteId } : {}) } });
+    const actor = await currentStaffActor(user, tx);
+    const delegators = await activeDelegadorIds(actor.id, "task.assign", tx);
+    const rows = await tx.task.findMany({ where: { id: { in: uniqueIds }, ...taskWorkspaceAccessWhere(actor), ...(siteId ? { siteId } : {}) } });
     if (rows.length !== uniqueIds.length) throw httpError("Tarea no encontrada", 404);
     const result = [];
     for (const before of rows) {
-      const permissions = taskMutationPermissions(user, before, delegators);
+      const permissions = taskMutationPermissions(actor, before, delegators);
       if (!permissions.edit) throw httpError("No puede modificar esta tarea", 403);
       if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== before.updatedAt.getTime()) {
         throw httpError("Esta tarea cambió. Recargue la lista antes de guardar sus cambios.", 409);
@@ -118,31 +126,55 @@ export async function updateTasks(user: CausaAccessUser, ids: string[], input: u
           if (!visible) throw httpError("El asignado no tiene acceso a esta tarea", 403);
         }
       }
-      if (changes.parentId === before.id) throw httpError("Una tarea no puede ser su propia subtarea", 400);
       const merged = { ...before, ...changes };
-      const causaId = await references(merged, user, tx);
+      const causaId = await references(merged, actor, tx);
+      if (changes.parentId) {
+        // UNION terminates even when legacy data already contains a cycle.
+        const cycle = await tx.$queryRaw<{ id: string }[]>`
+          WITH RECURSIVE ancestors AS (
+            SELECT id, "parentId" FROM "Task" WHERE id = ${changes.parentId}
+            UNION
+            SELECT t.id, t."parentId" FROM "Task" t JOIN ancestors a ON t.id = a."parentId"
+          ) SELECT id FROM ancestors WHERE id = ${before.id}`;
+        if (cycle.length) throw httpError("Una tarea no puede depender de sí misma ni de sus subtareas", 400);
+      }
       // A mirrored task cannot be detached or moved away from its source matter.
       if (before.origen !== "manual" && causaId !== before.causaId) throw httpError("El expediente del pendiente se modifica desde su origen", 409);
       const nextStatus = changes.status ?? before.status;
       const completed = nextStatus === "done" && before.status !== "done";
-      const task = await tx.task.update({ where: { id: before.id, updatedAt: before.updatedAt }, data: { ...changes, causaId, dueDate: changes.dueDate === undefined ? undefined : changes.dueDate ? new Date(changes.dueDate) : null, remindAt: changes.remindAt === undefined ? undefined : changes.remindAt ? new Date(changes.remindAt) : null, completedAt: completed ? new Date() : nextStatus !== "done" ? null : before.completedAt, completedById: completed ? user.id : nextStatus !== "done" ? null : before.completedById } });
+      const task = await tx.task.update({ where: { id: before.id, updatedAt: before.updatedAt }, data: { ...changes, causaId, dueDate: changes.dueDate === undefined ? undefined : changes.dueDate ? parseDateInput(changes.dueDate) : null, remindAt: changes.remindAt === undefined ? undefined : changes.remindAt ? parseDateInput(changes.remindAt) : null, completedAt: completed ? new Date() : nextStatus !== "done" ? null : before.completedAt, completedById: completed ? user.id : nextStatus !== "done" ? null : before.completedById } });
       await syncSourcesFromTask(task, tx);
       await tx.taskHistorial.create({ data: { taskId: task.id, campo: "estado", antes: JSON.stringify({ status: before.status, assigneeId: before.assigneeId }), despues: JSON.stringify(changes), actorId: user.id } });
       await writeAuditStrict({ actorId: user.id, action: "task.update", entityType: "Task", entityId: task.id, before: { status: before.status, assigneeId: before.assigneeId }, after: changes }, tx);
       if (task.assigneeId && task.assigneeId !== before.assigneeId) await emitNotification({ tipo: "tarea.reasignada", userId: task.assigneeId, title: "Tarea reasignada", body: task.title, href: "/tareas", entityType: "task", entityId: task.id }, tx);
-      if (completed && task.siteId) {
-        const workflows = await tx.workflow.findMany({ where: { siteId: task.siteId, active: true, triggerType: "task_done" }, select: { id: true } });
-        if (workflows.length) await tx.workflowInstance.createMany({ data: workflows.map((w) => ({ workflowId: w.id, status: "pending", actorId: user.id, payloadJson: JSON.stringify({ taskId: task.id }) })) });
-      }
-      if (completed && before.rrule) {
-        const dueDate = new Date(before.dueDate || new Date());
-        const interval = Number(/INTERVAL=(\d+)/.exec(before.rrule)?.[1] || 1);
-        if (before.rrule.startsWith("FREQ=MONTHLY")) dueDate.setMonth(dueDate.getMonth() + interval);
-        else dueDate.setDate(dueDate.getDate() + interval * (before.rrule.startsWith("FREQ=WEEKLY") ? 7 : 1));
-        await tx.task.create({ data: { title: before.title, description: before.description, instructions: before.instructions, considerations: before.considerations, priority: before.priority, dueDate, causaId, siteId: before.siteId, clienteId: before.clienteId, assigneeId: before.assigneeId, creatorId: user.id, origen: "manual", rrule: before.rrule } });
-      }
+      if (completed) await applyTaskCompletionEffects(task, user.id, tx);
       result.push(task);
     }
     return result;
   }, client);
+}
+
+async function authorizeReplay(user: CausaAccessUser, ids: string[], tx: Prisma.TransactionClient, siteId?: string) {
+  const actor = await currentStaffActor(user, tx);
+  const rows = await tx.task.findMany({ where: { id: { in: ids }, ...taskWorkspaceAccessWhere(actor), ...(siteId ? { siteId } : {}) } });
+  if (rows.length !== ids.length) throw httpError("Tarea no encontrada", 404);
+  const delegators = await activeDelegadorIds(actor.id, "task.assign", tx);
+  if (rows.some(row => !taskMutationPermissions(actor, row, delegators).edit)) throw httpError("No puede modificar esta tarea", 403);
+}
+
+/** Receipts cover tasks, histories, notifications, mirrors and completion effects together. */
+export async function createTaskCommand(user: CausaAccessUser, input: unknown, key: string) {
+  const data = taskCreateSchema.parse(input);
+  return executeCommand<Task>({ key, ownerId: user.id, input: data,
+    authorize: async (tx, result) => { if (result) await authorizeReplay(user, [result.id], tx); },
+    run: tx => createTask(user, data, tx),
+  });
+}
+
+export async function updateTasksCommand(user: CausaAccessUser, ids: string[], input: unknown, key: string, siteId?: string) {
+  const data = taskUpdateSchema.parse(input), uniqueIds = [...new Set(taskIdsSchema.parse(ids))].sort();
+  return executeCommand<Task[]>({ key, ownerId: user.id, input: { ids: uniqueIds, changes: data, siteId },
+    authorize: async (tx, result) => { if (result) await authorizeReplay(user, uniqueIds, tx, siteId); },
+    run: tx => updateTasks(user, uniqueIds, data, siteId, tx),
+  });
 }

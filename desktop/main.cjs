@@ -25,7 +25,7 @@ const {
   defaultBackupDirectory,
   validateBackupDirectory,
 } = require("./backup.cjs");
-const { isAllowedExternalUrl } = require("./external-url.cjs");
+const { isAllowedAppUrl, isAllowedExternalUrl } = require("./external-url.cjs");
 const { pathToFileURL } = require("node:url");
 const { prepareDesktopToolpack } = require("./altazor-toolpack.cjs");
 const { attachMicrophoneGuards } = require("./media-permissions.cjs");
@@ -297,23 +297,22 @@ function isAllowedDesktopNavigation(url) {
         resolved.startsWith(rendererRoot + path.sep)
       );
     }
-    return isAllowedExternalUrl(url, {
-      appUrls: collectDesktopAppUrls(),
-      extraHosts: ["github.com", "www.github.com"],
-    });
+    return isAllowedAppUrl(url, collectDesktopAppUrls());
   } catch {
     return false;
   }
 }
 
+function isAllowedDesktopExternalUrl(url) {
+  return isAllowedExternalUrl(url, {
+    appUrls: collectDesktopAppUrls(),
+    extraHosts: ["github.com", "www.github.com", "render.com", "docs.render.com"],
+  });
+}
+
 function attachWindowGuards(win) {
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (
-      isAllowedExternalUrl(url, {
-        appUrls: collectDesktopAppUrls(),
-        extraHosts: ["github.com", "www.github.com", "render.com", "docs.render.com"],
-      })
-    ) {
+    if (isAllowedDesktopExternalUrl(url)) {
       void shell.openExternal(url);
     }
     return { action: "deny" };
@@ -321,6 +320,7 @@ function attachWindowGuards(win) {
   win.webContents.on("will-navigate", (event, url) => {
     if (isAllowedDesktopNavigation(url)) return;
     event.preventDefault();
+    if (isAllowedDesktopExternalUrl(url)) void shell.openExternal(url);
   });
 }
 
@@ -926,12 +926,7 @@ ipcMain.handle("desktop:save-setup", async (event, payload) => {
 });
 
 ipcMain.handle("desktop:open-external", async (_e, url) => {
-  if (
-    !isAllowedExternalUrl(url, {
-      appUrls: collectDesktopAppUrls(),
-      extraHosts: ["github.com", "www.github.com", "render.com", "docs.render.com"],
-    })
-  ) {
+  if (!isAllowedDesktopExternalUrl(url)) {
     return { ok: false, error: "URL no permitida" };
   }
   await shell.openExternal(url);

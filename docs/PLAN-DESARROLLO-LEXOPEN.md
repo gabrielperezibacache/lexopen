@@ -1,5 +1,7 @@
 # Desarrollo de capacidades jurídicas propias en LexOpen
 
+Estado posterior: consulte las [correcciones de auditoría del 7 de noviembre](CORRECCIONES-AUDITORIA-2026-11-07.md). Este plan conserva la planificación de su fecha; Novedades y los recorridos académicos ya están implementados.
+
 Fecha: 1 de noviembre de 2026. Base de producto auditada: LexOpen 1.0.0, main 72400f9b9627cdc147ebf7c14a791c063747a686. Dirección del producto: ampliar la investigación, la evidencia y la redacción dentro de LexOpen.
 
 LexOpen debe conservar su operación de estudio jurídico y sumar un motor propio de investigación, evidencia y redacción. La base existente permite reutilizar causas, clientes, documentos, colaboración, minutas y dos superficies de asistente. La prioridad es asegurar permisos, privacidad y recuperación; después construir fuentes y evidencia comunes, y sobre ellas investigación, cronología, revisión, Word y MCP. Crear varios chats o copiar pantallas no alcanza esa integración.

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#35396a"><title>Trabajo sin conexión · LexOpen</title><link rel="stylesheet" href="/offline/workspace.css"><script type="module" src="/offline/workspace.js"></script></head>
+<body>
+<header><a href="/dashboard" aria-label="Volver a LexOpen">LexOpen</a><span id="connection" role="status">Comprobando conexión…</span></header>
+<main>
+<h1>Trabajo sin conexión</h1><p class="intro">Prepare escritos, clientes, tareas, causas, plazos, notas, minutas, documentos, adjuntos, eventos y trámites. Puede editar sus copias y crear registros locales cuando se interrumpa la conexión. Su copia se cifra en este navegador con una clave local.</p>
+<p id="message" role="status" aria-live="polite"></p>
+<section id="gate" aria-label="Abrir espacio local">
+<form id="unlock-form"><label for="password">Clave del espacio local</label><input id="password" type="password" minlength="12" required autocomplete="current-password" aria-describedby="key-help"><p id="key-help">Al crear el espacio, elija al menos 12 caracteres. Esta clave es independiente de su cuenta. Si la pierde, deberá recuperar el trabajo desde sus descargas o desde el servidor.</p><button id="unlock" type="submit">Desbloquear</button></form>
+<button id="create" class="secondary" type="button" hidden>Crear espacio cifrado</button>
+</section>
+<section id="workspace" hidden>
+<div class="toolbar"><button id="lock" class="secondary" type="button">Bloquear espacio</button></div>
+<details class="help"><summary>Protección y sincronización</summary><p>Las copias locales no reflejan cambios ni revocaciones posteriores. Para sincronizar, inicie sesión con la misma cuenta. Se comprobarán el acceso, los respaldos y la versión actual. Las revisiones y las exportaciones aprobadas requieren conexión.</p><button id="delete-vault" class="text-button" type="button">Borrar espacio local</button></details>
+<nav class="toolbar" aria-label="Áreas del espacio local"><button id="tab-writings" class="secondary" type="button" aria-pressed="true">Escritos</button><button id="tab-clientes" class="secondary" type="button" aria-pressed="false">Clientes</button><button id="tab-tasks" class="secondary" type="button" aria-pressed="false">Tareas</button><button id="tab-causes" class="secondary" type="button" aria-pressed="false">Causas</button><button id="tab-deadlines" class="secondary" type="button" aria-pressed="false">Plazos</button><button id="tab-notes" class="secondary" type="button" aria-pressed="false">Notas</button><button id="tab-documents" type="button" class="secondary">Documentos</button><button id="tab-attachments" type="button" class="secondary">Adjuntos</button><button id="tab-minutes" class="secondary" type="button" aria-pressed="false">Minutas</button><button id="tab-events" class="secondary" type="button" aria-pressed="false">Agenda</button><button id="tab-procedures" class="secondary" type="button" aria-pressed="false">Trámites</button></nav>
+<section id="writing-space" aria-label="Escritos locales">
+<div class="toolbar"><button id="pin" type="button" hidden>Preparar este escrito</button></div>
+<label for="drafts">Escritos preparados</label><select id="drafts"><option value="">Todavía no hay escritos preparados</option></select>
+<div id="editor" hidden>
+<div class="meta"><span id="revision"></span><span id="local-state" role="status"></span></div>
+<label for="title">Título del escrito</label><input id="title" maxlength="200" required>
+<label for="body">Texto del escrito</label><textarea id="body" rows="18" maxlength="100000" spellcheck="true"></textarea>
+<p class="help">Conserve los marcadores de las citas. Los cambios se guardan en la copia local al dejar de escribir. Sincronice antes de continuar en el editor principal.</p>
+<div class="toolbar"><button id="sync" type="button">Sincronizar escrito</button><button id="download" class="secondary" type="button">Descargar copia local</button><button id="refresh" class="secondary" type="button">Descargar versión del servidor</button><button id="remove" class="text-button" type="button">Quitar copia local</button></div>
+</div>
+</section>
+<section id="files-space" hidden aria-labelledby="files-heading">
+<h2 id="files-heading">Documentos</h2><p class="help">Prepare originales con conexión o añada archivos locales de hasta 8 MiB. Se guardan cifrados junto con sus cambios. Los reemplazos conservan las revisiones anteriores en el Host. Las descargas que solicite se guardan sin cifrar en su dispositivo.</p>
+<div class="toolbar"><button id="file-new" type="button">Nuevo documento local</button><button id="file-pin" class="secondary" type="button" hidden>Preparar documento</button></div>
+<label for="file-picker">Archivos locales</label><select id="file-picker"></select>
+<div id="file-editor" hidden><div class="meta"><span id="file-info"></span><span id="file-local-state" role="status"></span></div><p id="file-policy" class="help"></p><div id="file-fields"></div>
+<div id="file-text-area"><label for="file-text">Texto del documento o adjunto</label><textarea id="file-text" rows="12" maxlength="1048576" spellcheck="true"></textarea></div>
+<label for="file-input">Añadir o sustituir archivo local (hasta 8 MiB)</label><input id="file-input" type="file"><p id="file-content-info" class="help"></p>
+<section id="file-target-area"><label for="file-target">Destino del archivo</label><select id="file-target"></select><p class="help">Los documentos nuevos necesitan una causa preparada. Los adjuntos se incorporan al espacio y carpeta elegidos. El origen de los archivos existentes se conserva.</p><button id="file-target-clear" type="button" class="text-button">Quitar destino del catálogo</button>
+<details><summary>Preparar destinos con conexión</summary><label for="file-query">Buscar causa o espacio</label><input id="file-query" type="search" maxlength="200"><button id="file-search" type="button" class="secondary">Buscar destinos con conexión</button><div id="file-target-results"></div></details></section>
+<div class="toolbar"><button id="file-sync" type="button">Sincronizar archivo</button><button id="file-download" type="button" class="secondary">Descargar archivo local</button><button id="file-backup" type="button" class="secondary">Descargar copia completa</button><button id="file-refresh" type="button" class="secondary">Descargar versión del Host</button><button id="file-remove" type="button" class="text-button">Quitar copia de archivo</button></div>
+<div class="toolbar"><button id="file-review" type="button" class="secondary" hidden>Revisar rechazo del archivo</button><button id="file-review-confirm" type="button" hidden>Confirmar destino y permisos revisados</button><button id="file-history" type="button" class="secondary">Consultar versiones del Host</button></div><div id="file-history-list"></div>
+</div></section>
+<section id="records-space" hidden aria-labelledby="records-heading">
+<h2 id="records-heading">Clientes</h2>
+<details class="help"><summary>Asignaciones y vínculos</summary><p>Las causas nuevas son manuales y se crean a su nombre; los plazos requieren una fecha límite revisada. El equipo, acceso, cliente y conexiones externas de una causa se gestionan con conexión. Los registros nuevos se crean a su nombre. Las tareas nuevas se asignan a su cuenta. Prepare las opciones con conexión para cambiar responsables y vínculos con causas cuando trabaje sin red. Los permisos se revisan al sincronizar. Las copias preparadas conservan esos vínculos.</p></details>
+<div class="toolbar"><button id="record-new" type="button">Nuevo cliente local</button><button id="record-pin" class="secondary" type="button" hidden>Preparar cliente</button></div>
+<label id="record-picker-label" for="record-picker">Clientes locales</label><select id="record-picker"></select>
+<div id="record-editor" hidden>
+<div class="meta"><span id="record-revision"></span><span id="record-local-state" role="status"></span></div>
+<div id="record-fields"></div>
+<section id="cause-parties" hidden><h3>Partes de la causa</h3><p class="help">Se revisarán los conflictos de interés al sincronizar. Una coincidencia bloqueante requiere revisión autorizada con conexión.</p><div id="party-list"></div><button id="party-add" class="secondary" type="button">Añadir parte</button></section>
+<section id="operation-review" hidden><p id="operation-notice" class="help"></p><p id="operation-readback" class="help"></p><p id="operation-warning" class="help" role="status"></p><label id="operation-date-confirm" class="binding-case"><input id="operation-reviewed" type="checkbox"><span>He revisado las fechas y horas. No se calcula un vencimiento procesal sin conexión.</span></label></section>
+<section id="deadline-review" hidden><p id="deadline-source-note" class="help"></p><label class="binding-case"><input id="deadline-reviewed" type="checkbox"><span>He revisado la fecha límite para el país y el procedimiento aplicables.</span></label></section>
+<details id="memo-actions" hidden><summary id="memo-action-summary">Acciones y seguimiento</summary><p class="help">Los seguimientos nuevos se asignan a su cuenta. Los responsables existentes se conservan. Las acciones registradas se pueden editar o cancelar; sus tareas y plazos se conservan. Las fechas requieren revisión manual.</p><div id="memo-action-list"></div><button id="memo-action-add" class="secondary" type="button">Añadir acción</button></details>
+<details id="binding-panel" class="binding-panel"><summary>Responsable y causas</summary>
+<p id="binding-notice" class="help"></p>
+<div id="binding-owner"><label for="binding-responsible">Responsable del registro</label><select id="binding-responsible"></select></div>
+<div id="binding-task-cause"><label id="binding-cause-label" for="binding-cause">Causa de la tarea</label><select id="binding-cause"></select><p id="binding-cause-note" class="help"></p></div>
+<div id="binding-client-cases"><h3>Causas del cliente</h3><p class="help">Marque vínculos que quiera añadir o retirar. Vincular una causa que pertenece a otro cliente cambia ese vínculo, con sus tareas asociadas, si tiene permiso para todos ellos. Las demás causas se conservan.</p><div id="binding-cases"></div><p id="binding-more-cases" class="help" hidden>Hay más causas accesibles vinculadas a este cliente. Búsquelas y prepare las que quiera modificar; las demás se conservan.</p></div>
+<button id="binding-undo" class="text-button" type="button">Deshacer elecciones de vínculos</button>
+<details class="help"><summary>Preparar opciones con conexión</summary>
+<label for="reference-type">Tipo de opción</label><select id="reference-type"><option value="user">Responsables</option><option value="cause">Causas</option></select>
+<label for="reference-query">Buscar opciones</label><input id="reference-query" type="search" maxlength="200">
+<div class="toolbar"><button id="reference-search" class="secondary" type="button">Buscar opciones con conexión</button><button id="reference-more" class="secondary" type="button" hidden>Buscar más opciones</button></div>
+<div id="reference-results"></div></details>
+<button id="binding-review-start" class="secondary" type="button" hidden>Revisar referencias rechazadas</button>
+<section id="binding-review" hidden><h3>Referencias actuales</h3><div id="binding-review-list"></div><p class="help">Se conservan sus campos y elecciones locales. La petición anterior queda rechazada; confirmar estas referencias permite preparar una nueva, con las versiones revisadas.</p><button id="binding-review-confirm" type="button">Confirmar referencias revisadas</button></section>
+</details>
+<div class="toolbar"><button id="record-sync" type="button">Sincronizar registro</button><button id="record-download" class="secondary" type="button">Descargar copia local</button><button id="record-refresh" class="secondary" type="button">Descargar versión del servidor</button><button id="record-remove" class="text-button" type="button">Quitar copia local</button></div>
+</div>
+</section>
+</section>
+<noscript>Active JavaScript para abrir y cifrar sus registros locales.</noscript>
+</main>
+</body></html>

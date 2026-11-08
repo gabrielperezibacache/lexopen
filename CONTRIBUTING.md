@@ -7,6 +7,11 @@
 4. No agregue secretos reales a commits; use `.env.example`.
 5. PR con descripción de módulos tocados (causas, jurisprudencia, integraciones).
 
+Antes de entregar un cambio, ejecute `npm run typecheck`. Este comando regenera
+el cliente de Prisma y los tipos de rutas de Next.js antes de comprobar TypeScript;
+evita errores en cadena al añadir campos o relaciones, como las opciones y el
+orden de las acciones de una minuta. No aplica migraciones ni modifica datos.
+
 Para ejecutar las pruebas de navegador, use una base PostgreSQL local desechable:
 
 ```bash
@@ -16,6 +21,20 @@ E2E_DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e npm run
 
 El runner reinicia esa base antes de cada ejecución y rechaza URLs remotas o
 nombres que no indiquen `e2e`/`test`.
+
+`npm run e2e` conserva la suite de Chromium. `npm run e2e:cross` añade los
+recorridos breves de Firefox y WebKit y es el comando empleado en CI.
+La captura de audio se verifica por separado, con micrófono sintético y el
+servidor compilado, para evitar recargas de desarrollo durante la grabación:
+
+```bash
+npm run build
+E2E_DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e npm run e2e:audio
+```
+
+Ese ejecutor conserva los controles de autenticación y CSRF de producción.
+Prepara los ejemplos bajo entorno de prueba y permite almacenamiento local
+únicamente para su Host HTTP de prueba y su base desechable.
 
 Licencia del proyecto: AGPL-3.0-or-later.
 

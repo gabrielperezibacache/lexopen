@@ -54,11 +54,11 @@ jobs:
       ALTAZOR_COMPUTER_ENABLED: "1"
       LEXOPEN_ALTAZOR_TEST_DOCKER: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Read pinned desktop gateway source without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: madkoding/kitties
           ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
@@ -72,6 +72,15 @@ jobs:
         with:
           go-version-file: .tmp/kitties-upstream/go.mod
           cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare real PDF inspection fixture
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/lexopen-file-inspector"
+          "$RUNNER_TEMP/lexopen-file-inspector/bin/python" -m pip install pypdf==6.21.4
+          printf '%s\n' "$RUNNER_TEMP/lexopen-file-inspector/bin" >> "$GITHUB_PATH"
       - name: Verify native Linux container architecture
         run: test "$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')" = "linux/$ALTAZOR_TOOLPACK_ARCH"
         env:
@@ -94,6 +103,8 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - name: Check desktop source packaging offline
+        run: python3 scripts/altazor/prepare-desktop-source.test.py
       - name: Archive public source, build gateway and verify dedicated UID access
         shell: bash
         run: |
@@ -105,16 +116,16 @@ jobs:
           git -C "$upstream" archive HEAD | tar -xf - -C "$source_dir"
           test ! -e "$source_dir/.git"
           printf '%s\n' 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3 > "$source_dir/.lexopen-source-commit"
-          node scripts/altazor/harden-connectors.test.mjs
-          node scripts/altazor/harden-connectors.mjs "$source_dir"
-          (cd "$source_dir" && go test ./internal/chat ./internal/connector -run '^TestLexOpen' -count=1)
+          node scripts/altazor/prepare-gateway-source.test.mjs
+          node scripts/altazor/prepare-gateway-source.mjs "$source_dir"
+          (cd "$source_dir" && go test ./internal/chat ./internal/connector ./internal/gateway ./internal/oauth ./internal/orchestrator ./internal/approvals ./internal/desktop -run '^TestLexOpen' -count=1)
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
           node scripts/altazor/prepare-computer-ci.test.mjs
           node scripts/altazor/prepare-computer-ci.mjs "$source_dir"
           printf 'KITTIES_CI_SOURCE=%s\n' "$source_dir" >> "$GITHUB_ENV"
       - name: Retrieve the same desktop source archive bundled by native installers
         if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: altazor-desktop-source-context
           path: ${{ runner.temp }}/altazor-desktop-source
@@ -143,7 +154,7 @@ jobs:
         env:
           ALTAZOR_TOOLPACK_ARCH: ${{ matrix.architecture }}
       - name: Retain safe fictitious runtime evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.evidence }}
           path: ${{ env.KITTIES_CI_OUTPUT }}/
@@ -170,7 +181,7 @@ jobs:
           test "$(docker image inspect --format '{{.Id}}' "$profile_tag")" = "$KITTIES_CI_IMAGE_ID"
       - name: Retain the desktop verification receipt
         if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: altazor-toolpack-receipt-${{ matrix.architecture }}
           path: ${{ runner.temp }}/altazor-toolpack/*.json
@@ -182,7 +193,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
@@ -209,7 +220,7 @@ jobs:
           pdftotext "$RUNNER_TEMP"/workbench-output/*.pdf "$RUNNER_TEMP/workbench-output/opened.txt"
           test -s "$RUNNER_TEMP/workbench-output/opened.txt"
           node -e 'if(!require("fs").readFileSync(process.argv[1],"utf8").includes("análisis"))process.exit(1)' "$RUNNER_TEMP/workbench-output/opened.txt"
-  build:
+  application:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     services:
@@ -235,13 +246,17 @@ jobs:
       LEXOPEN_RELAX_CSRF: "1"
       LEXOPEN_PDF_REQUIRE_TOOLS: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
       - run: npm ci
       - run: npm ci --prefix desktop
+      - name: Check production dependency advisories
+        run: |
+          npm audit --omit=dev --audit-level=moderate
+          npm audit --prefix desktop --audit-level=moderate
       - run: npx prisma generate
       - name: Local PDF rendering and OCR
         run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
@@ -254,12 +269,78 @@ jobs:
             --to-schema-datamodel prisma/schema.prisma \
             --exit-code
       - run: npm test
+      - name: Check connection setup and OAuth errors
+        run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts src/lib/altazor/connectors/oauth-provider-response.test.ts src/lib/altazor/connectors/oauth-access.test.ts src/lib/altazor/connectors/persistent-oauth.test.ts src/lib/altazor/connectors/github-device.test.ts src/lib/altazor/connectors/desktop-read-policy.test.ts src/lib/assistant/connector-desktop-intent.test.ts src/lib/altazor/computer/activity-detail.test.ts src/lib/altazor/computer/file-read-capability.test.ts src/lib/altazor/computer/approval-continuation.test.ts src/lib/altazor/computer/approval-task.test.ts src/lib/altazor/computer/presentation.test.ts src/lib/altazor/computer/file-metadata-task.test.ts
+      - name: Check verified downloads and connection availability
+        run: node --import tsx --test src/lib/altazor/computer/file-task.test.ts src/lib/altazor/computer/file-receipt.test.ts src/lib/altazor/computer/public-cloud-oauth.test.ts src/lib/altazor/connectors/availability.test.ts src/lib/altazor/connectors/operation-safety.test.ts src/lib/altazor/connectors/microsoft-oauth.test.ts src/lib/altazor/connectors/cloud-oauth.test.ts src/components/altazor/pane-location.test.ts src/lib/altazor/computer/authorization-policy.test.ts src/lib/altazor/computer/computer-use-approval.test.ts
+      - name: Check desktop authorizations and verified-file transactions
+        run: node --import tsx src/lib/altazor/computer/authorization.integration.test.ts && node --import tsx src/lib/altazor/computer/staged-files.integration.test.ts && node --import tsx src/lib/altazor/computer/approval-continuation.integration.test.ts
       - run: npm run test:integration
       - run: npm run lint
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:pjud:browser
-      - run: npm run e2e
+      - name: Retain the exact compiled application for browser jobs
+        uses: actions/upload-artifact@v7
+        with:
+          name: application-build-${{ github.run_id }}
+          path: |
+            .next
+            !.next/cache/**
+            !.next/dev/**
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+  browser-general:
+    name: General browser ${{ matrix.shard }}/4
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    uses: ./.github/workflows/browser-check.yml
+    with:
+      project: chromium
+      shard-index: ${{ matrix.shard }}
+      shard-total: 4
+  browser-cross:
+    name: Compiled ${{ matrix.browser }}
+    needs: application
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    uses: ./.github/workflows/browser-check.yml
+    with:
+      project: ${{ matrix.browser }}
+      compiled: true
+  browser-audio:
+    name: Compiled native audio
+    needs: application
+    uses: ./.github/workflows/browser-check.yml
+    with:
+      project: chromium-audio
+      compiled: true
+  build:
+    name: build
+    if: ${{ always() }}
+    needs: [application, browser-general, browser-cross, browser-audio, altazor-computer-runtime, workbench-runtime]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require every application, browser and runtime check
         env:
-          CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
-          CODEX_DATA_DIR: /tmp/lexopen-codex-e2e
+          CHECK_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node - <<'JS'
+          const checks = JSON.parse(process.env.CHECK_RESULTS);
+          const required = ['application', 'browser-general', 'browser-cross', 'browser-audio', 'altazor-computer-runtime', 'workbench-runtime'];
+          const failed = required.filter(name => checks[name]?.result !== 'success');
+          if (failed.length) {
+            console.error('Required checks did not pass:', failed.join(', '));
+            process.exit(1);
+          }
+          console.log('Every required application, browser and runtime check passed.');
+          JS

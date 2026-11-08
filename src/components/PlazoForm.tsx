@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
-import { labelDiasRestantes, labelUrgencia } from "@/lib/plazos";
+import { labelDiasRestantes, labelUrgencia, MAX_DIAS_PLAZO } from "@/lib/plazos";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 
 type Option = { id: string; label: string };
@@ -126,6 +126,7 @@ export function PlazoForm({
       onSubmit={onSubmit}
       className="panel grid grid-cols-1 gap-4 rounded-[var(--radius-lg)] p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
+      <p className="text-sm text-[var(--muted)] sm:col-span-2 lg:col-span-4">El cálculo automático estima fechas internas para Chile y requiere revisar el régimen del procedimiento. Para otros países, indique una fecha límite revisada manualmente.</p>
       <div className="sm:col-span-2">
         <label htmlFor={`${fieldId}-titulo`} className="mb-2 block text-sm font-medium">Título</label>
         <input id={`${fieldId}-titulo`}
@@ -179,6 +180,7 @@ export function PlazoForm({
           className="input"
           type="number"
           min="1"
+          max={MAX_DIAS_PLAZO}
           name="diasPlazo"
           placeholder="5"
           value={diasPlazo}

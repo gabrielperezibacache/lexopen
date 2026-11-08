@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { calendarSubscriptionBasePath } from "./src/lib/altazor/calendar-feed-policy";
 import { buildSecurityHeaders } from "./src/lib/security/headers";
 
 // CSP is applied per-request from src/proxy.ts with a fresh nonce.
@@ -14,10 +15,16 @@ for (const directory of [process.env.CODEX_DATA_DIR, process.env.LEXOPEN_DATA_DI
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Eight MiB originals need room for base64; the upload route enforces this
+  // same 12 MiB bound for declared and chunked JSON bodies.
+  experimental: { proxyClientMaxBodySize: 12 * 1024 * 1024 },
   outputFileTracingExcludes: { "/*": privateRuntimePaths },
   /* Hide the floating "N" Next.js Dev Tools badge in development.
      Compile/runtime errors still surface via the error overlay. */
   devIndicators: false,
+  logging: {
+    incomingRequests: { ignore: [/\/api\/altazor\/academic\/calendar-subscriptions\//] },
+  },
   serverExternalPackages: [
     "@firecrawl/anydoc",
     "@firecrawl/pdf-inspector",
@@ -28,8 +35,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }],
+      },
+      {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        source: `${calendarSubscriptionBasePath}/:path*`,
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
     ];
   },

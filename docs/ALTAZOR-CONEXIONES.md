@@ -11,21 +11,23 @@ La revisión `1.1.0-preview.5` incorpora [Drive personal y sincronización de ca
 
 ## Conectar una aplicación
 
-1. Abra **Configuración → Preferencias personales → Altazor → Conexiones y secretos** y elija Google Workspace, GitHub o Dropbox. Una tarjeta del catálogo no concede acceso a una cuenta.
-2. Pulse **Conectar**, revise el acceso solicitado e inicie sesión personalmente en la página oficial. Contraseñas y códigos se introducen allí; no se envían al chat.
+1. Abra **Configuración → Conexiones e IA → Cuentas conectadas** y elija **Google Workspace** o **GitHub**. Para Dropbox, abra **Todas las conexiones y secretos**.
+2. Revise el acceso solicitado y elija iniciar sesión. Introduzca la contraseña y los códigos en la página oficial del servicio.
 3. Vuelva a LexOpen para comprobar el resultado. La conexión sólo se muestra confirmada cuando la autorización y la comprobación del servicio terminaron correctamente. Una denegación o interrupción no se presenta como conexión exitosa.
 4. Al crear un escritorio, elija expresamente las conexiones que podrá usar. Una selección vacía significa ninguna. La selección queda fijada a esa sesión; cambiar la configuración requiere cerrar las sesiones activas o inciertas.
 5. En el escritorio, revise cada solicitud pendiente: aplicación, operación, destino y contenido. Autorice o rechace esa operación concreta. La decisión no concede permiso permanente.
 
 El gateway reforzado exige confirmación incluso para lecturas. El modelo no puede modificar esas reglas. Los permisos concedidos mediante OAuth pueden ser más amplios que una tarea; la revisión por operación limita el uso desde LexOpen, pero no reduce los permisos de la cuenta en el proveedor. Una respuesta incierta se conserva y no se reenvía automáticamente.
 
-El administrador prepara una vez la aplicación OAuth del servicio y el escritorio dedicado. Si falta esa preparación, el profesional ve un estado pendiente de activación; no debe crear claves para realizar su trabajo. Otros adaptadores pueden requerir configuración particular. Sus campos técnicos y la alternativa de tokens se encuentran en **Opciones avanzadas**.
+Google y GitHub muestran únicamente el ingreso a la cuenta y su estado. El profesional no necesita crear claves, registrar aplicaciones ni abrir consolas. La preparación técnica de una instalación propia corresponde al administrador, en **Configuración**; otros adaptadores pueden requerir datos particulares.
 
-La conexión personal de Google de ALTAZOR es distinta de **Google del estudio**: no reutiliza esa cuenta global ni sus autorizaciones de correo y calendario. El ingreso sencillo solicita sólo lectura de metadatos de Drive; GitHub solicita lectura de perfil y consulta de repositorios públicos. No acredita acceso a repositorios privados, Gmail, Calendar ni contenido de documentos.
+Los instaladores admiten una identidad pública de LexOpen preparada por quien los distribuye. Google se abre en el navegador del usuario y LexOpen recoge el resultado en su ventana original. GitHub puede pedir un código breve en su página oficial. Después se comprueba y conserva la conexión. La [preparación del perfil de distribución](ALTAZOR-PERFIL-PUBLICO-DE-CONEXIONES.md) es una tarea única del publicador, con requisitos de los proveedores; este soporte no acredita que los instaladores publicados ya incluyan esa identidad.
+
+La conexión personal de Google de Altazor es distinta de **Google del estudio**: no reutiliza esa cuenta global ni sus autorizaciones de correo y calendario. El acceso básico consulta metadatos de Drive; trabajar con documentos requiere autorizar su contenido de lectura. GitHub permite consultar el perfil y repositorios públicos. Estas conexiones no habilitan repositorios privados, Gmail, Calendar ni escrituras.
 
 ### Inicio de sesión sencillo
 
-La preparación corresponde al administrador del Host, una sola vez por despliegue. En **Preparación del administrador**, abra el registro oficial del servicio y guarde el identificador y secreto en los campos reservados. Se conservan cifrados y no vuelven a mostrarse; los profesionales no necesitan introducirlos. Como alternativa de despliegue, pueden configurarse estas variables reservadas del servidor, que tienen prioridad:
+Una instalación que utilice un registro propio conserva la preparación administrativa, una vez por Host. En Configuración, abra la guía de preparación del servicio, copie la dirección de retorno y regístrela en la consola oficial. Guarde el identificador y secreto de la aplicación en los campos reservados. LexOpen cifra estos datos. Cada profesional pasa directamente al ingreso oficial una vez preparada la aplicación y habilitado su escritorio. También se admiten las siguientes variables del servidor, que tienen prioridad.
 
 | Servicio | Configuración del servidor |
 | --- | --- |
@@ -35,15 +37,21 @@ La preparación corresponde al administrador del Host, una sola vez por desplieg
 
 El retorno autorizado es el origen configurado de LexOpen seguido de `/api/altazor/connectors/oauth/callback`. Registre ese retorno exactamente en el proveedor. No añada contraseñas ni tokens a la URL. En un Host local, utilice su dirección loopback; una instalación publicada debe tener su propio registro y configuración autorizados por el proveedor.
 
-Cada inicio vincula la autorización al profesional, a su sesión de LexOpen y al espacio elegido, con un plazo y uso único. El proveedor entrega la autorización al servidor, que la comprueba y la guarda expresamente en el gateway dedicado. El retorno al navegador contiene únicamente el identificador del intento. Google y Dropbox conceden autorizaciones temporales. Al caducar, la persona puede volver a conectar desde el mismo apartado.
+Cada inicio vincula la autorización al profesional, a su sesión de LexOpen y al espacio elegido, con un plazo y uso único. El proveedor entrega la autorización al servidor, que la comprueba y la guarda expresamente en el gateway dedicado. El retorno al navegador contiene únicamente el identificador del intento.
+
+**Conexiones guardadas:** Google y Dropbox se autorizan con renovación automática. El gateway conserva la credencial de renovación fuera del chat y de los archivos del escritorio y obtiene un acceso nuevo cuando es necesario, también después de reiniciarse. No hay que iniciar sesión de nuevo al abrir LexOpen ni cada vez que vence un acceso temporal. GitHub conserva su autorización ya guardada; esta actualización no obliga a reemplazar una conexión válida. Las conexiones temporales anteriores de Google o Dropbox necesitan una sola autorización adicional desde **Mantener conexión** o **Conectar**. Desconectar o revocar el permiso en el proveedor pone fin al acceso.
+
+Un fallo de red conserva la conexión y ofrece **Comprobar conexión**. La autorización interactiva sólo vuelve a solicitarse cuando hace falta: por ejemplo, revocación, cambio de cuenta o de permisos, o una exigencia del proveedor. No se oculta ni se evita su verificación.
+
+**Preparación de Google para uso continuo:** el proyecto debe salir del modo Prueba. Google limita a siete días las credenciales de renovación para Drive de aplicaciones externas en Prueba. La consola exige completar la página pública de la aplicación y su política de privacidad antes de habilitar Producción. El registro puede requerir además verificación de Google según sus permisos y público. [Documentación oficial sobre duración y revocación](https://developers.google.com/identity/protocols/oauth2#expiration). La renovación automática evita ingresos repetidos por la caducidad del acceso; no promete una autorización irrevocable.
 
 Para habilitar **Dropbox**, prepare una aplicación en la consola oficial con permisos `account_info.read`, `files.metadata.read` y `files.content.read`. Puede limitar el acceso de la aplicación a su propia carpeta de Dropbox. Actualice el escritorio de Altazor para disponer de las operaciones de listado, búsqueda y lectura de archivos de hasta 4 MiB. Cada consulta requiere confirmación. Los usuarios inician sesión desde **Conectar Dropbox**. [Guía oficial de autorización de Dropbox](https://docs.dropboxapi.com/dropbox-api/docs/get-started/authorization).
 
 Registrar una aplicación no conecta las cuentas del estudio ni de sus profesionales. Cada persona debe conceder su propia autorización. Si el Host no tiene la aplicación preparada, el botón informa del requisito administrativo; no simula un ingreso exitoso.
 
-### Opciones avanzadas: prueba con tokens
+### Pruebas técnicas anteriores con tokens
 
-La alternativa de tokens es opcional para operadores y pruebas técnicas. El recorrido habitual del profesional es **Conectar → ingreso oficial → volver a LexOpen**. Iniciar sesión en una pestaña por separado no configura automáticamente la conexión API.
+Las siguientes modalidades documentan pruebas técnicas anteriores. Los formularios de tokens de Google y GitHub se retiraron del catálogo habitual. El recorrido del profesional es **Conectar → ingreso oficial → volver a LexOpen**. Iniciar sesión en una pestaña por separado no configura automáticamente la conexión API.
 
 - **Google Workspace:** en [OAuth Playground de Google](https://developers.google.com/oauthplayground/), use acceso **Online** y el único alcance `https://www.googleapis.com/auth/drive.metadata.readonly`. Inicie sesión personalmente, intercambie el código y pegue sólo el access token en el campo reservado. Esta modalidad temporal bloquea escrituras y comprueba `Drive about` con `fields=user(permissionId)`; no comprueba Gmail ni acceso al contenido de documentos. Caduca según Google y no se renueva automáticamente. Requiere reconstruir el gateway con el refuerzo que añade el campo `token`.
 - **GitHub:** cree un [token fine-grained](https://github.com/settings/personal-access-tokens/new) de un día, con acceso sólo al repositorio elegido y `Contents: Read-only`; `Metadata` se incluye. La comprobación consulta `/user`. Leer un README requiere además el permiso de contenido del repositorio.
@@ -103,11 +111,23 @@ Proteja directorios y respaldos del gateway con una cuenta de sistema dedicada y
 
 ### Construir el gateway reforzado
 
-La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). Ese flujo prepara una copia limpia, verifica la revisión, aplica el refuerzo de LexOpen y ejecuta sus pruebas antes de compilar. Si ya hay un paquete publicado para tu versión y arquitectura, sigue la [preparación del escritorio](ESCRITORIO-ALTAZOR.md).
+La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). La [receta única del gateway](../scripts/altazor/prepare-gateway-source.mjs) aplica los diecisiete refuerzos ordenados hasta `gateway.15`, con sus pruebas de scripts y los pasos de formato necesarios entre etapas. Incluye las conexiones persistentes, las descargas verificadas, las autorizaciones del computador, la creación inicial de cuentas autorizadas y el enfoque nativo de archivos de las cuatro cuentas seleccionadas, los metadatos tipados y parciales de Dropbox y OneDrive y la renovación persistente de GitHub con el permiso `read:user`. CI y la compilación manual deben usar esa misma receta.
 
 Para compilar manualmente, reproduce esos pasos en directorios nuevos, sin archivos ni credenciales del usuario. El refuerzo valida las huellas de la revisión, desactiva los cambios de permisos solicitados por el modelo y exige confirmación por operación. No lo apliques sobre los datos de una instalación existente.
 
+Después de archivar la revisión pública y crear su marcador `.lexopen-source-commit` como indica CI, ejecuta:
+
+```sh
+node scripts/altazor/prepare-gateway-source.mjs /ruta/al/codigo-publico-archivado
+```
+
+Necesita Node.js y `gofmt` de la versión de Go fijada en CI. `LEXOPEN_GOFMT` permite indicar la ruta de ese ejecutable. La receta prepara sólo el código: no compila ni instala un servicio, no crea credenciales ni cambia una instancia existente. Ante un error se detiene sin reintentar; conserva la copia para el diagnóstico y utiliza otra copia limpia al corregirlo. Las pruebas Go y la compilación se ejecutan después, como en CI.
+
+El instalador actual prepara automáticamente **la imagen de herramientas** (ofimática, OCR, PDF y audio). El gateway dedicado y su configuración por profesional se instalan por separado. Descargar esa imagen o completar esta receta no acredita que el servicio esté instalado ni conectado. Comprueba su respuesta de salud y la conexión desde LexOpen.
+
 La respuesta de salud de la compilación reforzada debe incluir `lexopen_connector_gate: "v1"` y `lexopen_connector_platform` con su sistema real. LexOpen exige esa capacidad antes de habilitar conexiones; un gateway sin el refuerzo puede seguir ofreciendo el escritorio sin conectores. El indicador es una capacidad del ejecutable administrado localmente, no una certificación externa.
+
+Para recibir encargos también necesita `lexopen_async_messages: "v1"`. LexOpen usa un identificador persistido por encargo y exige un recibo HTTP 202 con ese mismo identificador y el chat correspondiente. El escritorio guarda el encargo y permite cancelarlo antes de consultar al modelo. Una repetición del mismo identificador conserva el recibo sin ejecutar otra vez; tras reiniciar, los trabajos interrumpidos quedan registrados y no se reanudan solos. La aceptación confirma la recepción, no la terminación del trabajo, que se consulta en su actividad. Un gateway anterior puede seguir consultándose o deteniéndose, pero no recibe tareas mediante el antiguo envío síncrono.
 
 Prepara la imagen y una configuración nueva siguiendo la [guía del escritorio](ESCRITORIO-ALTAZOR.md). Usa un motor local disponible, directorios dedicados, una dirección local, puerto propio y autorización independiente. Revisa los registros del servicio antes de compartirlos: su salida puede contener datos de acceso.
 

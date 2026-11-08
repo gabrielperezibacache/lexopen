@@ -1,22 +1,42 @@
 .root { min-width: 0; padding-block: 1.25rem; border-block: 1px solid var(--line); margin-block: 1.5rem; }
-.root h4 { font-size: var(--text-lg); font-weight: 650; line-height: 1.4; margin: 0 0 .75rem; }
+.root h4 { font-family: var(--font-fraunces), Georgia, serif; font-size: var(--text-lg); font-weight: 500; line-height: 1.4; margin: 0 0 .75rem; }
 .root p { max-width: 70ch; margin: .65rem 0; line-height: 1.7; overflow-wrap: anywhere; }
 .root a { color: var(--sea); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-top: 1.25rem; }
-.root button, .root .admin > a { min-height: 44px; max-width: 100%; }
-.root .primary { background: var(--ink); color: var(--surface-solid); border-color: var(--ink); }
+.root button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; max-width: 100%; padding: .65rem .9rem; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-solid); color: var(--ink); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.root button:hover:not(:disabled) { background: var(--mist); }
+.root button:disabled { opacity: .5; cursor: not-allowed; }
+.root .hint { color: var(--muted); font-size: var(--text-sm); }
+.root button.primary { background: var(--action-bg); color: var(--action-ink); border-color: var(--action-bg); }
+.root button.primary:hover:not(:disabled) { background: var(--action-hover); border-color: var(--action-hover); }
 .root button:focus-visible, .root a:focus-visible, .root input:focus-visible, .root summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
 .error { color: var(--danger); }.notice, .connected { color: var(--sea); }
 .connected { display: flex; align-items: start; gap: .6rem; }.connected svg { flex: 0 0 auto; margin-top: .2rem; }
+.management { margin-top: 1.25rem; }
+.management > summary { display: flex; align-items: center; gap: .6rem; min-height: 44px; color: var(--sea); cursor: pointer; font-size: var(--text-sm); }
+.management > summary::after { content: ""; inline-size: .45rem; block-size: .45rem; border-block-end: 1px solid currentColor; border-inline-end: 1px solid currentColor; transform: rotate(45deg); }
+.management[open] > summary::after { transform: rotate(225deg); }
+.management > button { margin-block: .5rem; }
 .disconnect { display: grid; justify-items: start; gap: .75rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .root .disconnect > label.disconnectLabel { display: flex; align-items: start; gap: .65rem; font-size: 1rem; font-weight: 400; line-height: 1.65; }
 .disconnect input { flex: 0 0 auto; width: 18px; height: 18px; margin-top: .2rem; accent-color: var(--sea); }
-.admin { margin-top: 1.25rem; }.admin summary { cursor: pointer; min-height: 44px; padding-block: .65rem; }
-.root .admin > a { display: inline-flex; align-items: center; gap: .4rem; }
-.setup { padding-top: .5rem; }.setup code { overflow-wrap: anywhere; }
+.admin { margin-top: 1.25rem; border-top: 1px solid var(--line); }
+.admin summary { cursor: pointer; min-height: 44px; padding-block: .65rem; font-weight: 600; }
+.setup { padding-bottom: .5rem; }
 .setup > button { margin-top: .75rem; }
+.setupSteps { list-style: decimal; padding-inline-start: 1.5rem; margin-block: 1.25rem; }
+.setupSteps li { padding: .9rem 0; }
+.setupSteps li + li { border-top: 1px solid var(--line); }
+.setupSteps li::marker { color: var(--sea); font-weight: 600; }
+.root .setupSteps a { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; }
+.setupSteps a svg, .setupLinks a svg { flex: none; }
+.callback { display: block; margin-block: .75rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow-wrap: anywhere; user-select: all; }
 .setupLinks { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-block: 1rem; }.root .setupLinks a { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; }
-.setupForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.setupForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: .8rem; }
 .root .setupForm label { display: grid; gap: .5rem; min-width: 0; font-size: 1rem; }.root .setupForm input { width: 100%; min-width: 0; min-height: 46px; font-size: 1rem; }
 .setupForm > p, .setupForm > button { grid-column: 1 / -1; justify-self: start; }
-@media (max-width: 600px) { .root p, .root .disconnect > label { font-size: 1rem; }.actions { align-items: stretch; }.actions > button { flex: 1 1 auto; }.admin > a { flex-wrap: wrap; }.setupForm { grid-template-columns: minmax(0, 1fr); } }
+.device { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: 1rem; margin-block: 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.device > p { flex-basis: 100%; margin: 0; }
+.device > code { font-size: var(--text-lg); letter-spacing: .12em; user-select: all; }
+.device > a { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; }
+@media (max-width: 600px) { .root p, .root .disconnect > label { font-size: 1rem; }.actions { align-items: stretch; }.actions > button { flex: 1 1 auto; }.setupForm { grid-template-columns: minmax(0, 1fr); } }

@@ -109,10 +109,10 @@ export function resolveDeliveries(opts: {
   }));
 
   if (!def.apagable && opts.destinos.length && chosen.every((c) => c.modo === "off")) {
-    const fallback = [...opts.destinos].sort(
+    const fallback = opts.destinos.filter(destino => destino.canal !== "whatsapp").sort(
       (a, b) => EXTERNAL_CHANNELS.indexOf(a.canal) - EXTERNAL_CHANNELS.indexOf(b.canal)
     )[0];
-    for (const c of chosen) if (c.destino.canal === fallback.canal) c.modo = "realtime";
+    for (const c of chosen) if (c.destino.canal === fallback?.canal) c.modo = "realtime";
   }
 
   const out: Delivery[] = [];

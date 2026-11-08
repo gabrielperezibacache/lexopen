@@ -5,7 +5,7 @@ import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { putObject } from "../src/lib/storage";
-import { loginAs } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Preparation browser fixtures require local storage");
@@ -60,11 +60,12 @@ test.afterAll(async () => {
 test("preparación integrada: índice, hoja con citas, incertidumbre y permisos al descargar", async ({ page }, info) => {
   test.setTimeout(150_000);
   await loginAs(page, email);
+  await authenticateApiRequests(page);
   for (const id of documentIds) {
-    const response = await page.request.post(`/api/documentos/${id}/evidence`);
+    const response = await apiRequest(page).post(`/api/documentos/${id}/evidence`);
     expect(response.status(), await response.text()).toBe(201);
   }
-  const analyzed = await page.request.post(`/api/causas/${causaId}/knowledge/analyze`, { data: {} });
+  const analyzed = await apiRequest(page).post(`/api/causas/${causaId}/knowledge/analyze`, { data: {} });
   expect(analyzed.ok(), await analyzed.text()).toBeTruthy();
   expect((await analyzed.json()).newFacts).toBeGreaterThan(0);
   await page.emulateMedia({ reducedMotion: "reduce" });

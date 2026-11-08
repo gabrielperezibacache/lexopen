@@ -1,0 +1,401 @@
+{
+  "result": [
+    {
+      "route": "clientes",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "clientes-light-desktop.png",
+      "heading": "Clientes",
+      "overflow": false
+    },
+    {
+      "route": "clientes",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "clientes-light-mobile.png",
+      "heading": "Clientes",
+      "overflow": false
+    },
+    {
+      "route": "clientes",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "clientes-dark-desktop.png",
+      "heading": "Clientes",
+      "overflow": false
+    },
+    {
+      "route": "clientes",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "clientes-dark-mobile.png",
+      "heading": "Clientes",
+      "overflow": false
+    },
+    {
+      "route": "documentos",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "documentos-light-desktop.png",
+      "heading": "Documentos",
+      "overflow": false
+    },
+    {
+      "route": "documentos",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "documentos-light-mobile.png",
+      "heading": "Documentos",
+      "overflow": false
+    },
+    {
+      "route": "documentos",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "documentos-dark-desktop.png",
+      "heading": "Documentos",
+      "overflow": false
+    },
+    {
+      "route": "documentos",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "documentos-dark-mobile.png",
+      "heading": "Documentos",
+      "overflow": false
+    },
+    {
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "mis-causas-light-desktop.png",
+      "heading": "Mis Causas",
+      "overflow": false
+    },
+    {
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "mis-causas-light-mobile.png",
+      "heading": "Mis Causas",
+      "overflow": false
+    },
+    {
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "mis-causas-dark-desktop.png",
+      "heading": "Mis Causas",
+      "overflow": false
+    },
+    {
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "mis-causas-dark-mobile.png",
+      "heading": "Mis Causas",
+      "overflow": false
+    },
+    {
+      "route": "facturacion",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "facturacion-light-desktop.png",
+      "heading": "Facturación",
+      "overflow": false
+    },
+    {
+      "route": "facturacion",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "facturacion-light-mobile.png",
+      "heading": "Facturación",
+      "overflow": false
+    },
+    {
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "facturacion-dark-desktop.png",
+      "heading": "Facturación",
+      "overflow": false
+    },
+    {
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "facturacion-dark-mobile.png",
+      "heading": "Facturación",
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "configuracion-light-desktop.png",
+      "heading": "Configuración del estudio",
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "configuracion-light-mobile.png",
+      "heading": "Configuración del estudio",
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "configuracion-dark-desktop.png",
+      "heading": "Configuración del estudio",
+      "overflow": false
+    },
+    {
+      "route": "configuracion",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "configuracion-dark-mobile.png",
+      "heading": "Configuración del estudio",
+      "overflow": false
+    },
+    {
+      "route": "tareas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "tareas-light-desktop.png",
+      "heading": "Tareas",
+      "overflow": false
+    },
+    {
+      "route": "tareas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "tareas-light-mobile.png",
+      "heading": "Tareas",
+      "overflow": false
+    },
+    {
+      "route": "tareas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "tareas-dark-desktop.png",
+      "heading": "Tareas",
+      "overflow": false
+    },
+    {
+      "route": "tareas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "tareas-dark-mobile.png",
+      "heading": "Tareas",
+      "overflow": false
+    },
+    {
+      "route": "academico",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "academico-light-desktop.png",
+      "heading": "Académico",
+      "overflow": false
+    },
+    {
+      "route": "academico",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "academico-light-mobile.png",
+      "heading": "Académico",
+      "overflow": false
+    },
+    {
+      "route": "academico",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "academico-dark-desktop.png",
+      "heading": "Académico",
+      "overflow": false
+    },
+    {
+      "route": "academico",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "academico-dark-mobile.png",
+      "heading": "Académico",
+      "overflow": false
+    },
+    {
+      "route": "sincronizacion",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "sincronizacion-light-desktop.png",
+      "heading": "Archivos conectados",
+      "overflow": false
+    },
+    {
+      "route": "sincronizacion",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "sincronizacion-light-mobile.png",
+      "heading": "Archivos conectados",
+      "overflow": false
+    },
+    {
+      "route": "sincronizacion",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "sincronizacion-dark-desktop.png",
+      "heading": "Archivos conectados",
+      "overflow": false
+    },
+    {
+      "route": "sincronizacion",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "sincronizacion-dark-mobile.png",
+      "heading": "Archivos conectados",
+      "overflow": false
+    },
+    {
+      "route": "personas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "personas-light-desktop.png",
+      "heading": "Personas",
+      "overflow": false
+    },
+    {
+      "route": "personas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "personas-light-mobile.png",
+      "heading": "Personas",
+      "overflow": false
+    },
+    {
+      "route": "personas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "personas-dark-desktop.png",
+      "heading": "Personas",
+      "overflow": false
+    },
+    {
+      "route": "personas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "personas-dark-mobile.png",
+      "heading": "Personas",
+      "overflow": false
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "plazos-light-desktop.png",
+      "heading": "Plazos",
+      "overflow": false
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "plazos-light-mobile.png",
+      "heading": "Plazos",
+      "overflow": false
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "plazos-dark-desktop.png",
+      "heading": "Plazos",
+      "overflow": false
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "plazos-dark-mobile.png",
+      "heading": "Plazos",
+      "overflow": false
+    },
+    {
+      "route": "jurisprudencia",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "file": "jurisprudencia-light-desktop.png",
+      "heading": "Jurisprudencia",
+      "overflow": false
+    },
+    {
+      "route": "jurisprudencia",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "file": "jurisprudencia-light-mobile.png",
+      "heading": "Jurisprudencia",
+      "overflow": false
+    },
+    {
+      "route": "jurisprudencia",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "file": "jurisprudencia-dark-desktop.png",
+      "heading": "Jurisprudencia",
+      "overflow": false
+    },
+    {
+      "route": "jurisprudencia",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "file": "jurisprudencia-dark-mobile.png",
+      "heading": "Jurisprudencia",
+      "overflow": false
+    }
+  ],
+  "errors": []
+}

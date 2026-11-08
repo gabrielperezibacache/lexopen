@@ -17,6 +17,7 @@ files:
   - backup.cjs
   - preload.cjs
   - config.cjs
+  - oauth-clients.cjs
   - external-url.cjs
   - media-permissions.cjs
   - update-policy.cjs
@@ -38,6 +39,7 @@ asarUnpack:
   - "node_modules/**/*"
   - host-runtime.mjs
   - config.cjs
+  - oauth-clients.cjs
   - package.json
 mac:
   category: public.app-category.business

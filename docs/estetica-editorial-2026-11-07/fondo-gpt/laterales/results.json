@@ -1,0 +1,139 @@
+{
+  "results": [
+    {
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.48",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "buscar",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.38",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.48",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "buscar",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "research",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.38",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.48",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "none",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.38",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.48",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "minutas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "writing",
+      "imageLoaded": true,
+      "overflow": false,
+      "sidebarImage": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "backgroundDisplay": "block",
+      "backgroundImage": "url(\"http://127.0.0.1:3187/editorial/generated/filosofo-gpt-v1.webp\")",
+      "backgroundOpacity": "0.38",
+      "backgroundPointerEvents": "none"
+    },
+    {
+      "route": "menu",
+      "theme": "light",
+      "device": "mobile",
+      "image": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "pointerEvents": "none",
+      "opacity": "0.35"
+    },
+    {
+      "route": "menu",
+      "theme": "dark",
+      "device": "mobile",
+      "image": "url(\"http://127.0.0.1:3187/editorial/generated/atenea-gpt-v1.webp\")",
+      "pointerEvents": "none",
+      "opacity": "0.35"
+    },
+    {
+      "route": "sidebar-collapsed",
+      "backgroundDisplay": "none"
+    }
+  ],
+  "errors": [],
+  "backgroundAssetStatus": 200,
+  "sidebarAssetStatus": 200
+}

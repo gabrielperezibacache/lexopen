@@ -10,6 +10,7 @@ import { isAuthorizedCronRequest } from "@/lib/security/cron-paths";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 import { isClientAllowedPath } from "@/lib/auth/client-paths";
+import { calendarSubscriptionBasePath, isCalendarSubscriptionPath } from "@/lib/altazor/calendar-feed-policy";
 import { PORTAL_ROLES, VALID_ROLE_SET } from "@/lib/auth/roles";
 import {
   isTwoFactorExemptPath,
@@ -23,6 +24,9 @@ const CSRF_COOKIE = "lexopen_csrf";
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/offline.html",
+  "/api/notify/whatsapp/webhook/meta",
+  "/api/notify/whatsapp/webhook/twilio",
   "/setup",
   "/recovery",
   "/api/auth/login",
@@ -176,7 +180,9 @@ function withSecurityHeaders(
     nonce,
     isDev: process.env.NODE_ENV === "development",
   });
-  res.headers.set("Content-Security-Policy", csp);
+  // The public offline document contains only external, same-origin modules.
+  // Its cached HTML cannot carry a per-request nonce.
+  res.headers.set("Content-Security-Policy", req.nextUrl.pathname === "/offline.html" ? csp.replace(/script-src [^;]+/, "script-src 'self'") : csp);
   res.headers.set("x-request-id", requestId);
   if (!req.cookies.get(CSRF_COOKIE)?.value) {
     res.cookies.set(CSRF_COOKIE, newEdgeCsrfToken(), {
@@ -231,6 +237,16 @@ function migrateQueryToken(req: NextRequest, nonce: string, requestId: string) {
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Calendar clients use a bearer capability instead of a browser session.
+  // Let only the exact read route through without attaching pathname or cookies.
+  if (pathname.startsWith(`${calendarSubscriptionBasePath}/`)) {
+    if ((req.method === "GET" || req.method === "HEAD") && isCalendarSubscriptionPath(pathname)) {
+      return NextResponse.next();
+    }
+    return new NextResponse(null, { status: 404, headers: {
+      "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer",
+    } });
+  }
   const nonce = newCspNonce();
   const requestId =
     req.headers.get("x-request-id")?.trim() || newRequestId();
@@ -261,7 +277,7 @@ export async function proxy(req: NextRequest) {
 
   // OAuth callbacks validate one-use state. Account activation remains session-bound.
   if (pathname === "/api/integrations/google/callback" ||
-      req.method === "GET" && ["/api/personal-connectors/linkedin/oauth/callback", "/api/personal-connectors/google-drive/oauth/callback"].includes(pathname)) {
+      req.method === "GET" && ["/api/personal-connectors/linkedin/oauth/callback", "/api/personal-connectors/google-drive/oauth/callback", "/api/altazor/connectors/oauth/callback"].includes(pathname)) {
     return pass();
   }
 

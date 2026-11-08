@@ -12,11 +12,33 @@
 .heading h2 { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
 .heading p { margin: .16rem 0 0; font-size: .8125rem; line-height: 1.45; color: var(--ink-soft); }
 .header button { flex-shrink: 0; min-height: 44px; }
+.progress { padding: 0 .85rem .75rem; color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.progress p { margin: .2rem 0 0; }
+.progress strong { color: var(--ink); font-weight: 500; }
+.step { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem 1rem; }
+.step time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .screen { position: relative; background: var(--night, var(--surface)); border-top: 1px solid var(--line); }
 .live { position: absolute; inset-block-start: .55rem; inset-inline-start: .55rem; border-radius: var(--radius-sm); background: var(--surface-solid); color: var(--ink); font-size: var(--text-sm); padding: .2rem .5rem; }
 .screen img { display: block; width: 100%; height: auto; max-height: 32rem; object-fit: contain; }
+.files { min-width: 0; padding: .9rem; color: var(--ink-soft); border-top: 1px solid var(--line); font-size: var(--text-sm); line-height: 1.6; }
+.files h3 { display: flex; align-items: center; gap: .5rem; margin: 0 0 .6rem; color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+.files h3 svg { flex: none; color: var(--sea); }
+.files ul { margin: 0; padding: 0; list-style: none; }
+.files li { min-width: 0; overflow-wrap: anywhere; }
+.files li + li { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+.files p { margin: .15rem 0; }
+.files .fileName { color: var(--ink); font-weight: 600; }
+.firstLine { display: grid; gap: .2rem; padding-block: .4rem; }
+.firstLine span { font-size: .8125rem; color: var(--muted); }
+.firstLine q { white-space: pre-wrap; color: var(--ink); }
+.files details { margin-top: .5rem; }
+.files summary { width: fit-content; cursor: pointer; color: var(--sea); text-decoration: underline; text-underline-offset: .2em; }
+.files dl { margin: .65rem 0 0; }
+.files dt { margin-top: .5rem; color: var(--muted); font-size: .8125rem; }
+.files dd { margin: .1rem 0 0; overflow-wrap: anywhere; }
 
 @media (max-width: 480px) {
   .header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .65rem; row-gap: .4rem; }
   .header button { grid-column: 2; justify-self: start; }
 }
+.consultation { padding: .75rem 0; margin: 0; color: var(--ink); line-height: 1.7; font-size: var(--text-sm); overflow-wrap: anywhere; }

@@ -28,11 +28,12 @@ type Props = {
     clienteId: string | null;
     abogadoId: string | null;
   };
+  expectedUpdatedAt?: string;
   clientes: Option[];
   abogados: Option[];
 };
 
-export function CausaEditForm({ causa, clientes, abogados }: Props) {
+export function CausaEditForm({ causa, clientes, abogados, expectedUpdatedAt }: Props) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,6 +46,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
     const rit = String(fd.get("rit") || "");
     const ruc = String(fd.get("ruc") || "");
     const payload = {
+      expectedUpdatedAt,
       titulo: String(fd.get("titulo") || "").trim(),
       rit: rit || null,
       ruc: ruc || null,

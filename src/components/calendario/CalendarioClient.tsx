@@ -1,17 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { createSubmissionKeys, operationKey } from "@/lib/client-submission-key";
+import { moveEventToDay, toDatetimeLocal } from "@/lib/calendario/form-dates";
+import { addCivilDays, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
 import { ConfirmDialog, formatDateTime } from "@/components/ui";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { EventoForm, type EventoFormDefaults } from "@/components/calendario/EventoForm";
+
+import { useHydrated } from "./useHydrated";
 
 type Option = { id: string; label: string };
 
 export type EventoListItem = {
   id: string;
+  updatedAt?: string;
   titulo: string;
   tipo: string;
   inicio: string; // ISO
@@ -26,23 +32,16 @@ export type EventoListItem = {
   tribunal: string | null;
 };
 
-function toDatetimeLocal(iso: string): string {
-  // `datetime-local` espera hora local sin zona; usamos la del navegador.
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
-    d.getMinutes()
-  )}`;
-}
-
 function toFormDefaults(e: EventoListItem): EventoFormDefaults {
+  const firstDay = e.inicio.slice(0, 10);
+  const lastDay = e.fin && e.todoElDia ? addCivilDays(e.fin.slice(0, 10), -1) : null;
   return {
     id: e.id,
+    expectedUpdatedAt: e.updatedAt,
     titulo: e.titulo,
     tipo: e.tipo,
-    inicio: toDatetimeLocal(e.inicio),
-    fin: e.fin ? toDatetimeLocal(e.fin) : "",
+    inicio: e.todoElDia ? firstDay : toDatetimeLocal(e.inicio),
+    fin: e.todoElDia ? lastDay ? lastDay < firstDay ? firstDay : lastDay : "" : e.fin ? toDatetimeLocal(e.fin) : "",
     todoElDia: e.todoElDia,
     lugar: e.lugar || "",
     modalidad: e.modalidad || "",
@@ -65,6 +64,7 @@ export function CalendarioClient({
   autoOpenNuevo: boolean;
   currentYm: string;
 }) {
+  const hydrated = useHydrated();
   const router = useRouter();
   const { dict, t } = useI18n();
   const [formOpen, setFormOpen] = useState(autoOpenNuevo);
@@ -72,7 +72,13 @@ export function CalendarioClient({
   const [moving, setMoving] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+  const moveKeys = useRef(createSubmissionKeys());
+  const deleteKeys = useRef<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<EventoListItem | null>(null);
+  const [year, month] = currentYm.split("-").map(Number);
+  const exportRange = civilMonthQueryRange(year, month - 1);
+  const exportQuery = new URLSearchParams({ desde: exportRange.start.toISOString(), hasta: exportRange.end.toISOString() });
 
   function openCreate() {
     setEditing(null);
@@ -89,7 +95,8 @@ export function CalendarioClient({
     setEditing(null);
   }
 
-  function onSaved() {
+  function onSaved(conflictWarning?: string | null) {
+    setWarning(conflictWarning || "");
     closeForm();
     router.refresh();
   }
@@ -99,16 +106,15 @@ export function CalendarioClient({
     if (!newDate) return;
     setBusyId(evento.id);
     setError("");
-    const original = new Date(evento.inicio);
-    const [y, m, d] = newDate.split("-").map(Number);
-    const moved = new Date(original);
-    moved.setFullYear(y, m - 1, d);
+    const moved = moveEventToDay(evento.inicio, newDate, evento.todoElDia);
+    if (!moved) { setBusyId(null); setError("Revise el día y la hora del evento"); return; }
+    const payload = { inicio: moved, expectedUpdatedAt: evento.updatedAt };
     const result = await apiMutation<{ conflictWarning?: string | null }>(
       `/api/eventos/${evento.id}`,
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inicio: moved.toISOString() }),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": moveKeys.current.forPayload({ id: evento.id, ...payload }) },
+        body: JSON.stringify(payload),
       }
     );
     setBusyId(null);
@@ -116,6 +122,8 @@ export function CalendarioClient({
       setError(result.error || "No se pudo mover el evento");
       return;
     }
+    moveKeys.current.complete({ id: evento.id, ...payload });
+    setWarning(result.data.conflictWarning || "");
     router.refresh();
   }
 
@@ -124,7 +132,7 @@ export function CalendarioClient({
     const evento = pendingDelete;
     setBusyId(evento.id);
     setError("");
-    const result = await apiMutation(`/api/eventos/${evento.id}`, { method: "DELETE" });
+    const result = await apiMutation(`/api/eventos/${evento.id}`, { method: "DELETE", headers: { "Idempotency-Key": deleteKeys.current[evento.id] ||= operationKey() } });
     setBusyId(null);
     setPendingDelete(null);
     if (!result.ok) {
@@ -141,7 +149,7 @@ export function CalendarioClient({
         <div className="flex flex-wrap gap-2">
           <a
             className="btn btn-ghost"
-            href={`/api/calendario/ics?desde=${currentYm}-01`}
+            href={`/api/calendario/ics?${exportQuery}`}
           >
             Exportar calendario
           </a>
@@ -155,6 +163,7 @@ export function CalendarioClient({
 
       {formOpen && (
         <EventoForm
+          key={editing?.id || "create"}
           causas={causas}
           defaults={editing ? toFormDefaults(editing) : undefined}
           onSaved={onSaved}
@@ -162,12 +171,15 @@ export function CalendarioClient({
         />
       )}
 
+      {warning && <p role="status" className="text-sm text-[var(--warn)]">{warning}</p>}
       {error && <p role="alert" className="text-sm text-[var(--danger)]">{error}</p>}
 
       <div className="space-y-2">
         {eventos.map((e) => (
           <div
             key={e.id}
+            role="group"
+            aria-label={`Evento ${e.titulo}`}
             className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
           >
             <div className="min-w-0">
@@ -175,7 +187,7 @@ export function CalendarioClient({
                 {e.tipo === "audiencia" ? "Audiencia · " : ""}{e.titulo}
               </button>
               <div className="text-xs text-[var(--ink-soft)]/65">
-                {formatDateTime(e.inicio)}
+                {e.todoElDia ? `${formatCivilDate(e.inicio)} · Todo el día` : hydrated ? formatDateTime(e.inicio) : <time dateTime={e.inicio}>…</time>}
                 {e.causaLabel ? (
                   <>
                     {" · "}
@@ -191,6 +203,7 @@ export function CalendarioClient({
             <details className="text-sm">
               <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Opciones</summary>
               <div className="flex flex-wrap items-center gap-2 py-2">
+              <Link className="btn btn-ghost" href={`/offline.html?kind=evento&record=${encodeURIComponent(e.id)}`}>Preparar sin conexión</Link>
               <input
                 type="date"
                 className="input h-9 w-auto py-1 text-xs"

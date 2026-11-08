@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { altazorSourceInputSchema } from "./resource-input";
+import { ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
+import { isWorkCountry } from "@/lib/config/countries";
+import { writingId } from "@/lib/writings/schemas";
+import { isValidYmd } from "@/lib/chile-time";
+import { parseCommitteeDeliverableHref } from "./committee-deliverables";
+export const ACADEMIC_WORKSPACE_LIMIT = 100;
+export const ACADEMIC_MANUSCRIPT_MAX = 100000;
 export const ACADEMIC_MODES = ["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "academic_writing", "translation", "abstract", "peer_review", "syllabus", "rubric", "teaching_material", "cv"] as const;
 export const academicModeSchema = z.enum(ACADEMIC_MODES);
 export type AcademicMode = z.infer<typeof academicModeSchema>;
@@ -8,7 +15,125 @@ const requestId = z.string().min(10).max(120).regex(/^[a-zA-Z0-9-]+$/);
 const revision = z.number().int().positive();
 export const academicProfileSchema = z.object({ name: z.string().trim().max(180), headline: z.string().trim().max(300).default(""), orcid: z.string().regex(/^(?:\d{4}-\d{4}-\d{4}-\d{3}[\dX])?$/).default(""), biography: z.string().max(12000).default(""), education: z.string().max(12000).default(""), experience: z.string().max(12000).default(""), publications: z.string().max(20000).default(""), languages: z.string().max(1000).default(""), interests: z.string().max(2000).default("") }).strict();
 export const academicProfileSaveSchema = z.object({ expectedRevision: z.number().int().nonnegative(), profile: academicProfileSchema }).strict();
-const brief = z.object({ objective: z.string().max(8000).default(""), audience: z.string().max(1000).default(""), language: z.string().max(80).default("Español"), duration: z.string().max(100).default(""), learningOutcomes: z.string().max(6000).default(""), evaluation: z.string().max(6000).default(""), task: academicModeSchema.default("literature_review") }).strict();
+const agendaSessionIds = z.array(writingId).max(200)
+  .refine(ids => new Set(ids).size === ids.length, "Elige cada sesión una sola vez").optional();
+const syllabus = z.object({
+  summary: z.string().max(4000),
+  approach: z.string().max(3000),
+  schedule: z.string().max(1500),
+  room: z.string().max(600),
+  requirements: z.string().max(3000),
+  bibliography: z.string().max(5000),
+  sessionIds: agendaSessionIds,
+}).strict();
+export type AcademicSyllabus = z.infer<typeof syllabus>;
+export const emptyAcademicSyllabus: AcademicSyllabus = { summary: "", approach: "", schedule: "", room: "", requirements: "", bibliography: "" };
+export const ACADEMIC_CONGRESS_LIMITS = { axes: 12, tables: 48, actions: 100, meetings: 30, agreementsPerMeeting: 30, agreements: 200, deliverablesPerAction: 12, deliverables: 200, titleLength: 200, responsibleLength: 200, actionNotesLength: 2000, meetingAttendeesLength: 2000, meetingNotesLength: 8000, agreementTextLength: 2000, deliverableNotesLength: 2000, deliverableHrefLength: 1000, sessionsPerTable: 200, sessions: 200 } as const;
+const congressTitle = z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.titleLength)
+  .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]+$/u, "Escribe el nombre en una sola línea.");
+const meetingDate = z.string().refine(isValidYmd, "Elige una fecha válida para la reunión.");
+const agreementText = z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.agreementTextLength);
+const agreementOrigin = z.object({
+  meetingId: writingId,
+  agreementId: writingId,
+  meetingTitle: congressTitle,
+  meetingDate,
+  agreementText,
+}).strict();
+export type AcademicCongressAgreementOrigin = z.infer<typeof agreementOrigin>;
+const congressMeeting = z.object({
+  id: writingId,
+  title: congressTitle,
+  date: meetingDate,
+  attendees: z.string().max(ACADEMIC_CONGRESS_LIMITS.meetingAttendeesLength),
+  notes: z.string().max(ACADEMIC_CONGRESS_LIMITS.meetingNotesLength),
+  agreements: z.array(z.object({ id: writingId, text: agreementText }).strict()).max(ACADEMIC_CONGRESS_LIMITS.agreementsPerMeeting),
+}).strict();
+export type AcademicCongressMeeting = z.infer<typeof congressMeeting>;
+export const ACADEMIC_CONGRESS_ACTION_STATUS = { pending: "Pendiente", in_progress: "En curso", done: "Completado" } as const;
+export const ACADEMIC_CONGRESS_DELIVERABLE_STATUS = { pending: "Pendiente", in_progress: "En preparación", submitted: "Para revisar", approved: "Aprobado" } as const;
+const congressDeliverable = z.object({
+  id: writingId,
+  title: congressTitle,
+  status: z.enum(["pending", "in_progress", "submitted", "approved"]),
+  notes: z.string().max(ACADEMIC_CONGRESS_LIMITS.deliverableNotesLength),
+  href: z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.deliverableHrefLength)
+    .refine(value => parseCommitteeDeliverableHref(value) !== null, "Usa un enlace HTTPS, de Biblioteca o de un resultado de este trabajo.").optional(),
+}).strict();
+export type AcademicCongressDeliverable = z.infer<typeof congressDeliverable>;
+const congressAction = z.object({
+  id: writingId,
+  title: congressTitle,
+  responsible: z.string().trim().max(ACADEMIC_CONGRESS_LIMITS.responsibleLength)
+    .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u, "Escribe el nombre del responsable en una sola línea."),
+  tableId: writingId.optional(),
+  dueAtLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/, "Elige una fecha y una hora válidas.")
+    .refine(value => isValidYmd(value.slice(0, 10)), "Elige una fecha válida.").optional(),
+  status: z.enum(["pending", "in_progress", "done"]),
+  notes: z.string().max(ACADEMIC_CONGRESS_LIMITS.actionNotesLength),
+  agreementOrigin: agreementOrigin.optional(),
+  deliverables: z.array(congressDeliverable).max(ACADEMIC_CONGRESS_LIMITS.deliverablesPerAction).optional(),
+}).strict();
+export type AcademicCongressAction = z.infer<typeof congressAction>;
+export const academicCongressSchema = z.object({
+  axes: z.array(z.object({ id: writingId, title: congressTitle }).strict()).max(ACADEMIC_CONGRESS_LIMITS.axes),
+  tables: z.array(z.object({
+    id: writingId,
+    axisId: writingId,
+    title: congressTitle,
+    responsible: z.string().trim().max(ACADEMIC_CONGRESS_LIMITS.responsibleLength)
+      .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u, "Escribe el nombre del responsable en una sola línea."),
+    sessionIds: z.array(writingId).max(ACADEMIC_CONGRESS_LIMITS.sessionsPerTable),
+  }).strict()).max(ACADEMIC_CONGRESS_LIMITS.tables),
+  actions: z.array(congressAction).max(ACADEMIC_CONGRESS_LIMITS.actions).optional(),
+  meetings: z.array(congressMeeting).max(ACADEMIC_CONGRESS_LIMITS.meetings).optional(),
+}).strict().superRefine((value, ctx) => {
+  const agreements = value.meetings?.flatMap(meeting => meeting.agreements) ?? [];
+  const deliverables = value.actions?.flatMap(action => action.deliverables ?? []) ?? [];
+  const ids = [...value.axes, ...value.tables, ...(value.actions ?? []), ...(value.meetings ?? []), ...agreements, ...deliverables].map(item => item.id);
+  const origins = (value.actions ?? []).flatMap(action => action.agreementOrigin
+    ? [JSON.stringify([action.agreementOrigin.meetingId, action.agreementOrigin.agreementId])] : []);
+  const axes = new Set(value.axes.map(axis => axis.id));
+  const tables = new Set(value.tables.map(table => table.id));
+  const sessionIds = value.tables.flatMap(table => table.sessionIds);
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: "Cada eje, mesa, encargo, reunión, acuerdo y entregable debe tener un identificador propio." });
+  if (agreements.length > ACADEMIC_CONGRESS_LIMITS.agreements) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 acuerdos en sus reuniones." });
+  if (deliverables.length > ACADEMIC_CONGRESS_LIMITS.deliverables) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 entregables entre sus encargos." });
+  if (new Set(origins).size !== origins.length) ctx.addIssue({ code: "custom", message: "Cada acuerdo puede tener un único encargo vinculado." });
+  if (value.tables.some(table => !axes.has(table.axisId))) ctx.addIssue({ code: "custom", message: "Asigna cada mesa a un eje del congreso." });
+  if (value.actions?.some(action => action.tableId && !tables.has(action.tableId))) ctx.addIssue({ code: "custom", message: "Asigna cada encargo a una mesa disponible o al seguimiento general." });
+  if (new Set(sessionIds).size !== sessionIds.length) ctx.addIssue({ code: "custom", message: "Una sesión sólo puede pertenecer a una mesa." });
+  if (sessionIds.length > ACADEMIC_CONGRESS_LIMITS.sessions) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 sesiones vinculadas a sus mesas." });
+});
+export type AcademicCongress = z.infer<typeof academicCongressSchema>;
+export const emptyAcademicCongress: AcademicCongress = { axes: [], tables: [] };
+export const committeeAgreementConversionSchema = z.object({
+  expectedRevision: revision,
+  meetingId: writingId,
+  agreementId: writingId,
+}).strict();
+export const ACADEMIC_CALL_STATUS = { watching: "En seguimiento", preparing: "Preparando postulación", submitted: "Presentada", closed: "Cerrada" } as const;
+const academicCall = z.object({
+  country: z.string().refine(value => value === "" || isWorkCountry(value), "Selecciona un país válido"),
+  organization: z.string().trim().max(200),
+  url: z.string().trim().max(1000).refine(value => {
+    if (!value) return true;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password;
+    } catch { return false; }
+  }, "Usa un enlace oficial HTTPS"),
+  deadline: z.string().refine(value => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Usa una fecha de cierre válida"),
+  status: z.enum(["watching", "preparing", "submitted", "closed"]),
+}).strict();
+export type AcademicCall = z.infer<typeof academicCall>;
+export const emptyAcademicCall: AcademicCall = { country: "", organization: "", url: "", deadline: "", status: "watching" };
+const brief = z.object({ objective: z.string().max(8000).default(""), audience: z.string().max(1000).default(""), language: z.string().max(80).default("Español"), duration: z.string().max(100).default(""), learningOutcomes: z.string().max(6000).default(""), evaluation: z.string().max(6000).default(""), task: academicModeSchema.default("literature_review"), syllabus: syllabus.optional(), programSessionIds: agendaSessionIds, congress: academicCongressSchema.optional(), call: academicCall.optional() }).strict();
 const dimension = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,40}$/), label: z.string().trim().min(1).max(100), type: z.enum(["text", "number", "date", "tag"]) }).strict();
 const cell = z.object({ value: z.string().max(5000), source: altazorSourceInputSchema.optional() }).strict();
 const matrix = z.object({ dimensions: z.array(dimension).max(12), rows: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/), title: z.string().max(240), included: z.boolean(), cells: z.record(z.string(), cell) }).strict()).max(100) }).strict().superRefine((value, ctx) => {
@@ -19,10 +144,11 @@ const matrix = z.object({ dimensions: z.array(dimension).max(12), rows: z.array(
     if (entry.value && (type === "number" && !/^-?\d+(?:[.,]\d+)?$/.test(entry.value) || type === "date" && (!/^\d{4}-\d{2}-\d{2}$/.test(entry.value) || Number.isNaN(Date.parse(entry.value))))) ctx.addIssue({ code: "custom", message: "Hay celdas cuyo valor no coincide con el tipo de dimensión" });
   }
 });
-export const academicWorkspaceCreateSchema = z.object({ requestId, title: z.string().trim().min(1).max(200), kind: z.enum(["research", "writing", "course", "career"]) }).strict();
+export const academicWorkspaceCreateSchema = z.object({ requestId, title: z.string().trim().min(1).max(200), kind: z.enum(["research", "writing", "career", ...ACADEMIC_TEACHING_TEMPLATES]) }).strict();
 export const academicWorkspaceSaveSchema = z.object({ expectedRevision: revision, title: z.string().trim().min(1).max(200), brief, matrix, sources: z.array(altazorSourceInputSchema).max(8).optional() }).strict();
 export const academicPrepareSchema = z.object({ requestId, expectedRevision: revision, mode: academicModeSchema, instruction: z.string().trim().min(1).max(12000), sources: z.array(altazorSourceInputSchema).max(8), destinationKey: z.string().length(64), allowRemote: z.boolean().default(false) }).strict();
-export const academicArtifactSaveSchema = z.object({ expectedRevision: revision, body: z.string().max(100000), reviewed: z.boolean() }).strict();
+export const academicDraftCreateSchema = z.object({ requestId, expectedRevision: revision, template: z.enum(ACADEMIC_MANUSCRIPT_TEMPLATE_IDS) }).strict();
+export const academicArtifactSaveSchema = z.object({ expectedRevision: revision, body: z.string().max(ACADEMIC_MANUSCRIPT_MAX), reviewed: z.boolean() }).strict();
 export const academicArtifactRestoreSchema = z.object({ expectedRevision: revision, revision }).strict();
-export const emptyAcademicBrief = { objective: "", audience: "", language: "Español", duration: "", learningOutcomes: "", evaluation: "", task: "literature_review" as AcademicMode };
+export const emptyAcademicBrief: z.infer<typeof brief> = { objective: "", audience: "", language: "Español", duration: "", learningOutcomes: "", evaluation: "", task: "literature_review" };
 export const emptyAcademicMatrix = { dimensions: [{ id: "question", label: "Pregunta y método", type: "text" as const }, { id: "finding", label: "Hallazgo", type: "text" as const }, { id: "limitations", label: "Límites", type: "text" as const }], rows: [] };

@@ -32,7 +32,7 @@ La migración aditiva `20261101190000_pdf_pages_and_legal_research` es la númer
 
 ## Requisitos y límites del Host
 
-La extracción nativa usa una biblioteca local en un proceso separado. La imagen usa Poppler (`pdftoppm`) y el OCR, Tesseract con los idiomas instalados. No hay conversión remota de documentos. El Host puede configurar `OCR_PDFTOPPM_BIN`, `OCR_TESSERACT_BIN`, `OCR_LANGUAGE` (por defecto `spa+eng`) y `TESSDATA_PREFIX`. `OCR_ENABLED=0` desactiva el OCR. Una herramienta ausente produce un estado o error explícito, sin recurrir a un proveedor externo. Los límites de este nuevo motor no dependen de `OCR_MAX_PAGES` de la cola OCR previa.
+La extracción nativa usa una biblioteca local en un proceso separado. La imagen usa Poppler (`pdftoppm`) y el OCR, Tesseract con los idiomas instalados. No hay conversión remota de documentos. El Host puede configurar `OCR_PDFTOPPM_BIN`, `OCR_TESSERACT_BIN`, `OCR_LANGUAGE` (por defecto `spa+eng`) y `TESSDATA_PREFIX`. `OCR_ENABLED=0` desactiva el OCR. Una herramienta ausente produce un estado o error explícito, sin recurrir a un proveedor externo. La preparación de documentos y las citas usan el mismo motor de páginas físicas: `OCR_MAX_PAGES` limita los intentos de reconocimiento a 20 páginas por documento por defecto (entre 1 y 100), sin contar el texto nativo ni las páginas vacías. Las páginas pendientes conservan su número y motivo. `OCR_TIMEOUT_MS` limita cada comando de render/OCR; sigue vigente el máximo total de 120 segundos.
 
 | Operación | Límite actual |
 | --- | --- |

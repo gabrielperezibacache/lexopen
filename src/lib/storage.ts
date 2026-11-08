@@ -5,6 +5,12 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 
 export const MAX_STORAGE_OBJECT_BYTES = 25 * 1024 * 1024;
 
+/** Cleanup only an unreferenced, isolated offline upload after a confirmed outcome. */
+export async function discardOfflineFileAttempt(key: string): Promise<void> {
+  if (!/^offline-files\/attempts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(key)) throw new Error("Sólo se puede limpiar un intento aislado offline");
+  await discardIsolatedObject(key);
+}
+
 /** Compensation is restricted to an isolated book-import attempt, never a shared source key. */
 export async function discardBookImportAttempt(key: string): Promise<void> {
   assertSafeStorageKey(key);

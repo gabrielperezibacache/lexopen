@@ -1,0 +1,25 @@
+{
+  "provider": "Google Flow",
+  "project": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79",
+  "verifiedAt": "2026-11-07T22:40:13.558Z",
+  "imageProvider": "OpenAI GPT image generation",
+  "verifiedFileNames": [
+    "academico-gpt-v1-original.png",
+    "tareas-gpt-v1-original.png",
+    "personas-gpt-v1-original.png",
+    "correspondencia-gpt-v1-original.png",
+    "conexiones-gpt-v1-original.png",
+    "configuracion-gpt-v1-original.png",
+    "flujos-gpt-v1-original.png",
+    "clientes-gpt-v1-original.png",
+    "audiencias-gpt-v1-original.png",
+    "agenda-gpt-v1-original.png",
+    "avisos-gpt-v1-original.png",
+    "escritura-gpt-v1-original.png"
+  ],
+  "writingResourceId": "ebe5a66f-9d12-464f-b965-597edd5c1e79",
+  "writingAnimationPrompt": "Only the free upper-right corner of the TOP LOOSE MANUSCRIPT FOLIO lifts gently by a few millimeters and settles. The sheet stays flat everywhere else; no sheet flips. Inkwell, cap, fountain pen, lower papers and bookmark remain absolutely fixed. The paper is not a cover and cannot peel or transform. Eight-second restrained editorial animation of this EXACT supplied GPT-created silver steel engraving. Use the supplied first AND last frames as the visual anchors. Fill any transparent canvas with a perfectly flat uniform deep indigo #0d1022 backdrop. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching and the original cool silver/indigo/iris palette. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+  "generationAttempts": 2,
+  "generationResult": "blocked_unusual_activity",
+  "generatedVideos": []
+}

@@ -4,8 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
+import { createRequire } from "node:module";
+import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, stageDistributedOAuthProfile, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 import { copyTrackedRuntimeResources } from "./prepare-resources.mjs";
+const require = createRequire(import.meta.url), yaml = require("js-yaml");
 
 for (const name of [".env", "host.env", "credentials.json", "database.sql", "pg-password-fixture", ".postgres-init-fixture/password", "node_modules/a/.env.production", ".tmp/session/case.txt", "storage/book.pdf", "pgdata/base/123", "secrets/key.txt", "a/client.p12", "node_modules/cache.sqlite", "x/private/data.json", ".next/cache/results.json"]) assert.equal(privateResourcePath(name), true, name);
 for (const name of ["src/lib/db.ts", "src/lib/pjud/private-response.ts", "prisma/migrations/1/migration.sql", "node_modules/.prisma/client/schema.prisma", "node_modules/@next/env/dist/index.js"]) assert.equal(privateResourcePath(name), false, name);
@@ -78,6 +80,7 @@ try {
     "tsconfig.json": "{}",
     "scripts/local-host-schedulers.mjs": "// scheduler fixture",
     "desktop/scripts/host-smoke-runner.mjs": "// smoke fixture",
+    "desktop/oauth-clients.cjs": "module.exports = {}; // shared profile parser fixture",
     "prisma/database.sql": "PRIVATE_DUMP_CANARY",
     "prisma/migrations/20261104000000_fixture/dump.sql": "PRIVATE_DUMP_CANARY",
   };
@@ -89,6 +92,7 @@ try {
     assert.equal(result.status, 0, result.stderr);
   }
   copyTrackedRuntimeResources(publicRepo, resources);
+  assert.equal(fs.readFileSync(path.join(resources, "app-standalone/desktop/oauth-clients.cjs"), "utf8"), publicInputs["desktop/oauth-clients.cjs"]);
   for (const prefix of [resources, path.join(resources, "app-standalone")]) {
     assert.equal(fs.readFileSync(path.join(prefix, migration), "utf8"), publicInputs[migration]);
     assert.equal(fs.existsSync(path.join(prefix, "prisma/database.sql")), false);
@@ -99,6 +103,63 @@ try {
   write(path.join(app, "lexopen-release.json"), JSON.stringify({ version: "1.1.0-preview.1", sourceDirty: false, sourceRevision: "a".repeat(40), buildId: "fixture-build", platform: "darwin", arch: "arm64" }));
   write(path.join(app, "playwright-browsers/chromium-fixture/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), macho);
   assert.equal(verifyReleaseResources(resources, modules, native).browserExecutables, 1);
+  // Only an explicitly supplied installed/device identity may enter the release.
+  const publicOAuth = { schemaVersion: 1, google: { type: "installed", client_id: "123456789-fixture.apps.googleusercontent.com", client_secret: "fixture-installed-public-parameter" }, github: { type: "device", client_id: "fixturePublicClient123" }, dropbox: { type: "public_client", client_id: "fixtureDropboxPublic123" }, microsoft: { type: "public_client", client_id: "12345678-abcd-1234-abcd-123456789abc" } };
+  const publisherProfile = path.join(root, "publisher-oauth.json"), stagedProfile = path.join(resources, "oauth-clients.json"), releaseMetadata = path.join(app, "lexopen-release.json");
+  write(publisherProfile, JSON.stringify(publicOAuth));
+  assert.equal(stageDistributedOAuthProfile(resources, { env: { ALTAZOR_GOOGLE_CLIENT_SECRET: "PRIVATE_OPERATOR_CANARY" }, defaultFile: path.join(root, "missing-public-profile.json") }), null);
+  assert.equal(fs.existsSync(stagedProfile), false);
+  assert.throws(() => stageDistributedOAuthProfile(resources, { env: { LEXOPEN_DISTRIBUTED_OAUTH_PROFILE: path.join(root, "missing-explicit-profile.json") } }), /Falta el perfil público/);
+  const previousUmask = process.platform !== "win32" ? process.umask(0o077) : null;
+  let stagedOAuth;
+  try { stagedOAuth = stageDistributedOAuthProfile(resources, { env: { LEXOPEN_DISTRIBUTED_OAUTH_PROFILE: publisherProfile } }); }
+  finally { if (previousUmask !== null) process.umask(previousUmask); }
+  if (process.platform !== "win32") assert.equal(fs.statSync(stagedProfile).mode & 0o777, 0o644);
+  assert.deepEqual(stagedOAuth.providers, ["google", "github", "dropbox", "microsoft"]);
+  assert.equal(fs.readFileSync(stagedProfile, "utf8"), JSON.stringify(publicOAuth) + "\n");
+  assert.throws(() => verifyReleaseResources(resources, modules, native), /profile differs/);
+  const publicMeta = JSON.parse(fs.readFileSync(releaseMetadata, "utf8")); publicMeta.distributedOAuthSha256 = stagedOAuth.sha256;
+  write(releaseMetadata, JSON.stringify(publicMeta));
+  assert.equal(verifyReleaseResources(resources, modules, native).distributedOAuth.sha256, stagedOAuth.sha256);
+  const approvedProfileBytes = fs.readFileSync(stagedProfile);
+  // Exercise the real workflow boundary: CI input becomes only a validated file
+  // and a path, while absent/invalid input never produces a usable profile.
+  const workflowRepo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  const workflow = yaml.load(fs.readFileSync(path.join(workflowRepo, ".github/workflows/desktop-release.yml"), "utf8"), { schema: yaml.JSON_SCHEMA });
+  const profileStep = workflow.jobs.native.steps.find(step => step.name === "Prepare optional public account connection profile");
+  assert.equal(profileStep.env.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON, "${{ secrets.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON }}");
+  const profileCommand = profileStep.run.match(/^node <<'NODE'\n([\s\S]*?)\nNODE\s*$/)?.[1];
+  assert.ok(profileCommand, "the CI profile step must execute the checked parser directly");
+  const invokeProfileStep = (name, raw) => {
+    const directory = path.join(root, name); fs.mkdirSync(directory);
+    const githubEnv = path.join(directory, "github.env");
+    const environment = { RUNNER_TEMP: directory, GITHUB_ENV: githubEnv };
+    if (process.env.SystemRoot) environment.SystemRoot = process.env.SystemRoot;
+    if (raw !== undefined) environment.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON = raw;
+    return { directory, githubEnv, result: spawnSync(process.execPath, ["-e", profileCommand], { cwd: workflowRepo, env: environment, encoding: "utf8" }) };
+  };
+  const ciPrepared = invokeProfileStep("ci-public-profile", JSON.stringify(publicOAuth));
+  assert.equal(ciPrepared.result.status, 0, ciPrepared.result.stderr);
+  assert.equal(ciPrepared.result.stdout, ""); assert.equal(ciPrepared.result.stderr, "");
+  const ciProfile = path.join(ciPrepared.directory, "lexopen-oauth-clients.json");
+  assert.deepEqual(JSON.parse(fs.readFileSync(ciProfile, "utf8")), publicOAuth);
+  assert.equal(fs.readFileSync(ciPrepared.githubEnv, "utf8"), "LEXOPEN_DISTRIBUTED_OAUTH_PROFILE=" + ciProfile + "\n");
+  const ciPackage = path.join(root, "ci-public-package"); fs.mkdirSync(ciPackage);
+  assert.equal(stageDistributedOAuthProfile(ciPackage, { env: { LEXOPEN_DISTRIBUTED_OAUTH_PROFILE: ciProfile } }).sha256, stagedOAuth.sha256);
+  const ciAbsent = invokeProfileStep("ci-no-public-profile");
+  assert.equal(ciAbsent.result.status, 0); assert.equal(fs.existsSync(ciAbsent.githubEnv), false);
+  assert.equal(fs.existsSync(path.join(ciAbsent.directory, "lexopen-oauth-clients.json")), false);
+  const ciRejected = invokeProfileStep("ci-invalid-public-profile", JSON.stringify({ schemaVersion: 1, google: { ...publicOAuth.google, type: "web", client_secret: "PRIVATE_WEB_CANARY_VALUE" } }));
+  assert.notEqual(ciRejected.result.status, 0);
+  assert.equal((ciRejected.result.stdout + ciRejected.result.stderr).includes("PRIVATE_WEB_CANARY_VALUE"), false);
+  assert.equal(fs.existsSync(path.join(ciRejected.directory, "lexopen-oauth-clients.json")), false);
+  write(stagedProfile, JSON.stringify({ schemaVersion: 1, github: { type: "device", client_id: "anotherPublicClient123" } }));
+  assert.throws(() => verifyReleaseResources(resources, modules, native), /profile differs/);
+  write(stagedProfile, approvedProfileBytes);
+  const invalidProfileOutput = path.join(root, "rejected-profile-output"); fs.mkdirSync(invalidProfileOutput);
+  write(publisherProfile, JSON.stringify({ schemaVersion: 1, google: { ...publicOAuth.google, type: "web" } }));
+  assert.throws(() => stageDistributedOAuthProfile(invalidProfileOutput, { env: { LEXOPEN_DISTRIBUTED_OAUTH_PROFILE: publisherProfile } }), /perfil público/);
+  assert.equal(fs.existsSync(path.join(invalidProfileOutput, "oauth-clients.json")), false);
   const sourceBundle = path.join(resources, "altazor-desktop-source"), context = path.join(sourceBundle, "context.tar.gz");
   const profile = JSON.parse(fs.readFileSync(new URL("../altazor-desktop-profile.json", import.meta.url), "utf8"));
   const archiveBytes = Buffer.from("fictitious source context fixture");
@@ -125,6 +186,8 @@ try {
   assert.equal(fs.existsSync(path.join(packaged, "app-standalone/node_modules/next/stale.js")), false);
   assert.equal(fs.readFileSync(path.join(packaged, "app-standalone/node_modules/next/dist/server/fixture.js"), "utf8"), "// complete Next dependency fixture");
   assert.equal(verifyReleaseResources(packaged, modules, native).browserExecutables, 1);
+  assert.equal(fs.readFileSync(path.join(packaged, "oauth-clients.json"), "utf8"), JSON.stringify(publicOAuth) + "\n");
+  assert.equal(verifyReleaseResources(packaged, modules, native).distributedOAuth.sha256, stagedOAuth.sha256);
   write(path.join(app, ".env"), "PRIVATE_ENV_CANARY");
   write(path.join(packaged, "app-standalone/server.js"), "// keep destination on rejected staging");
   assert.throws(() => copyStagedReleaseResources(resources, packaged, modules, native), /Private resource/);

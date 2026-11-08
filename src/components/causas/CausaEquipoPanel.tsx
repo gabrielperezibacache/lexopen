@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useRef } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Member = {
@@ -36,74 +36,60 @@ export function CausaEquipoPanel({
 }) {
   const [acceso, setAcceso] = useState(initialAcceso || "estudio");
   const [miembros, setMiembros] = useState(initialMiembros);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ kind: "access" | "add" | "remove"; userId?: string } | null>(null);
+  const active = useRef(false);
+  const busy = pending !== null;
+  function begin(action: NonNullable<typeof pending>) {
+    if (!canManage || active.current) return false;
+    active.current = true; setPending(action); setError(null); setMsg(null); return true;
+  }
+  function finish() { active.current = false; setPending(null); }
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function reload() {
     const res = await fetch(`/api/causas/${causaId}/equipo`);
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("No se pudo actualizar el equipo");
     const data = await res.json();
     setMiembros(data.miembros || []);
     if (data.causa?.acceso) setAcceso(data.causa.acceso);
   }
 
   async function setAccesoMode(next: "estudio" | "equipo") {
-    setBusy(true);
-    setError(null);
-    const result = await apiMutation(`/api/causas/${causaId}/equipo`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acceso: next }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error || "No se pudo cambiar el acceso");
-      return;
-    }
-    setAcceso(next);
-    setMsg(
-      next === "equipo"
-        ? "Muro ético activo: solo el equipo ve esta causa."
-        : "Acceso de estudio: todo el staff puede ver la causa."
-    );
+    if (!begin({ kind: "access" })) return;
+    try {
+      const result = await apiMutation(`/api/causas/${causaId}/equipo`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acceso: next }),
+      });
+      if (!result.ok) { setError(result.error || "No se pudo cambiar el acceso"); return; }
+      setAcceso(next);
+      setMsg(next === "equipo" ? "Muro ético activo: solo el equipo ve esta causa." : "Acceso de estudio: todo el staff puede ver la causa.");
+    } finally { finish(); }
   }
 
   async function addMember(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const fd = new FormData(e.currentTarget);
-    const result = await apiMutation(`/api/causas/${causaId}/equipo`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: fd.get("userId"),
-        rol: fd.get("rol"),
-      }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error || "No se pudo agregar");
-      return;
-    }
-    e.currentTarget.reset();
-    await reload();
+    const form = e.currentTarget, fd = new FormData(form);
+    if (!begin({ kind: "add" })) return;
+    try {
+      const result = await apiMutation(`/api/causas/${causaId}/equipo`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: fd.get("userId"), rol: fd.get("rol") }),
+      });
+      if (!result.ok) { setError(result.error || "No se pudo agregar"); return; }
+      form.reset();
+      await reload();
+    } catch { setError("El cambio se envió, pero no se pudo actualizar el equipo. Recargue la causa para comprobarlo."); }
+    finally { finish(); }
   }
 
   async function removeMember(userId: string) {
-    setBusy(true);
-    setError(null);
-    const result = await apiMutation(
-      `/api/causas/${causaId}/equipo?userId=${encodeURIComponent(userId)}`,
-      { method: "DELETE" }
-    );
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error || "No se pudo quitar");
-      return;
-    }
-    await reload();
+    if (!begin({ kind: "remove", userId })) return;
+    try {
+      const result = await apiMutation(`/api/causas/${causaId}/equipo?userId=${encodeURIComponent(userId)}`, { method: "DELETE" });
+      if (!result.ok) { setError(result.error || "No se pudo quitar"); return; }
+      await reload();
+    } catch { setError("El cambio se envió, pero no se pudo actualizar el equipo. Recargue la causa para comprobarlo."); }
+    finally { finish(); }
   }
 
   return (
@@ -127,11 +113,17 @@ export function CausaEquipoPanel({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div
+        className="flex flex-wrap items-center gap-3"
+        role="group"
+        aria-label="Nivel de acceso"
+        aria-busy={pending?.kind === "access"}
+      >
         <span className="text-sm text-[var(--ink-soft)]/70">Acceso:</span>
         <button
           type="button"
           className={`btn ${acceso === "estudio" ? "btn-primary" : "btn-ghost"}`}
+          aria-pressed={acceso === "estudio"}
           disabled={!canManage || busy}
           onClick={() => void setAccesoMode("estudio")}
         >
@@ -140,6 +132,7 @@ export function CausaEquipoPanel({
         <button
           type="button"
           className={`btn ${acceso === "equipo" ? "btn-primary" : "btn-ghost"}`}
+          aria-pressed={acceso === "equipo"}
           disabled={!canManage || busy}
           onClick={() => void setAccesoMode("equipo")}
         >
@@ -163,10 +156,11 @@ export function CausaEquipoPanel({
               <button
                 type="button"
                 className="btn btn-ghost text-xs"
+                aria-label={`${pending?.kind === "remove" && pending.userId === m.userId ? "Quitando" : "Quitar"} a ${m.user.name}`}
                 disabled={busy}
                 onClick={() => void removeMember(m.userId)}
               >
-                Quitar
+                {pending?.kind === "remove" && pending.userId === m.userId ? "Quitando…" : "Quitar"}
               </button>
             )}
           </li>
@@ -184,7 +178,7 @@ export function CausaEquipoPanel({
             <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">
               Persona
             </span>
-            <select className="select" name="userId" required>
+            <select className="select" name="userId" required disabled={busy}>
               <option value="">Elegir…</option>
               {staffOptions.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -197,7 +191,7 @@ export function CausaEquipoPanel({
             <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">
               Rol en la causa
             </span>
-            <select className="select" name="rol" defaultValue="colaborador">
+            <select className="select" name="rol" defaultValue="colaborador" disabled={busy}>
               {Object.entries(ROL_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -205,8 +199,13 @@ export function CausaEquipoPanel({
               ))}
             </select>
           </label>
-          <button className="btn btn-primary" type="submit" disabled={busy}>
-            Agregar
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={busy}
+            aria-busy={pending?.kind === "add"}
+          >
+            {pending?.kind === "add" ? "Agregando…" : "Agregar"}
           </button>
         </form>
       )}

@@ -11,7 +11,7 @@ async function main() {
   fs.writeFileSync(path.join(dataDir, "pgdata", "PG_VERSION"), "17"); fs.writeFileSync(path.join(dataDir, "storage", "fixture.txt"), "fake preserved content");
   fs.writeFileSync(path.join(dataDir, ".env"), `STORAGE_PATH=${path.join(dataDir, "storage")}\n`);
   const cfg = { ...realConfig.DEFAULTS, dataDir, hostDataDir: dataDir, mode: null };
-  const events = [], intervals = [], status = [], dialogs = [], handlers = new Map();
+  const events = [], intervals = [], status = [], dialogs = [], handlers = new Map(), externalUrls = [];
   const packageCalls = [];
   let completePreparation;
   const updater = new EventEmitter(); let checks = 0;
@@ -19,7 +19,7 @@ async function main() {
   const app = new EventEmitter(); Object.assign(app, { isPackaged: true, whenReady: () => Promise.resolve(), getPath: () => tmp, getAppPath: () => path.join(tmp, "app"), quit() {}, exit() {} });
   const windows = [];
   class Window extends EventEmitter {
-    constructor() { super(); this.webContents = new EventEmitter(); Object.assign(this.webContents, { setWindowOpenHandler() {}, send: (_name, value) => status.push(value), getURL: () => "file:///fixture/setup.html", mainFrame: { url: pathToFileURL(path.join(tmp, "lexopen-desktop", "setup.html")).href } }); windows.push(this); }
+    constructor() { super(); this.webContents = new EventEmitter(); Object.assign(this.webContents, { setWindowOpenHandler(handler) { this.openWindow = handler; }, send: (_name, value) => status.push(value), getURL: () => "file:///fixture/setup.html", mainFrame: { url: pathToFileURL(path.join(tmp, "lexopen-desktop", "setup.html")).href } }); windows.push(this); }
     isDestroyed() { return false; }
     loadFile() { return Promise.resolve(); }
     loadURL() { return Promise.resolve(); }
@@ -30,7 +30,7 @@ async function main() {
     setTimeout: () => ({ unref() {} }), setInterval: (callback, ms) => { intervals.push({ callback, ms }); return { unref() {} }; }, clearInterval() {},
     fixtureHost: { stop: async () => events.push("stop") },
     require: name => {
-      if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, openExternal() {} }, Menu: { buildFromTemplate: value => value, setApplicationMenu() {} }, dialog: { showOpenDialog: async () => assert.fail("Automatic preparation must not show a file chooser"), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => { throw new Error(message); } } };
+      if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, async openExternal(url) { externalUrls.push(url); } }, Menu: { buildFromTemplate: value => value, setApplicationMenu() {} }, dialog: { showOpenDialog: async () => assert.fail("Automatic preparation must not show a file chooser"), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => { throw new Error(message); } } };
       if (name === "electron-updater") return { autoUpdater: updater };
       if (name === "./config.cjs") return { ...realConfig, readConfig: () => ({ ...cfg }), writeConfig: value => Object.assign(cfg, value), readPackageVersion: () => "1.0.0", readAppState: () => ({}) };
       if (name === "./backup.cjs") return { ...realBackup, createDataBackup: async (...args) => { events.push("backup"); return realBackup.createDataBackup(...args); } };
@@ -61,6 +61,32 @@ async function main() {
     const window = windows[0];
     const sender = window.webContents, senderFrame = sender.mainFrame;
     const setupEvent = { sender, senderFrame };
+    const oauthParams = new URLSearchParams({ client_id: "fixture-public-client", response_type: "code", redirect_uri: "http://127.0.0.1:3000/api/altazor/connectors/oauth/callback", state: "s".repeat(43), code_challenge: "c".repeat(43), code_challenge_method: "S256" });
+    const google = `https://accounts.google.com/o/oauth2/v2/auth?${oauthParams}`;
+    const microsoftParams = new URLSearchParams(oauthParams); microsoftParams.set("scope", "offline_access User.Read Files.Read"); microsoftParams.set("response_mode", "query"); microsoftParams.set("redirect_uri", "http://localhost:3000/api/altazor/connectors/oauth/callback");
+    const allowedExternal = [google, `https://www.dropbox.com/oauth2/authorize?${oauthParams}&token_access_type=offline`, `https://github.com/login/oauth/authorize?${oauthParams}`, `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${microsoftParams}`, "https://github.com/login/device", "https://docs.render.com/deploy-hooks#creating-a-deploy-hook"];
+    const blockedExternal = ["https://evil.test/", `${google}&client_secret=fixture`, `${google}&redirect=https://evil.test`, google.replace("127.0.0.1%3A3000", "127.0.0.1%3A9999"), `${google}#token=fixture`, "https://accounts.google.com/other", "https://www.dropbox.com/redirect?url=https://evil.test", "javascript:alert(1)", "https://user:pass@github.com/login/device", "http://github.com/login/device"];
+    for (const url of [...allowedExternal, ...blockedExternal]) {
+      const expected = allowedExternal.includes(url);
+      externalUrls.length = 0;
+      assert.equal(sender.openWindow({ url }).action, "deny", "Electron must never create a provider child window");
+      assert.deepEqual(externalUrls, expected ? [url] : [], `window.open: ${url}`);
+      externalUrls.length = 0;
+      let prevented = false;
+      sender.emit("will-navigate", { preventDefault() { prevented = true; } }, url);
+      assert.equal(prevented, true, "external pages must not replace the LexOpen window");
+      assert.deepEqual(externalUrls, expected ? [url] : [], `will-navigate: ${url}`);
+      externalUrls.length = 0;
+      assert.equal((await handlers.get("desktop:open-external")({}, url)).ok, expected);
+      assert.deepEqual(externalUrls, expected ? [url] : [], `IPC: ${url}`);
+    }
+    externalUrls.length = 0;
+    for (const url of ["http://127.0.0.1:3000/inicio", pathToFileURL(path.join(__dirname, "renderer", "setup.html")).href]) {
+      let prevented = false;
+      sender.emit("will-navigate", { preventDefault() { prevented = true; } }, url);
+      assert.equal(prevented, false, "app/setup navigation remains inside LexOpen");
+      assert.deepEqual(externalUrls, []);
+    }
     assert.equal((await prepare({ sender, senderFrame: { url: senderFrame.url } })).state, "unavailable");
     assert.deepEqual(packageCalls, []);
     assert.equal((await prepare(setupEvent, "ignored-file-from-renderer")).state, "package-downloading");
@@ -100,7 +126,7 @@ async function main() {
     await vm.runInContext("promptInstallUpdate({version:'1.0.1'})", context);
     assert.deepEqual(events, ["install"]);
     assert.equal(handlers.has("desktop:choose-data-directory"), true);
-    console.log("desktop main fixture: periodic preference/progress/package identity/Host stop+verified backup/client install passed");
+    console.log("desktop main fixture: shared window.open/navigation/IPC OAuth policy; periodic preference/progress/package identity/Host stop+verified backup/client install passed");
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

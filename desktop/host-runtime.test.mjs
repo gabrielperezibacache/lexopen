@@ -11,6 +11,7 @@ import {
   ensureStandalonePlaywright,
   repoNodePath,
   loadEnvFile,
+  loadBundledOAuthProfile,
   preferEnvFileKeys,
   setupPendingMessage,
   validateHostPorts,
@@ -104,6 +105,23 @@ for (const provider of ["GOOGLE", "GITHUB"]) {
   assert.equal(identityEnv[`ALTAZOR_${provider}_CLIENT_ID`], `host-${provider.toLowerCase()}-client`);
   assert.equal(identityEnv[`ALTAZOR_${provider}_CLIENT_SECRET`], `host-${provider.toLowerCase()}-fixture`);
 }
+
+// A public release identity fills an empty Host without replacing saved setup.
+const publicOAuth = { schemaVersion: 1, github: { type: "device", client_id: "fixturePublicClient123" } };
+const publicOAuthResources = path.join(tmp, "public-oauth-resources");
+fs.mkdirSync(publicOAuthResources);
+fs.writeFileSync(path.join(publicOAuthResources, "oauth-clients.json"), JSON.stringify(publicOAuth));
+const publicOAuthEnvironment = { ALTAZOR_GOOGLE_CLIENT_SECRET: "keep-operator-fixture" };
+assert.deepEqual(loadBundledOAuthProfile(publicOAuthResources, publicOAuthEnvironment), publicOAuth);
+assert.equal(publicOAuthEnvironment.ALTAZOR_DISTRIBUTED_OAUTH, JSON.stringify(publicOAuth));
+assert.equal(publicOAuthEnvironment.ALTAZOR_GOOGLE_CLIENT_SECRET, "keep-operator-fixture");
+const savedOAuthIdentity = path.join(tmp, "saved-public-profile.env");
+fs.writeFileSync(savedOAuthIdentity, "ALTAZOR_DISTRIBUTED_OAUTH=" + JSON.stringify(publicOAuth) + "\n");
+const savedPublicEnvironment = { ALTAZOR_DISTRIBUTED_OAUTH: "invalid-parent-fixture" };
+preferEnvFileKeys(savedOAuthIdentity, undefined, savedPublicEnvironment);
+assert.deepEqual(loadBundledOAuthProfile(publicOAuthResources, savedPublicEnvironment), publicOAuth);
+assert.equal(loadBundledOAuthProfile(null, {}), null);
+assert.equal(loadBundledOAuthProfile(path.join(tmp, "no-public-profile"), {}), null);
 
 const electronMsg = setupPendingMessage({ isElectron: true, port: 3000 });
 assert.match(electronMsg, /Desktop/);

@@ -1,11 +1,8 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MinutaDetailActions } from "@/components/minutas/MinutaDetailActions";
 import { formatDateTime } from "@/components/ui";
-import { requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { getMinuteView } from "@/lib/minutas/http-service";
 import { requireStaff } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
 import { driveFileUrl } from "@/lib/integrations/drive-folder";
 import { labelModalidadMinuta, labelTipoMinuta } from "@/lib/minutas";
 import Link from "next/link";
@@ -20,19 +17,8 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
   const user = await requireStaff();
   const { id, minutaId } = await params;
   const sp = await searchParams;
-  const minuta = await prisma.minuta.findFirst({
-    where: { AND: [scopedrequiredCausaWhere(user), { id: minutaId }] },
-    include: {
-      causa: true,
-      autor: { select: publicUserSelect },
-      acciones: true,
-      documento: true,
-    },
-  });
-  if (!minuta || minuta.causaId !== id) notFound();
-  if (minuta.confidencial && !canSeeConfidential(user)) {
-    notFound();
-  }
+  const minuta = await getMinuteView(user, minutaId).catch(e => { if ([403,404].includes(e.status)) notFound(); throw e; });
+  if (minuta.causaId !== id) notFound();
 
   const rank: Record<string, number> = {
     pendiente: 0,
@@ -54,10 +40,11 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
       <Link href={`/causas/${id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
         ← {minuta.causa.titulo}
       </Link>
-      <PageHeader artwork="writing"
+      <PageHeader
+        artwork="writing"
         title={minuta.titulo}
         subtitle={<>{formatDateTime(minuta.fecha)} · {minuta.autor?.name || "Sin autor"} · {minuta.causa.rit || "Sin RIT"}</>}
-        actions={<Link href={`/causas/${id}/minuta/nueva?tipo=${minuta.tipo}`} className="btn btn-primary">Nueva minuta</Link>}
+        actions={minuta.canCreate ? <Link href={`/causas/${id}/minuta/nueva?tipo=${minuta.tipo}`} className="btn btn-primary">Nueva minuta</Link> : undefined}
       />
           <div className="flex flex-wrap gap-2">
             <span className="badge badge-sea">{labelTipoMinuta(minuta.tipo)}</span>
@@ -69,6 +56,7 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
             )}
           </div>
 
+      {minuta.canEdit && <Link href={`/offline.html?kind=minuta&record=${minuta.id}`} className="btn btn-secondary">Trabajar sin conexión</Link>}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="panel space-y-5 rounded-[var(--radius-lg)] p-5 lg:col-span-2">
           <section>
@@ -148,6 +136,8 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
           </div>
           <MinutaDetailActions
             minutaId={minuta.id}
+            version={minuta.version}
+            canEdit={minuta.canEdit}
             acciones={acciones}
             folderId={minuta.causa.googleDriveFolderId}
             googleDriveFileId={minuta.googleDriveFileId}

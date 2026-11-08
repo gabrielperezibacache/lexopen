@@ -27,7 +27,8 @@ export function LanguageSwitcher({
       <span className="sr-only">{t("common.language")}</span>
       <span className="relative inline-flex items-center">
         <select
-          className={`min-h-11 appearance-none rounded-full border py-1.5 ps-3 pe-9 font-medium outline-none focus:ring-2 focus:ring-[var(--sea)]/40 ${base}`}
+          data-custom-select
+          className={`min-h-11 appearance-none rounded-full border py-1.5 ps-3 pe-11 font-medium outline-none focus:ring-2 focus:ring-[var(--sea)]/40 ${base}`}
           value={locale}
           disabled={pending}
           onChange={(e) => void setLocale(e.target.value as Locale)}
@@ -38,7 +39,7 @@ export function LanguageSwitcher({
             </option>
           ))}
         </select>
-        <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute end-3" />
+        <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute end-4" />
       </span>
     </label>
   );

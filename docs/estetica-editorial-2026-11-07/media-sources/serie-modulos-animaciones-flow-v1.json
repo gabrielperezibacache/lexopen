@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-07",
+  "provider": "Google Flow",
+  "project": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79",
+  "videos": [
+    {
+      "name": "investigacion",
+      "startFrameAssetId": "d1f19d6b-70be-4f8b-83e1-117303fdf910",
+      "endFrameAssetId": "d1f19d6b-70be-4f8b-83e1-117303fdf910",
+      "resourceTitle": "Magnifying glass on index slips",
+      "prompt": "Only the rigid magnifying glass slides a very short distance to the left across the slips, no more than two percent of the frame width, then returns exactly to its initial position. Its circular lens and solid handle remain geometrically rigid and the paper slips remain completely fixed. No magnification distortion or writing appears. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "submitted": true,
+      "flowAssetId": "5403e0b7-6ba9-42e1-9e9b-5075076685a1",
+      "originalFile": "/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/docs/estetica-editorial-2026-11-07/media-sources/flow-investigacion-motion-v1-original.mp4",
+      "status": "generated; integrated after review",
+      "retryCount": 0
+    },
+    {
+      "name": "escritura",
+      "startFrameAssetId": "54a08c6d-28f9-435a-80fb-f0a615af2328",
+      "endFrameAssetId": "54a08c6d-28f9-435a-80fb-f0a615af2328",
+      "resourceTitle": "Inkwell and fountain pen still l…",
+      "prompt": "Only the free upper-right corner of the TOP LOOSE MANUSCRIPT FOLIO lifts gently by a few millimeters and settles. The sheet stays flat everywhere else; no sheet flips. Inkwell, cap, fountain pen, lower papers and bookmark remain absolutely fixed. The paper is not a cover and cannot peel or transform. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "submitted": true,
+      "status": "blocked: unusual activity after normal UI retry",
+      "retryCount": 1
+    },
+    {
+      "name": "audiencias",
+      "startFrameAssetId": "57c1ffae-a119-4900-8a8b-eb3a598682c6",
+      "endFrameAssetId": "57c1ffae-a119-4900-8a8b-eb3a598682c6",
+      "resourceTitle": "Gooseneck microphone and closed …",
+      "prompt": "Only the small microphone head makes one very slight, mechanically plausible two-degree nod at the top of its flexible gooseneck, then returns. The base, notepad and lower neck remain fixed. No stretching, breathing, speech, indicator light or sound waves. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "submitted": true,
+      "status": "blocked: unusual activity after normal UI retry",
+      "retryCount": 1
+    },
+    {
+      "name": "personas",
+      "startFrameAssetId": "64d4a108-9332-455f-bdca-8d48f7cab3d1",
+      "endFrameAssetId": "64d4a108-9332-455f-bdca-8d48f7cab3d1",
+      "resourceTitle": "Silver engraved desktop card box",
+      "prompt": "Only the loose blank contact card leaning against the front makes a subtle three-degree tilt and returns to rest. The solid card-index box, open lid and all divider cards remain absolutely fixed. No card is removed and no labels or portraits appear. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "status": "pending: generation service restriction",
+      "retryCount": 0
+    },
+    {
+      "name": "flujos",
+      "startFrameAssetId": "1823b8c4-ef4a-401e-8db8-0f7c946c6c0e",
+      "endFrameAssetId": "1823b8c4-ef4a-401e-8db8-0f7c946c6c0e",
+      "resourceTitle": "Three paper work cards connected",
+      "prompt": "Only the slender silk thread makes one gentle small traveling tension-and-release movement between the three eyelets, then rests exactly as it began. All three paper cards and eyelets remain completely fixed, rigid and flat. The thread remains one continuous strand, no tangling, detaching or extra strands. No light trail or arrows. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "status": "pending: generation service restriction",
+      "retryCount": 0
+    },
+    {
+      "name": "conexiones",
+      "startFrameAssetId": "a068c416-a723-437f-ace5-86b7aacfc7d1",
+      "endFrameAssetId": "a068c416-a723-437f-ace5-86b7aacfc7d1",
+      "resourceTitle": "Interlocked silver chain links e…",
+      "prompt": "Only the two rigid metal chain links make a very small natural rocking motion of a few degrees around their shared contact point, then settle into the original arrangement. The closed document wallet stays perfectly fixed. Links stay solid, distinct and genuinely interlocked throughout; no opening, fusing, bending or pulling apart. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "status": "pending: generation service restriction",
+      "retryCount": 0
+    },
+    {
+      "name": "avisos",
+      "startFrameAssetId": "f694acfe-ce02-41aa-8abc-bcbe6fbc10e1",
+      "endFrameAssetId": "f694acfe-ce02-41aa-8abc-bcbe6fbc10e1",
+      "resourceTitle": "Desk bell and reminder slips",
+      "prompt": "Only the whole solid handbell makes one extremely small natural two-degree rock about the bottom rim and settles back in the original upright position. Keep the handle and bell body rigid as one coherent object. The two paper reminder slips stay absolutely fixed. No floating, no added clapper or sound waves. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "status": "pending: generation service restriction",
+      "retryCount": 0
+    },
+    {
+      "name": "configuracion",
+      "startFrameAssetId": "6e35d124-1ef7-4fc5-97e0-8319574e8871",
+      "endFrameAssetId": "6e35d124-1ef7-4fc5-97e0-8319574e8871",
+      "resourceTitle": "Antique metal divider compass re…",
+      "prompt": "Only the two existing rigid compass legs open three degrees at their ONE original left pivot and close back exactly to their initial position. The wheel and drafting slip underneath stay fixed. Keep EXACTLY two legs and one hinge for the entire shot. No extra points, hands, legs, new metal, stretching or changing the compass design. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "status": "pending: generation service restriction",
+      "retryCount": 0
+    }
+  ]
+}

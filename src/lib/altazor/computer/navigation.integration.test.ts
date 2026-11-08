@@ -19,7 +19,13 @@ async function main() {
     const url = new URL(String(raw)); assert.equal(url.origin, "http://127.0.0.1:18846");
     assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer fictitious-navigation-token");
     let result: unknown;
-    if (url.pathname === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); result = { ok: true, containers: true, version: "fictitious-navigation-contract" }; }
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(url.pathname)) {
+      assert.equal(init?.method || "GET", "GET", "Legacy fixtures never grant computer-use permissions");
+      const binding = url.searchParams.get("binding"), kittyId = url.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: url.pathname.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
+    if (url.pathname === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); result = { ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-navigation-contract", lexopen_async_messages: "v1" }; }
     else if (url.pathname === "/v1/providers") result = { providers: [{ name: "navigation-model", kind: "openai" }] };
     else if (url.pathname === "/v1/kitties") result = { kitties: kitty ? [kitty] : [] };
     else if (url.pathname === "/v1/kitties/navigation-kitty") result = { kitty };

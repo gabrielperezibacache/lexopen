@@ -1,3 +1,4 @@
+import { currentStaffActor } from "@/lib/auth/staff-actor";
 import { z } from "zod";
 import { plazoCreateSchema } from "@/lib/schemas";
 import { httpError } from "@/lib/auth/access";
@@ -7,8 +8,9 @@ import { assertCausaAccess, assertCausaCapability, plazoAccessWhere, type CausaA
 import { executeCommand } from "@/lib/command-execution";
 import { writeAuditStrict } from "@/lib/audit";
 import { civilDateKey } from "@/lib/chile-time";
-import { calcularVencimiento } from "@/lib/plazos";
-import { parseLocalDateInput } from "@/lib/minutas";
+import { calcularVencimientoYmd } from "@/lib/plazos";
+import { parseDateInput } from "@/lib/date-input";
+import { requireDeadlineComputation, deadlineCalculation } from "@/lib/plazos-policy";
 
 export const plazoStateSchema = z.object({
   id: z.string().min(1),
@@ -16,16 +18,16 @@ export const plazoStateSchema = z.object({
 });
 
 export async function createPlazoCommand(user: CausaAccessUser, body: z.infer<typeof plazoCreateSchema>, commandKey: string) {
-  const fechaNotificacion = parseLocalDateInput(body.fechaNotificacion || undefined);
-  const fechaLimite = parseLocalDateInput(body.fechaLimite || undefined) || (body.diasPlazo ? calcularVencimiento({
-    desde: fechaNotificacion || new Date(), dias: body.diasPlazo, tipoComputo: body.tipoComputo || "habiles",
-  }) : null);
-  if (!fechaLimite) throw httpError("Indique fechaLimite o diasPlazo", 400);
+  body = plazoCreateSchema.parse(body);
+  const fechaNotificacion = body.fechaNotificacion ? parseDateInput(body.fechaNotificacion) : null;
+  const explicitDate = body.fechaLimite ? parseDateInput(body.fechaLimite) : null;
+  if (!explicitDate && !body.diasPlazo) throw httpError("Indique fechaLimite o diasPlazo", 400);
   return executeCommand({
     key: commandKey, ownerId: user.id, input: body,
     authorize: async (tx) => {
-      if (body.causaId) await assertCausaCapability(body.causaId, user, "plazo.edit", tx);
-      else if (!can(user, "plazo.edit", { own: !body.responsableId || body.responsableId === user.id })) throw httpError("Sin permiso para crear este plazo", 403);
+      const actor = await currentStaffActor(user, tx);
+      if (body.causaId) { const access = await assertCausaCapability(body.causaId, actor, "plazo.edit", tx); if (access.causaRol === "lectura" && !can(actor, "causa.write")) throw httpError("La causa sólo permite lectura", 403); }
+      else if (!can(actor, "plazo.edit", { own: !body.responsableId || body.responsableId === user.id })) throw httpError("Sin permiso para crear este plazo", 403);
       if (body.responsableId) {
         const target = await tx.user.findFirst({ where: { id: body.responsableId, role: { in: [...STAFF_ROLES] } } });
         if (!target) throw httpError("Responsable no válido", 400);
@@ -33,7 +35,10 @@ export async function createPlazoCommand(user: CausaAccessUser, body: z.infer<ty
       }
     },
     run: async (tx) => {
+      if (!explicitDate) await requireDeadlineComputation(tx);
+      const fechaLimite = explicitDate || new Date(`${calcularVencimientoYmd({ desde: civilDateKey(fechaNotificacion || new Date()), dias: body.diasPlazo!, tipoComputo: body.tipoComputo || "habiles" })}T00:00:00.000Z`);
       const plazo = await tx.plazo.create({ data: {
+        ...(!explicitDate ? deadlineCalculation : {}),
         titulo: body.titulo, descripcion: body.descripcion || null, fechaLimite, fechaNotificacion,
         diasPlazo: body.diasPlazo || null, tipoComputo: body.tipoComputo || "habiles", esFatal: Boolean(body.esFatal),
         tipo: body.tipo || "procesal", estado: "pendiente", causaId: body.causaId || null, responsableId: body.responsableId || user.id,
@@ -51,11 +56,14 @@ export async function updatePlazoCommand(user: CausaAccessUser, body: z.infer<ty
   return executeCommand({
     key: commandKey, ownerId: user.id, input: body,
     authorize: async (tx) => {
-      const current = await tx.plazo.findFirst({ where: { id: body.id, ...plazoAccessWhere(user) } });
+      const actor = await currentStaffActor(user, tx);
+      const current = await tx.plazo.findFirst({ where: { id: body.id, ...plazoAccessWhere(actor) } });
       if (!current) throw httpError("Plazo no encontrado", 404);
-      const capability = body.estado === "cumplido" ? "plazo.close" : "plazo.edit";
-      if (current.causaId) await assertCausaCapability(current.causaId, user, capability, tx);
-      else if (!can(user, capability, { own: current.responsableId === user.id })) throw httpError("Sin permiso para modificar este plazo", 403);
+      const capabilities = body.estado === "cumplido" ? ["plazo.edit", "plazo.close"] as const : ["plazo.edit"] as const;
+      for (const capability of capabilities) {
+        if (current.causaId) { const access = await assertCausaCapability(current.causaId, actor, capability, tx); if (access.causaRol === "lectura" && !can(actor, "causa.write")) throw httpError("La causa sólo permite lectura", 403); }
+        else if (!can(actor, capability, { own: current.responsableId === user.id })) throw httpError("Sin permiso para modificar este plazo", 403);
+      }
     },
     run: async (tx) => {
       const before = await tx.plazo.findUniqueOrThrow({ where: { id: body.id } });

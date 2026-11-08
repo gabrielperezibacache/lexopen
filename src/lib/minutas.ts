@@ -1,3 +1,4 @@
+import { civilDateKey } from "@/lib/chile-time";
 export const TIPOS_MINUTA = [
   { value: "audiencia", label: "Audiencia", hint: "Tribunal, junta o acto procesal" },
   { value: "reunion", label: "Reunión", hint: "Cliente, contraparte o equipo" },
@@ -143,6 +144,7 @@ export function renderMinutaMarkdown(input: {
     responsable?: string | null;
     fechaLimite?: Date | string | null;
     prioridad?: string | null;
+    estado?: string | null;
   }>;
 }) {
   const fecha =
@@ -160,8 +162,9 @@ export function renderMinutaMarkdown(input: {
             const due =
               a.fechaLimite == null
                 ? "sin plazo"
-                : formatLocalDate(a.fechaLimite);
-            return `${i + 1}. **${a.descripcion}** — ${a.responsable || "sin asignar"} · ${due} · prioridad ${a.prioridad || "media"}`;
+                : civilDateKey(typeof a.fechaLimite === "string" ? parseLocalDateInput(a.fechaLimite)! : a.fechaLimite);
+            const estado = ESTADOS_ACCION.find((item) => item.value === a.estado)?.label || a.estado || "Pendiente";
+            return `${i + 1}. **${a.descripcion}** — ${a.responsable || "sin asignar"} · ${due} · prioridad ${a.prioridad || "media"} · estado ${estado}`;
           })
           .join("\n")
       : input.proximosPasos || "_Sin acciones registradas_";

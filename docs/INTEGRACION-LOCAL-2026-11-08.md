@@ -1,0 +1,54 @@
+# Integración del trabajo local — 8 de noviembre de 2026
+
+La consolidación se publica en [PR #254](https://github.com/gabrielperezibacache/lexopen/pull/254). Conserva el historial local de Altazor académico, docencia, conexiones, escritorio y archivos verificados, junto con las correcciones de la auditoría, el modo sin conexión cifrado, WhatsApp, Clientes, tareas, causas, plazos, notas, minutas, documentos y adjuntos. La sincronización mantiene las comprobaciones actuales de permisos, versiones y claves de idempotencia.
+
+## Revisión de pull requests
+
+| PR | Decisión técnica |
+| --- | --- |
+| #231 | Integrado directamente: setup-node 7. |
+| #232, #233, #234 | Incorporados en #254: checkout 7, download-artifact 8 y upload-artifact 7. |
+| #235, #253 | Dependencias compatibles incorporadas en #254; se conservan Prisma 5.22 y las versiones locales superiores cuando corresponde. |
+| #216 | Accesibilidad del equipo incorporada; carga separada por acción, errores recuperables y permisos conservados. |
+| #241 | Estado de carga de tareas incorporado junto con las claves de idempotencia y la versión esperada del trabajo local. |
+| #251 | Incorporada la implementación local posterior de conexiones/configuración, que amplía el trabajo original a Google, GitHub, Dropbox y Microsoft. |
+
+Los PR originales cubiertos por la consolidación se cierran después de integrar #254. No se necesita aplicar sus parches de nuevo.
+
+## Trabajo local y separación de proyectos
+
+Se revisaron las 42 ramas locales. Las diferencias sin publicar de `codex/audit-consolidation` tienen el mismo árbol que la auditoría ya publicada; el texto del chungungo de `codex/altazor-desktop-and-case-workspace` ya está presente. Los tres commits de `codex/mac-private-editorial-8` son integraciones privadas de la edición 8 y las mismas funciones posteriores incluidas en la consolidación. No requieren reintroducir versiones anteriores.
+
+Relevo Android conserva su Git independiente y se excluye de LexOpen por decisión del usuario. Las capturas y vídeos de QA quedan en el equipo y en el respaldo verificado; se publican los recursos usados por la aplicación y los informes de texto. Las configuraciones privadas, credenciales y almacenamiento de usuarios quedan fuera de la publicación.
+
+## Correcciones durante la consolidación
+
+- Resolución de solapamientos manteniendo las funciones locales más recientes, los permisos y la sincronización idempotente.
+- Simulaciones del gateway actualizadas al contrato de autorizaciones, sin conceder permisos de uso del computador por defecto.
+- Reintentos acotados con espera para transacciones serializables de Altazor; regresión con doce preparaciones simultáneas que convergen en una conversación.
+- Limpieza de fixtures después de finalizar todas las operaciones concurrentes, conservando el error original.
+- Pruebas de navegación adaptadas a la restauración del panel de memoria y al rechazo de orígenes externos.
+- Fechas de Agenda en la zona del navegador después de la hidratación, sin diferencias entre el HTML inicial del servidor y el cliente.
+- Formulario de Agenda bloqueado hasta que sus controles están preparados, para conservar las entradas durante la carga inicial.
+- Simulaciones de fallos de red aisladas del service worker; las pruebas sin conexión continúan usándolo.
+- Actualización de dependencias transitivas vulnerables de escritorio y de minimatch en los dos consumidores afectados, manteniendo electron-builder actual.
+- Separación de la regresión general y de las pruebas sin conexión: estas últimas usan el servidor compilado y CSRF activo en Chromium, Firefox y WebKit.
+- Corrección del texto largo del selector de transcripción en WebKit a 360 px, sin ocultar el desbordamiento de la página.
+
+## Validación
+
+Se usan PostgreSQL, almacenamiento y cuentas ficticias en copias aisladas. La revisión incluye pruebas unitarias, integración completa, migraciones y comparación del esquema, tipos, lint, compilación, regresión de navegador y CI con instaladores nativos. Los resultados finales y los checks corresponden al estado del PR #254. Estas pruebas no acreditan el funcionamiento con cuentas externas reales ni implican publicar una versión o ejecutar migraciones sobre datos de usuarios.
+
+La validación local acumulada después de corregir los fallos cubre más de 260 casos distintos de Chromium, 81 de WebKit y 5 de audio nativo. Pasaron las pruebas unitarias, la integración completa con PostgreSQL, la integración adicional de Altazor y sus autorizaciones, el esquema sin diferencias, tipos, lint y la compilación final. La instalación reproducible de escritorio y sus pruebas pasan; la auditoría final de producción y la de escritorio registran cero vulnerabilidades. Los motores locales instalados se usan como comprobación adicional; CI descarga los motores correspondientes a Playwright 1.64.1 y construye los instaladores desde el commit final.
+
+
+## Último trabajo simultáneo
+
+La instantánea adicional revisada incorpora el encaminamiento de encargos de Dropbox/OneDrive, las instrucciones jurídicas y académicas de Altazor sin presuponer una jurisdicción, la presentación de consultas en español y la continuación acotada de metadatos autorizados. Se conservan las revisiones y permisos vigentes; estos cambios no acreditan el acceso a cuentas externas reales. Los commits locales terminados después de esa instantánea incorporan la receta fijada `gateway.15`, con diecisiete refuerzos y sus pruebas, y la selección estricta de herramientas de las cuentas elegidas. También exigen procedencia asignada por el servidor antes de presentar texto como resultado de una consulta: un mensaje del modelo no puede suplantar ese recibo. El informe del trabajo de conexiones conserva separados los resultados ficticios, los resultados externos comunicados por su autor y las funciones pendientes.
+
+
+La primera ejecución completa de CI alcanzó el límite de 35 minutos durante la etapa general. El flujo final reparte esos mismos 197 casos en cuatro grupos independientes (50, 55, 47 y 45), y ejecuta Chromium, Firefox, WebKit y audio compilados en paralelo a partir del mismo artefacto. Un check final `build` exige éxito de todas las pruebas de aplicación, navegador y runtimes; los estados fallidos, cancelados, omitidos o ausentes impiden la fusión. Se verificaron la selección completa sin duplicados, la sintaxis con actionlint y el comportamiento de esa puerta final.
+
+Se incorporan también los commits locales `6c01549d` y `aa95abe5`: los listados de nombres usan metadatos tipados y origen verificado, distinguen carpetas y PDF y declaran los límites de cada página. GitHub conserva y renueva los accesos con vencimiento, con comprobación de capacidades, rotación y permisos `read:user`; las credenciales permanecen fuera del navegador y del modelo.
+
+La ejecución compilada de WebKit detectó un problema de los fixtures: un encabezado CSRF global de Playwright sobrescribía el token actualizado de las peticiones de la página. Se reprodujo con cookies ficticias y los dos motores locales de WebKit. Los encabezados de autenticación se limitan ahora a las peticiones API explícitas y se calculan con la cookie vigente. La prueba de rotación exige que la página use el token nuevo y que se rechacen los tokens inválidos, los orígenes externos y la ausencia de token en producción. El servidor conserva su protección CSRF.

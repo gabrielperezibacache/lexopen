@@ -55,7 +55,7 @@
 .altazor-composer { margin-top:.5rem; min-width:0; border:1px solid var(--line-strong); border-radius:.85rem; background:var(--surface-solid); padding:.7rem; }
 .altazor-composer:focus-within { border-color:var(--sea); }
 .altazor-composer textarea { border:none; padding:.5rem .6rem; min-height:110px; box-shadow:none; outline-offset:2px; }
-.altazor-composer-footer { display:flex; align-items:center; gap:.5rem; padding-top:.4rem; }
+.altazor-composer-footer { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding-top:.4rem; }
 .altazor-composer-footer>.btn:last-child { margin-left:auto; }
 .altazor-composer-footer>span { flex-shrink:0; color:var(--muted); font-size:1rem; margin-left:auto; }
 .altazor-attachments { display:grid; gap:.75rem; margin-top:1rem; }
@@ -154,6 +154,8 @@
  .altazor-composer { padding:.4rem; }
  .altazor-composer textarea { min-height:84px; }
  .altazor-composer-footer>span { display:none; }
+ .altazor-composer-apps>span { display:none; }
+ .altazor-composer-apps { padding-inline:.65rem; }
  .altazor-composer-footer>.btn:last-child { margin-left:auto; }
  .altazor-send-settings { padding:.35rem; }
  .altazor-context-label { margin:0; }

@@ -19,7 +19,8 @@ export default async function TarifasPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleHeader artwork="billing"
+      <ModuleHeader
+        artwork="billing"
         eyebrow="Condiciones de honorarios"
         title="Tarifas y honorarios"
         subtitle="Condiciones por hora, suma alzada, retainer, cuota litis o mixtas — por cliente o causa."

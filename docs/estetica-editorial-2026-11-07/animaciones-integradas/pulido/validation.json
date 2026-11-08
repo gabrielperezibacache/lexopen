@@ -1,0 +1,107 @@
+{
+  "views": 20,
+  "engines": [
+    "Chromium",
+    "WebKit"
+  ],
+  "allPlaying": true,
+  "allMutedAndInline": true,
+  "allAtRate08": true,
+  "allVideosFullyPresented": true,
+  "desktopControlHidden": true,
+  "overflow": [],
+  "javascriptErrors": [],
+  "backgroundChecks": [
+    {
+      "file": "chromium-mis-causas-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-mis-causas-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-mis-causas-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-mis-causas-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-facturacion-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-plazos-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "chromium-buscar-dark-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-light-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-dark-desktop.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-light-mobile.png",
+      "backgroundDelta": 0
+    },
+    {
+      "file": "webkit-buscar-dark-mobile.png",
+      "backgroundDelta": 0
+    }
+  ],
+  "functionalCasesPassed": 13,
+  "functionalVerification": "11 autoplay, lifecycle, frame-presentation and navigation cases passed; the two strict-gesture cases passed in a targeted run after correcting the fixture to close permission after React delegated events.",
+  "typeScript": "global noEmit passed",
+  "eslint": "affected components and tests passed",
+  "sourceHashes": {
+    "src/components/ui/EditorialMotion.tsx": "aefa6bb1ea1c681385a23b0fba21be80abdff444ae0f5a06cb7b323ab6b78055",
+    "src/components/ui/EditorialHeading.tsx": "d4acee1e08f9b3ae61c91481326011beb9a13fa4eb17a95d5d927abd060427ef",
+    "e2e/editorial-motion.spec.ts": "6df11884debd559aa3803382f9e83ab80d893880114060bb157a152db5ed96ba"
+  },
+  "scope": "Local dummy-data verification. Strict gesture permission and delayed frame callbacks are simulated. No physical-device battery or decoder-performance claim.",
+  "deployed": false
+}

@@ -8,6 +8,7 @@
 import { normalizeSearch } from "@/lib/search";
 import type { AssistantIntent, AssistantIntentId } from "./types";
 import type { NormalizedAssistantInput } from "./normalize";
+import { connectorDesktopIntent } from "./connector-desktop-intent";
 
 export type RuleClassifyResult = {
   intents: AssistantIntent[];
@@ -209,6 +210,8 @@ export function ruleClassify(
   normalized: NormalizedAssistantInput
 ): RuleClassifyResult {
   const flat = normalizeSearch(normalized.text);
+  const connectorTask = connectorDesktopIntent(normalized.text);
+  if (connectorTask) return { intents: [connectorTask] };
   const desktopRead = explicitDesktopListing(normalized);
   if (desktopRead) return { intents: [desktopRead] };
   const workflowRead=explicitWorkflowListing(normalized);

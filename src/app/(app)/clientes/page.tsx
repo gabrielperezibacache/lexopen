@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireStaffPage } from "@/lib/auth/access";
 import { NewClienteForm } from "@/components/clientes/NewClienteForm";
-import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { clienteListInclude } from "@/lib/clientes/list";
 import { StatusBadge } from "@/components/ui";
 import { getI18n } from "@/lib/i18n/server";
 import { PageHeader } from "@/components/sites/SiteNav";
@@ -12,7 +12,7 @@ export default async function ClientesPage({
 }: {
   searchParams: Promise<{ q?: string; estado?: string }>;
 }) {
-  await requireStaffPage();
+  const user = await requireStaffPage();
   const { t } = await getI18n();
   const sp = await searchParams;
   const q = sp.q?.trim();
@@ -35,23 +35,7 @@ export default async function ClientesPage({
             : {},
         ],
       },
-      include: {
-        abogado: { select: { id: true, name: true } },
-        _count: { select: { causas: true, documentos: true } },
-        causas: {
-          select: {
-            // ⚡ Bolt: Use Prisma's `_count` aggregate to avoid an O(N) memory/bandwidth
-            // bottleneck that gets worse as a client accumulates cases and tasks.
-            _count: {
-              select: {
-                tramites: {
-                  where: { estado: { in: [...TRAMITES_ABIERTOS] } },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: clienteListInclude(user),
       orderBy: { updatedAt: "desc" },
       take: LIST_TAKE,
     }),
@@ -64,11 +48,12 @@ export default async function ClientesPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader artwork="clients"
+      <PageHeader
         eyebrow={t("crm.eyebrow")}
         title={t("crm.title")}
+        artwork="clients"
         subtitle={t("crm.subtitle")}
-        actions={<NewClienteForm abogados={abogados} />}
+        actions={<NewClienteForm abogados={abogados} userId={user.id} />}
       />
 
       <form className="panel grid items-end gap-4 rounded-[var(--radius-lg)] p-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,0.5fr)_auto]" role="search">

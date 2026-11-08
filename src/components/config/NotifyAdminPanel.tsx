@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { WhatsAppSettings, type WhatsAppSnapshot } from "./WhatsAppSettings";
 import { tipoDef } from "@/lib/notify/catalog";
 
 type Snapshot = {
@@ -24,7 +25,7 @@ type Snapshot = {
     subject: string | null;
     hasPrivateKey: boolean;
   };
-  whatsapp: { enabled: boolean; note: string };
+  whatsapp: WhatsAppSnapshot;
 };
 
 type UncertainDelivery = { id: string; canal: string; plantilla: string; createdAt: string; envioIniciadoAt: string | null; proveedor: string | null };
@@ -219,7 +220,7 @@ export function NotifyAdminPanel() {
         <h2 className="font-semibold">Notificaciones · proveedores</h2>
         <p className="text-sm text-[var(--ink-soft)]/70">
           SMTP genérico, Gmail OAuth (existente), Telegram long-poll, Web Push.
-          WhatsApp: interfaz en 1.1, envío en 1.2.
+          WhatsApp: Meta Cloud API o Twilio, con vinculación verificada.
         </p>
         {outbox && (
           <p className="text-xs text-[var(--ink-soft)]/60">
@@ -453,13 +454,7 @@ export function NotifyAdminPanel() {
         </form>
       </Dialog>
 
-      <section className="panel space-y-2 rounded-3xl p-5 opacity-80">
-        <h3 className="font-medium">WhatsApp (1.2)</h3>
-        <p className="text-sm text-[var(--ink-soft)]/70">
-          {snapshot?.whatsapp.note ||
-            "Interfaz ChannelProvider lista; envío en la siguiente fase."}
-        </p>
-      </section>
+      {snapshot && <WhatsAppSettings key={JSON.stringify(snapshot.whatsapp)} snapshot={snapshot.whatsapp} onSaved={load} />}
 
       {message && <p role="status" className="text-sm text-[var(--ink-soft)]">{message}</p>}
     </div>

@@ -1,20 +1,19 @@
-/* LexOpen service worker — PWA basics + Web Push (1.1). Offline cola = 2.0. */
-
-self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  event.waitUntil(caches.open("lexopen-shell-v1").then((cache) => cache.addAll(["/"])));
+/* Only this public shell is cached. Authenticated pages, APIs and attachments never enter CacheStorage. */
+const SHELL_CACHE = "lexopen-offline-shell-v8";
+const SHELL_FILES = ["/offline.html", "/offline/workspace.css", "/offline/workspace.js", "/offline/vault.js", "/offline/records.js", "/offline/bindings.js", "/offline/memos.js", "/offline/files.js", "/offline/operations.js"];
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("lexopen-shell-") || key.startsWith("lexopen-offline-shell-") && key !== SHELL_CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
-self.addEventListener("fetch", (event) => {
-  // Network-first; shell cache solo como respaldo de navegación.
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match("/") || Response.error())
-    );
+self.addEventListener("fetch", event => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (SHELL_FILES.includes(url.pathname)) {
+    event.respondWith(caches.open(SHELL_CACHE).then(cache => cache.match(url.pathname)).then(cached => cached || fetch(event.request)));
+  } else if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(async () => (await caches.match("/offline.html")) || Response.error()));
   }
 });
 
@@ -37,7 +36,8 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/";
+  let url = new URL("/", self.location.origin).href;
+  try { const target = new URL(event.notification.data?.url || "/", self.location.origin); if (target.origin === self.location.origin) url = target.href; } catch {}
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {

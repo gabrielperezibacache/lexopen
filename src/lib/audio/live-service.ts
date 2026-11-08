@@ -63,7 +63,7 @@ export async function readHearingLiveAudio(causaId: string, workspaceId: string,
   const config = await hearingTranscriptionReadiness(client);
   if (!can(actor, "doc.confidential.read")) { config.canCapture = false; config.warnings.push("La captura privada requiere permiso para documentos confidenciales."); }
   const sessions = await client.hearingLiveAudioSession.findMany({ where: { workspaceId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: L.sessions, include: { _count: { select: { clips: true } } } });
-  return { config, sessions: sessions.map(row => summary(row, row._count.clips)), ...(input.sessionId ? { session: await detail(causaId, workspaceId, input.sessionId, actor, client, input.before) } : {}), canWrite, maxBytes: L.clipBytes, clipSeconds: L.clipSeconds, maxSessions: L.sessions, maxClips: L.clips, warnings };
+  return { actorId: actor.id, config, sessions: sessions.map(row => summary(row, row._count.clips)), ...(input.sessionId ? { session: await detail(causaId, workspaceId, input.sessionId, actor, client, input.before) } : {}), canWrite, maxBytes: L.clipBytes, clipSeconds: L.clipSeconds, maxSessions: L.sessions, maxClips: L.clips, warnings };
 }
 export async function startHearingLiveAudio(causaId: string, workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma): Promise<HearingLiveAudioMutation> {
   const input = liveAudioStartSchema.parse(raw), { actor } = await workspaceFor(causaId, workspaceId, user, client, true); await captureReady(client, actor);

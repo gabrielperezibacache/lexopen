@@ -81,7 +81,7 @@ Poller dedicado opcional: `node scripts/telegram-poller.mjs`.
 - Salidas HTTP vía `fetchSafeOutbound`.
 - Payload **minimizado antes** de encolar (Telegram/push default `minimo`).
 - Rate limit en vinculación Telegram.
-- WhatsApp 1.2: consentimientos + webhook firmado (fuera de alcance aquí).
+- WhatsApp: vinculación de un uso con consentimiento, firmas Meta/Twilio, destino cifrado y revocación. [Configuración y alcance](WHATSAPP-Y-OFFLINE.md).
 
 ## Tests
 
@@ -99,10 +99,10 @@ E2E_DATABASE_URL=postgresql://.../lexopen_own_core_e2e node --import tsx src/lib
 E2E_BASE_URL=http://127.0.0.1:3210 npm run e2e -- e2e/notify-reconciliation.spec.ts
 ```
 
-## Límites 1.1
+## Límites actuales
 
-- Sin WhatsApp de envío (stub `whatsapp_meta` / `whatsapp_twilio`).
-- PWA: instalable + push; offline con cola de quick-add → 2.0.
+- WhatsApp envía plantillas aprobadas sin variables mediante Meta o Twilio. Requiere credenciales y webhook HTTPS; no implementa conversaciones ni confirmación de lectura.
+- PWA: instalable y push, con espacio cifrado de escritos previamente preparados. El trabajo sin conexión de otros módulos requiere implementación específica.
 - La entrega externa y la confirmación en PostgreSQL no forman una transacción distribuida. No se promete exactamente una entrega: los casos ambiguos requieren conciliación.
 - Los handlers de la cola genérica `Job` deben ser idempotentes: una lease vencida puede ejecutar nuevamente su trabajo.
 - Web Push admite los servicios de navegador declarados (Google, Mozilla, Apple y Windows), HTTPS y transporte sin redirecciones; un endpoint arbitrario no es un destino válido.

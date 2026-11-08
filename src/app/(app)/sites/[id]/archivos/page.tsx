@@ -139,7 +139,7 @@ export default async function SiteFilesPage({ params }: Params) {
                       Descargar
                     </a>{" "}
                     · {f.versions.length} versiones
-                    {!clientView && <Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link>}
+                    {!clientView && <><Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link><Link href={`/offline.html?kind=adjunto&record=${f.id}`} className="ml-3 inline-flex min-h-11 items-center text-[var(--sea)]">Sin conexión</Link></>}
                     {!clientView && (
                       <details className="mt-2">
                         <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Comentar</summary>
@@ -169,7 +169,7 @@ export default async function SiteFilesPage({ params }: Params) {
                   >
                     Descargar
                   </a>
-                  {!clientView && <Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link>}
+                  {!clientView && <><Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link><Link href={`/offline.html?kind=adjunto&record=${f.id}`} className="ml-3 inline-flex min-h-11 items-center text-[var(--sea)]">Sin conexión</Link></>}
                 </div>
               ))}
             </div>

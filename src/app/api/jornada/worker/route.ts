@@ -1,4 +1,6 @@
 import { runQueuedAltazorTurns } from "@/lib/altazor/worker";
+import { runScheduledAcademicCallRefresh } from "@/lib/altazor/academic-calls";
+import { runDueTeachingReminders } from "@/lib/altazor/teaching-reminders";
 import { processDueDailyBriefs } from "@/lib/altazor/daily-brief";
 import { processDueDriveSyncSubscriptions } from "@/lib/integrations/drive-sync";
 import { processPendingPjudDocumentJobs } from "@/lib/pjud/document-queue";
@@ -13,6 +15,8 @@ export async function POST(request: Request) {
   const tasks = [
     ["altazor", () => runQueuedAltazorTurns()],
     ["dailyBrief", () => processDueDailyBriefs()],
+    ["academicCalls", () => runScheduledAcademicCallRefresh()],
+    ["teachingReminders", () => runDueTeachingReminders()],
     ["drive", () => processDueDriveSyncSubscriptions({ limit: 2 })],
     ["pjud", () => processPendingPjudDocumentJobs({ limit: 4 })],
   ] as const;

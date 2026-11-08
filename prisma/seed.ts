@@ -27,6 +27,7 @@ async function main() {
           // Demo/e2e: no forzar enrolamiento 2FA (producción sigue default true).
           require2faPrivileged: false,
           caseManagementMode: "pjud_cl",
+          workCountry: "CL",
         },
       },
     },

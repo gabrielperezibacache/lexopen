@@ -1,30 +1,12 @@
-import {
-  assertCsrf,
-  handleRouteError,
-  minutaConfidentialWhere,
-  requireStaff,
-} from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
-import { assertCausaCapability, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { assertCsrf, handleRouteError, minutaConfidentialWhere, requireStaff } from "@/lib/api";
+import { requiredCausaWhere as scopedrequiredCausaWhere, documentReadWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
+import { currentStaffActor } from "@/lib/auth/staff-actor";
+import { serializable, requestCommandKey } from "@/lib/command-execution";
+import { parseKnowledgeBody } from "@/lib/knowledge/route-body";
+import { nativeMinuteCreateSchema, createNativeMinute } from "@/lib/minutas/http-service";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
-import {
-  formatLocalDate,
-  isValidModalidad,
-  isValidPrioridad,
-  isValidTipoMinuta,
-  labelTipoMinuta,
-  mapPrioridadToTask,
-  parseLocalDateInput,
-  renderMinutaMarkdown,
-  type MinutaAccionInput,
-} from "@/lib/minutas";
-import { emitNotification } from "@/lib/notify/emit";
-import { calcularVencimiento } from "@/lib/plazos";
-import { documentoListSelect } from "@/lib/sites/file-select";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -51,7 +33,9 @@ export async function GET(req: NextRequest) {
     take: limit,
   });
 
-  return NextResponse.json(minutas);
+  const ids = minutas.flatMap(m => m.documento ? [m.documento.id] : []);
+  const readable = new Set((await prisma.documento.findMany({ where: { id: { in: ids }, ...documentReadWhere(user) }, select: { id: true } })).map(d => d.id));
+  return NextResponse.json(minutas.map(m => ({ ...m, documento: m.documento && readable.has(m.documento.id) ? m.documento : null })), { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     return handleRouteError(e);
   }
@@ -59,324 +43,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-  assertCsrf(req);
-  const body = await req.json();
-  const user = await requireStaff();
-
-  if (!body.causaId || !body.titulo?.trim() || !body.resumenEjecutivo?.trim()) {
-    return NextResponse.json(
-      {
-        error:
-          "Faltan campos obligatorios: causaId, titulo y resumenEjecutivo.",
-      },
-      { status: 400 }
-    );
-  }
-
-  const tipo = body.tipo || "reunion";
-  if (!isValidTipoMinuta(tipo)) {
-    return NextResponse.json(
-      { error: `Tipo de minuta inválido: ${tipo}` },
-      { status: 400 }
-    );
-  }
-
-  const modalidad = body.modalidad || "presencial";
-  if (!isValidModalidad(modalidad)) {
-    return NextResponse.json(
-      { error: `Modalidad inválida: ${modalidad}` },
-      { status: 400 }
-    );
-  }
-
-  await assertCausaCapability(String(body.causaId), user, "causa.write");
-  const causa = await prisma.causa.findFirst({
-    where: { AND: [scopedcausaAccessWhere(user), { id: body.causaId }] },
-    include: { site: true },
-  });
-  if (!causa) {
-    return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
-  }
-  if (Boolean(body.confidencial) && !canSeeConfidential(user)) {
-    return NextResponse.json(
-      { error: "Su rol no puede crear minutas confidenciales" },
-      { status: 403 }
-    );
-  }
-
-  const fecha = body.fecha
-    ? parseLocalDateInput(body.fecha) || new Date(body.fecha)
-    : new Date();
-  if (Number.isNaN(fecha.getTime())) {
-    return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });
-  }
-
-  const accionesInput: MinutaAccionInput[] = Array.isArray(body.acciones)
-    ? body.acciones
-        .filter((a: MinutaAccionInput) => a?.descripcion?.trim())
-        .map((a: MinutaAccionInput) => ({
-          descripcion: a.descripcion.trim(),
-          responsable: a.responsable?.trim() || undefined,
-          fechaLimite: a.fechaLimite || null,
-          diasPlazo: a.diasPlazo ? Number(a.diasPlazo) : null,
-          tipoComputo: a.tipoComputo === "corridos" ? "corridos" : "habiles",
-          esFatal: Boolean(a.esFatal),
-          prioridad: a.prioridad || "media",
-          crearPlazo: Boolean(a.crearPlazo),
-          crearTask: a.crearTask !== false,
-        }))
-    : [];
-
-  for (const a of accionesInput) {
-    if (a.prioridad && !isValidPrioridad(a.prioridad)) {
-      return NextResponse.json(
-        { error: `Prioridad inválida: ${a.prioridad}` },
-        { status: 400 }
-      );
-    }
-    if (a.crearPlazo && !a.fechaLimite && !a.diasPlazo) {
-      return NextResponse.json(
-        {
-          error: `La acción «${a.descripcion}» pide crear plazo pero no tiene fecha ni días plazo.`,
-        },
-        { status: 400 }
-      );
-    }
-  }
-
-  const markdown = renderMinutaMarkdown({
-    tipo,
-    titulo: body.titulo.trim(),
-    fecha,
-    modalidad,
-    lugar: body.lugar,
-    participantes: body.participantes,
-    resumenEjecutivo: body.resumenEjecutivo.trim(),
-    hechosRelevantes: body.hechosRelevantes,
-    acuerdos: body.acuerdos,
-    proximosPasos: body.proximosPasos,
-    riesgosAlertas: body.riesgosAlertas,
-    estadoCausaNota: body.estadoCausaNota,
-    causa,
-    autorName: user?.name,
-    acciones: accionesInput,
-  });
-
-  const docNombre = `Minuta ${tipo} — ${body.titulo.trim()} — ${formatLocalDate(fecha)}.md`;
-
-  const { minuta, createdAcciones } = await prisma.$transaction(async (tx) => {
-    const documento = await tx.documento.create({
-      data: {
-        nombre: docNombre,
-        tipo: "minuta",
-        mimeType: "text/markdown",
-        contenido: markdown,
-        causaId: causa.id,
-        autorId: user?.id,
-      },
-    });
-
-    const minutaRow = await tx.minuta.create({
-      data: {
-        tipo,
-        titulo: body.titulo.trim(),
-        fecha,
-        modalidad,
-        lugar: body.lugar?.trim() || null,
-        participantes: body.participantes?.trim() || "",
-        resumenEjecutivo: body.resumenEjecutivo.trim(),
-        hechosRelevantes: body.hechosRelevantes?.trim() || null,
-        acuerdos: body.acuerdos?.trim() || null,
-        proximosPasos: body.proximosPasos?.trim() || null,
-        riesgosAlertas: body.riesgosAlertas?.trim() || null,
-        estadoCausaNota: body.estadoCausaNota?.trim() || null,
-        etapaSugerida: body.etapaSugerida || null,
-        confidencial: Boolean(body.confidencial),
-        causaId: causa.id,
-        autorId: user?.id,
-        documentoId: documento.id,
-      },
-    });
-
-    const acciones = [];
-    for (const accion of accionesInput) {
-      let plazoId: string | undefined;
-      let taskId: string | undefined;
-      const due =
-        parseLocalDateInput(accion.fechaLimite) ||
-        (accion.diasPlazo
-          ? calcularVencimiento({
-              desde: fecha,
-              dias: accion.diasPlazo,
-              tipoComputo: accion.tipoComputo || "habiles",
-            })
-          : null);
-
-      if (accion.crearPlazo && due) {
-        const plazo = await tx.plazo.create({
-          data: {
-            titulo: accion.descripcion.slice(0, 120),
-            descripcion: `Derivado de minuta: ${body.titulo.trim()}`,
-            fechaLimite: due,
-            diasPlazo: accion.diasPlazo || null,
-            tipoComputo: accion.tipoComputo || "habiles",
-            esFatal: Boolean(accion.esFatal),
-            tipo: tipo === "audiencia" ? "procesal" : "interno",
-            estado: "pendiente",
-            causaId: causa.id,
-            responsableId: user?.id,
-          },
-        });
-        plazoId = plazo.id;
-      }
-
-      if (accion.crearTask) {
-        let assigneeId: string | null = null;
-        if (accion.responsable) {
-          const needle = accion.responsable.toLowerCase();
-          const users = await tx.user.findMany({
-            where: { role: { in: ["admin", "abogado", "asistente"] } },
-            select: { id: true, name: true, email: true },
-          });
-          const match = users.find(
-            (u) =>
-              u.name.toLowerCase() === needle ||
-              u.email.toLowerCase() === needle ||
-              u.name.toLowerCase().includes(needle) ||
-              needle.includes(u.name.toLowerCase().split(" ")[0] || "")
-          );
-          assigneeId = match?.id ?? null;
-        }
-
-        const task = await tx.task.create({
-          data: {
-            title: accion.descripcion.slice(0, 160),
-            description: `Handoff desde minuta «${body.titulo.trim()}» (${tipo}). Responsable: ${accion.responsable || "por asignar"}`,
-            status: "todo",
-            priority: mapPrioridadToTask(accion.prioridad),
-            dueDate: due,
-            siteId: causa.site?.id,
-            creatorId: user?.id,
-            assigneeId,
-          },
-        });
-        taskId = task.id;
-      }
-
-      const row = await tx.minutaAccion.create({
-        data: {
-          descripcion: accion.descripcion,
-          responsable: accion.responsable || null,
-          fechaLimite: due,
-          prioridad: accion.prioridad || "media",
-          minutaId: minutaRow.id,
-          plazoId,
-          taskId,
-        },
-      });
-      acciones.push(row);
-    }
-
-    if (body.etapaSugerida && body.actualizarEtapa) {
-      await tx.causa.update({
-        where: { id: causa.id },
-        data: { etapa: body.etapaSugerida },
-      });
-    }
-
-    await tx.activity.create({
-      data: {
-        tipo: "minuta",
-        mensaje: `Minuta de ${labelTipoMinuta(tipo).toLowerCase()}: ${body.titulo.trim()}`,
-        causaId: causa.id,
-        siteId: causa.site?.id,
-        userId: user?.id,
-      },
-    });
-
-    return { minuta: minutaRow, createdAcciones: acciones };
-  });
-
-  const peers = await prisma.user.findMany({
-    where: {
-      role: { in: ["admin", "abogado", "asistente"] },
-      ...(user ? { id: { not: user.id } } : {}),
-    },
-    take: 20,
-  });
-  if (peers.length > 0) {
-    for (const p of peers) {
-      await emitNotification({
-        tipo: "minuta.nueva",
-        userId: p.id,
-        title: `Nueva minuta · ${causa.rit || causa.titulo}`,
-        body: `${labelTipoMinuta(tipo)}: ${body.titulo.trim()}. Revise próximos pasos para continuar la tramitación.`,
-        href: `/causas/${causa.id}/minutas/${minuta.id}`,
-        entityType: "minuta",
-        entityId: minuta.id,
-        dedupeKey: `minuta:${minuta.id}:${p.id}`,
-      });
-    }
-  }
-
-  let driveResult: Record<string, unknown> | null = null;
-  const wantsDrive = Boolean(body.subirADrive);
-  const canUpload = isRealDriveFolderId(causa.googleDriveFolderId);
-
-  if (wantsDrive) {
-    if (!canUpload) {
-      driveResult = {
-        status: "needs_real_folder",
-        message:
-          "Minuta guardada. Para subir a Drive, vincule o cree una carpeta real en la causa (no stub/demo).",
-      };
-    } else {
-      try {
-        driveResult = await pushMinutaToDrive(minuta.id, {
-          role: user.role,
-        });
-      } catch (e) {
-        driveResult = {
-          status: "error",
-          message: e instanceof Error ? e.message : "Error al subir a Drive",
-        };
+    assertCsrf(req); const user = await requireStaff();
+    const body = await parseKnowledgeBody(req, nativeMinuteCreateSchema);
+    const minuta = await createNativeMinute(user, body, requestCommandKey(req, "minuta.create"));
+    let drive: Record<string, unknown> | null = null;
+    if (body.subirADrive) {
+      if (!isRealDriveFolderId(minuta.causa.googleDriveFolderId)) drive = { status: "needs_real_folder", message: "Minuta guardada. Vincule una carpeta real para subirla a Drive." };
+      else {
+        const actor = await serializable(tx => currentStaffActor(user, tx));
+        try { drive = await pushMinutaToDrive(minuta.id, { role: actor.role }); }
+        catch (e) { drive = { status: "error", message: e instanceof Error ? e.message : "Error al subir a Drive" }; }
       }
     }
-  }
-
-  const full = await prisma.minuta.findFirst({
-    where: { AND: [scopedrequiredCausaWhere(user), { id: minuta.id }] },
-    include: {
-      causa: true,
-      autor: { select: publicUserSelect },
-      acciones: true,
-      documento: { select: documentoListSelect },
-    },
-  });
-
-  await writeAuditStrict({
-    actorId: user.id,
-    action: "minuta.create",
-    entityType: "Minuta",
-    entityId: minuta.id,
-    after: { titulo: body.titulo, tipo, confidencial: Boolean(body.confidencial) },
-  });
-
-  return NextResponse.json(
-    {
-      minuta: full,
-      acciones: createdAcciones,
-      drive: driveResult,
-      warnings:
-        driveResult &&
-        typeof driveResult.status === "string" &&
-        !["uploaded"].includes(driveResult.status)
-          ? [driveResult.message || driveResult.status]
-          : [],
-    },
-    { status: 201 }
-  );
-  } catch (e) {
-    return handleRouteError(e);
-  }
+    return NextResponse.json({ minuta, acciones: minuta.acciones, drive, warnings: drive && drive.status !== "uploaded" ? [drive.message || drive.status] : [] }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) { return handleRouteError(error); }
 }

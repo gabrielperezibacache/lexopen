@@ -1,3 +1,5 @@
+import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
+import { clienteVersion } from "@/lib/offline/version";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { causaAccessWhere, documentReadWhere, siteAccessWhere } from "@/lib/auth/causa-access";
 import Link from "next/link";
@@ -55,6 +57,7 @@ export default async function ClienteDetailPage({
           include: {
             abogado: { select: { id: true, name: true } },
             tramites: {
+              where: { OR: [{ task: null }, { task: { is: taskWorkspaceAccessWhere(user) } }] },
               orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
               include: {
                 responsable: { select: { id: true, name: true } },
@@ -123,7 +126,7 @@ export default async function ClienteDetailPage({
 
       <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="mb-4 text-lg font-semibold">Datos del cliente</h2>
-        <ClienteEditForm cliente={cliente} abogados={abogados} />
+        <ClienteEditForm cliente={{ ...cliente, version: clienteVersion(cliente) }} abogados={abogados} />
       </section>
 
       <section className="panel rounded-[var(--radius-lg)] p-5">

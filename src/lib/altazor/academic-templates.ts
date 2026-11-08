@@ -1,4 +1,6 @@
-import type { AcademicMode } from "./academic-schemas";
+import { SANTIAGO_TZ, santiagoDateKey } from "@/lib/chile-time";
+import type { AcademicCongress, AcademicMode, emptyAcademicBrief } from "./academic-schemas";
+import type { TeachingSessionContent } from "./teaching-session-content";
 
 export type AcademicJourney = "research" | "writing" | "course";
 export const ACADEMIC_JOURNEYS = [
@@ -8,13 +10,149 @@ export const ACADEMIC_JOURNEYS = [
 ] as const satisfies readonly { id: AcademicJourney; label: string; description: string; initialMode: AcademicMode; modes: readonly AcademicMode[] }[];
 
 export function academicJourney(kind: string): AcademicJourney {
-  return kind === "course" ? "course" : kind === "writing" || kind === "career" ? "writing" : "research";
+  return isAcademicTeachingKind(kind) ? "course" : kind === "writing" || kind === "career" ? "writing" : "research";
 }
 export function academicHref(workspaceId?: string, artifactId?: string) {
   const query = new URLSearchParams();
   if (workspaceId) query.set("trabajo", workspaceId);
   if (artifactId) query.set("resultado", artifactId);
   return `/academico${query.size ? `?${query}` : ""}`;
+}
+
+export const ACADEMIC_CALLS_HREF = "/academico?vista=docencia#convocatorias-oficiales";
+
+const teachingProgramSections = {
+  seminar: "Programa y ponentes",
+  congress: "Programa y mesas",
+  workshop: "Actividades y tiempos",
+} as const;
+export function isAcademicTeachingProgram(kind: string): kind is keyof typeof teachingProgramSections {
+  return Object.hasOwn(teachingProgramSections, kind);
+}
+export function isAcademicTeachingSessionKind(kind: string): kind is "course" | keyof typeof teachingProgramSections {
+  return kind === "course" || isAcademicTeachingProgram(kind);
+}
+
+export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
+  blank: { label: "Documento en blanco", description: "Escribe con tu propia estructura.", headings: [] },
+  article: { label: "Artículo académico", description: "Presenta una pregunta, su método y tus hallazgos.", headings: ["Resumen", "Palabras clave", "Introducción", "Marco teórico", "Metodología", "Resultados", "Discusión", "Conclusiones", "Referencias"] },
+  legal_essay: { label: "Ensayo jurídico", description: "Desarrolla una tesis, sus objeciones y sus fundamentos.", headings: ["Problema jurídico", "Tesis", "Marco normativo y jurisprudencial", "Argumentación", "Objeciones y respuesta", "Conclusiones", "Referencias"] },
+  thesis: { label: "Proyecto de tesis", description: "Delimita la investigación y organiza su ejecución.", headings: ["Problema y justificación", "Pregunta de investigación", "Objetivos", "Estado del arte", "Metodología", "Cronograma", "Referencias"] },
+  paper: { label: "Ponencia", description: "Prepara una intervención para un encuentro académico.", headings: ["Resumen", "Problema y tesis", "Argumentos", "Conclusiones", "Preguntas para el diálogo", "Referencias"] },
+  course: { label: "Programa de curso", description: "Planifica unidades, sesiones y evaluación.", headings: ["Descripción y destinatarios", "Resultados de aprendizaje", "Unidades y sesiones", "Metodología", "Evaluación", "Calendario", "Lecturas"] },
+  seminar: { label: "Seminario", description: "Ordena sesiones, ponentes, lecturas y discusión.", headings: ["Propósito y destinatarios", teachingProgramSections.seminar, "Lecturas previas", "Preguntas de discusión", "Calendario y responsabilidades"] },
+  congress: { label: "Congreso", description: "Prepara el programa y distribuye el trabajo del equipo.", headings: ["Tema y ejes", "Comité y responsabilidades", teachingProgramSections.congress, "Convocatoria y evaluación", "Inscripción y logística", "Hitos y plazos"] },
+  workshop: { label: "Taller", description: "Diseña actividades, materiales y una pauta de evaluación.", headings: ["Resultados esperados", "Destinatarios y requisitos", teachingProgramSections.workshop, "Materiales", "Evaluación y seguimiento"] },
+  participant_handout: { label: "Hoja para participantes", description: "Reúne las sesiones elegidas, sus actividades y espacio para notas.", headings: [] },
+  call: { label: "Convocatoria", description: "Registra bases, elegibilidad, entregables y fechas clave.", headings: ["Entidad convocante y país", "Bases y fuente oficial", "Requisitos de elegibilidad", "Documentos y entregables", "Fechas y zona horaria", "Equipo y responsabilidades", "Seguimiento"] },
+} as const;
+export type AcademicManuscriptTemplate = keyof typeof ACADEMIC_MANUSCRIPT_TEMPLATES;
+export const ACADEMIC_MANUSCRIPT_TEMPLATE_IDS = Object.keys(ACADEMIC_MANUSCRIPT_TEMPLATES) as [AcademicManuscriptTemplate, ...AcademicManuscriptTemplate[]];
+export const ACADEMIC_TEACHING_TEMPLATES = ["course", "seminar", "congress", "workshop", "call"] as const;
+export function isAcademicTeachingKind(kind: string): kind is (typeof ACADEMIC_TEACHING_TEMPLATES)[number] {
+  return ACADEMIC_TEACHING_TEMPLATES.some(id => id === kind);
+}
+
+type ManuscriptSession = {
+  id?: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  content: TeachingSessionContent;
+};
+
+const sessionDateTime = new Intl.DateTimeFormat("es-CL", { timeZone: SANTIAGO_TZ, dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
+const sessionTime = new Intl.DateTimeFormat("es-CL", { timeZone: SANTIAGO_TZ, timeStyle: "short", hourCycle: "h23" });
+
+function markdownSessionText(value: string) {
+  return value.replace(/[\s\p{Cc}]+/gu, " ").trim().replace(/[\\`*\[\]]/g, "\\$&");
+}
+
+function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptSession, titleStyle: "heading" | "bold" = "heading") {
+  const start = sessionDateTime.format(startsAt);
+  const end = endsAt && (santiagoDateKey(startsAt) === santiagoDateKey(endsAt) ? sessionTime : sessionDateTime).format(endsAt);
+  const resourceLabel = ({ title, href }: TeachingSessionContent["readings"][number]) =>
+    href ? `${markdownSessionText(title)} — ${href}` : markdownSessionText(title);
+  const sections = [
+    { label: "Ponentes", entries: (content.speakers ?? []).map(markdownSessionText) },
+    { label: "Moderación", entries: (content.moderators ?? []).map(markdownSessionText) },
+    { label: "Resultados de aprendizaje", entries: content.outcomes.map(markdownSessionText) },
+    { label: "Lecturas", entries: content.readings.map(resourceLabel) },
+    { label: "Materiales", entries: content.materials.map(resourceLabel) },
+  ];
+  return [
+    titleStyle === "bold" ? `**${markdownSessionText(title)}**` : `### ${markdownSessionText(title)}`,
+    `${end ? `${start} – ${end}` : start} (Santiago)`,
+    ...(content.location ? [`**Sala o modalidad**`, markdownSessionText(content.location)] : []),
+    ...sections.filter(({ entries }) => entries.length)
+      .flatMap(({ label, entries }) => [`**${label}**`, entries.map(entry => `- ${entry}`).join("\n")]),
+    ...(content.activity ? ["**Actividad**", content.activity.split(/\r\n?|\n/).map(markdownSessionText).join("\n")] : []),
+  ].join("\n\n");
+}
+
+function congressProgramBody(congress: AcademicCongress, sessions: readonly ManuscriptSession[]) {
+  const sections: string[] = [];
+  const assigned = new Set<string>();
+  for (const axis of congress.axes) {
+    const tables: string[] = [];
+    for (const table of congress.tables.filter(item => item.axisId === axis.id)) {
+      const linkedIds = new Set(table.sessionIds);
+      const linked = sessions.filter(session => session.id && linkedIds.has(session.id));
+      if (!linked.length) continue;
+      for (const session of linked) assigned.add(session.id!);
+      tables.push([
+        `**Mesa · ${markdownSessionText(table.title)}**`,
+        ...(table.responsible ? ["**Responsable**", markdownSessionText(table.responsible)] : []),
+        ...linked.map(session => manuscriptSessionBody(session, "bold")),
+      ].join("\n\n"));
+    }
+    if (tables.length) sections.push(`### Eje · ${markdownSessionText(axis.title)}`, ...tables);
+  }
+  const unassigned = sessions.filter(session => !session.id || !assigned.has(session.id));
+  if (unassigned.length) sections.push("### Otras sesiones", ...unassigned.map(session => manuscriptSessionBody(session, "bold")));
+  return sections;
+}
+
+export function academicManuscriptBody(
+  templateId: AcademicManuscriptTemplate,
+  title: string,
+  brief: typeof emptyAcademicBrief,
+  sessions: readonly ManuscriptSession[] = [],
+) {
+  if (templateId === "blank") return "";
+  const heading = `# ${title.replace(/\s+/g, " ")}`;
+  if (templateId === "participant_handout") {
+    return ["# Hoja para participantes", `## ${markdownSessionText(title)}`, ...sessions.map(session =>
+      `${manuscriptSessionBody(session)}\n\n**Tus notas**\n\n\n\n\n`,
+    )].join("\n\n");
+  }
+  if (templateId === "call" && brief.call) {
+    const { country, organization, url, deadline } = brief.call;
+    const [entity, source, requirements, deliverables, dates, roles, followup] = ACADEMIC_MANUSCRIPT_TEMPLATES.call.headings;
+    const countryName = country ? new Intl.DisplayNames(["es"], { type: "region" }).of(country) : "";
+    return [heading, `## ${entity}`, [organization, countryName].filter(Boolean).join(" · "), `## ${source}`, url,
+      `## ${requirements}`, `## ${deliverables}`, `## ${dates}`, deadline ? `Cierre registrado: ${deadline}` : "", `## ${roles}`, `## ${followup}`].filter(Boolean).join("\n\n");
+  }
+  if (templateId !== "course") {
+    const sessionSection = isAcademicTeachingProgram(templateId) ? teachingProgramSections[templateId] : undefined;
+    const sessionBodies = templateId === "congress" && brief.congress?.axes.length
+      ? congressProgramBody(brief.congress, sessions)
+      : sessions.map(session => manuscriptSessionBody(session));
+    return [heading, ...ACADEMIC_MANUSCRIPT_TEMPLATES[templateId].headings.flatMap(label =>
+      label === sessionSection ? [`## ${label}`, ...sessionBodies] : [`## ${label}`],
+    )].join("\n\n");
+  }
+  const fields = brief.syllabus;
+  const blocks = [
+    ["Resumen y enfoque", fields?.summary, fields?.approach],
+    ["Destinatarios y requisitos", brief.audience, fields?.requirements],
+    ["Horario y sala", fields?.schedule, fields?.room, brief.duration],
+    ["Resultados de aprendizaje", brief.learningOutcomes],
+    ["Unidades y sesiones", ...sessions.map(session => manuscriptSessionBody(session))],
+    ["Evaluación", brief.evaluation],
+    ["Bibliografía base", fields?.bibliography],
+  ];
+  return [heading, ...blocks.map(([label, ...contents]) => [`## ${label}`, ...contents.map(value => value?.trim()).filter(Boolean)].join("\n\n"))].join("\n\n");
 }
 export const ACADEMIC_INSTRUCTIONS: Record<AcademicMode, string> = {
   literature_review: "Organiza el estado del arte sobre la pregunta del trabajo. Distingue consensos, desacuerdos, métodos y vacíos de investigación en las fuentes elegidas.",

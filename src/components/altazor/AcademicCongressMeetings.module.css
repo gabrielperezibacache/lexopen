@@ -1,0 +1,31 @@
+.root { min-width:0; border-block:1px solid var(--line); scroll-margin-block-start:calc(var(--shell-header-offset, 4rem) + .75rem); }
+.root > details > summary,.meeting > details > summary,.notes > summary { display:flex; align-items:center; gap:.6rem; min-height:44px; padding:.5rem .75rem; color:var(--sea); cursor:pointer; }
+.root > details > summary { flex-wrap:wrap; }
+.root summary::after { content:""; inline-size:.48rem; block-size:.48rem; flex:none; border-block-end:1px solid currentColor; border-inline-end:1px solid currentColor; margin-inline-start:auto; transform:rotate(45deg); }
+.root details[open] > summary::after { transform:rotate(225deg); }
+.count,.helper,.meetingHeading > span { font-size:var(--text-sm); color:var(--ink-soft); }
+.count { margin-inline-start:auto; }
+.body { display:grid; gap:.8rem; min-width:0; padding-block:.5rem 1rem; }
+.helper { margin:0; max-width:65ch; }
+.meeting { min-width:0; border-block:1px solid var(--line); }
+.meetingHeading { display:grid; gap:.25rem; min-width:0; overflow-wrap:anywhere; }
+.meetingHeading > strong { color:var(--ink); font-size:var(--text-sm); }
+.editor { display:grid; gap:.85rem; min-width:0; padding:.5rem .75rem 1rem; }
+.fields { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:.85rem 1rem; min-width:0; }
+.fields label,.notes label,.agreement > label { display:grid; gap:.35rem; min-width:0; }
+.fields input,.notes textarea,.agreement textarea { min-width:0; }
+.notes { min-width:0; border-block:1px solid var(--line); }
+.notes > summary { font-size:var(--text-sm); }
+.notes > div { display:grid; gap:.85rem; padding-block:.35rem 1rem; }
+.agreements { display:grid; gap:1rem; min-width:0; }
+.agreement { display:grid; gap:.6rem; min-width:0; border-block-end:1px solid var(--line); padding-block-end:.75rem; }
+.actions { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; }
+.originLink { display:inline-flex; align-items:center; gap:.4rem; min-height:44px; color:var(--sea); text-decoration:underline; text-underline-offset:.18em; }
+.originLink svg { flex:none; }
+.body > button,.editor > button,.agreements > button { justify-self:start; }
+.error { margin:0; font-size:var(--text-sm); color:var(--danger); overflow-wrap:anywhere; }
+@media (max-width:600px) {
+  .fields { grid-template-columns:minmax(0,1fr); }
+  :global(body:has(.altazor-companion-launcher)) .editor { padding-inline-end:4.25rem; }
+  :global(body:has(.altazor-companion-launcher)) .body > button { margin-inline-end:4.25rem; }
+}

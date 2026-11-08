@@ -29,7 +29,8 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
       <Link href={sp.desde === "minutas" ? "/minutas?nueva=1#nueva-minuta" : `/causas/${causa.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] underline underline-offset-4">
         {sp.desde === "minutas" ? "Volver a elegir causa" : "Volver a la causa"}
       </Link>
-      <PageHeader artwork="writing"
+      <PageHeader
+        artwork="writing"
         title="Nueva minuta"
         subtitle="Completa el contexto y el resumen. Si quedaron compromisos, añádelos antes de guardar."
       />

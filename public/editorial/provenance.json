@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-06",
+  "generator": "built-in ImageGen",
+  "contains_application_data": false,
+  "assets": [
+    {
+      "file": "academico.webp",
+      "sha256": "b8eede15df2b999ef5d25b74a6bbd96a60ab1f31eab06ff8affbc9c166781d03",
+      "dimensions": [360, 224],
+      "prompt": "Create ONE standalone transparent PNG cutout for the header of LexOpen, an editorial workspace for legal academics. Subject: a small slightly angled open scholar's book with a plain feather quill laying across the lower margin, a thick closed volume subtly supporting it beneath. Entire grouped silhouette fully visible, compact horizontal 4:3 composition, centered with 5% safety margin, clear detail at 100 px wide. Design exactly in the silver classical engraving / intaglio tradition of a 19th century bookplate, dimensional fine etched crosshatching and carved highlights, weathered graphite ink shadows, a restrained neutral silver with a whisper of cool slate at midtones. Plenty of solid dark engraved ink lines so it reads on white and opaque light silver highlights so it reads on deep indigo. True transparent alpha outside subject. No background, vignette, base platform, aura, border, added shadow, text, characters, ornament, sparkles, brand mark, gradients or colored wash. Faint abstract non-legible hatching on the book leaves, no readable letters. Final should feel archival, tactile, composed and used, like an original elegant legal publisher's spot illustration."
+    },
+    {
+      "file": "agenda.webp",
+      "sha256": "9910f1bed961d8a34f0604962dcc5055922432ef0c59e8988622dec6040f27ad",
+      "dimensions": [360, 231],
+      "prompt": "Create ONE standalone transparent PNG cutout for the Agenda of LexOpen, a restrained editorial legal workspace. Subject: a small classical hourglass with a visible trickle of sand beside a folded leather pocket planner and a single ribbon bookmark. No visible lettering or dates. This should read as a crisp, compact horizontal spot illustration on both white and deep indigo at about 105 px wide. Group the three elements into one stable low centered silhouette with a clear outline and 5% safe margin, whole objects uncropped. Fine 19th-century steel engraving crosshatching, silver metallic lit edge, graphite engraved shadows, subtle cool slate neutrals, tactile historic bookplate workmanship. Opaque bright and dark interior strokes, genuine transparent alpha outside subject. No colored background or color wash, gradient, base platform, cast shadow, frame, lines around the objects, figures, type, logo, glitter or surrounding decoration. One collectible sober engraving for a modern legal interface."
+    }
+  ]
+}

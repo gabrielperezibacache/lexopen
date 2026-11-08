@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { OfflineStatus } from "@/components/OfflineStatus";
 import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StudioCredit } from "@/components/StudioCredit";
@@ -167,6 +168,7 @@ export function AppShell({
             <NotificationBell key={user?.id} />
           </div>
         </header>
+        {navigation.mode !== "portal" && <OfflineStatus />}
 
         <UpdateAvailableBanner
           enabled={showUpdateBanner}

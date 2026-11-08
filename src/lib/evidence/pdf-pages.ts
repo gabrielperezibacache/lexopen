@@ -4,10 +4,10 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { pdftoppmBinCandidates, prependOcrPath, tesseractBinCandidates } from "@/lib/local-ocr";
+import { ocrCommandTimeout, ocrPageLimit, pdftoppmBinCandidates, prependOcrPath, tesseractBinCandidates } from "@/lib/local-ocr";
 
 const execFile = promisify(execFileCallback);
-export const PDF_PAGE_EXTRACTOR_VERSION = "lexopen-pdf-pages-2";
+export const PDF_PAGE_EXTRACTOR_VERSION = "lexopen-pdf-pages-3";
 export const PDF_MAX_BYTES = 25 * 1024 * 1024;
 export const PDF_MAX_PHYSICAL_PAGES = 500;
 const MAX_TEXT = 2_000_000;
@@ -25,6 +25,7 @@ export type PdfEvidencePage = {
 };
 export type PdfPageOptions = {
   maxPages?: number;
+  maxOcrPages?: number;
   maxTextCharacters?: number;
   timeoutMs?: number;
   ocr?: boolean;
@@ -298,6 +299,7 @@ export async function renderPdfPage(bytes: Buffer, pageNumber: number, options: 
 export async function extractPdfPages(bytes: Buffer, options: PdfPageOptions = {}): Promise<PdfPageExtraction> {
   checkBytes(bytes, options.expectedSourceSha256);
   const maxPages = bounded(options.maxPages, 100, 1, PDF_MAX_PHYSICAL_PAGES, "Límite de páginas");
+  const maxOcrPages = bounded(options.maxOcrPages, ocrPageLimit(), 0, 100, "Límite de páginas OCR");
   const maxText = bounded(options.maxTextCharacters, MAX_TEXT, 64, MAX_TEXT, "Límite de texto");
   const timeout = bounded(options.timeoutMs, 120_000, 1, 120_000, "Tiempo de extracción");
   const started = Date.now();
@@ -305,6 +307,7 @@ export async function extractPdfPages(bytes: Buffer, options: PdfPageOptions = {
   const nativeByNumber = new Map(native.pages.map(page => [page.pageNumber, page]));
   const pages: PdfEvidencePage[] = [];
   let remainingText = maxText;
+  let ocrAttempts = 0;
   let tools: { renderer: string; tesseract: string } | null | undefined;
   let toolsReason = "ocr_unavailable";
   const root = await fs.mkdtemp(path.join(os.tmpdir(), `lexopen-pdf-extract-${process.pid}-`));
@@ -334,6 +337,8 @@ export async function extractPdfPages(bytes: Buffer, options: PdfPageOptions = {
         page.reason = item.reason || "text_unreliable";
         if (options.ocr === false || process.env.OCR_ENABLED === "0") {
           page.reason = "ocr_disabled";
+        } else if (ocrAttempts >= maxOcrPages) {
+          page.reason = "ocr_page_limit";
         } else if (Date.now() - started >= timeout) {
           page.status = "limit"; page.reason = "time_limit";
         } else {
@@ -347,15 +352,17 @@ export async function extractPdfPages(bytes: Buffer, options: PdfPageOptions = {
           }
           if (!tools) page.reason = toolsReason;
           else {
+            // Count attempts, including failures: broken pages must not bypass the budget.
+            ocrAttempts++;
             const prefix = path.join(root, `page-${pageNumber}`);
             try {
               const remaining = timeout - (Date.now() - started);
               if (remaining <= 0) throw failure("Tiempo de OCR agotado", 504, "pdf_timeout");
-              await renderFromFile(tools.renderer, input, prefix, pageNumber, Math.min(remaining, 30_000), options.signal);
+              await renderFromFile(tools.renderer, input, prefix, pageNumber, Math.min(remaining, ocrCommandTimeout()), options.signal);
               const language = options.language || process.env.OCR_LANGUAGE || "spa+eng";
               if (!/^[A-Za-z0-9_+.-]{1,100}$/.test(language)) throw failure("Idioma OCR inválido", 400, "ocr_language_invalid");
               const result = await execFile(tools.tesseract, [`${prefix}.png`, "stdout", "-l", language, "--psm", "3"], {
-                timeout: Math.max(1, Math.min(timeout - (Date.now() - started), 30_000)), maxBuffer: 8 * 1024 * 1024, encoding: "utf8", windowsHide: true, signal: options.signal,
+                timeout: Math.max(1, Math.min(timeout - (Date.now() - started), ocrCommandTimeout())), maxBuffer: 8 * 1024 * 1024, encoding: "utf8", windowsHide: true, signal: options.signal,
               });
               const text = result.stdout.replace(/\u0000/g, "\uFFFD").trim();
               if (text && text.length <= remainingText) Object.assign(page, { text, method: "ocr", status: "completed", reason: undefined });

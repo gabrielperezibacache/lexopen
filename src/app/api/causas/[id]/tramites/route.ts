@@ -1,29 +1,18 @@
-import {
-  assertCsrf,
-  handleRouteError,
-  requireStaff,
-} from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
-import { assertCausaAccess, assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { assertCausaAccess, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
-import { emitNotification } from "@/lib/notify/emit";
-import { tramiteCreateSchema } from "@/lib/schemas";
-import { syncTaskFromTramite } from "@/lib/tasks/sync-mirrors";
-import {
-  fechaLimiteFromDias,
-  findTemplate,
-  templatesForMateria,
-} from "@/lib/tramite-templates";
-import { NextRequest, NextResponse } from "next/server";
+import { templatesForMateria } from "@/lib/tramite-templates";
+import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
+import { createTramiteCommand } from "@/lib/tramites/commands";
+import { requestCommandKey } from "@/lib/command-execution";
+import { parseKnowledgeBody } from "@/lib/knowledge/route-body";
 import { z } from "zod";
-
+import { NextRequest, NextResponse } from "next/server";
 type Params = { params: Promise<{ id: string }> };
-
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
-    await readCausa(id, user);
     await assertCausaAccess(id, user);
     const causa = await prisma.causa.findFirst({
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
@@ -33,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
     }
     const tramites = await prisma.tramite.findMany({
-      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
+      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }, { OR: [{ task: null }, { task: { is: taskWorkspaceAccessWhere(user) } }] }] },
       include: {
         responsable: { select: { id: true, name: true } },
       },
@@ -42,149 +31,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({
       tramites,
       templates: templatesForMateria(causa.materia),
-    });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     return handleRouteError(e);
   }
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
-  try {
-    assertCsrf(req);
-    const user = await requireStaff();
-    const { id } = await params;
-    await mutateCausa(id, user, "causa.write");
-    await assertCausaAccess(id, user);
-    const causa = await prisma.causa.findFirst({
-      where: { AND: [scopedcausaAccessWhere(user), { id }] },
-      select: {
-        id: true,
-        titulo: true,
-        materia: true,
-        rit: true,
-        clienteId: true,
-      },
-    });
-    if (!causa) {
-      return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
-    }
-    const tramiteHref = causa.clienteId
-      ? `/clientes/${causa.clienteId}`
-      : `/causas/${id}#tramites`;
-
-    const raw = await req.json().catch(() => ({}));
-    return await prisma.$transaction(async (tx) => {
-    if (raw?.action === "apply-template") {
-      const { templateId } = z
-        .object({ action: z.literal("apply-template"), templateId: z.string() })
-        .parse(raw);
-      const template = findTemplate(templateId);
-      if (!template) {
-        return NextResponse.json({ error: "Plantilla no encontrada" }, { status: 404 });
-      }
-      const maxOrden = await tx.tramite.aggregate({
-        where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
-        _max: { orden: true },
-      });
-      let orden = (maxOrden._max.orden ?? 0) + 1;
-
-      const tramiteData = template.items.map((item) => {
-        const current = orden;
-        orden += 1;
-        return {
-          causaId: id,
-          titulo: item.titulo,
-          detalle: item.detalle || null,
-          estado: "pendiente",
-          fechaLimite: item.diasLimite
-            ? fechaLimiteFromDias(item.diasLimite)
-            : null,
-          responsableId: user.id,
-          orden: current,
-        };
-      });
-
-      const created = await tx.tramite.createManyAndReturn({
-        data: tramiteData,
-      });
-
-      await tx.activity.create({
-        data: {
-          tipo: "tramite",
-          mensaje: `Plantilla «${template.label}»: +${created.length} trámites`,
-          causaId: id,
-          userId: user.id,
-        },
-      });
-      await writeAuditStrict({
-        actorId: user.id,
-        action: "tramite.apply-template",
-        entityType: "Causa",
-        entityId: id,
-        after: { templateId, count: created.length },
-      }, tx);
-      for (const row of created) {
-        await syncTaskFromTramite(row.id, tx);
-      }
-      return NextResponse.json({ rows: created.length, tramites: created }, { status: 201 });
-    }
-
-    const body = tramiteCreateSchema.parse(raw);
-    const maxOrden = await tx.tramite.aggregate({
-      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
-      _max: { orden: true },
-    });
-    const estado = body.estado || "pendiente";
-    const responsableId = body.responsableId || user.id;
-    const tramite = await tx.tramite.create({
-      data: {
-        causaId: id,
-        titulo: body.titulo.trim(),
-        detalle: body.detalle || null,
-        estado,
-        fechaLimite: body.fechaLimite ? new Date(body.fechaLimite) : null,
-        fechaHecho: estado === "hecho" ? new Date() : null,
-        responsableId,
-        orden: body.orden ?? (maxOrden._max.orden ?? 0) + 1,
-      },
-      include: {
-        responsable: { select: { id: true, name: true } },
-      },
-    });
-
-    if (responsableId && responsableId !== user.id) {
-      await emitNotification({
-        tipo: "tramite.asignado",
-        userId: responsableId,
-        title: `Trámite asignado · ${causa.rit || causa.titulo}`,
-        body: tramite.titulo,
-        href: tramiteHref,
-        entityType: "tramite",
-        entityId: tramite.id,
-      }, tx);
-    }
-
-    await tx.activity.create({
-      data: {
-        tipo: "tramite",
-        mensaje: `Trámite creado: ${tramite.titulo}`,
-        causaId: id,
-        userId: user.id,
-      },
-    });
-    await writeAuditStrict({
-      actorId: user.id,
-      action: "tramite.create",
-      entityType: "Tramite",
-      entityId: tramite.id,
-      after: tramite,
-    }, tx);
-
-    await syncTaskFromTramite(tramite.id, tx);
-
-    return NextResponse.json(tramite, { status: 201 });
-    });
-  } catch (e) {
-    return handleRouteError(e);
-  }
+  try { assertCsrf(req); const user=await requireStaff(),{id}=await params,body=await parseKnowledgeBody(req,z.unknown()); return NextResponse.json(await createTramiteCommand(user,id,body,requestCommandKey(req,"tramite.create")),{status:201,headers:{"Cache-Control":"private, no-store"}}); }
+  catch(e){return handleRouteError(e);}
 }

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-07",
+  "scope": "Local disposable fixtures only; no deployment",
+  "staticViews": 20,
+  "clockVideoViews": 4,
+  "allImagesLoaded": true,
+  "allResponsesOk": true,
+  "horizontalOverflow": false,
+  "javascriptErrors": [],
+  "e2e": {
+    "file": "e2e/editorial-motion.spec.ts",
+    "project": "chromium",
+    "passed": 4
+  },
+  "eslint": "passed on changed TS/TSX files",
+  "typescript": "EditorialHeading component dependency tree passed; no claim of full-repository compilation"
+}

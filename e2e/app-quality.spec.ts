@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext } from "@playwright/test";
-import { loginAs } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 let sessionCookies: Awaited<ReturnType<BrowserContext["cookies"]>>;
 test.beforeAll(async ({ browser }) => {
@@ -87,13 +87,14 @@ test("una cookie con solo el ID del usuario no autentica", async ({ page, contex
 
 test("el cambio de contraseña limita intentos por usuario", async ({ page }) => {
   await page.goto("/dashboard");
+  await authenticateApiRequests(page);
   for (let i = 0; i < 10; i++) {
-    const response = await page.request.post("/api/auth/password", {
+    const response = await apiRequest(page).post("/api/auth/password", {
       data: { currentPassword: "wrong-password", newPassword: "New-Audit-password-42" },
     });
     expect([401, 429]).toContain(response.status());
   }
-  const limited = await page.request.post("/api/auth/password", {
+  const limited = await apiRequest(page).post("/api/auth/password", {
     data: { currentPassword: "wrong-password", newPassword: "New-Audit-password-42" },
   });
   expect(limited.status()).toBe(429);

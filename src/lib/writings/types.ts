@@ -2,9 +2,12 @@ import type { ResolvedWritingSource, StoredWritingSource } from "./source-types"
 
 export type WritingReference = { id: string; source: StoredWritingSource };
 export type WritingReferenceView = { id: string; source: ResolvedWritingSource };
+export type WritingReviewView = { id: string; revision: number; current: boolean; reviewerId: string; reviewerName: string; decision: "approved" | "changes_requested"; note: string; createdAt: string };
 export type WritingDraftView = {
   id: string; causaId: string; title: string; body: string; revision: number;
   references: WritingReferenceView[]; canWrite: boolean; createdAt: string; updatedAt: string; warnings: string[];
+  review?: WritingReviewView | null;
+  canReview?: boolean;
 };
 export type WritingListItem = { id: string; available: false } | {
   id: string; available: true; title: string; revision: number; updatedAt: string;
