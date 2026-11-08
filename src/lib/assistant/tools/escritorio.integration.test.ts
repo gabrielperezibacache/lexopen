@@ -59,6 +59,13 @@ async function main() {
       snapshots.set(endpoint,{kitty:{id:session.kittyId,name:session.kittyName,provider:"separate-model",desktop:true,container:`kitty-${session.kittyName}`,status:"running",connectors:["clima"],approvals:"ask",backup:""},chat:{id:session.chatId,members:[session.kittyId],turns:[]}});
     }
     const ctx: ToolContext={userId:owner.id,role:"abogado",chatId:conversation.id,scope:{causaId:cases[0].id}};
+    const aliases = ["google", "github", "dropbox", "microsoft"].map(kind => `altazor-${kind}-${"a".repeat(16)}`);
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: JSON.stringify(aliases) } });
+    const cloudPreview = await escritorioEncargarTool.preview({ sessionId: sessions[0].id, texto: text }, ctx);
+    for (const label of ["Google Drive", "GitHub (repositorios públicos)", "Dropbox (archivos)", "Microsoft 365 / OneDrive (archivos)"]) assert.ok(cloudPreview.includes(label));
+    assert.equal(aliases.some(alias => cloudPreview.includes(alias)), false, "review uses service names instead of technical account aliases");
+    assert.ok(cloudPreview.includes("sin editar, publicar ni eliminar")); assert.ok(cloudPreview.includes("OneDrive no incluye correo ni calendario"));
+    await prisma.altazorComputerSession.update({ where: { id: sessions[0].id }, data: { connectorNamesJson: '["clima"]' } });
     const listed=await escritorioListarTool.execute({},ctx);assert.ok(listed.ok);
     assert.equal((listed.card?.sessions as unknown[]).length,1);assert.ok(listed.message.includes(sessions[0].id));assert.equal(listed.message.includes(sessions[1].id),false);assert.equal(JSON.stringify(listed).includes("fictitious-desktop-tool-token"),false);
     await assert.rejects(escritorioListarTool.execute({}, {...ctx,scope:undefined}),denied);

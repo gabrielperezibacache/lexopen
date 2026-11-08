@@ -22,6 +22,7 @@ async function main() {
     const { checkAltazorDestination } = await import("./conversations");
     const { createConversationSchema, createTurnSchema } = await import("./schemas");
     const { readAltazorUpload } = await import("./attachments");
+    const { altazorConversationInstructions } = await import("./system-prompt");
     const expectedDestination = { provider: "custom", model: process.env.LLM_MODEL || "gpt-4o-mini", endpointHash: sha256("http://127.0.0.1:11434/v1") };
     // Probe actual configured fixture model/preset, without network access.
     const { getLlmConfig } = await import("@/lib/integrations/llm"); const config = await getLlmConfig(); expectedDestination.provider = config.preset; expectedDestination.model = config.model;
@@ -30,6 +31,11 @@ async function main() {
     assert.equal(calls, 2);
     assert.doesNotMatch(JSON.stringify(prompts[0]), /HISTORIA_AUTORIZADA|ADJUNTO_SELECCIONADO|NO_CLASIFICAR_ADJUNTO/);
     assert.match(JSON.stringify(prompts[1]), /HISTORIA_AUTORIZADA/); assert.match(JSON.stringify(prompts[1]), /ADJUNTO_SELECCIONADO/);
+    assert.ok(prompts[1][0].content.includes(altazorConversationInstructions("personal")), "the actual model receives the complete conversational workflow after transport sanitization");
+    assert.ok(prompts[1][0].content.length <= 12_000, "workflow and legal rules fit inside the transport system-message limit");
+    assert.doesNotMatch(prompts[1][0].content, /HISTORIA_AUTORIZADA|ADJUNTO_SELECCIONADO/, "recall and selected sources never become privileged system instructions");
+    const casePrompt = altazorConversationInstructions("case");
+    assert.notEqual(casePrompt, altazorConversationInstructions("personal"), "case and personal workflows must not imply the same resource scope");
     const aborted = new AbortController(); aborted.abort(); await assert.rejects(runAssistantTurn({ text: "Cancelado", user: actor, scope: { causaId: null }, signal: aborted.signal })); assert.equal(calls, 2);
     classifierTool = "documento.resumir"; answerText = "Resumen del pasaje ficticio [R1].";
     const summarized = await runAssistantTurn({ text: "Resume este PDF", user: actor, scope: { causaId: null }, context: "[R1] Pasaje ficticio. Texto adjunto no confiable [R99].", validatedReferences: [{ marker: "R1", quote: "Pasaje ficticio." }], expectedDestination });

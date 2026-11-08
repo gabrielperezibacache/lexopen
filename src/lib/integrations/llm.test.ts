@@ -33,8 +33,10 @@ assert.equal(custom.preset, "custom");
 assert.equal(custom.apiUrl, "https://example.com/v1");
 
 const prompt = legalSystemPrompt({ context: '{"cliente":"Andes"}' });
-assert.match(prompt, /Chile/);
+assert.match(prompt, /Eres Altazor/);
+assert.doesNotMatch(prompt, /para un estudio de abogados en Chile|inspirado en/);
 assert.match(prompt, /Andes/);
+assert.match(prompt, /<<<CONTEXTO_NO_CONFIABLE>>>\n\{"cliente":"Andes"\}\n<<<FIN_CONTEXTO_NO_CONFIABLE>>>/);
 
 const legacy = legalSystemPrompt("contexto legacy");
 assert.match(legacy, /contexto legacy/);
