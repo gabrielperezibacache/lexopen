@@ -12,6 +12,7 @@ import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { computerOperationHash } from "../computer/operation-hash";
 import { configureConnector, configurePersistentEasyOAuth, connectorInventory, testConnector, assertPersistentOAuthImportReady } from "./service";
 import { oauthFailureReason, readOAuthTokenResponse } from "./oauth-token-response";
+import { requestOAuthProviderJson } from "./oauth-provider-response";
 import { checkGithubApplication } from "./github-application-check";
 import { canReadConnectorFiles, easyOAuthScopes, validEasyOAuthScopes, type EasyOAuthAccess } from "./oauth-access";
 import { validatePersistentEasyOAuth } from "./persistent-oauth";
@@ -178,26 +179,14 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
   if (input.provider === "dropbox") params.set("token_access_type", "offline");
   return { attemptId: attempt.id, provider: input.provider, flow: binding.external ? "external" as const : "redirect" as const, authUrl: `${spec.authorize}?${params}`, expiresAt: attempt.expiresAt.toISOString() };
 }
-async function providerJson(url: string, init: RequestInit, fetcher: typeof fetch) {
-  try {
-    const response = await fetcher(url, { ...init, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(15_000) });
-    if (!response.ok) throw new Error();
-    const reader = response.body?.getReader(); if (!reader) throw new Error();
-    const chunks: Uint8Array[] = []; let size = 0;
-    try { for (;;) { const chunk = await reader.read(); if (chunk.done) break; size += chunk.value.length; if (size > 64 * 1024) { await reader.cancel(); throw new Error(); } chunks.push(chunk.value); } } finally { reader.releaseLock(); }
-    const body: unknown = JSON.parse(Buffer.concat(chunks, size).toString("utf8"));
-    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
-    return body as Record<string, unknown>;
-  } catch { throw new ConnectorError("oauth_provider_rejected", "El servicio no confirmó la autorización. Inicie una conexión nueva.", 502); }
-}
 async function verifyProviderAccount(provider: EasyOAuthProvider, headers: Record<string, string>, fetcher: typeof fetch) {
   if (provider === "dropbox") {
-    const account = await providerJson("https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "null" }, fetcher);
+    const account = await requestOAuthProviderJson("account", "https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "null" }, fetcher);
     return account.account_id;
   }
-  if (provider === "github") return (await providerJson("https://api.github.com/user", { headers }, fetcher)).id;
-  if (provider === "microsoft") return (await providerJson("https://graph.microsoft.com/v1.0/me?$select=id", { headers }, fetcher)).id;
-  const account = await providerJson("https://www.googleapis.com/drive/v3/about?fields=user(permissionId)", { headers }, fetcher);
+  if (provider === "github") return (await requestOAuthProviderJson("account", "https://api.github.com/user", { headers }, fetcher)).id;
+  if (provider === "microsoft") return (await requestOAuthProviderJson("account", "https://graph.microsoft.com/v1.0/me?$select=id", { headers }, fetcher)).id;
+  const account = await requestOAuthProviderJson("account", "https://www.googleapis.com/drive/v3/about?fields=user(permissionId)", { headers }, fetcher);
   return account.user && typeof account.user === "object" ? (account.user as Record<string, unknown>).permissionId : null;
 }
 export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: string; code?: string; denied?: boolean }, origin: string, options: Options = {}) {
@@ -241,7 +230,7 @@ async function receiveAuthorizedEasyOAuth(actor: ConnectorActor, input: { state:
     const requestedScopes: unknown = JSON.parse(attempt.requestedScopesJson);
     if (!validEasyOAuthScopes(provider, requestedScopes)) throw new ConnectorError("oauth_scope_mismatch", "Los permisos de este intento no son válidos.", 409);
     const body = provider === "microsoft" ? microsoftPublicCodeBody({ clientId: config.clientId, redirectUri: config.redirectUri, code: input.code!, verifier: binding.verifier }) : new URLSearchParams({ grant_type: "authorization_code", client_id: config.clientId, ...(config.flow !== "public_client" ? { client_secret: config.clientSecret } : {}), redirect_uri: config.redirectUri, code: input.code!, code_verifier: binding.verifier });
-    const tokens = deviceTokens || await providerJson(spec.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body }, fetcher);
+    const tokens = deviceTokens || await requestOAuthProviderJson("token", spec.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body }, fetcher);
     if (deviceTokens && (tokens.expires_in !== undefined || tokens.refresh_token !== undefined)) throw new ConnectorError("github_device_expiring_unsupported", "La identidad de GitHub del instalador usa una modalidad de renovación todavía no compatible. El administrador debe revisar la preparación; su cuenta no se guardó como permanente.", 409);
     let tokenResponse = tokens;
     if (provider === "microsoft" && tokens.error === undefined) { try { tokenResponse = { ...tokens, scope: normalizeMicrosoftFileScopes(tokens.scope).join(" ") }; } catch { throw new ConnectorError("oauth_scope_mismatch", oauthFailureReason("oauth_scope_mismatch"), 409); } }
