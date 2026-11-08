@@ -185,8 +185,9 @@ test(`los recibos externos de ${label} quedan plegados y su contenido original s
   await page.route(`**/api/altazor/computer/sessions/${sessionId}`, route => route.fulfill({ json: {
     session: { id: sessionId, state: "ready", held: false, canRenew: false, connectors: connections }, working: false, approvals: [],
     turns: [
-      { index: 0, from: "assistant", text: receipt, working: false, needsHelp: false, steps: [] },
+      { index: 0, from: "assistant", origin: "connector-result", text: receipt, working: false, needsHelp: false, steps: [] },
       { index: 1, from: "assistant", text: answer, working: false, needsHelp: false, steps: [] },
+      { index: 2, from: "assistant", text: receipt, working: false, needsHelp: false, steps: [] },
     ],
   } }));
   await loginAs(page, "abogado@estudio.cl");
@@ -195,6 +196,8 @@ test(`los recibos externos de ${label} quedan plegados y su contenido original s
   await expect(panel.getByText(`Consulta de ${label} completada`, { exact: true })).toBeVisible();
   await expect(panel.getByText("Respuesta de la consulta disponible para revisión.", { exact: true })).toBeVisible();
   await expect(panel.getByText(answer, { exact: true })).toBeVisible();
+  await expect(panel.getByText(`Consulta de ${label} completada`, { exact: true })).toHaveCount(1);
+  await expect(panel.getByText(receipt, { exact: true }).filter({ visible: true })).toHaveCount(1);
   const result = panel.locator("article").filter({ has: page.getByText(`Consulta de ${label} completada`, { exact: true }) });
   const details = result.locator("details");
   await expect(details).not.toHaveAttribute("open", "");

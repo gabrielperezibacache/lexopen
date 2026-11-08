@@ -97,6 +97,8 @@ Las instrucciones de Altazor ahora explican el flujo entre conversación persist
 
 Las autorizaciones y las respuestas técnicas de Dropbox y OneDrive se presentan en español, con origen y destino visibles y detalles desplegables. Los recibos completos se conservan para revisión, sin interpretar instrucciones de los documentos externos.
 
+La revisión independiente detectó que un modelo podía copiar el formato textual de una consulta y obtener su presentación visual de resultado. Ahora sólo un turno de aprobación generado por el gateway recibe la marca de procedencia del conector; el modelo no puede declararla mediante su texto ni mediante un campo de origen. Además se comprueba que el servicio y la acción sean compatibles. Los recibos tipados de archivos siguen verificándose por separado.
+
 ## Orden de continuidad
 
 1. Completar la identidad de Microsoft y comprobar su cuenta y un archivo seleccionado.
