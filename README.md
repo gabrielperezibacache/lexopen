@@ -1,137 +1,129 @@
 <div align="center">
-  <h1>
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="public/icons/lexopen-logo.png">
-      <img src="public/icons/lexopen-logo-ink.png" width="184" alt="LexOpen">
-    </picture>
-  </h1>
-  <p><strong>Causas, audiencias y escritos con sus fuentes a la vista.</strong></p>
-  <p>Un espacio de trabajo para abogados, estudios jurídicos, investigadores y docentes.</p>
-  <p><a href="#descargar-lexopen"><strong>Descargar LexOpen</strong></a> · <a href="#primeros-pasos">Primeros pasos</a> · <a href="#recorrido-por-la-aplicación">Ver la aplicación</a> · <a href="#ayuda-y-privacidad">Ayuda</a></p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/icons/lexopen-logo.png">
+    <img src="public/icons/lexopen-logo-ink.png" width="184" alt="LexOpen">
+  </picture>
+  <h1>LexOpen</h1>
+  <p><strong>El trabajo de tu estudio, organizado por cliente y causa.</strong></p>
+  <p>Expedientes, plazos, fuentes jurídicas y Altazor AI en el servidor de tu estudio.</p>
+  <p><a href="#descargar-e-instalar">Descargar</a> · <a href="#primeros-pasos">Primeros pasos</a> · <a href="#qué-puedes-hacer">Funciones</a> · <a href="#desarrollo">Desarrollo</a></p>
 </div>
 
-LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audiencias y los borradores de escritos. Puedes volver desde una cita al pasaje que la respalda. **Altazor AI** te acompaña desde una conversación que conserva tus encargos, respuestas y avisos.
+LexOpen es una aplicación de código abierto para profesionales y estudios jurídicos, con herramientas de investigación y docencia. Conserva los documentos y la base de datos en un **Host** que administras. Tu equipo accede a ese servidor con cuentas y permisos propios.
 
-![Inicio de LexOpen en índigo y plata, con el chat, un aviso de plazo y el estado del escritorio de Altazor](docs/readme/inicio-escritorio.jpg)
+**Versión del código: 1.1.0-preview.9.** Esta entrega integra Google compartido, carpetas de Organización, una jornada con vencidos de todos los meses y búsqueda más simple de apartados y ajustes. [Historial de cambios](CHANGELOG.md) · [Revisión de PR, commits y ramas](docs/REVISION-INTEGRACION-2026-11-09.md)
 
-*Las capturas muestran LexOpen con expedientes y conversaciones ficticios. La galería muestra las herramientas de esta versión.*
+![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
 
-## Tu jornada y acceso rápido
+*Las imágenes de la galería son ilustrativas y utilizan expedientes ficticios; algunos controles han evolucionado desde su captura.*
 
-Inicio reúne los plazos pendientes vencidos, los próximos vencimientos y los eventos de hoy asignados a ti, junto a Altazor cuando tienes permiso para usarlo. **Mis vencidos pendientes** incluye registros de todos los meses. Con **Ctrl+K** o **⌘K** puedes buscar apartados por varias palabras, en cualquier orden y sin acentos. En Configuración, **Buscar un ajuste** permite ir a Google, OJV o permisos sin perder formularios sin guardar. La navegación conserva los permisos y las secciones habilitadas del estudio.
+## Descargar e instalar
 
-[Revisión de recorridos, criterios comparativos y límites](docs/REVISION-UX-Y-COMPETENCIA-2026-11-09.md).
+[**Publicaciones y descargas verificadas**](https://github.com/gabrielperezibacache/lexopen/releases) · [Versión 1.1.0-preview.9](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.9)
 
-## Organización de documentos en Google Drive
+La publicación ofrece estos paquetes cuando finalizan las comprobaciones de la aplicación y de las cuatro plataformas. Si la versión todavía no aparece, utiliza la última publicación disponible; un trabajo de CI pendiente no equivale a un instalador publicado.
 
-Elige una carpeta de **Organización** desde Configuración, una causa o un espacio de trabajo. Con la cuenta compartida de Google del estudio puedes preparar la estructura **Organización → Clientes → Cliente → Causas → Causa**, organizar espacios independientes por cliente y crear tu carpeta en **Organización → Usuarios**. Las carpetas confirmadas se reutilizan y las existentes se conservan. No se copian documentos ni se cambian permisos automáticamente.
-
-La administración conecta Google una sola vez para Drive, Calendar y Gmail y elige la raíz compartida. Los profesionales conservan sus permisos en LexOpen; sólo la administración accede al buzón completo del estudio. Las cuentas anteriores con menos permisos pueden necesitar ampliar esa misma autorización. No se migran automáticamente conexiones ni archivos personales. [Flujo, permisos y límites](docs/GOOGLE-ORGANIZACION.md).
-
-## OJV y Buscador Unificado de Jurisprudencia
-
-En la investigación jurídica puedes incorporar un fallo civil del Buscador Unificado del Poder Judicial por su identificador numérico. Introduce el ID en **Incorporar una fuente jurídica**, revisa la referencia preparada y pulsa **Recuperar fuente oficial**. LexOpen abre una sesión pública independiente de ClaveÚnica, exige el ID exacto y conserva la respuesta JSON y su texto en el corpus con versiones y hashes. Los previews y marcadores de anonimización sin texto no se incorporan como fallos íntegros.
-
-En **Fuentes → Buscar fallos civiles en el Poder Judicial** puedes buscar por términos o ROL y recorrer páginas de diez resultados. Sólo se envían los campos de ese formulario; la consulta local y el expediente permanecen en el Host. Se comprueban de nuevo el acceso y los permisos antes de contactar al portal. Cada página usa una sesión pública nueva. Si caduca el CSRF (HTTP 419), se renueva toda la sesión y se reintenta una vez; cancelar impide ese reintento. Si se indica ROL y año, se comprueban en los resultados antes de mostrarlos. Seleccionar un resultado prepara su incorporación y exige recuperar el texto íntegro por separado.
-
-La integración es experimental: el portal declara el total y la coincidencia por términos; no acredita cobertura exhaustiva ni páginas de un PDF. Las fuentes incorporadas quedan disponibles para el equipo autorizado. En OJV, una respuesta que devuelve al inicio por sesión vencida produce un error explícito; no confirma que la causa esté sin novedades. [Alcance, pruebas y pendientes de la integración](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).
-
-## Descargar LexOpen
-
-Elige el archivo para tu equipo en la versión **1.1.0-preview.8**. [Ver la versión y todos sus archivos](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.8)
-
-| Tu equipo | Descarga |
+| Equipo | Archivo que debes elegir |
 | --- | --- |
-| Windows de 64 bits, Intel o AMD | [Instalador EXE](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-win-x64.exe) |
-| Mac con chip Apple | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-mac-arm64.dmg) |
-| Mac con procesador Intel | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-mac-x64.dmg) |
-| Linux de 64 bits, Intel o AMD | [DEB](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-linux-amd64.deb) · [AppImage](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-linux-x86_64.AppImage) |
+| Windows Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.9-win-x64.exe` |
+| Mac con chip Apple | `LexOpen-1.1.0-preview.9-mac-arm64.dmg` |
+| Mac Intel | `LexOpen-1.1.0-preview.9-mac-x64.dmg` |
+| Linux Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.9-linux-amd64.deb` o `LexOpen-1.1.0-preview.9-linux-x86_64.AppImage` |
 
-Esta versión es **preliminar**. Los instaladores de Windows y macOS carecen de firma de editor y macOS puede mostrar avisos. [Guía de instalación y requisitos](docs/INSTALADORES.md)
+Los paquetes incluyen el servidor, PostgreSQL y Chromium nativos. No necesitas instalar Node ni npm para abrir el programa. El escritorio de Altazor, los modelos y OCR tienen preparación adicional. Windows ARM y Linux ARM no están en esta matriz.
+
+La serie **preview es preliminar**. Consulta `release-manifest.json` para conocer la firma del editor y `SHA256SUMS` para comprobar la integridad. Un hash no sustituye la firma. [Instalación, requisitos y límites](docs/INSTALADORES.md) · [Actualización y recuperación](docs/ACTUALIZACIONES.md)
 
 ## Primeros pasos
 
-1. **Abre LexOpen.** Si vas a guardar el trabajo en este equipo, elige **Este PC es el servidor** y crea la primera cuenta de administración. Si el estudio ya tiene un servidor, elige **Conectar a un servidor** y escribe la dirección que te indique el equipo.
-2. **Entra en Mis Causas.** Crea una causa y añade una resolución o un documento. Puedes organizar expedientes manualmente en cualquier país.
-3. **Prepara tu próximo trabajo.** Abre el documento, consulta su fuente, prepara la pauta de una audiencia o empieza un borrador. Desde **Inicio** puedes pedirle ayuda a Altazor.
+1. **Elige el equipo principal.** Abre LexOpen, selecciona **Este PC es el servidor** y crea la primera cuenta de administración. En los demás equipos, selecciona **Conectar a un servidor** e introduce la dirección del Host.
+2. **Configura tu estudio y su equipo.** Revisa el país de trabajo, los roles y las secciones habilitadas. En **Mi cuenta → Mi rol y permisos**, cada persona puede consultar su acceso efectivo.
+3. **Conecta Google una vez.** La administración autoriza la cuenta compartida del estudio y selecciona una carpeta de **Organización** en Drive. La misma conexión se utiliza para Drive, Calendar y Gmail; las cuentas antiguas pueden necesitar ampliar su autorización.
+4. **Organiza un cliente y su causa.** Crea la causa en **Mis Causas** y prepara su carpeta. Añade documentos, registra plazos y revisa las fuentes antes de preparar una audiencia o un escrito.
+5. **Empieza tu jornada.** Inicio muestra tus pendientes y eventos. Altazor aparece cuando tienes permiso para utilizarlo. **Ctrl+K / ⌘K** permite ir a un apartado; **Buscar un ajuste** te lleva a la configuración correspondiente.
 
-Google Drive, correo y la integración judicial chilena se activan cuando el estudio los necesita. Altazor, su escritorio, la transcripción y los modelos locales tienen su propia preparación. [Conectar archivos y causas](docs/SINCRONIZACION.md) · [Preparar el escritorio de Altazor](docs/ESCRITORIO-ALTAZOR.md)
+Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 
-En **Configuración** se reúnen tus preferencias y los ajustes del estudio. **Comunicaciones** aparece allí al elegir Chile como país de trabajo o al activar las herramientas del PJUD.
+## Google y organización de documentos
 
-En **Mi cuenta → Mi rol y permisos** puedes consultar el alcance de tu rol y los permisos adicionales o revocados. La administración técnica del Host y las atribuciones jurídicas del socio son responsabilidades distintas. Un permiso explícito de administración permite delegar los ajustes compartidos a otro integrante del equipo; las cuentas de cliente y externo siguen limitadas al portal. Nadie puede ampliar sus propios permisos ni dejar el Host sin un administrador efectivo.
+Una **cuenta Google compartida para todo el estudio** evita repetir conexiones por función. La administración elige la raíz; los profesionales trabajan desde las causas y espacios a los que tienen acceso.
 
-Las preferencias, conexiones de Codex y autorizaciones personales pertenecen a cada usuario. La política de IA del estudio se aplica también a las conexiones personales. **Cuenta conectada** indica autorización; **Probar conexión** comprueba una respuesta del modelo seleccionado.
+```text
+Organización/
+├── Clientes/
+│   └── Cliente/
+│       ├── Causas/
+│       │   └── Causa/
+│       └── Espacios de trabajo/
+│           └── Espacio/
+└── Usuarios/
+    └── Usuario/
+```
 
-La **campanita** muestra los avisos recientes y los que quedan por leer. Desde allí puedes revisar un aviso o abrir el historial. Los avisos críticos mantienen su confirmación de recepción por separado.
+Puedes preparar carpetas desde Configuración, una causa o un espacio de trabajo. Se reutilizan las carpetas confirmadas y se conservan las existentes. La preparación no mueve archivos ni cambia sus permisos automáticamente. Las copias de documentos conservan su procedencia y se verifican antes de confirmarlas.
 
-## Recorrido por la aplicación
+La conexión compartida **no amplía los permisos de LexOpen**: el acceso al buzón completo corresponde a la administración y cada causa mantiene su equipo autorizado. Los permisos propios de Drive se administran también en Google. No se migran conexiones ni archivos personales automáticamente. [Flujo completo, estructura exacta y permisos](docs/GOOGLE-ORGANIZACION.md)
 
-### Mis Causas
+## Qué puedes hacer
 
-Cada expediente reúne carpetas, documentos, hechos, cronología, minutas y encargos del equipo. En **Novedades** puedes ver de dónde llegó un archivo y volver al original. Novedades agrupa ingresos idénticos verificados de carga manual, correo, Google Drive y OJV. Las revisiones de Drive con identidad propia conservan su copia.
+| Apartado | Flujo de trabajo |
+| --- | --- |
+| **Inicio y jornada** | Consulta vencidos pendientes de todos los meses, próximos siete días y eventos de hoy asignados a ti. En móvil, despliega el resumen cuando lo necesites y mantén el editor de Altazor a mano. |
+| **Clientes y Mis Causas** | Organiza expedientes manuales o conectados, documentos, equipo y actividad; aplica acceso del estudio o muro ético por causa. |
+| **Plazos, calendario y tareas** | Asigna responsables, registra vencimientos y sigue pendientes. Los avisos y acuses críticos tienen su propio seguimiento. |
+| **Documentos, audiencias y escritos** | Conserva originales y versiones, reúne antecedentes, prepara pautas y revisa borradores con sus pasajes de respaldo. |
+| **Fuentes y jurisprudencia** | Reúne material jurídico y recupera fuentes oficiales compatibles, con texto, procedencia y hashes. |
+| **Biblioteca y Académico** | Organiza lecturas privadas, bibliografía, pasajes, matrices y manuscritos; revisa el respaldo antes de exportar. |
+| **Correo y comunicaciones** | Vincula canales habilitados y conserva el origen de los documentos recibidos. Los canales externos requieren su configuración. |
+| **Facturación** | Registra honorarios, pagos y cuenta corriente con el alcance de acceso de cada usuario. No emite DTE del SII. |
+| **Configuración y Mi cuenta** | Distingue preferencias personales de ajustes compartidos; busca un ajuste sin desmontar formularios sin guardar. |
 
-![Novedades de una causa ficticia, con cuatro orígenes para un solo documento y una revisión de Drive separada](docs/readme/novedades-escritorio.jpg)
+La navegación respeta los permisos efectivos y las secciones habilitadas por el estudio. [Recorridos y criterios comparativos](docs/REVISION-UX-Y-COMPETENCIA-2026-11-09.md)
 
-### Audiencias y escritos
+### OJV y Buscador Unificado de Jurisprudencia
 
-Prepara una pauta con tus documentos y notas. Durante la audiencia puedes registrar audio y revisar la transcripción si configuraste esa herramienta. Desde la causa, convierte lo revisado en hechos o borradores, continúa con guardado automático e historial y exporta a Word con referencias. [Audiencias en vivo](docs/ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md) · [Escritos](docs/ENTREGA-ESCRITOS-2026-11-02.md)
+Las herramientas del Poder Judicial de Chile son opcionales. En OJV, una sesión vencida genera un error explícito; no se presenta como una causa sin novedades. La integración depende de las sesiones y respuestas que permita el portal.
 
-### Tu biblioteca
+En **Fuentes → Buscar fallos civiles en el Poder Judicial**, busca por términos o ROL y recorre páginas de diez resultados. Se utiliza una sesión pública independiente de ClaveÚnica. Sólo se envían los campos de búsqueda; la consulta local y el expediente permanecen en el Host. Seleccionar un resultado prepara su incorporación: recuperar y comprobar el texto íntegro es un paso separado. También puedes incorporar un fallo por su identificador numérico.
 
-Organiza libros, sentencias y otros documentos en estantes que puedes personalizar. Añade PDF, EPUB y texto, entre otros formatos. Al importar puedes conservar el original o preparar una copia de texto, con reconocimiento de páginas escaneadas cuando corresponda. Comparte las colecciones que elijas y vuelve al pasaje usado al citar.
+Se conservan la respuesta y el texto con versiones y hashes. Los previews o marcadores de anonimización sin texto no se aceptan como fallos íntegros. La integración es experimental y no acredita cobertura exhaustiva ni páginas físicas de un PDF. [Alcance y validación](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md) · [OJV/PJUD](docs/PJUD.md)
 
-![Biblioteca privada de demostración con seis libros jurídicos ficticios y encuadernaciones clásicas](docs/readme/biblioteca-escritorio.jpg)
+### Altazor AI e Ícaros
 
-### Académico
+Altazor conserva la conversación y sus adjuntos, propone un plan resumido y cuenta las acciones. Puedes consultar los detalles bajo demanda y revisar los cambios preparados. El visor permite seguir una sesión activa del escritorio.
 
-Crea un trabajo para investigar, escribir o enseñar. Reúne bibliografía y pasajes, contrasta lecturas en la matriz y revisa tu manuscrito. La **Mesa de revisión** señala qué lecturas y secciones necesitan un pasaje vinculado. Desde allí puedes volver a la propuesta y cotejar el argumento antes de exportarlo.
+El escritorio prioriza leer texto del navegador y de los documentos antes de recurrir a capturas. **Ícaros** permite delegar análisis a especialistas con modelo y memoria propios. **Ayuda a distancia** conserva una solicitud en espera y permite responder por ntfy o WhatsApp cuando el canal está conectado. Estas capacidades requieren configurar el perfil de escritorio, el worker y los canales correspondientes.
 
-![Mesa de revisión académica con manuscritos, fuentes ficticias y observaciones de respaldo](docs/readme/academico-escritorio.jpg)
+Los profesionales pueden utilizar Codex personal o la conexión compartida habilitada por el Host. La disponibilidad y las credenciales se comprueban en la configuración de esa conexión; LexOpen no incluye una suscripción a Codex. También admite proveedores de IA compatibles y modelos locales según la preparación del equipo.
 
-### Altazor AI
+[Altazor](docs/ALTAZOR.md) · [Escritorio y requisitos](docs/ESCRITORIO-ALTAZOR.md) · [Conexiones](docs/ALTAZOR-CONEXIONES.md) · [Cobertura](docs/COBERTURA-ALTAZOR.md)
 
-Habla con Altazor desde **Inicio** o desde el acompañante lateral. Comparte el archivo de la causa que quieres revisar y retoma el trabajo desde el mismo hilo. Altazor recupera el contexto al que tienes acceso y te pide revisar los cambios que prepara. Debajo del chat puedes observar el escritorio cuando haya una sesión activa. [Guía de Altazor](docs/ALTAZOR.md) · [Conexiones y secretos](docs/ALTAZOR-CONEXIONES.md)
+## Permisos, privacidad y límites
 
-Puedes pegar un documento directamente en el chat, abrir una solicitud de ayuda del escritorio y activar desde **Mi cuenta** un resumen privado de plazos y correo judicial recibido.
+El administrador técnico del Host y el socio del estudio tienen responsabilidades distintas. Los roles, permisos adicionales y revocados determinan las acciones efectivas; las causas pueden restringirse a su equipo. Un usuario no puede ampliar sus propios permisos ni dejar el Host sin administración efectiva. Los clientes y externos tienen acceso limitado al portal.
 
-Altazor resume el plan y cuenta sus acciones, con los detalles bajo demanda. El escritorio puede leer texto del navegador y documentos antes de recurrir a capturas. **Ícaros** permite delegar análisis a especialistas con modelo y memoria propios; **Ayuda a distancia** conserva las esperas y recibe respuestas por ntfy o WhatsApp conectado. Consulta la preparación del perfil de escritorio, los canales y el worker en la [guía de Altazor](docs/ALTAZOR.md).
+Los datos permanecen en el Host salvo los envíos que hagas mediante las integraciones o proveedores habilitados. Revisa el destino, el contenido y sus fuentes antes de compartir un documento o aceptar una propuesta de IA. Drive mantiene además sus propias reglas de acceso.
 
-<details>
-<summary>Más capturas de la aplicación</summary>
+El trabajo sin conexión cubre recorridos concretos y exige reconciliar los cambios al volver. [Funciones disponibles sin conexión](docs/TRABAJO-SIN-CONEXION.md). Los instaladores y el escritorio tienen requisitos distintos; la validación de CI no sustituye probar instalación, restauración, audio y actualización en tus equipos.
 
-| Pantalla | Escritorio | Móvil |
-| --- | --- | --- |
-| Portada | [Ver](docs/readme/portada-escritorio.jpg) | [Ver](docs/readme/portada-movil.jpg) |
-| Iniciar sesión | [Ver](docs/readme/ingreso-escritorio.jpg) | [Ver](docs/readme/ingreso-movil.jpg) |
-| Inicio con Altazor | [Ver](docs/readme/inicio-escritorio.jpg) | [Ver](docs/readme/inicio-movil.jpg) |
-| Novedades | [Ver](docs/readme/novedades-escritorio.jpg) | [Ver](docs/readme/novedades-movil.jpg) |
-| Biblioteca | [Ver](docs/readme/biblioteca-escritorio.jpg) | [Ver](docs/readme/biblioteca-movil.jpg) |
-| Académico | [Ver](docs/readme/academico-escritorio.jpg) | [Ver](docs/readme/academico-movil.jpg) |
+## Desarrollo
 
-</details>
+Requiere Node **22.12 o posterior** y PostgreSQL. [Configuración de ejemplo](.env.example) · [Preparar el Host desde código](docs/WEB-HOST.md) · [Contribuir](CONTRIBUTING.md)
 
-## Ayuda y privacidad
+```sh
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
 
-Los expedientes se guardan en el servidor del estudio y se comparten según los permisos de cada causa. Las conexiones externas y el proveedor de IA dependen de tu configuración. Revisa las propuestas y sus fuentes antes de incorporarlas a un escrito o compartirlas.
+Las pruebas de integración y navegador necesitan una base **local desechable** con nombre de prueba. El runner de navegador la reinicia. Consulta `CONTRIBUTING.md` antes de ejecutarlas. En instalaciones reales utiliza las migraciones de despliegue y conserva respaldos.
 
-- **Instalación o actualización.** [Instaladores](docs/INSTALADORES.md) · [Respaldos y recuperación](docs/ACTUALIZACIONES.md)
-- **Sincronización.** [Google Drive](docs/SINCRONIZACION.md) · [Poder Judicial de Chile](docs/PJUD.md)
-- **Sugerencias o fallos.** En **Mi cuenta → Feedback** puedes escribirle a la administración de tu estudio y seguir el estado del comentario. Si reportas un problema públicamente, usa ejemplos ficticios e indica la versión de LexOpen. [Abrir un reporte en GitHub](https://github.com/gabrielperezibacache/lexopen/issues)
+[CI de la aplicación](https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml) · [Instaladores nativos](https://github.com/gabrielperezibacache/lexopen/actions/workflows/desktop-release.yml) · [Inventario de integración](docs/REVISION-INTEGRACION-2026-11-09.md)
 
-## Desarrollo y licencia
+## Ayuda y licencia
 
-<details>
-<summary>Guías para contribuir o ejecutar el código</summary>
+En **Mi cuenta → Feedback** puedes informar problemas a la administración y seguir su estado. Para un [reporte público en GitHub](https://github.com/gabrielperezibacache/lexopen/issues), indica la versión y utiliza datos ficticios.
 
-- [Guía de contribución](CONTRIBUTING.md) y [configuración de ejemplo](.env.example).
-- [Preparar el servidor desde el código](docs/WEB-HOST.md) y [comprobaciones automáticas](https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml).
-- [Plan de desarrollo](docs/PLAN-DESARROLLO-2026-11-05.md) e [identidad visual](docs/REFERENCIAS-GRAFICAS-2026-11-05.md).
-- [Correcciones de auditoría y pendientes vigentes](docs/CORRECCIONES-AUDITORIA-2026-11-07.md).
-- [Activar WhatsApp](docs/WHATSAPP-Y-OFFLINE.md).
-- [Trabajo sin conexión: escritos, Clientes y tareas](docs/TRABAJO-SIN-CONEXION.md).
-- [Cobertura funcional de Altazor](docs/COBERTURA-ALTAZOR.md).
-
-</details>
-
-LexOpen se desarrolla en el **Estudio Jurídico Pérez Ibacache** y se publica bajo la licencia **GNU AGPL v3**. [Estudio Jurídico Pérez Ibacache](https://perezibacache.cl/) · [Licencia](LICENSE)
+LexOpen se desarrolla en el [Estudio Jurídico Pérez Ibacache](https://perezibacache.cl/) y se distribuye bajo **GNU AGPL-3.0-or-later**. [Licencia](LICENSE)

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0-preview.9 — 2026-11-09
+
+- Google compartido: una autorización del estudio para Drive, Calendar y Gmail; selección de Organización y preparación de carpetas por cliente, causa, espacio y usuario, con permisos y recuperación de escrituras inciertas.
+- Inicio: jornada con vencidos pendientes de todos los meses, próximos siete días y eventos propios. Resumen plegado en móvil para mantener visibles el editor, Adjuntar y Enviar de Altazor.
+- Navegación: búsqueda por múltiples términos sin acentos y búsqueda de ajustes que conserva formularios sin guardar.
+- Poder Judicial: búsqueda pública civil por términos/ROL y recuperación de fallos íntegros por ID, con control de sesión, procedencia y versiones. OJV informa explícitamente las sesiones vencidas.
+- Distribución: archivo generado de tipos alineado con producción y rechazo temprano de un checkout modificado al empaquetar; se conservan las comprobaciones de origen y persistencia de los instaladores.
+- Integración: revisión de los PR y ramas históricos, actualizaciones vigentes de CI y dependencias, nuevo README y trazabilidad en `docs/REVISION-INTEGRACION-2026-11-09.md`.
+
+Versión preliminar. La disponibilidad de los instaladores y su firma se consultan en GitHub Releases y `release-manifest.json`.
+
 ## Unreleased
 
 ### Núcleo fiable y fuentes propias — 2026-11-01
