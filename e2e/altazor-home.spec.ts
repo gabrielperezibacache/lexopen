@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { apiRequest, loginAs } from "./helpers";
 
 const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), storage = process.env.STORAGE_PATH;
 if (new URL(process.env.DATABASE_URL!).toString() !== url || !storage || !path.isAbsolute(storage) || [process.env.S3_BUCKET,process.env.S3_ACCESS_KEY_ID,process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw Error("Use only the explicitly disposable local database and storage");
@@ -123,7 +123,7 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   const book=await db.libraryBook.findFirstOrThrow({where:{ownerId:user.id,requestId:`altazor-attachment-${attached.id}`}});expect(book.originalRetained).toBe(false);expect(book.convertedToText).toBe(true);expect(book.sourceSha256).toBe(sha(bytes));
   await page.getByRole("button",{name:"Guardar en biblioteca",exact:true}).click();await expect(page.getByRole("button",{name:"Guardar en biblioteca",exact:true})).toBeEnabled();expect(await db.libraryBook.count({where:{ownerId:user.id,requestId:`altazor-attachment-${attached.id}`}})).toBe(1);
   const fragment=await db.libraryBookFragment.findFirstOrThrow({where:{bookId:book.id},orderBy:{ordinal:"asc"}}),callsBeforeForgery=modelRequests.length,current=await readChat(page,id);
-  const forged=await page.request.post(`/api/altazor/conversations/${id}/turns`,{data:{requestId:randomUUID(),expectedRevision:current.conversation.revision,text:"Consulta ficticia con cita fabricada",destinationKey:current.destination.key,sources:[{kind:"book",bookId:book.id,fragmentId:fragment.id,quote:"Una afirmación inventada que no figura en el material conservado"}]}});expect(forged.status()).toBe(409);expect(modelRequests.length).toBe(callsBeforeForgery);
+  const forged=await apiRequest(page).post(`/api/altazor/conversations/${id}/turns`,{data:{requestId:randomUUID(),expectedRevision:current.conversation.revision,text:"Consulta ficticia con cita fabricada",destinationKey:current.destination.key,sources:[{kind:"book",bookId:book.id,fragmentId:fragment.id,quote:"Una afirmación inventada que no figura en el material conservado"}]}});expect(forged.status()).toBe(409);expect(modelRequests.length).toBe(callsBeforeForgery);
   expect(await page.locator(".altazor-source-disclosure").count()).toBe(0);
   const beforeSource=modelRequests.length,third=await send(page,"Explica el comprobante de mi biblioteca: treinta unidades y revisión prudente");expect(third.turns.at(-1)?.sourceRefs.length).toBeGreaterThan(0);
   expect(modelRequests.slice(beforeSource).filter(messages=>!messages.some(message=>message.content.startsWith("Clasifica la intención"))).some(messages=>JSON.stringify(messages).includes("treinta unidades"))).toBe(true);
@@ -241,21 +241,21 @@ test("memoria privada: grafo confirmado entra al contexto y olvidar oculta el hi
 test("el ámbito es inmutable; un turno en cola se recupera sin ejecutarse y cancelar libera el siguiente",async({page,browser})=>{
   test.setTimeout(100_000);const {email,user}=await fixture(),other=await fixture();await loginAs(page,email);
   const causa=await db.causa.create({data:{titulo:"Causa privada ficticia ALTAZOR",tribunal:"Tribunal ficticio",materia:"civil",acceso:"equipo",abogadoId:user.id}});causaIds.push(causa.id);
-  const created=await json<Conversation>(await page.request.post("/api/altazor/conversations",{data:{requestId:randomUUID(),title:"Conversación personal en cola",causaId:null}}),201),id=created.conversation.id;
+  const created=await json<Conversation>(await apiRequest(page).post("/api/altazor/conversations",{data:{requestId:randomUUID(),title:"Conversación personal en cola",causaId:null}}),201),id=created.conversation.id;
   const current=await readChat(page,id),payload={requestId:randomUUID(),expectedRevision:current.conversation.revision,text:"Explicación ficticia preparada en cola",destinationKey:current.destination.key,allowRemote:false};
-  const queued=await json<{turnId:string}>(await page.request.post(`/api/altazor/conversations/${id}/turns`,{data:payload}),201),calls=modelRequests.length;
-  const blocked=await page.request.post(`/api/altazor/conversations/${id}/turns`,{data:{...payload,requestId:randomUUID(),expectedRevision:2}});expect(blocked.status()).toBe(409);
-  expect((await page.request.patch(`/api/altazor/conversations/${id}`,{data:{expectedRevision:2,causaId:causa.id}})).status()).toBe(400);
+  const queued=await json<{turnId:string}>(await apiRequest(page).post(`/api/altazor/conversations/${id}/turns`,{data:payload}),201),calls=modelRequests.length;
+  const blocked=await apiRequest(page).post(`/api/altazor/conversations/${id}/turns`,{data:{...payload,requestId:randomUUID(),expectedRevision:2}});expect(blocked.status()).toBe(409);
+  expect((await apiRequest(page).patch(`/api/altazor/conversations/${id}`,{data:{expectedRevision:2,causaId:causa.id}})).status()).toBe(400);
   await page.goto(`/inicio?conversacion=${id}`);await expect(page.getByRole("button",{name:"Ejecutar solicitud",exact:true})).toBeVisible();await page.reload();await expect(page.getByRole("button",{name:"Ejecutar solicitud",exact:true})).toBeVisible();expect(modelRequests.length).toBe(calls);
   await page.getByRole("button",{name:"Detener",exact:true}).click();await expect.poll(async()=>(await readChat(page,id)).turns[0].status).toBe("cancelled");expect(modelRequests.length).toBe(calls);
-  const second=await json<{turnId:string}>(await page.request.post(`/api/altazor/conversations/${id}/turns`,{data:{...payload,requestId:randomUUID(),expectedRevision:(await readChat(page,id)).conversation.revision,text:"Reanudar explícitamente la siguiente explicación ficticia"}}),201);
+  const second=await json<{turnId:string}>(await apiRequest(page).post(`/api/altazor/conversations/${id}/turns`,{data:{...payload,requestId:randomUUID(),expectedRevision:(await readChat(page,id)).conversation.revision,text:"Reanudar explícitamente la siguiente explicación ficticia"}}),201);
   await page.reload();await page.getByRole("button",{name:"Ejecutar solicitud",exact:true}).click();await expect.poll(async()=>(await readChat(page,id)).turns.at(-1)?.status,{timeout:20_000}).toBe("completed");
-  const after=modelRequests.length;await page.request.post(`/api/altazor/conversations/${id}/turns/${second.turnId}/execute`,{data:{}});expect(modelRequests.length).toBe(after);
+  const after=modelRequests.length;await apiRequest(page).post(`/api/altazor/conversations/${id}/turns/${second.turnId}/execute`,{data:{}});expect(modelRequests.length).toBe(after);
   expect((await readChat(page,id)).turns.map(turn=>turn.id)).toEqual([queued.turnId,second.turnId]);
   await page.getByTestId("inicio-composer").fill("DETENER-FIXTURE: explicación ficticia interrumpible");await page.getByTestId("inicio-send").click();
   await expect.poll(()=>modelRequests.some(messages=>messages.at(-1)?.content.includes("DETENER-FIXTURE")&&!messages.some(message=>message.content.startsWith("Clasifica la intención"))),{timeout:20_000}).toBe(true);
   await page.getByRole("button",{name:"Detener",exact:true}).click();await expect.poll(async()=>(await readChat(page,id)).turns.at(-1)?.status,{timeout:20_000}).toBe("cancelled");
-  const scoped=await json<Conversation>(await page.request.post("/api/altazor/conversations",{data:{requestId:randomUUID(),title:"Conversación de causa ficticia",causaId:causa.id}}),201);expect(scoped.conversation.scopeKey).toBe(`causa:${causa.id}`);
-  expect((await page.request.patch(`/api/altazor/conversations/${scoped.conversation.id}`,{data:{expectedRevision:1,causaId:null}})).status()).toBe(400);
+  const scoped=await json<Conversation>(await apiRequest(page).post("/api/altazor/conversations",{data:{requestId:randomUUID(),title:"Conversación de causa ficticia",causaId:causa.id}}),201);expect(scoped.conversation.scopeKey).toBe(`causa:${causa.id}`);
+  expect((await apiRequest(page).patch(`/api/altazor/conversations/${scoped.conversation.id}`,{data:{expectedRevision:1,causaId:null}})).status()).toBe(400);
   const outsider=await browser.newContext();try{const outsidePage=await outsider.newPage();await loginAs(outsidePage,other.email);expect((await outsidePage.request.get(`/api/altazor/conversations/${id}`)).status()).toBe(404);expect((await outsidePage.request.get(`/api/altazor/conversations/${scoped.conversation.id}`)).status()).toBe(404);}finally{await outsider.close();}
 });
