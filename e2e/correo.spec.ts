@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { apiRequest, loginAs } from "./helpers";
 
 test("correo PJUD separa la configuración personal de la bandeja", async ({
   page,
@@ -47,12 +47,17 @@ test("correo PJUD separa la configuración personal de la bandeja", async ({
   await expect(page.getByTestId("mailbox-error")).toBeVisible();
   await expect(page.getByTestId("mailbox-error")).toContainText(/IMAP|privada|Host/i);
 
-  const start = await page.request.post("/api/mail/google/start");
+  const start = await apiRequest(page).post("/api/mail/google/start");
   expect([200, 503]).toContain(start.status());
-  const startBody = (await start.json()) as { authUrl?: string; error?: string };
+  const startBody = (await start.json()) as { authUrl?: string; error?: string; reused?: boolean };
   if (start.status() === 200) {
-    expect(startBody.authUrl).toContain("accounts.google.com");
-    expect(startBody.authUrl).toContain("gmail.readonly");
+    if (startBody.reused !== undefined) {
+      expect(typeof startBody.reused).toBe("boolean");
+      expect(startBody.authUrl).toBe(startBody.reused ? "/configuracion/correo?gmail=connected" : "/configuracion#google-settings");
+    } else {
+      expect(startBody.authUrl).toContain("accounts.google.com");
+      expect(startBody.authUrl).toContain("gmail.readonly");
+    }
   } else {
     expect(startBody.error).toBeTruthy();
   }

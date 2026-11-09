@@ -7,9 +7,10 @@ type Folder = { id: string; name: string; url?: string };
 type State = { userId: string; canConfigureRoot: boolean; connectionId: string; bindingRevision: string; revision: string; canManage: boolean; root: Folder | null; listing?: { folders: Folder[]; nextPageToken?: string; incompleteSearch?: boolean } };
 export function OrganizationDrivePanel({ kind, id }: { kind?: "causa" | "site"; id?: string }) {
   const router = useRouter();
+  const [setupMessage, setSetupMessage] = useState("");
   const [state, setState] = useState<State | null>(null), [error, setError] = useState(""), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [choosing, setChoosing] = useState(false), [reference, setReference] = useState(""), [parent, setParent] = useState("root");
   const [folder, setFolder] = useState<Folder | null>(null);
-  useEffect(() => { const controller = new AbortController(); void fetch("/api/integrations/google/organization", { cache: "no-store", signal: controller.signal }).then(async response => { const body = await response.json(); if (!response.ok) throw Error(body.error || "Revisa la conexión de Google"); setState(body); }).catch(e => { if (!controller.signal.aborted) setError(e.message); }); return () => controller.abort(); }, []);
+  useEffect(() => { const controller = new AbortController(); void fetch("/api/integrations/google/organization", { cache: "no-store", signal: controller.signal }).then(async response => { const body = await response.json(); if (!response.ok) throw Error(body.error || "Revisa la conexión de Google"); setState(body); }).catch(e => { if (!controller.signal.aborted) setSetupMessage(e.message); }); return () => controller.abort(); }, []);
   async function browse(next = "root", pageToken?: string) {
     setBusy(true); setError("");
     const result = await apiMutation<State>(`/api/integrations/google/organization?${new URLSearchParams({ parentId: next, ...(pageToken ? { pageToken } : {}) })}`, { method: "GET", cache: "no-store" });
@@ -31,6 +32,7 @@ export function OrganizationDrivePanel({ kind, id }: { kind?: "causa" | "site"; 
   }
   return <section className="panel my-4 space-y-3 rounded-3xl p-5" aria-label="Organización en Google Drive"><h3 className="text-lg font-semibold">Organización en Google Drive</h3>
     <p className="text-sm">Usa la cuenta de Google del estudio, conectada una sola vez por la administración. Elige una carpeta del estudio una vez y prepara destinos por cliente, causa o espacio de trabajo. Los permisos de Drive se administran en Google.</p>
+    {setupMessage && !state && <p role="status">{setupMessage}</p>}
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     <p className="text-sm"><Link href="/configuracion#google-settings" className="underline">Revisar la conexión de Google del estudio</Link></p>
     {state && <><p>Organización: {state.root ? <a href={state.root.url} target="_blank" rel="noreferrer" className="underline">{state.root.name}</a> : "Sin seleccionar"}</p>
