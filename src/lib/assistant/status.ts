@@ -8,6 +8,7 @@ import { civilDayQueryRange, civilSpanQueryRange, santiagoDateKey, addCivilDays 
 import { causaAccessWhere, relatedCausaWhere, plazoAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 
 export type InicioStatus = {
+  plazosVencidos: number;
   plazosFatalesProximos: number;
   plazosProximos7d: number;
   eventosHoy: number;
@@ -22,8 +23,9 @@ export async function buildInicioStatus(user: CausaAccessUser, now: Date = new D
   const hoy = civilDayQueryRange(todayYmd);
   const desde48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-  const [plazosFatalesProximos, plazosProximos7d, eventosHoy, movimientosRecientes] =
+  const [plazosVencidos, plazosFatalesProximos, plazosProximos7d, eventosHoy, movimientosRecientes] =
     await Promise.all([
+      prisma.plazo.count({ where: { estado: "pendiente", ...plazoAccessWhere(user), responsableId: user.id, fechaLimite: { lt: hoy.start } } }),
       prisma.plazo.count({
         where: {
           estado: "pendiente",
@@ -59,6 +61,7 @@ export async function buildInicioStatus(user: CausaAccessUser, now: Date = new D
     ]);
 
   return {
+    plazosVencidos,
     plazosFatalesProximos,
     plazosProximos7d,
     eventosHoy,

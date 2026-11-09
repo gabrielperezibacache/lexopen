@@ -147,6 +147,7 @@ export const es = {
     pageOf: "Página {page} de {pages}",
     commandPalette: "Ir a un apartado",
     sectionPlaceholder: "Escribe el nombre de un apartado…",
+    sectionMatches: "apartados disponibles",
     commandHint: "Atajo: ⌘K o Ctrl+K",
     breadcrumbs: "Miga de pan",
     confirmDelete: "¿Confirmar eliminación?",

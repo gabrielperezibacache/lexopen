@@ -16,6 +16,12 @@ LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audi
 
 *Las capturas muestran LexOpen con expedientes y conversaciones ficticios. La galería muestra las herramientas de esta versión.*
 
+## Tu jornada y acceso rápido
+
+Inicio reúne los plazos pendientes vencidos, los próximos vencimientos y los eventos de hoy asignados a ti, junto a Altazor cuando tienes permiso para usarlo. **Mis vencidos pendientes** incluye registros de todos los meses. Con **Ctrl+K** o **⌘K** puedes buscar apartados por varias palabras, en cualquier orden y sin acentos. En Configuración, **Buscar un ajuste** permite ir a Google, OJV o permisos sin perder formularios sin guardar. La navegación conserva los permisos y las secciones habilitadas del estudio.
+
+[Revisión de recorridos, criterios comparativos y límites](docs/REVISION-UX-Y-COMPETENCIA-2026-11-09.md).
+
 ## Organización de documentos en Google Drive
 
 Elige una carpeta de **Organización** desde Configuración, una causa o un espacio de trabajo. Con la cuenta compartida de Google del estudio puedes preparar la estructura **Organización → Clientes → Cliente → Causas → Causa**, organizar espacios independientes por cliente y crear tu carpeta en **Organización → Usuarios**. Las carpetas confirmadas se reutilizan y las existentes se conservan. No se copian documentos ni se cambian permisos automáticamente.

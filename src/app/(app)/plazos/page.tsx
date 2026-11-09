@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { causaAccessWhere as scopedcausaAccessWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
-import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
+import { civilDateKey, civilDayQueryRange, santiagoDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import { diasRestantes, labelDiasRestantes, labelTipoComputo } from "@/lib/plazos";
@@ -15,6 +15,7 @@ import Link from "next/link";
 type Props = {
   searchParams: Promise<{
     mes?: string;
+    vista?: string;
     causaId?: string;
     fechaLimite?: string;
     desde?: string;
@@ -52,12 +53,15 @@ export default async function PlazosPage({ searchParams }: Props) {
   const h = dict.hubs.plazos;
   const sp = await searchParams;
   const { start, end, year, monthIndex } = monthView(sp.mes);
+  const overdue = sp.vista === "mis-vencidos";
+  const today = civilDayQueryRange(santiagoDateKey(new Date())).start;
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
   const [plazosRaw, causas, responsables] = await Promise.all([
     prisma.plazo.findMany({
-      where: { AND: [plazoAccessWhere(user), { fechaLimite: { gte: start, lte: end } }] },
+      where: { AND: [plazoAccessWhere(user), (overdue ? { estado: "pendiente", responsableId: user.id, fechaLimite: { lt: today } } : { fechaLimite: { gte: start, lte: end } })] },
       include: { causa: true, responsable: { select: publicUserSelect } },
       orderBy: { fechaLimite: "asc" },
+      ...(overdue ? { take: 101 } : {}),
     }),
     prisma.causa.findMany({
       where: { AND: [scopedcausaAccessWhere(user), { estado: { in: ["activa", "suspensa"] } }] },
@@ -71,7 +75,7 @@ export default async function PlazosPage({ searchParams }: Props) {
       orderBy: { name: "asc" },
     }),
   ]);
-  const plazos = plazosRaw.filter((plazo) =>
+  const plazos = overdue ? plazosRaw.slice(0, 100) : plazosRaw.filter((plazo) =>
     civilDateKey(plazo.fechaLimite).startsWith(monthKey)
   );
   const prev = shiftMonthParam(year, monthIndex, -1);
@@ -96,6 +100,9 @@ export default async function PlazosPage({ searchParams }: Props) {
         }
       />
 
+      <nav className="flex flex-wrap gap-2" aria-label={locale === "en" ? "Deadline view" : "Vista de plazos"}><Link href="/plazos" className={`btn ${overdue ? "btn-secondary" : "btn-primary"}`} aria-current={!overdue ? "page" : undefined}>{locale === "en" ? "By month" : "Por mes"}</Link><Link href="/plazos?vista=mis-vencidos" className={`btn ${overdue ? "btn-primary" : "btn-secondary"}`} aria-current={overdue ? "page" : undefined}>{locale === "en" ? "My overdue deadlines" : "Mis vencidos pendientes"}</Link></nav>
+      {overdue && <p role="status" className="text-sm">{locale === "en" ? "Pending deadlines assigned to you before today, across all months." : "Plazos pendientes asignados a ti anteriores a hoy, de todos los meses."}{plazosRaw.length > 100 ? (locale === "en" ? " Showing the 100 oldest." : " Se muestran los 100 más antiguos.") : ""}</p>}
+      <details open={!overdue} className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{locale === "en" ? "Register a deadline" : "Registrar un plazo"}</summary>
       <PlazoForm
         causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))}
         responsables={responsables.map((u) => ({ id: u.id, label: u.name }))}
@@ -108,8 +115,9 @@ export default async function PlazosPage({ searchParams }: Props) {
           titulo: sp.titulo || "",
         }}
       />
+      </details>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      {!overdue && <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Link
           className="btn btn-ghost order-2 flex-1 sm:order-1 sm:flex-none"
           href={`/plazos?mes=${prev}`}
@@ -129,13 +137,13 @@ export default async function PlazosPage({ searchParams }: Props) {
           <span className="sm:hidden">Sig.</span>
           <span className="hidden sm:inline">{t("common.nextMonth")}</span> →
         </Link>
-      </div>
+      </div>}
 
       <div className="space-y-3">
         {plazos.length === 0 && (
           <EmptyState
             title={h.title}
-            description={h.empty}
+            description={overdue ? (locale === "en" ? "No overdue pending deadlines assigned to you were found in the accessible records." : "No se encontraron plazos vencidos pendientes asignados a ti en los registros accesibles.") : h.empty}
             actionLabel={h.openCalendar}
             actionHref="/calendario"
           />
