@@ -207,6 +207,7 @@ test("Codex del Host: autorización de administrador, elección explícita, fuen
     const hostPanel = admin.locator("#host-codex");
     const sharing = hostPanel.getByRole("checkbox", { name: "Permitir que los usuarios elijan Codex del Host", exact: true });
     await expect(hostPanel.getByRole("heading", { name: "Codex del Host", exact: true })).toBeVisible();
+    await expect(sharing).toBeVisible({ timeout: 20_000 });
     await expect(sharing).not.toBeChecked();
     await expect(sharing).toBeDisabled();
     const initialHost = await json<HostState>(await admin.request.get(adminApi));

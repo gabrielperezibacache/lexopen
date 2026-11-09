@@ -1,0 +1,26 @@
+name: Proponer una mejora
+description: Describe el problema y el resultado que necesitas.
+title: "[Mejora] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usa ejemplos ficticios y evita publicar información privada. Consulta la [guía de contribución](https://github.com/gabrielperezibacache/lexopen/blob/main/CONTRIBUTING.md) y [política de privacidad](https://perezibacache.cl/lexopen/privacidad/).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema o necesidad
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Alcance propuesto
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+    validations:
+      required: true

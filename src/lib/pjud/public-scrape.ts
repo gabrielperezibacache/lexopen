@@ -1429,7 +1429,7 @@ export async function attachDocumentoBytesFromPage(
   opts?: { limit?: number; delayMs?: number; maxTotalBytes?: number }
 ): Promise<PjudFetchedMovimiento[]> {
   if (!pjudDocumentDownloadsAllowed()) return movimientos;
-  const { looksLikePdf, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
+  const { validPjudDownloadedContent, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
   const limit = opts?.limit ?? pjudDocDownloadMaxPerRun(), delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
   let remainingBytes = Math.min(opts?.maxTotalBytes ?? 20 * 1024 * 1024, 20 * 1024 * 1024), attempted = 0;
   const out: PjudFetchedMovimiento[] = [];
@@ -1471,7 +1471,7 @@ export async function attachDocumentoBytesFromPage(
       if (!result && !direct) { out.push(movement); continue; }
       const bytes = direct?.bytes || Buffer.concat(result!.chunks.map(chunk => Buffer.from(chunk, "base64")));
       const contentType = direct?.contentType || result!.contentType;
-      if (bytes.length < 100 || bytes.length > remainingBytes || (!looksLikePdf(bytes) && !/pdf|msword|officedocument|octet-stream/i.test(contentType)) || /^\s*</.test(bytes.subarray(0, 40).toString("utf8"))) { out.push(movement); continue; }
+      if (!validPjudDownloadedContent(bytes, contentType, ref, remainingBytes)) { out.push(movement); continue; }
       remainingBytes -= bytes.length;
       const filename = new URL(ref).pathname.split("/").filter(Boolean).pop() || `folio-${movement.folio || attempted}.pdf`;
       out.push({ ...movement, documentoBytes: bytes, documentoFilename: filename });

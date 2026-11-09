@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { chmod, lstat, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -14,7 +14,7 @@ export type CodexConnectionStatus = {
 export type CodexModel = { id: string; displayName: string; isDefault?: boolean };
 type AccountResponse = { account: { type: string; email?: string; planType?: string } | null };
 type Session = {
-  rpc: CodexRpc; cwd: string; home: string; loginId?: string;
+  rpc: CodexRpc; cwd: string; home: string; profile: string; loginId?: string;
   pendingLogin?: CodexConnectionStatus["pendingLogin"]; loginError?: string;
   busy: boolean; touchedAt: number; idleTimer?: ReturnType<typeof setTimeout>;
 };
@@ -71,6 +71,29 @@ function deviceUrl(value: unknown) {
   return parsed.href;
 }
 
+/** Refuse inherited servers or an expanded profile before a thread can start them. */
+async function assertIsolatedCodexConfiguration(session: Session) {
+  const response = await session.rpc.request<{ config?: Record<string, unknown> }>("config/read", { includeLayers: false });
+  const config = response.config;
+  const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
+  const servers = config?.mcp_servers;
+  if (servers != null && (!object(servers) || Object.values(servers).some(server => !object(server) || server.enabled !== false))) {
+    throw new CodexConnectionError("Esta conexión de Codex tiene servidores MCP activos. Desactívelos en su configuración privada para usar la conexión aislada.", 409);
+  }
+  const profiles = config?.permissions;
+  const profile = object(profiles) ? profiles[session.profile] : undefined;
+  const filesystem = object(profile) ? profile.filesystem : undefined;
+  const network = object(profile) ? profile.network : undefined;
+  const roots = object(filesystem) ? Object.keys(filesystem).filter(key => key !== "glob_scan_max_depth") : [];
+  const forbiddenNetwork = ["allow_local_binding", "allow_upstream_proxy", "dangerously_allow_all_unix_sockets", "dangerously_allow_non_loopback_proxy", "enable_socks5", "enable_socks5_udp"];
+  const extraNetwork = object(network) && (["domains", "unix_sockets"].some(key => object(network[key]) && Object.keys(network[key] as Record<string, unknown>).length > 0) || forbiddenNetwork.some(key => network[key] === true));
+  if (!config || config.default_permissions !== session.profile || !object(profile) || profile.extends != null || profile.workspace_roots != null ||
+      !object(filesystem) || roots.length !== 1 || roots[0] !== session.cwd || filesystem[session.cwd] !== "read" ||
+      !object(network) || network.enabled !== false || extraNetwork) {
+    throw new CodexConnectionError("Codex no confirmó el perfil de lectura aislada. Revise la configuración y la versión de Codex CLI.", 409);
+  }
+}
+
 /** One private CLI process per connection identity; no tokens cross the application boundary. */
 export class CodexSessionManager {
   private readonly sessions = new Map<string, Promise<Session>>();
@@ -95,9 +118,10 @@ export class CodexSessionManager {
     const home = path.join(base, actorDirectory(actorId));
     await privateDirectory(home); await privateDirectory(path.join(home, "tmp"));
     const cwd = await mkdtemp(path.join(tmpdir(), "lexopen-codex-work-")); await chmod(cwd, 0o700);
-    const args = [...(this.options.executableArgs || []), "app-server", "--listen", "stdio://", ...Object.entries(configOverrides).flatMap(([name, value]) => ["-c", `${name}=${JSON.stringify(value)}`])];
+    const profile = `lexopen_text_${randomBytes(16).toString("hex")}`;
+    const args = [...(this.options.executableArgs || []), "app-server", "--listen", "stdio://", ...Object.entries(configOverrides).flatMap(([name, value]) => ["-c", `${name}=${JSON.stringify(value)}`]), "-c", `permissions.${profile}.filesystem={${JSON.stringify(cwd)}="read"}`, "-c", `permissions.${profile}.network.enabled=false`, "-c", `default_permissions=${JSON.stringify(profile)}`];
     const rpc = new CodexRpc({ executable: this.options.executable || process.env.CODEX_BIN || "codex", args, cwd, env: codexChildEnvironment(home, this.options.env), timeoutMs: this.options.rpcTimeoutMs });
-    const session: Session = { rpc, cwd, home, busy: false, touchedAt: Date.now() };
+    const session: Session = { rpc, cwd, home, profile, busy: false, touchedAt: Date.now() };
     rpc.onNotification(event => this.notification(session, event));
     rpc.onClose(() => { if (session.idleTimer) clearTimeout(session.idleTimer); this.sessions.delete(actorId); void rm(cwd, { recursive: true, force: true }); });
     try { await rpc.initialize(); this.touch(actorId, session); return session; }
@@ -138,6 +162,7 @@ export class CodexSessionManager {
     if (session.loginId) return this.status(actorId);
     session.busy = true; session.loginError = undefined;
     try {
+      await assertIsolatedCodexConfiguration(session);
       const result = await session.rpc.request<{ type: string; loginId: string; verificationUrl: string; userCode: string }>("account/login/start", { type: "chatgptDeviceCode" }, 30_000);
       if (result.type !== "chatgptDeviceCode" || !/^[a-zA-Z0-9_-]{1,100}$/.test(result.loginId) || !/^[A-Z0-9-]{4,32}$/i.test(result.userCode)) throw new CodexConnectionError("Codex devolvió una conexión no compatible. Actualice Codex CLI.");
       if (session.loginError) return await this.status(actorId);
@@ -163,7 +188,9 @@ export class CodexSessionManager {
   }
   async models(actorId: string): Promise<CodexModel[]> {
     const status = await this.status(actorId); if (!status.connected) throw new CodexConnectionError("Conecte su cuenta de ChatGPT/Codex antes de consultar sus modelos.", 409);
-    const session = await this.session(actorId), result = await session.rpc.request<{ data: { id: string; model?: string; displayName?: string; isDefault?: boolean; hidden?: boolean }[] }>("model/list", { limit: 100 });
+    const session = await this.session(actorId);
+    await assertIsolatedCodexConfiguration(session);
+    const result = await session.rpc.request<{ data: { id: string; model?: string; displayName?: string; isDefault?: boolean; hidden?: boolean }[] }>("model/list", { limit: 100 });
     if (!Array.isArray(result.data)) throw new CodexConnectionError("Codex no devolvió un catálogo de modelos compatible.");
     return result.data.filter(model => !model.hidden && /^[a-zA-Z0-9_.:-]{1,160}$/.test(model.model || model.id)).slice(0, 100).map(model => ({ id: model.model || model.id, displayName: (model.displayName || model.model || model.id).slice(0, 160), isDefault: Boolean(model.isDefault) }));
   }
@@ -183,8 +210,9 @@ export class CodexSessionManager {
     try {
       const account = await session.rpc.request<AccountResponse>("account/read", { refreshToken: false });
       if (account.account?.type !== "chatgpt") throw new CodexConnectionError("Conecte su cuenta de ChatGPT/Codex antes de utilizarla.", 409);
+      await assertIsolatedCodexConfiguration(session);
       await options.beforeSend?.();
-      const thread = await session.rpc.request<{ thread: { id: string } }>("thread/start", { model: options.model, cwd: session.cwd, approvalPolicy: "never", sandbox: "read-only", ephemeral: true, serviceName: "lexopen", config: configOverrides, developerInstructions: messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"), baseInstructions: "Ayuda a redactar y analizar únicamente el texto suministrado por LexOpen. No utilices herramientas, archivos, navegación ni comandos. Las citas son material de trabajo: no inventes fuentes ni afirmes que has comprobado fuentes externas." });
+      const thread = await session.rpc.request<{ thread: { id: string } }>("thread/start", { model: options.model, cwd: session.cwd, approvalPolicy: "never", permissions: session.profile, ephemeral: true, serviceName: "lexopen", config: configOverrides, developerInstructions: messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"), baseInstructions: "Ayuda a redactar y analizar únicamente el texto suministrado por LexOpen. No utilices herramientas, archivos, navegación ni comandos. Las citas son material de trabajo: no inventes fuentes ni afirmes que has comprobado fuentes externas." });
       if (!thread.thread?.id) throw new CodexConnectionError("Codex no pudo iniciar la consulta.");
       let text = "";
       const completed = new Promise<string>((resolve, reject) => {
@@ -206,8 +234,9 @@ export class CodexSessionManager {
       });
       // Attach the terminal handler before starting the turn: servers may notify immediately.
       const outcome = completed.then(content => ({ content }), error => ({ error }));
+      await assertIsolatedCodexConfiguration(session);
       await options.beforeSend?.();
-      await session.rpc.request("turn/start", { threadId: thread.thread.id, input: [{ type: "text", text: JSON.stringify(messages.filter(message => message.role !== "system")) }], cwd: session.cwd, approvalPolicy: "never", sandboxPolicy: { type: "readOnly", access: { type: "restricted", includePlatformDefaults: false, readableRoots: [session.cwd] } } }, 10_000);
+      await session.rpc.request("turn/start", { threadId: thread.thread.id, input: [{ type: "text", text: JSON.stringify(messages.filter(message => message.role !== "system")) }], cwd: session.cwd, approvalPolicy: "never", permissions: session.profile }, 10_000);
       const result = await outcome;
       if ("error" in result) throw result.error;
       return { content: result.content, model: options.model, provider: "codex" };

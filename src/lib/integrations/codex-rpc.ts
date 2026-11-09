@@ -39,7 +39,7 @@ export class CodexRpc {
   onClose(listener: (reason: CodexTransportError) => void) { this.closeListeners.add(listener); return () => { this.closeListeners.delete(listener); }; }
 
   async initialize() {
-    await this.request("initialize", { clientInfo: { name: "lexopen", title: "LexOpen", version: "1.0.0" } });
+    await this.request("initialize", { clientInfo: { name: "lexopen", title: "LexOpen", version: "1.0.0" }, capabilities: { experimentalApi: true } });
     this.notify("initialized");
   }
 
@@ -93,7 +93,14 @@ export class CodexRpc {
       } else if (typeof message.id === "number") {
         const pending = this.pending.get(message.id); if (!pending) continue;
         clearTimeout(pending.timer); this.pending.delete(message.id);
-        if (message.error) pending.reject(new CodexTransportError("remote", "Codex no pudo completar la solicitud. Revise la conexión y vuelva a intentarlo."));
+        if (message.error) {
+          const error = message.error;
+          const code = error && typeof error === "object" && !Array.isArray(error) ? (error as { code?: unknown }).code : undefined;
+          const protocolError = typeof code === "number" && [-32600, -32601, -32602].includes(code);
+          pending.reject(new CodexTransportError("remote", protocolError
+            ? `Codex rechazó el formato de la solicitud (RPC ${code}). Compruebe la compatibilidad de Codex CLI.`
+            : "Codex no pudo completar la solicitud. Revise la conexión y vuelva a intentarlo."));
+        }
         else if ("result" in message) pending.resolve(message.result);
         else { const reason = new CodexTransportError("protocol", "Codex devolvió una respuesta no compatible."); pending.reject(reason); this.fail(reason); return; }
       }

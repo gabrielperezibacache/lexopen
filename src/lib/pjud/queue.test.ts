@@ -4,6 +4,7 @@ import { clearFallidosMonitoreoAvisos, syncCausaPjud } from "@/lib/pjud/sync";
 import {
   isBackupableDocumentoRef,
   looksLikePdf,
+  validPjudDownloadedContent,
 } from "@/lib/pjud/pdf-backup";
 
 const now = new Date("2026-08-12T15:00:00.000Z");
@@ -36,6 +37,16 @@ emptySelectionDoesNotTouchDatabase().catch((error) => { console.error(error); pr
 
 assert.equal(looksLikePdf(Buffer.from("%PDF-1.4")), true);
 assert.equal(looksLikePdf(Buffer.from("<html>")), false);
+
+const fixturePdf = Buffer.from("%PDF-1.4\n" + "x".repeat(140));
+const fixtureError = Buffer.from("La sesión caducó. " + "x".repeat(140));
+assert.equal(validPjudDownloadedContent(fixturePdf, "application/pdf", "https://civil.pjud.cl/doc.pdf", 1000), true);
+assert.equal(validPjudDownloadedContent(fixtureError, "application/pdf", "https://civil.pjud.cl/doc.pdf", 1000), false);
+assert.equal(validPjudDownloadedContent(fixtureError, "application/octet-stream", "https://civil.pjud.cl/doc.pdf", 1000), false);
+assert.equal(validPjudDownloadedContent(fixtureError, "application/msword", "https://civil.pjud.cl/doc.doc", 1000), true);
+assert.equal(validPjudDownloadedContent(Buffer.from("<html>" + "x".repeat(140)), "application/octet-stream", "https://civil.pjud.cl/doc", 1000), false);
+assert.equal(validPjudDownloadedContent(fixturePdf, "application/pdf", "https://civil.pjud.cl/doc.pdf", 100), false);
+
 
 assert.equal(
   isBackupableDocumentoRef(

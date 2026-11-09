@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   contentDispositionFor,
+  documentBodyForDownload,
   downloadResponseHeaders,
   isInlineSafeMime,
   sanitizeUploadMimeType,
@@ -31,3 +32,15 @@ assert.match(html["Content-Disposition"], /^attachment;/);
 assert.equal(html["X-Content-Type-Options"], "nosniff");
 
 console.log("security/download.test.ts OK");
+
+// A missing original must not become a successful zero-byte download.
+assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, contenido: null, mimeType: "application/pdf" }, null), null);
+assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: "missing", contenido: "extracted text", mimeType: "application/pdf" }, null), null);
+assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, contenido: "extracted text", mimeType: "application/pdf" }, null), null);
+assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: "pdf", contenido: null, mimeType: "Application/PDF; charset=binary" }, Buffer.from("%PDF-1.7"))?.toString(), "%PDF-1.7");
+assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, contenido: "", mimeType: "text/plain" }, null)?.length, 0);
+assert.equal(documentBodyForDownload({ nombre: "archivo.PDF", storageKey: null, contenido: "no es PDF", mimeType: null }, null), null);
+assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, contenido: "error", mimeType: "application/x-pdf" }, null), null);
+
+const damagedOriginal = Buffer.from("Original almacenado con formato incorrecto");
+assert.deepEqual(documentBodyForDownload({ nombre: "archivo.pdf", storageKey: "stored", contenido: "texto extraído", mimeType: "application/pdf" }, damagedOriginal), damagedOriginal);

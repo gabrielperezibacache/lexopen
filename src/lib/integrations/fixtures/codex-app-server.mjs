@@ -5,8 +5,12 @@ import path from "node:path";
 const scenario = process.argv.find(value => value.startsWith("--scenario="))?.slice(11) || "normal";
 const home = process.env.CODEX_HOME || process.cwd();
 const credential = path.join(home, "fake-auth.json"), trace = path.join(home, "trace.jsonl");
-let connected = ["connected", "hang", "tool", "tool-event", "failed"].includes(scenario) || existsSync(credential) && Boolean(JSON.parse(readFileSync(credential, "utf8"))), loginTimer;
+const profileArg = process.argv.find(value => value.startsWith("default_permissions="));
+const profile = profileArg ? JSON.parse(profileArg.slice("default_permissions=".length)) : "";
+let configReads = 0;
+let connected = ["connected", "hang", "tool", "tool-event", "failed", "mcp-present", "mcp-late", "mcp-disabled"].includes(scenario) || existsSync(credential) && Boolean(JSON.parse(readFileSync(credential, "utf8"))), loginTimer;
 writeFileSync(path.join(home, "fake-environment.json"), JSON.stringify(process.env));
+writeFileSync(path.join(home, "fake-arguments.json"), JSON.stringify(process.argv.slice(2)));
 const send = value => process.stdout.write(JSON.stringify(value) + "\n");
 const result = (id, value) => send({ id, result: value });
 const notify = (method, params) => send({ method, params });
@@ -16,6 +20,14 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
   const { id, method, params } = message;
   if (method === "initialize") result(id, { userAgent: "lexopen-test" });
   else if (method === "initialized") {}
+  else if (method === "config/read") {
+    configReads++;
+    const unsafe = scenario === "mcp-present" || scenario === "mcp-late" && configReads > 1;
+    const fsArg = process.argv.find(value => value.startsWith(`permissions.${profile}.filesystem=`));
+    const fsMatch = fsArg?.slice(fsArg.indexOf("=") + 1).match(/^\{("(?:\\.|[^"\\])*")="read"\}$/);
+    const workspace = fsMatch ? JSON.parse(fsMatch[1]) : process.cwd();
+    result(id, { config: { default_permissions: profile, permissions: { [profile]: { filesystem: { [workspace]: "read" }, network: { enabled: false } } }, mcp_servers: unsafe ? { fixture: { command: "NEVER_EXECUTE" } } : scenario === "mcp-disabled" ? { fixture: { command: "NEVER_EXECUTE", enabled: false } } : {} } });
+  }
   else if (method === "account/read") result(id, { account: connected ? { type: "chatgpt", email: "codex-demo@example.test", planType: "plus", accessToken: "SHOULD_NEVER_LEAVE" } : null, requiresOpenaiAuth: true });
   else if (method === "account/login/start") {
     result(id, { type: "chatgptDeviceCode", loginId: "login_test", verificationUrl: scenario === "bad-url" ? "https://evil.example/codex/device" : "https://auth.openai.com/codex/device", userCode: "DEMO-1234" });
@@ -38,6 +50,7 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
   } else if (method === "invalid") process.stdout.write("not-json\n");
   else if (method === "empty-response") send({ id });
   else if (method === "oversize") process.stdout.write("x".repeat(5000));
+  else if (method === "remote-protocol-error") send({ id, error: { code: -32600, message: "SECRET_FROM_PROVIDER" } });
   else if (method === "remote-error") { process.stderr.write("SECRET_FROM_STDERR\n"); send({ id, error: { code: -1, message: "SECRET_FROM_PROVIDER" } }); }
   else if (method === "echo") result(id, params);
   else if (method === "hang") {}
