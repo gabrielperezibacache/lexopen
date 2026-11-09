@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { getCaseManagementMode } from "@/lib/causas/management-mode";
 import { isWorkCountry, showCommunications, workCountryOptions, type WorkCountry } from "./countries";
@@ -64,6 +64,25 @@ async function main() {
     assert.equal(settings.claveUnicaEnabled, true);
     assert.equal(settings.claveUnicaPasswordEnc, "fictitious-kept-value");
     assert.equal(await db.auditEvent.count({ where: auditWhere }), 3);
+
+    let injectedConflict = false;
+    const conflictDb = db.$extends({ query: { auditEvent: { async create({ args, query }) {
+      if (!injectedConflict) {
+        injectedConflict = true;
+        throw new Prisma.PrismaClientKnownRequestError("synthetic serialization conflict", { code: "P2034", clientVersion: "5.22.0" });
+      }
+      return query(args);
+    } } } });
+    const beforeConflictAudits = await db.auditEvent.count({ where: auditWhere });
+    assert.deepEqual(await updateWorkCountry("CL", admin, conflictDb as unknown as PrismaClient), { country: "CL" });
+    assert.equal(injectedConflict, true);
+    assert.equal(await getWorkCountry(db), "CL");
+    assert.equal(await db.auditEvent.count({ where: auditWhere }), beforeConflictAudits + 1, "rolled-back audit conflicts retry the entire mutation exactly once");
+
+    const brokenAuditDb = db.$extends({ query: { auditEvent: { async create() { throw new Error("synthetic persistent audit failure"); } } } });
+    await assert.rejects(updateWorkCountry("AR", admin, brokenAuditDb as unknown as PrismaClient), statusIs(500));
+    assert.equal(await getWorkCountry(db), "CL", "persistent audit errors roll back and are never retried as conflicts");
+    assert.equal(await db.auditEvent.count({ where: auditWhere }), beforeConflictAudits + 1);
 
     await db.user.update({ where: { id: admin.id }, data: { capabilityRevokes: "host.admin" } });
     await assert.rejects(updateWorkCountry("CL", admin, db), statusIs(403));

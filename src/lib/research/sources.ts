@@ -1,3 +1,5 @@
+import { searchPjud, type PjudSearchInput } from "./pjud-search";
+import { fetchPjudJudgment } from "./pjud-judgments";
 import { request } from "node:https";
 import { lookup } from "node:dns";
 import { isIP, type LookupFunction } from "node:net";
@@ -25,7 +27,7 @@ function validDate(value: string | undefined): Date | undefined {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : undefined;
 }
 
-type Location = { provider: "dt" | "bcn" | "sii"; format: "html" | "xml" | "json"; canonicalUrl: string; retrievalUrl: string; externalId: string; version?: string };
+type Location = { provider: "dt" | "bcn" | "sii" | "juris_pjud"; format: "html" | "xml" | "json"; canonicalUrl: string; retrievalUrl: string; externalId: string; version?: string };
 function sourceLocation(raw: string): Location {
   if (raw.length > 2000 || !isSafeOutboundHttpUrl(raw, { allowHttp: false })) {
     throw sourceError("Use una URL HTTPS de una fuente oficial admitida", 400, "unsupported_source_url");
@@ -33,6 +35,11 @@ function sourceLocation(raw: string): Location {
   const url = new URL(raw);
   if (url.port && url.port !== "443") throw sourceError("Puerto de fuente no admitido", 400, "unsupported_source_url");
   const host = url.hostname.toLowerCase();
+  if (host === "juris.pjud.cl") {
+    const id = /^#sentencia-([1-9]\d{0,14})$/.exec(url.hash)?.[1];
+    if (url.pathname !== "/busqueda" || url.search !== "?Civiles" || !id) throw sourceError("Use https://juris.pjud.cl/busqueda?Civiles#sentencia-ID con el identificador numérico del fallo", 400, "unsupported_source_url");
+    return { provider: "juris_pjud", format: "json", canonicalUrl: url.href, retrievalUrl: "https://juris.pjud.cl/busqueda/buscar_sentencias", externalId: `PJUD:${id}` };
+  }
   if (["www.dt.gob.cl", "dt.gob.cl"].includes(host)) {
     const id = /^\/legislacion\/1624\/w3-article-(\d{1,10})\.html$/.exec(url.pathname)?.[1];
     if (!id || url.search) throw sourceError("Importe el enlace individual de un dictamen de la Dirección del Trabajo", 400, "unsupported_source_url");
@@ -72,11 +79,11 @@ function sourceLocation(raw: string): Location {
 export function validatePublicLegalSourceUrl(raw: string): string { return sourceLocation(raw).canonicalUrl; }
 
 /** Authority and class come from the approved URL, including for manual copies. */
-export function describePublicLegalSource(raw: string): { canonicalUrl: string; organism: string; kind: "legislation" | "administrative" } {
+export function describePublicLegalSource(raw: string): { canonicalUrl: string; organism: string; kind: "legislation" | "administrative" | "jurisprudence" } {
   const location = sourceLocation(raw);
   return { canonicalUrl: location.canonicalUrl,
-    organism: location.provider === "dt" ? "Dirección del Trabajo" : location.provider === "sii" ? "Servicio de Impuestos Internos" : "Biblioteca del Congreso Nacional de Chile",
-    kind: location.provider === "bcn" ? "legislation" : "administrative" };
+    organism: location.provider === "juris_pjud" ? "Poder Judicial de Chile" : location.provider === "dt" ? "Dirección del Trabajo" : location.provider === "sii" ? "Servicio de Impuestos Internos" : "Biblioteca del Congreso Nacional de Chile",
+    kind: location.provider === "juris_pjud" ? "jurisprudence" : location.provider === "bcn" ? "legislation" : "administrative" };
 }
 
 export function isPublicSourceAddress(address: string): boolean {
@@ -103,12 +110,15 @@ const publicLookup: LookupFunction = (hostname, options, callback) => {
 
 async function officialRequest(url: string, init: RequestInit): Promise<Response> {
   return new Promise((resolve, reject) => {
-    const req = request(url, { method: "GET", signal: init.signal || undefined, lookup: publicLookup,
-      headers: { Accept: "application/xml, text/xml, application/json, text/html;q=0.9", "Accept-Encoding": "identity", "User-Agent": "LexOpen/1.0 (public legal source importer)" } }, response => {
+    const req = request(url, { method: init.method || "GET", signal: init.signal || undefined, lookup: publicLookup,
+      headers: { Accept: "application/xml, text/xml, application/json, text/html;q=0.9", "Accept-Encoding": "identity", "User-Agent": "LexOpen/1.0 (public legal source importer)", ...Object.fromEntries(new Headers(init.headers)) } }, response => {
       // node:https never follows a Location header; the caller rejects 3xx.
       try {
         const headers = new Headers();
-        for (const [key, value] of Object.entries(response.headers)) if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+        for (const [key, value] of Object.entries(response.headers)) if (value !== undefined) {
+          if (Array.isArray(value)) value.forEach(item => headers.append(key, item));
+          else headers.set(key, value);
+        }
         const status = response.statusCode || 502;
         const body = [204, 205, 304].includes(status) ? null : Readable.toWeb(response) as ReadableStream<Uint8Array>;
         if (!body) response.resume();
@@ -116,7 +126,7 @@ async function officialRequest(url: string, init: RequestInit): Promise<Response
       } catch (error) { response.destroy(); reject(error); }
     });
     req.once("error", reject);
-    req.end();
+    req.end(typeof init.body === "string" ? init.body : undefined);
   });
 }
 
@@ -307,6 +317,7 @@ export async function fetchPublicLegalSource(rawUrl: string, options: PublicSour
   const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
   if (signal.aborted) throw sourceError("La consulta a la fuente fue cancelada", 503, "public_source_timeout");
   const transport = options.fetch || officialRequest;
+  if (location.provider === "juris_pjud") return fetchPjudJudgment(location.canonicalUrl, location.externalId.slice(5), transport, signal, maxBytes, readBounded);
   let response: Response;
   try {
     response = await transport(location.retrievalUrl, { method: "GET", redirect: "error", credentials: "omit", cache: "no-store", signal, headers: { Accept: "application/xml, text/xml, application/json, text/html;q=0.9" } });
@@ -331,4 +342,11 @@ export async function fetchPublicLegalSource(rawUrl: string, options: PublicSour
   catch (error) { if (error && typeof error === "object" && "status" in error) throw error; throw sourceError("No fue posible interpretar el documento oficial", 502, "public_source_format"); }
   if (parsed.text.length > MAX_SOURCE_TEXT) throw sourceError("El texto de la fuente supera el límite de preparación", 413, "public_source_too_large");
   return { ...parsed, canonicalUrl: location.canonicalUrl, retrievalUrl: location.retrievalUrl, mimeType: mime.split(";")[0].trim().toLowerCase(), rawBytes, retrievedAt: new Date() };
+}
+
+/** Explicit public terms only; never forward a case document or a local research question implicitly. */
+export async function searchPublicPjudJudgments(input: PjudSearchInput, options: PublicSourceFetchOptions = {}) {
+  const signal = AbortSignal.any([AbortSignal.timeout(Math.min(PUBLIC_SOURCE_TIMEOUT_MS, Math.max(1, options.timeoutMs || PUBLIC_SOURCE_TIMEOUT_MS))), ...(options.signal ? [options.signal] : [])]);
+  if (signal.aborted) throw sourceError("Consulta cancelada", 503);
+  return searchPjud(input, options.fetch || officialRequest, signal, Math.min(PUBLIC_SOURCE_MAX_BYTES, Math.max(1, options.maxBytes || PUBLIC_SOURCE_MAX_BYTES)), readBounded);
 }
