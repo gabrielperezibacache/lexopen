@@ -53,8 +53,9 @@ export class GoogleIntegrationError extends Error {
 }
 
 const DEFAULT_SCOPES = [
-  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/drive",
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
   "openid",
   "email",
@@ -190,14 +191,7 @@ export function getGoogleAuthUrl(state = "lexopen") {
     response_type: "code",
     access_type: "offline",
     prompt: "consent",
-    scope: [
-      "openid",
-      "email",
-      "profile",
-      "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/calendar.events",
-      "https://www.googleapis.com/auth/gmail.send",
-    ].join(" "),
+    scope: DEFAULT_SCOPES.join(" "),
     state,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -240,6 +234,7 @@ export async function exchangeGoogleCode(code: string) {
     access_token: string;
     refresh_token?: string;
     expires_in: number;
+    scope?: string;
   };
 
   let email: string | undefined;
@@ -256,8 +251,10 @@ export async function exchangeGoogleCode(code: string) {
   }
 
   const current = await getGoogleConfig();
+  if (!tokens.refresh_token && (!email || !current.connectedEmail || email !== current.connectedEmail)) throw new GoogleIntegrationError("needs_reconnect", "Autoriza de nuevo la cuenta del estudio; no se mezclarán credenciales de cuentas distintas.");
   const next: GoogleConfig = {
     ...current,
+    scopes: tokens.scope ? tokens.scope.split(/\s+/).filter(Boolean) : current.scopes,
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token || current.refreshToken,
     connectedEmail: email,

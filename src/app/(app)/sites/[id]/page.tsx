@@ -1,3 +1,4 @@
+import { OrganizationDrivePanel } from "@/components/OrganizationDrivePanel";
 import { NewISheetButton } from "@/components/sites/NewISheetButton";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { SiteSettingsPanel } from "@/components/sites/SiteSettingsPanel";
@@ -108,6 +109,7 @@ export default async function SiteOverviewPage({ params, searchParams }: Params)
         </section>
       )}
 
+      <OrganizationDrivePanel kind="site" id={site.id} />
       <SiteSettingsPanel
         site={{
           id: site.id,

@@ -99,7 +99,7 @@ async function readFolder(io: ReturnType<typeof transport>, folderId: string) {
 /** Inspect one explicitly chosen folder using the supplied owner-bound server session. */
 export async function inspectChosenDriveFolder(folderId: string, session: Awaited<ReturnType<typeof requireDriveSession>> | null, options: Dependencies = {}) {
   const io = options.openTransport ? await options.openTransport() : transport(session || await (options.session || requireDriveSession)(), options);
-  try { const folder = await readFolder(io, folderId); return { id: folder.id, name: typeof folder.name === "string" ? folder.name.slice(0, 250) : "Carpeta elegida" }; }
+  try { const folder = await readFolder(io, folderId); return { id: folder.id, name: typeof folder.name === "string" ? folder.name.slice(0, 250) : "Carpeta elegida", parents: folder.parents || [] }; }
   finally { io.close(); }
 }
 /** Native folder picker: bounded metadata only; selecting a folder is a separate mutation. */

@@ -1,3 +1,5 @@
+import { studyDriveMode } from "@/lib/integrations/google-study-drive";
+import { configureOrganizationDrive, organizationDriveState } from "@/lib/integrations/drive-organization";
 import { assertCsrf, canReadFlagged, handleRouteError, httpError, requireStaff } from "@/lib/api";
 import { assertCausaAccess, assertCausaCapability, documentReadWhere, plazoAccessWhere, requiredCausaWhere } from "@/lib/auth/causa-access";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
@@ -234,6 +236,12 @@ export async function POST(req: Request) {
     }
     if (body.action === "create-causa-folder" && body.causaId) {
       try {
+        if (await studyDriveMode()) {
+          if (body.parentFolderId || body.name) throw httpError("La cuenta compartida utiliza la estructura de Organización. Prepara la carpeta desde ese apartado.", 400);
+          const organization = await organizationDriveState(user);
+          const result = await configureOrganizationDrive(user, { action: "organize", kind: "causa", id: String(body.causaId), revision: organization.revision, confirmed: true });
+          return NextResponse.json(result, { status: result.state === "unknown" ? 202 : 200 });
+        }
         const result = await createCausaDriveFolder(body.causaId, {
           parentFolderId: body.parentFolderId,
           name: body.name,

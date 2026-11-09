@@ -16,6 +16,12 @@ LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audi
 
 *Las capturas muestran LexOpen con expedientes y conversaciones ficticios. La galería muestra las herramientas de esta versión.*
 
+## Organización de documentos en Google Drive
+
+Elige una carpeta de **Organización** desde Configuración, una causa o un espacio de trabajo. Con la cuenta compartida de Google del estudio puedes preparar la estructura **Organización → Clientes → Cliente → Causas → Causa**, organizar espacios independientes por cliente y crear tu carpeta en **Organización → Usuarios**. Las carpetas confirmadas se reutilizan y las existentes se conservan. No se copian documentos ni se cambian permisos automáticamente.
+
+La administración conecta Google una sola vez para Drive, Calendar y Gmail y elige la raíz compartida. Los profesionales conservan sus permisos en LexOpen; sólo la administración accede al buzón completo del estudio. Las cuentas anteriores con menos permisos pueden necesitar ampliar esa misma autorización. No se migran automáticamente conexiones ni archivos personales. [Flujo, permisos y límites](docs/GOOGLE-ORGANIZACION.md).
+
 ## OJV y Buscador Unificado de Jurisprudencia
 
 En la investigación jurídica puedes incorporar un fallo civil del Buscador Unificado del Poder Judicial por su identificador numérico. Introduce el ID en **Incorporar una fuente jurídica**, revisa la referencia preparada y pulsa **Recuperar fuente oficial**. LexOpen abre una sesión pública independiente de ClaveÚnica, exige el ID exacto y conserva la respuesta JSON y su texto en el corpus con versiones y hashes. Los previews y marcadores de anonimización sin texto no se incorporan como fallos íntegros.

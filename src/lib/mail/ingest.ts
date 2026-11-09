@@ -1,3 +1,4 @@
+import { STUDY_GMAIL_REFERENCE, studyGmailToken } from "@/lib/integrations/google-study-mail";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
@@ -225,7 +226,7 @@ export async function ingestGmailMail(user: CausaAccessUser) {
   if (!account || account.protocol !== "gmail") {
     throw Object.assign(new Error("Gmail no conectado"), { status: 400 });
   }
-  const fetched = await fetchGmailPjudMessages(account);
+  const fetched = await fetchGmailPjudMessages(account, account.oauthRefreshEnc === STUDY_GMAIL_REFERENCE ? await studyGmailToken(user.id, account.email) : undefined);
   const inserted = await ingestFetched(user, account.id, fetched);
   await saveProviderCursor(account.id, {
     accessEnc: fetched.accessEnc,
