@@ -15,6 +15,9 @@ export async function searchPjud(input: PjudSearchInput, transport: Parameters<t
   const response = payload?.response;
   const fail = () => Object.assign(new Error("El Buscador Unificado devolvió resultados incompatibles con la consulta. Revise el portal oficial."), { status: 502 });
   if (!response || !Number.isSafeInteger(response.numFound) || response.numFound < 0 || !Array.isArray(response.docs) || response.docs.length > 10 || response.docs.length > response.numFound) throw fail();
+  const offset = checked.page * 10;
+  if (response.start !== undefined && response.start !== offset) throw fail();
+  if (response.docs.length && offset + response.docs.length > response.numFound) throw fail();
   const ids = new Set<string>();
   const items = response.docs.map((doc: Record<string, unknown>) => {
     if (!doc || typeof doc !== "object") throw fail();
