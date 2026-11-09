@@ -95,7 +95,8 @@ const url = getGoogleAuthUrl("abcSTATE");
 assert.ok(url?.includes("accounts.google.com"), "auth host");
 assert.ok(url?.includes("client_id=client-test"), "client id");
 assert.ok(url?.includes("state=abcSTATE"), "state");
-assert.ok(url?.includes("drive.file"), "drive scope");
+assert.ok(new URL(url!).searchParams.get("scope")?.split(" ").includes("https://www.googleapis.com/auth/drive"), "shared Drive scope");
+assert.ok(url?.includes("gmail.readonly"), "shared Gmail reading scope");
 assert.ok(url?.includes("access_type=offline"), "offline");
 
 if (prevId === undefined) delete process.env.GOOGLE_CLIENT_ID;

@@ -149,6 +149,7 @@ export const en: Dictionary = {
     pageOf: "Page {page} of {pages}",
     commandPalette: "Go to a section",
     sectionPlaceholder: "Type a section name…",
+    sectionMatches: "available sections",
     commandHint: "Shortcut: ⌘K or Ctrl+K",
     breadcrumbs: "Breadcrumb",
     confirmDelete: "Confirm deletion?",

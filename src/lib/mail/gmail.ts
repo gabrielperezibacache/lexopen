@@ -32,11 +32,11 @@ async function gmailGetRaw(accessToken: string, id: string) {
 }
 
 export async function fetchGmailPjudMessages(
-  account: GmailAccount
+  account: GmailAccount, sharedAccessToken?: string
 ): Promise<
   ProviderFetchResult & { accessEnc?: string; refreshEnc?: string; expiresAt?: Date }
 > {
-  const token = await mailboxAccessToken(account);
+  const token = sharedAccessToken ? { accessToken: sharedAccessToken } : await mailboxAccessToken(account);
   const messages: InboundMail[] = [];
   let pageToken: string | undefined;
   let historyId = account.gmailHistoryId || undefined;

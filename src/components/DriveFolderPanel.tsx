@@ -10,6 +10,7 @@ import {
 } from "@/lib/integrations/drive-folder";
 import { apiMutation } from "@/lib/api-mutation";
 import type { DriveImportCandidate } from "@/lib/integrations/drive-import";
+import { OrganizationDrivePanel } from "./OrganizationDrivePanel";
 import { PersonalDriveFolderPicker } from "./PersonalDriveFolderPicker";
 import { DriveAutoSyncPanel } from "./DriveAutoSyncPanel";
 
@@ -31,7 +32,7 @@ export function DriveFolderPanel({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [folderRef, setFolderRef] = useState("");
-  const [folderAccount, setFolderAccount] = useState<"study" | "personal">("personal");
+  const [folderAccount, setFolderAccount] = useState<"study" | "personal">("study");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [files, setFiles] = useState<DriveImportCandidate[] | null>(null);
@@ -104,12 +105,14 @@ export function DriveFolderPanel({
   }
 
   return (
+    <>
+      {canImport && <OrganizationDrivePanel kind="causa" id={causaId} />}
     <section id="drive-folder" className="panel case-destination rounded-3xl p-5">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Google Drive</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-            Vincula la carpeta de esta causa con la cuenta conectada a Altazor.
+            Usa la cuenta compartida de Google del estudio para organizar esta causa.
             Puedes recibir sus documentos y guardar tus nuevas versiones,
             conservando los originales y sus fuentes.
           </p>
@@ -292,5 +295,6 @@ export function DriveFolderPanel({
         </p>
       )}
     </section>
+    </>
   );
 }

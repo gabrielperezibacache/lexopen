@@ -1,5 +1,6 @@
 "use client";
 
+import { searchCommands } from "@/lib/navigation/command-search";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { type configCategoriesForMode, configSectionFromHash } from "./config-sections";
@@ -8,6 +9,7 @@ import styles from "./WorkspaceArea.module.css";
 export function ConfigSectionNav({ categories }: { categories: ReturnType<typeof configCategoriesForMode> }) {
   const { locale } = useI18n();
   const english = locale === "en";
+  const [query, setQuery] = useState("");
   const [active, setActive] = useState<string>(categories[0].sections[0].id);
   const navRef = useRef<HTMLElement>(null);
   const category = categories.find(item => item.sections.some(section => section.id === active)) ?? categories[0];
@@ -76,8 +78,12 @@ export function ConfigSectionNav({ categories }: { categories: ReturnType<typeof
     };
   }, [categories]);
 
+  const aliases: Record<string, string> = { "google-settings": "Drive carpetas Organización Gmail Calendar calendario", "pjud-settings": "OJV ClaveÚnica tribunales courts", "llm-settings": "modelo model inteligencia intelligence API", "work-country": "país country Chile", "usuarios": "permisos roles usuarios permissions users" };
+  const results = searchCommands(categories.flatMap(item => item.sections.map(section => ({ ...section, label: english ? section.labelEn : section.label, group: english ? item.labelEn : item.label, keywords: aliases[section.id] || section.id }))), query);
   return (
     <nav ref={navRef} className={styles.sectionNav} aria-label={english ? "Settings sections" : "Secciones de configuración"}>
+      <label className={styles.settingsSearch}><span>{english ? "Find a setting" : "Buscar un ajuste"}</span><input className="input" type="search" value={query} maxLength={100} onChange={event => setQuery(event.target.value)} placeholder={english ? "Google, permissions, court mail…" : "Google, permisos, correo judicial…"} /></label>
+      {query.trim() ? <div className={styles.settingsResults}><p className="text-xs text-[var(--muted)]" role="status">{results.length} {english ? "available settings" : "ajustes disponibles"}</p>{results.map(section => <a key={section.id} href={`#${section.id}`} className={styles.sectionLink} onClick={() => setQuery("")}><span>{section.label}</span><small>{section.group}</small></a>)}</div> : <>
       <label className={styles.mobileCategory} htmlFor="settings-category">
         <span>{english ? "Settings category" : "Categoría de configuración"}</span>
         <select id="settings-category" className="select" value={category.id} onChange={event => {
@@ -101,6 +107,7 @@ export function ConfigSectionNav({ categories }: { categories: ReturnType<typeof
           </a>
         ))}
       </div>
+      </>}
     </nav>
   );
 }

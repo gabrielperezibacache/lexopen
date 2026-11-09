@@ -1,3 +1,4 @@
+import { connectStudyGmail } from "@/lib/integrations/google-study-mail";
 import { timingSafeEqual, createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeGoogleCode } from "@/lib/integrations/google";
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
       );
     }
     await exchangeGoogleCode(code);
+    await connectStudyGmail(user.id);
     return clearOauthState(
       NextResponse.redirect(new URL("/integraciones?google=connected", req.url))
     );

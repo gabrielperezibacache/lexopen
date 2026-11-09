@@ -70,6 +70,7 @@ export async function prepareReleaseResources(target) {
   if (revision.status !== 0 || !/^[a-f0-9]{40,64}$/.test(revision.stdout.trim())) throw new Error("Cannot identify the public source revision");
   const dirty = spawnSync("git", ["status", "--porcelain", "--untracked-files=normal"], { cwd: repo, encoding: "utf8" });
   if (dirty.status !== 0) throw new Error("Cannot verify source state");
+  if (dirty.stdout.trim()) throw new Error(`Build changed the public checkout; commit the intended generated inputs before packaging:\n${dirty.stdout.trim()}`);
   fs.rmSync(output, { recursive: true, force: true }); fs.mkdirSync(output, { recursive: true });
   const app = path.join(output, "app-standalone"), stripped = [];
   copyResourceTree(path.join(repo, ".next/standalone"), app, { stripped, nextNodeModulesRoot: path.join(repo, "node_modules") });

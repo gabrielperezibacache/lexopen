@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { OrganizationDrivePanel } from "../OrganizationDrivePanel";
 import { apiMutation } from "@/lib/api-mutation";
 
 type GoogleState = {
@@ -138,13 +139,14 @@ export function GoogleSettingsForm() {
       className="panel space-y-5 rounded-3xl p-5 md:p-6"
       data-testid="google-settings-form"
     >
+      <OrganizationDrivePanel />
       <div>
-        <h2 className="text-lg font-semibold">Google Workspace</h2>
+        <h2 className="text-lg font-semibold">Cuenta de Google compartida del estudio</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          OAuth para Drive (carpetas por causa + archivos/minutas), Calendar
-          (push de plazos/eventos + pull a Eventos LexOpen + ICS) y Gmail
-          (digests PJUD). Credenciales: <code>GOOGLE_CLIENT_ID</code> /{" "}
-          <code>GOOGLE_CLIENT_SECRET</code>.
+          Conecta una sola cuenta de Google del estudio para organizar Drive,
+          sincronizar Calendar y enviar avisos por Gmail. El buzón PJUD de la
+          administración puede reutilizar la misma autorización. Cada profesional
+          conserva sus permisos dentro de LexOpen.
         </p>
       </div>
 
@@ -165,9 +167,9 @@ export function GoogleSettingsForm() {
           </p>
         )}
         <p className="mt-2 text-xs text-[var(--ink-soft)]/65">
-          Scope <code>drive.file</code>: LexOpen puede crear carpetas y subir
-          archivos; vincular carpetas ajenas solo funciona si Drive las expone a
-          la app.
+          La autorización incluye Drive, Calendar y lectura/envío de Gmail.
+          Si la cuenta anterior tenía menos permisos, la administración deberá
+          ampliar esa misma conexión; no hace falta conectar cada apartado.
         </p>
       </div>
 

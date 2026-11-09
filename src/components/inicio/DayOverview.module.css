@@ -1,0 +1,29 @@
+.overview { width:100%; max-width:880px; margin:0 auto 1.5rem; padding-bottom:1.25rem; border-bottom:1px solid var(--line); min-width:0; }
+.toggle { display:none; }
+.header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem; margin-bottom:.85rem; }
+.header h2 { font-size:1.1rem; font-weight:600; color:var(--ink); }
+.header p { font-size:.8rem; color:var(--muted); margin-top:.25rem; }
+.cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
+.card { display:flex; flex-direction:column; min-width:0; padding:1rem; border:1px solid var(--line); border-radius:.85rem; background:var(--surface); color:var(--ink); text-decoration:none; transition: border-color 120ms ease,background 120ms ease; }
+.card:hover { border-color:var(--sea); background:var(--mist); }
+.card:focus-visible { outline:2px solid var(--sea); outline-offset:3px; }
+.card[data-attention] { border-inline-start:3px solid var(--rust,#a04d3b); }
+.label { display:flex; align-items:center; gap:.4rem; font-size:.8rem; line-height:1.4; }
+.label span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.label svg { flex-shrink:0; }
+.card strong { font-size:1.65rem; line-height:1.1; margin-block:.65rem .3rem; font-variant-numeric:tabular-nums; }
+.note { font-size:.75rem; line-height:1.5; color:var(--muted); overflow-wrap:anywhere; }
+@media(max-width:600px) { .cards { grid-template-columns:1fr; gap:.5rem; } .card { display:grid; grid-template-columns:1fr auto; column-gap:.75rem; padding:.8rem; } .card strong { grid-column:2; grid-row:1/3; align-self:center; margin:0; font-size:1.5rem; } .note { grid-column:1; } .label>svg:last-child { display:none; } }
+@media(prefers-reduced-motion:reduce) { .card { transition:none; } }
+@media(max-width:600px) {
+ .overview { margin-bottom:.5rem; padding-bottom:.5rem; }
+ .toggle { display:flex; align-items:center; justify-content:space-between; gap:.5rem; width:100%; min-height:44px; text-align:left; color:var(--ink); }
+ .toggle>span { min-width:0; font-weight:600; font-size:.85rem; }
+ .toggle small { display:block; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; font-weight:400; font-size:.75rem; color:var(--muted); }
+ .toggle svg { flex-shrink:0; }
+ .toggle:focus-visible { outline:2px solid var(--sea); outline-offset:2px; }
+ [data-expanded="false"]>.details { display:none; }
+ [data-expanded="true"]>.toggle svg { transform:rotate(180deg); }
+ .details { padding-top:.75rem; }
+ .header h2,.header p { display:none; }
+}

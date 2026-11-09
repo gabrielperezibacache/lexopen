@@ -29,6 +29,7 @@ export type DriveWriteReceipt = {
   previous_file_id?: string; previous_version?: string;
 };
 export type ManagedDriveAccount = {
+  source?: "study" | "altazor";
   ownerId: string; workspaceId: string; connectionId: string; bindingRevision: string;
   canRead: boolean; canManage: boolean; proofRevision: string;
   assertActive(db?: Db): Promise<void>;

@@ -1,3 +1,4 @@
+import { resolveStudyDriveAccount, studyDriveMode } from "./google-study-drive";
 /** Case folders and deliberate outgoing copies, using the professional's existing Altazor account. */
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -27,7 +28,7 @@ export const caseDriveCommandSchema = z.discriminatedUnion("action", [
   z.object({ ...common, action: z.literal("reconcile") }).strict(),
 ]);
 export type CaseDriveCommand = z.infer<typeof caseDriveCommandSchema>;
-export type CaseDriveBinding = { ownerId: string; accountId: string; accountRevision: string; proofRevision: string; folderId: string; generation: string };
+export type CaseDriveBinding = { source?: "study" | "altazor"; ownerId: string; accountId: string; accountRevision: string; proofRevision: string; folderId: string; generation: string };
 type Snapshot = { documentoId: string; version: number; storageKey: string; sha256: string; bytes: number; mime: string; name: string; remoteId: string | null };
 type Saved = { version: 1; binding: CaseDriveBinding | null; command: DriveWriteCommand; bytes: number; caseFolderId: string | null; subscriptionGeneration: number | null; source?: Snapshot; result?: CaseDriveResult };
 export type CaseDriveResult = { state: "completed" | "unknown" | "pending" | "failed"; operationId: string; message: string; folder?: { id: string; name: string; url: string }; file?: { id: string; name: string; mime: string; bytes: number; sha256?: string; previousFileId?: string; previousVersion?: string } };
@@ -64,10 +65,10 @@ export async function assertAltazorDriveFolderBinding(causaId: string, user: Cau
     db.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } }),
     db.driveSyncSubscription.findUnique({ where: { causaId } }),
   ]);
-  if (!binding || canonicalJson(binding) !== canonicalJson(expected) || binding.ownerId !== user.id || binding.accountId !== account.connectionId || binding.accountRevision !== account.bindingRevision || binding.proofRevision !== account.proofRevision || cause.googleDriveFolderId !== binding.folderId || !subscription || subscription.ownerId !== user.id || subscription.account !== "altazor" || subscription.connectionId !== account.connectionId || subscription.folderId !== binding.folderId) throw httpError("La carpeta o la cuenta cambió. Vuelve a abrir Drive.", 409);
+  if (!binding || canonicalJson(binding) !== canonicalJson(expected) || (binding.source !== "study" && binding.ownerId !== user.id) || binding.accountId !== account.connectionId || binding.accountRevision !== account.bindingRevision || binding.proofRevision !== account.proofRevision || cause.googleDriveFolderId !== binding.folderId || !subscription || (binding.source !== "study" && subscription.ownerId !== user.id) || subscription.account !== (binding.source || "altazor") || subscription.connectionId !== account.connectionId || subscription.folderId !== binding.folderId) throw httpError("La carpeta o la cuenta cambió. Vuelve a abrir Drive.", 409);
 }
 async function availableAccount(user: CausaAccessUser, options: Options): Promise<ManagedDriveAccount> {
-  const account = options.account || await resolveAltazorDriveAccount(user, options);
+  const account = options.account || (await studyDriveMode(options.client) ? await resolveStudyDriveAccount(user, options.client) : await resolveAltazorDriveAccount(user, options));
   if (!account || account.ownerId !== user.id) throw httpError("Conecta Google Drive desde las aplicaciones de Altazor.", 409);
   return account;
 }
@@ -77,9 +78,9 @@ async function assertNoOtherActiveOwner(causaId: string, ownerId: string, db: Db
 }
 async function storeFolder(causaId: string, user: CausaAccessUser, account: ManagedDriveAccount, folder: { id: string; name: string }, db: Db) {
   await actor(causaId, user, db); await account.assertActive(db); await assertNoOtherActiveOwner(causaId, user.id, db);
-  const binding: CaseDriveBinding = { ownerId: user.id, accountId: account.connectionId, accountRevision: account.bindingRevision, proofRevision: account.proofRevision, folderId: folder.id, generation: randomUUID() };
+  const binding: CaseDriveBinding = { source: account.source || "altazor", ownerId: user.id, accountId: account.connectionId, accountRevision: account.bindingRevision, proofRevision: account.proofRevision, folderId: folder.id, generation: randomUUID() };
   await db.causa.update({ where: { id: causaId }, data: { googleDriveFolderId: folder.id, googleDriveFolderName: folder.name, googleDriveFolderUrl: driveFolderUrl(folder.id) } });
-  const data = { ownerId: user.id, account: "altazor", connectionId: account.connectionId, folderId: folder.id, enabled: false, status: "paused", nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null, note: "Carpeta vinculada con tu cuenta de Altazor. Activa su actualización cuando quieras." };
+  const data = { ownerId: user.id, account: account.source || "altazor", connectionId: account.connectionId, folderId: folder.id, enabled: false, status: "paused", nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null, note: "Carpeta vinculada con tu cuenta de Altazor. Activa su actualización cuando quieras." };
   await db.driveSyncSubscription.upsert({ where: { causaId }, create: { causaId, ...data }, update: { ...data, generation: { increment: 1 } } });
   await db.commandExecution.upsert({ where: { key: bindingKey(causaId) }, create: { key: bindingKey(causaId), ownerId: user.id, inputHash: digest(canonicalJson(binding)), status: "completed", resultJson: canonicalJson(binding) }, update: { ownerId: user.id, inputHash: digest(canonicalJson(binding)), status: "completed", resultJson: canonicalJson(binding) } });
   await writeAuditStrict({ actorId: user.id, action: "case.drive.folder-link", entityType: "Causa", entityId: causaId, after: { folderId: folder.id, accountId: account.connectionId } }, db);
@@ -116,9 +117,9 @@ export async function caseDriveState(causaId: string, user: CausaAccessUser, opt
   let canConfigure = false; try { await actor(causaId, user, db); await assertNoOtherActiveOwner(causaId, user.id, db); canConfigure = true; } catch { /* Read access does not imply configuration rights. */ }
   const pending = await db.commandExecution.findMany({ where: { ownerId: user.id, key: { startsWith: operationPrefix(user.id, causaId) }, status: { in: ["running", "unknown"] } }, select: { id: true, key: true, status: true, resultJson: true, createdAt: true }, orderBy: { createdAt: "asc" }, take: 10 });
   let account: ManagedDriveAccount | null = null, reason: string | null = null;
-  try { account = options.account || await resolveAltazorDriveAccount(user, options); } catch { reason = "No pudimos comprobar tu cuenta de Google de Altazor. Revisa su conexión."; }
+  try { account = options.account || (await studyDriveMode(options.client) ? await resolveStudyDriveAccount(user, options.client) : await resolveAltazorDriveAccount(user, options)); } catch { reason = "No pudimos comprobar tu cuenta de Google de Altazor. Revisa su conexión."; }
   const pendingOperation = pending[0] ? (() => { let action = "upload-document", documentoId: string | undefined; try { const saved = JSON.parse(pending[0].resultJson || "{}"); action = saved.command?.action === "create_folder" ? "create-folder" : saved.command?.action === "save_version" ? "save-version" : "upload-document"; documentoId = saved.source?.documentoId; } catch { /* Incomplete records remain unknown. */ } return { requestId: pending[0].key.slice(operationPrefix(user.id, causaId).length), action, ...(documentoId ? { documentoId } : {}), state: pending[0].status === "running" && Date.now() - pending[0].createdAt.getTime() < 60_000 ? "pending" : "unknown", message: "Comprueba el resultado anterior antes de realizar otra operación." }; })() : undefined;
-  const base = { causaId, caseRevision: await caseDriveRevision(causaId, db), account: account ? "altazor" as const : null, connected: Boolean(account), canRead: account?.canRead || false, canManage: account?.canManage || false, connectionId: account?.connectionId || null, bindingRevision: account?.bindingRevision || null, canConfigure, reason, folder: isRealDriveFolderId(causa.googleDriveFolderId) ? { id: causa.googleDriveFolderId!, name: causa.googleDriveFolderName || "Carpeta de la causa", url: driveFolderUrl(causa.googleDriveFolderId!) } : null, ...(pendingOperation ? { pendingOperation } : {}) };
+  const base = { causaId, caseRevision: await caseDriveRevision(causaId, db), account: account ? account.source || "altazor" as const : null, connected: Boolean(account), canRead: account?.canRead || false, canManage: account?.canManage || false, connectionId: account?.connectionId || null, bindingRevision: account?.bindingRevision || null, canConfigure, reason, folder: isRealDriveFolderId(causa.googleDriveFolderId) ? { id: causa.googleDriveFolderId!, name: causa.googleDriveFolderName || "Carpeta de la causa", url: driveFolderUrl(causa.googleDriveFolderId!) } : null, ...(pendingOperation ? { pendingOperation } : {}) };
   if (!documentoId) return base;
   const snapshot = await documentSnapshot(causaId, documentoId, user, db);
   const doc = await db.documento.findUniqueOrThrow({ where: { id: documentoId }, select: { googleDriveId: true } });
@@ -134,8 +135,8 @@ export async function caseDriveState(causaId: string, user: CausaAccessUser, opt
     } catch { /* A missing remote object is never converted into an update. */ } finally { io.close(); }
   }
   const binding = await readAltazorDriveFolderBinding(causaId, db);
-  const bound = Boolean(account && binding && binding.ownerId === user.id && binding.accountId === account.connectionId && binding.accountRevision === account.bindingRevision && binding.proofRevision === account.proofRevision && binding.folderId === base.folder?.id);
-  const canSave = Boolean(base.canManage && base.canConfigure && bound && ["none", "ready"].includes(remoteTargetState));
+  const bound = Boolean(account && binding && (binding.source === "study" || binding.ownerId === user.id) && binding.accountId === account.connectionId && binding.accountRevision === account.bindingRevision && binding.proofRevision === account.proofRevision && binding.folderId === base.folder?.id);
+  const canSave = Boolean(base.canManage && (base.canConfigure || account?.source === "study") && bound && ["none", "ready"].includes(remoteTargetState));
   return { ...base, document: { id: snapshot.documentoId, name: snapshot.name, version: snapshot.version, sourceSha256: snapshot.sha256, bytes: snapshot.bytes, mime: snapshot.mime, remoteTargetState, canSave, reason: remoteTargetState === "unavailable" ? "No se pudo comprobar el archivo de Drive. No se creará otro archivo en su lugar." : remoteTargetState === "outside_folder" ? "El archivo de Drive ya no pertenece a la carpeta de esta causa." : !bound ? "Vincula la carpeta con tu cuenta actual de Altazor antes de guardar." : null, ...(remoteId ? { remoteId, remoteVersion } : {}) } };
 }
 function publicResult(id: string, receipt: DriveWriteReceipt): CaseDriveResult {
@@ -214,7 +215,8 @@ export async function runCaseDriveCommand(causaId: string, user: CausaAccessUser
   try {
     claimed = await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
-      await actor(causaId, user, tx); await account.assertActive(tx); await assertNoOtherActiveOwner(causaId, user.id, tx);
+      await actor(causaId, user, tx); await account.assertActive(tx);
+      if (input.action === "create-folder" || account.source !== "study") await assertNoOtherActiveOwner(causaId, user.id, tx);
       if (input.caseRevision !== await caseDriveRevision(causaId, tx)) throw httpError("La carpeta de la causa cambió. Revisa el destino antes de continuar.", 409);
       if (binding) await assertAltazorDriveFolderBinding(causaId, user, binding, account, tx);
       await assertCaseState(causaId, saved, tx);

@@ -1,0 +1,267 @@
+PR,estado_inicial,rama,fusionado_en,titulo
+1,MERGED,cursor/lexora-highq-clone-9d5f,2026-07-23T08:21:17Z,LexOpen: clon open-source de HighQ para estudios jurídicos en Chile
+2,MERGED,cursor/minutas-drive-estudio-f4ac,2026-07-25T08:50:16Z,Minutas de handoff y carpeta Google Drive por causa
+3,MERGED,cursor/lexopen-perfection-roadmap-f4ac,2026-07-25T08:50:16Z,"feat: LexOpen perfection roadmap — auth, Postgres, ops Chile, billing, integrations"
+4,MERGED,cursor/lexopen-madurez-estudio-f4ac,2026-07-25T08:50:16Z,"feat: madurez LexOpen — ACL real, Chile UI, storage, compliance"
+5,CLOSED,cursor/hermes-obsidian-qa-f4ac,,fix: five-pass QA — Hermes Agent y Obsidian
+6,CLOSED,cursor/lexopen-estudio-confiable-f4ac,,"feat: LexOpen estudio confiable — ACL, portal, Chile ops, billing/DMS"
+7,CLOSED,cursor/pjud-casetracking-f4ac,,feat(pjud): monitoreo de causas estilo CaseTracking
+8,MERGED,cursor/mejoras-apartados-lexopen-9fcd,2026-07-26T02:49:35Z,"Mejora por apartados: español, tareas, notificaciones, personas y polish"
+9,MERGED,cursor/pjud-monitoreo-causas-3c94,2026-08-11T05:44:08Z,feat(pjud): monitoreo de causas estilo CaseTracking
+10,CLOSED,cursor/crm-clientes-ia-3c94,,"feat: CRM de clientes, trámites y IA multi-proveedor"
+11,CLOSED,cursor/readme-github-3c94,,docs: README de GitHub orientado al valor para estudios jurídicos
+12,CLOSED,cursor/pia-site-lexopen-3c94,,docs(site): LexOpen en el apartado Proyectos de perezibacache.cl
+13,CLOSED,cursor/i18n-multiidioma-3c94,,feat(i18n): soporte multiidioma Español / English
+14,MERGED,cursor/desktop-tailscale-3c94,2026-08-11T00:10:05Z,feat(desktop): PC principal + sesiones remotas por Tailscale (Mac/Windows)
+15,MERGED,cursor/pasadas-desarrollo-3c94,2026-08-11T00:15:46Z,"chore: 10 pasadas de desarrollo — desktop, CSRF y verificación"
+16,MERGED,cursor/readme-showcase-0916,2026-08-11T03:45:09Z,docs: present LexOpen with a complete public README
+17,MERGED,cursor/automatic-local-backups-0916,2026-08-12T05:11:12Z,feat: add rotating local web backups
+18,MERGED,cursor/pjud-causamonitor-parity-f8fb,2026-08-12T19:32:45Z,PJUD: CAPTCHA multi-provider + status UI + fallback
+19,MERGED,cursor/copiloto-polish-f8fb,2026-08-12T21:24:44Z,"feat(ai): perfeccionar copiloto — grounding, aprobación y plazos"
+20,CLOSED,cursor/hide-next-dev-indicator-d33b,,fix(ui): ocultar el botón «N» de Dev Tools de Next.js
+21,CLOSED,cursor/production-render-d33b,,feat(deploy): Blueprint de producción en Render
+22,MERGED,cursor/config-ia-endpoints-c03d,2026-08-12T21:10:09Z,"feat(config): endpoints de IA, config completa y admin de usuarios"
+23,MERGED,cursor/local-production-host-d33b,2026-08-12T20:11:23Z,feat(host): producción 100% local (sin Render)
+24,MERGED,cursor/security-audit-remediation-9b24,2026-08-12T21:02:17Z,fix(security): remediación de hallazgos de la auditoría
+25,MERGED,cursor/document-folder-ingest-f3b5,2026-08-12T21:04:43Z,feat: carpetas investigativas + copiloto IA anclado a documentos
+26,MERGED,cursor/readme-actualizar-app-f3b5,2026-08-12T21:16:42Z,docs: instrucciones para actualizar LexOpen en el README
+27,MERGED,cursor/security-audit-followup3-9b24,2026-08-12T21:17:37Z,fix(security): Redis rate limits and CSP nonces via proxy
+28,MERGED,cursor/security-audit-followup4-9b24,2026-08-12T21:23:00Z,"fix(security): logout invalidation, downloads, legacy PG rotation"
+29,CLOSED,cursor/google-drive-integration-2db0,,feat(google): integración Drive lista para producción
+30,MERGED,cursor/crm-clientes-tramites-e1fd,2026-08-12T21:58:21Z,"feat(crm): clientes, trámites y acciones IA"
+31,MERGED,cursor/google-drive-integration-e1fd,2026-08-12T21:57:49Z,feat(google): integración Drive lista para producción
+32,MERGED,cursor/i18n-multiidioma-e1fd,2026-08-12T21:59:42Z,feat(i18n): soporte multiidioma Español / English
+33,MERGED,cursor/pjud-scraping-warning-9de1,2026-08-12T22:00:19Z,docs: advertencia de scraping PJUD en LICENSE y README
+34,MERGED,cursor/security-audit-followup8-9b24,2026-08-12T21:55:38Z,"fix(security): vault keys, path confinement, billing ACL (pass 8)"
+35,MERGED,cursor/residuales-estudio-site-e1fd,2026-08-12T22:00:15Z,"feat: residuales estudio — alertas, tribunales, plantillas, site y Gmail"
+36,MERGED,cursor/security-audit-followup9-9b24,2026-08-12T22:01:20Z,"fix(security): SSRF IPv6/rebinding, site ACL, strip file bodies (pass 9)"
+37,MERGED,cursor/hermes-obsidian-readme-e1fd,2026-08-12T22:16:31Z,feat: QA Obsidian/LLM y showcase README
+38,MERGED,cursor/plazos-alertas-scheduler-e1fd,2026-08-12T22:19:49Z,feat(host): scheduler de alertas de plazos en web:host
+39,MERGED,cursor/host-parity-crm-i18n-e1fd,2026-08-12T22:30:01Z,"feat(host): schedulers Desktop, email opcional de plazos e i18n CRM"
+40,MERGED,cursor/prod-audit-f04e,2026-08-12T22:44:33Z,"fix(prod): auditoría Host local — e2e i18n, flags demo y checklist"
+41,MERGED,cursor/prod-hardening-f04e,2026-08-12T22:55:35Z,"fix(prod): harden Host — cron proxy, LLM demo fail-closed, setup docs"
+42,MERGED,cursor/prod-hardening2-f04e,2026-08-12T23:03:08Z,"fix(prod): P1 hardening — downloads, SESSION_SECRET, Windows host"
+43,MERGED,cursor/prod-hardening3-f04e,2026-08-12T23:11:14Z,"fix(prod): P2 hardening — session secret, demo switcher, recovery docs"
+44,MERGED,cursor/prod-hardening4-f04e,2026-08-12T23:18:16Z,fix(prod): Host force-off Hermes/PJUD demos; prefer web:host
+45,MERGED,cursor/prod-check-f04e,2026-08-12T23:24:40Z,feat(host): npm run prod:check for Host production checklist
+46,MERGED,cursor/host-relax-csrf-f04e,2026-08-12T23:43:04Z,fix(host): strip CI LEXOPEN_RELAX_CSRF from production Host
+47,MERGED,cursor/readme-independientes-f04e,2026-08-12T23:43:04Z,docs(readme): LexOpen para independientes y estudios
+48,MERGED,cursor/macos-unstyled-desktop-fc13,2026-08-13T01:03:49Z,fix(desktop): pantalla blanca con texto sin formato en macOS
+49,MERGED,cursor/clone-install-not-dmg-fc13,2026-08-13T01:08:25Z,"docs: instalar clonando el repo, no con .dmg/.exe"
+50,MERGED,cursor/standalone-static-copy-fc13,2026-08-13T01:09:55Z,fix(host): copiar estilos al standalone en el clon Git
+51,MERGED,cursor/readme-reopen-host-fc13,2026-08-13T01:11:19Z,docs(readme): cómo reabrir un Host ya instalado
+52,MERGED,cursor/claveunica-error-interno-fc13,2026-08-13T01:55:48Z,fix(pjud): ClaveÚnica deja de mostrar «Error interno»
+53,MERGED,cursor/llm-sse-json-parse-fc13,2026-08-13T01:59:49Z,fix(llm): no fallar al probar API key si el endpoint hace stream SSE
+54,MERGED,cursor/ocr-tesseract-path-fc13,2026-08-13T02:07:49Z,fix(ocr): detectar Tesseract de Homebrew y indicar cómo instalarlo
+55,MERGED,cursor/llm-env-snippet-live-fc13,2026-08-13T02:16:16Z,fix(llm): el recuadro .env de IA sigue el formulario
+56,MERGED,cursor/claveunica-sidecar-fallback-fc13,2026-08-13T02:28:12Z,fix(pjud): sincronizar Mis Causas si el sidecar está caído
+57,MERGED,cursor/playwright-host-chromium-fc13,2026-08-13T02:39:10Z,fix(host): Playwright/Chromium para scrape PJUD en web:host
+58,MERGED,chore/remove-published-installers,2026-08-13T22:58:18Z,chore: retirar instaladores desktop de GitHub Releases
+59,MERGED,fix/app-shell-viewport,2026-08-13T22:58:22Z,fix(ui): viewport shell + navegación móvil responsive
+60,MERGED,fix/ci-appshell-lint,2026-08-13T23:05:59Z,fix(ci): lint AppShell mobile nav close
+61,MERGED,docs/uninstall-readme,2026-08-13T23:20:43Z,docs: comando para desinstalar LexOpen
+62,MERGED,fix/mobile-ui-pass,2026-08-14T00:01:41Z,"fix(ui): mobile layout pass for pages, tables, and forms"
+63,MERGED,fix/llm-endpoints-api,2026-08-14T00:37:57Z,fix(llm): harden Endpoints de IA and related APIs
+64,CLOSED,feat/in-app-self-update,,feat(host): in-app automatic update button
+65,MERGED,fix/claveunica-rut-locator,2026-08-14T01:21:22Z,fix(pjud): ClaveÚnica login hits visible RUT field
+66,MERGED,fix/claveunica-login-form,2026-08-14T01:42:39Z,fix(pjud): ClaveÚnica SPA/OIDC login form
+67,MERGED,chore/claveunica-live-verify,2026-08-14T02:22:42Z,fix(pjud): ClaveÚnica OIDC via AutenticaCUnica
+68,MERGED,polish/lexopen-wave1,2026-08-14T02:22:45Z,"polish: LexOpen wave1 (Copiloto, lists, Host self-update)"
+69,MERGED,fix/claveunica-mis-causas,2026-08-14T02:44:38Z,fix(pjud): Mis Causas post-login materia + Buscar
+70,MERGED,fix/mis-causas-524,2026-08-14T03:23:23Z,fix(pjud): avoid Cloudflare 524 on Mis Causas sync
+71,MERGED,fix/ojv-buscar-visible,2026-08-14T04:00:32Z,fix(pjud): click visible Buscar and widen Mis Causas coverage
+72,MERGED,fix/ojv-movimientos-rol,2026-08-14T04:33:03Z,"fix(pjud): deepen OJV sync with docs, tribunales, and detail scrape"
+73,MERGED,fix/ojv-doc-link-no-session,2026-08-14T05:00:53Z,fix(pjud): stop opening OJV doc URLs without session
+74,MERGED,fix/clear-pjud-error-msgs,2026-08-14T05:04:30Z,fix(pjud): add clear buttons for sticky sync error notices
+75,MERGED,feat/causas-crud-ux,2026-08-14T05:34:40Z,feat(causas): add CRUD UI and unify Mis Causas / Monitoreo flows
+76,MERGED,feat/causa-docs-sequential-download,2026-08-14T05:36:52Z,feat(pjud): import timeline documents into LexOpen sequentially
+77,MERGED,fix/env-example-doc-import-comment,2026-08-14T05:37:45Z,docs: clarify PJUD doc import env comments
+78,MERGED,cursor/mejora-progresiva-0b96,2026-08-16T06:21:18Z,Mejora progresiva LexOpen (Fases 1–5)
+79,MERGED,cursor/release-0-1-5-0b96,2026-08-16T06:47:54Z,"Release 0.1.5 — CSRF, wiki/blog harden, docs y tests"
+80,MERGED,cursor/harden-0-1-6,2026-08-17T18:31:54Z,"Harden Host CSRF, audit, and Drive stub for 0.1.6"
+81,MERGED,cursor/release-0-1-6,2026-08-17T18:50:12Z,Release 0.1.6 — version bump and changelog
+82,MERGED,cursor/correo-pjud-buzon,2026-08-17T22:52:35Z,"Repaso 0.1.7: ops, i18n, auditoría y buzón PJUD /correo"
+83,MERGED,cursor/mejorar-espacios-5da6,2026-08-18T23:42:14Z,"Espacios, Host update y apartado Causas unificado"
+84,MERGED,cursor/correo-pjud-produccion-5da6,2026-08-18T23:28:37Z,Correo PJUD de producción (solo pjud.cl → carpetas)
+85,MERGED,fix-hardcoded-session-secret-4581897184095595965,2026-09-07T03:03:18Z,🔒 fix: remove hardcoded fallback for session secret
+86,MERGED,perf-batch-plazos-updates-2905118617217962976,2026-09-07T03:03:21Z,⚡ perf: Batch plazos updates to prevent N+1 query issue in alertas route
+87,MERGED,perf/optimize-salas-updates-5126301811324687828,2026-09-07T03:03:21Z,⚡ Optimize N+1 query in salas update
+88,MERGED,perf-fix-n-plus-one-2796244869912611503,2026-09-07T03:03:21Z,⚡ Fix N+1 Query loop in requeueFailedJobs
+89,MERGED,fix-insecure-queryrawunsafe-15171285673597264692,2026-09-07T03:03:21Z,🔒 fix: secure Prisma queries by replacing $queryRawUnsafe with $queryRaw
+90,MERGED,fix-password-rate-limit-13005693311971896259,2026-09-07T03:03:21Z,🔒 Add rate limiting to password change endpoint
+91,MERGED,feat/optimize-pjud-queue-4190476176249964408,2026-09-07T03:03:21Z,⚡ Fix N+1 query creating jobs inside loop
+92,MERGED,perf/fix-sync-n1-query-16301535327751746278,2026-09-07T03:03:21Z,⚡ Optimize clearFallidosMonitoreoAvisos by removing N+1 queries
+93,MERGED,bolt-optimize-layout-db-queries-17877618089162346474,2026-09-07T03:03:21Z,⚡ Bolt: optimize app layout sequential db queries
+94,MERGED,codex/audit-consolidation,2026-09-07T03:03:21Z,"Corrige seguridad, procesamiento por lotes y accesibilidad de la aplicación"
+95,MERGED,palette-totp-loading-states-16376442322015224009,2026-09-07T03:03:21Z,🎨 Palette: Add loading states to TOTP setup buttons
+96,MERGED,bolt/ledger-entry-fetch-optimization-1443068893874508742,2026-09-07T03:03:21Z,⚡ Bolt: Optimize ledger entry fetch in billing summary
+97,MERGED,cursor/merge-pending-main-76af,2026-09-07T03:03:19Z,Merge: PRs #85–#96 y ramas pendientes en main
+98,MERGED,fix/totp-pending-secret,2026-09-07T03:30:40Z,fix(security): reject fallback TOTP pending secrets
+99,MERGED,bolt/bulk-insert-optimization-4599238402606726401,2026-09-29T21:31:29Z,⚡ Bolt: Replace individual creates with createManyAndReturn
+100,CLOSED,palette-ux-improvements-17321432941586767295,,🎨 Palette: Add ARIA labels to CausasFilters inputs
+101,CLOSED,bolt/optimize-ledger-queries-18067957065796542960,,⚡ Bolt: Optimize unbounded queries when fetching ledger balances
+102,CLOSED,palette-aria-expanded-panels-16975830876724728250,,🎨 Palette: Add aria-expanded to collapsible panels
+103,MERGED,bolt-performance-promise-all-6361448793718448876,2026-09-29T22:26:52Z,⚡ Bolt: Use Promise.all to fetch page data concurrently
+104,CLOSED,sentinel-math-random-crypto-13450475788769490016,,🛡️ Sentinel: [MEDIUM] Replace `Math.random()` with `crypto.randomUUID()`
+105,CLOSED,bolt-ledger-optimization-18216456523605460442,,⚡ Bolt: [performance improvement] Optimize ledger balance querying
+106,MERGED,palette-aria-labels-ufrateform-10778816659404591821,2026-09-29T21:17:46Z,🎨 Palette: [a11y] Add aria-labels to UfRateForm inputs
+107,CLOSED,bolt/ledger-unbounded-query-optim-8392179256276843826,,⚡ Bolt: Optimize unbounded ledger history queries to eliminate O(N) memory scaling
+108,CLOSED,security/replace-math-random-7860927873582442201,,🛡️ Sentinel: [MEDIUM] Replace weak PRNG with secure random UUID
+109,CLOSED,bolt-ledger-balance-optimization-9017593903712274696,,⚡ Bolt: Optimizing Ledger History Over-Fetching
+110,CLOSED,sentinel/crypto-random-uuid-17877898755992337917,,🛡️ Sentinel: [MEDIUM] Replace Math.random with crypto.randomUUID
+111,CLOSED,bolt-optimize-ledger-queries-17499218554381736963,,⚡ Bolt: fix unbounded ledger queries for billing summary
+112,CLOSED,palette/disclosure-a11y-6177921218092577095,,🎨 Palette: Improve accessibility for disclosure widgets
+113,CLOSED,sentinel-fix-weak-randomness-12445167532145043666,,🛡️ Sentinel: [ENHANCEMENT] Replace Math.random with secure crypto.randomUUID
+114,CLOSED,palette-aria-panels-265726871551040356,,🎨 Palette: Add ARIA attributes to expandable panels
+115,CLOSED,bolt-optimize-ledger-balance-query-7628149331564697236,,⚡ Bolt: Optimize ledger balance query using distinct and orderBy descending
+116,CLOSED,bolt-optimize-facturacion-query-2218784013057302905,,⚡ Bolt: [performance improvement] Unbounded Prisma Data Fetching in Billing Page
+117,CLOSED,sentinel-crypto-random-uuid-2566753586103491362,,🛡️ Sentinel: [Security Improvement] Replace weak randomness in React component keys
+118,MERGED,palette/a11y-improvements-11283442910793209193,2026-09-29T21:12:42Z,🎨 Palette: Improve form and filter accessibility
+119,CLOSED,sentinel/fix-weak-randomness-10735373039507367142,,🛡️ Sentinel: [MEDIUM] Fix weak randomness usage
+120,CLOSED,bolt-optimize-ledger-balances-14136946226922214380,,⚡ Bolt: Optimize ledger balance extraction by pushing distinct queries to DB
+121,CLOSED,bolt/site-files-parallel-fetch-12426928650665274736,,⚡ Bolt: Concurrent data fetching in site files page
+122,CLOSED,bolt-ledger-balance-optimization-8709825002600064672,,⚡ Bolt: Optimize ledger balance queries
+123,CLOSED,palette/sites-guide-panel-accessibility-11638652719712380856,,🎨 Palette: Improve accessibility of SitesGuidePanel collapsible section
+124,CLOSED,sentinel-fix-weak-randomness-14016827989795154449,,🛡️ Sentinel: [MEDIUM] Fix weak randomness in MinutaWizard
+125,CLOSED,sentinel/fix-weak-randomness-7398705496647433502,,🛡️ Sentinel: [MEDIUM] Fix weak randomness in client identifiers
+126,CLOSED,palette-sites-panel-aria-attributes-13100354259713223610,,🎨 Palette: Add ARIA attributes to expand/collapse panels in sites
+127,CLOSED,bolt-optimize-ledger-balance-queries-4246048999050729345,,⚡ Bolt: Optimize ledger balance queries to prevent O(N) memory scaling
+128,MERGED,bolt-optimize-billing-summary-aggregation-11547860632645991156,2026-09-29T22:48:51Z,⚡ Bolt: Optimize billing summary with DB-level aggregations
+129,CLOSED,sentinel/crypto-randomuuid-7320798328183954074,,🛡️ Sentinel: [MEDIUM] Replace weak randomness with crypto.randomUUID
+130,MERGED,bolt-concurrent-queries-archivos-10898599152804941604,2026-09-29T22:37:43Z,⚡ Bolt: Concurrent database queries in Site Files page
+131,MERGED,bolt/optimize-causas-monitoreo-filter-16360935976568453538,2026-09-29T23:02:38Z,⚡ Bolt: Optimize search filter performance in Pjud Monitoreo
+132,MERGED,bolt-parallelize-db-queries-10175984441342563983,2026-09-29T22:43:19Z,⚡ Bolt: [performance improvement] Parallelize database queries on site pages
+133,CLOSED,bolt-optimize-ledger-balances-8679278968412496233,,⚡ Bolt: Optimize billing ledger latest balance query
+134,CLOSED,sentinel/crypto-randomuuid-9863283483303930279,,🛡️ Sentinel: [Security Enhancement] Replace Math.random with crypto.randomUUID
+135,CLOSED,bolt-optimize-ledger-balance-2136205014506562617,,⚡ Bolt: Optimize ledger balance aggregation via distinct query
+136,MERGED,palette-a11y-user-switcher-16968035718272790170,2026-09-29T23:07:35Z,🎨 Palette: Add aria-controls to UserSwitcher
+137,MERGED,palette-wiki-history-loading-state-11412917349615351311,2026-09-29T21:25:48Z,🎨 Palette: Add loading state text to WikiHistoryPanel restore button
+138,CLOSED,security/sentinel-fix-weak-randomness-2987230901454504805,,🛡️ Sentinel: Fix weak randomness in MinutaWizard keys
+139,CLOSED,bolt/optimize-ledger-queries-2399665175737998286,,⚡ Bolt: Optimize ledger queries to only load latest balance per client
+140,CLOSED,palette/improve-site-settings-panel-a11y-17086954686299814320,,🎨 Palette: Improve accessibility of site settings toggle button
+141,MERGED,jules-2122448274690865579-e27d854a,2026-09-29T21:42:27Z,⚡ Bolt: [performance improvement] Add index to Causa.materia
+142,CLOSED,bolt-optimize-ledger-balance-query-7554632472642218064,,⚡ Bolt: Optimize account balance loading query
+143,CLOSED,sentinel/fix-weak-randomness-16449451359050433165,,🛡️ Sentinel: [MEDIUM] Fix weak randomness in MinutaWizard
+144,CLOSED,bolt-ledger-entry-optimization-17239397208062518759,,⚡ Bolt: [Optimized LedgerEntry queries for performance]
+145,MERGED,sentinel/fix-weak-randomness-17444205062851855450,2026-09-29T20:59:04Z,🛡️ Sentinel: [security improvement] Fix weak randomness with crypto.randomUUID()
+146,MERGED,palette/a11y-disclosure-widgets-15750305334257484614,2026-09-29T21:05:50Z,🎨 Palette: Improve accessibility of disclosure widgets
+147,MERGED,bolt-optimize-ledger-balances-1224664123655938343,2026-09-29T21:37:11Z,⚡ Bolt: Optimize ledger balance computation
+148,MERGED,cursor/chile-plazos-calendario-328c,2026-09-30T11:28:24Z,Plazos Chile: feriados vigentes y fechas en America/Santiago
+149,CLOSED,bolt/optimize-billing-aggregation-16044626052189121780,,⚡ Bolt: Optimize database aggregations for billing page
+150,MERGED,cursor/facturacion-db-aggregates-8117,2026-09-30T11:46:43Z,Agregar totales de /facturacion en la base / Aggregate billing page totals in the database
+151,MERGED,cursor/lexopen-1.0,2026-10-30T23:47:12Z,feat: LexOpen 1.0 Fase 1–2 — Inicio asistente + Evento + UI
+152,MERGED,cursor/facturacion-chile-5ce8,2026-09-30T12:11:21Z,"Facturación Chile: KPIs agregados, estados claros y exportación civil"
+153,MERGED,palette-add-aria-dialog-attributes-4525898121766844880,2026-09-30T18:21:43Z,🎨 Palette: Add ARIA dialog attributes to modals
+154,MERGED,cursor/phase3-prod-hardening-ba41,2026-10-30T23:53:43Z,"Phase 3: endurecimiento producción (seguridad, datos, observabilidad, CI)"
+155,MERGED,palette-add-loading-text-async-buttons-13064032263874323927,2026-10-01T01:42:07Z,🎨 Palette: Add loading text feedback to async cause actions
+156,MERGED,cursor/remove-jules-scratch-7163,2026-10-01T15:34:31Z,Higiene: eliminar .jules/.Jules — Hygiene: remove Jules agent scratch
+157,MERGED,palette-a11y-modal-dialog-18044601917169377871,2026-10-01T18:41:02Z,🎨 Palette: Add ARIA roles to EditWikiButton modal
+158,MERGED,bolt-perf-tramites-count-8126615090381663318,2026-10-01T18:49:48Z,⚡ Bolt: Optimize pending tramites count using Prisma _count aggregate
+159,MERGED,sentinel/fix-hmac-timing-safe-equality-17072150071879731315,2026-10-01T18:58:16Z,🛡️ Sentinel: [CRITICAL] Fix timing attack vulnerability in proxy middleware
+160,MERGED,palette/fix-aria-controls-create-invoice-7042207130341478555,2026-10-02T19:49:28Z,🎨 Palette: Add aria-controls to CreateInvoicePanel toggle
+161,MERGED,palette/a11y-modal-dialogs-8916312708934750267,2026-10-03T18:39:54Z,🎨 Palette: [a11y] Add ARIA attributes to modal dialogs
+162,MERGED,palette-modal-dialog-a11y-5489009366554002660,2026-10-04T18:28:36Z,🎨 Palette: [accessibility] Add screen reader attributes to modal dialogs
+163,MERGED,sentinel/fix-cron-secret-timing-8771593375334394728,2026-10-04T19:02:20Z,🛡️ Sentinel: [MEDIUM] Fix custom string comparison timing leak
+164,MERGED,palette-time-entry-actions-ux-14503140004333744458,2026-10-05T01:34:49Z,🎨 Palette: Specific loading state for time entry actions
+165,MERGED,palette-aria-expanded-9843733639137952090,2026-10-06T11:41:42Z,🎨 Palette: Add aria-expanded to UpdateAvailableBanner toggle
+166,MERGED,palette-add-loading-state-billing-forms-3927967609197232567,2026-10-06T11:47:11Z,🎨 Palette: Add loading text to billing forms
+167,MERGED,sentinel-fix-proxy-timing-safe-equal-3282119262671402179,2026-10-07T18:58:16Z,🛡️ Sentinel: [HIGH] Replace async crypto verification with sync timingSafeEqual in proxy
+168,MERGED,bolt-optimize-minuta-count-16542519188666193692,2026-10-07T18:52:15Z,⚡ Bolt: Replace array fetch with _count aggregate for minuta actions
+169,MERGED,palette/workflow-loading-states-9010407554904942875,2026-10-08T01:39:39Z,🎨 Palette: Improve loading feedback for workflow actions
+170,MERGED,sentinel-security-headers-11061498833138150346,2026-10-08T02:12:14Z,🛡️ Sentinel: [security improvement] Disable X-Powered-By header
+171,MERGED,palette-edit-blog-post-a11y-9696298884731070919,2026-10-08T18:42:38Z,🎨 Palette: Add accessibility labels and placeholders to blog post edit form
+172,MERGED,jules-ux-specific-loading-states-9969572492720998529,2026-10-11T01:40:40Z,🎨 Palette: [UX improvement] Specific loading states for list actions
+173,MERGED,bolt-optimize-site-personas-fetch-4858214372008555079,2026-10-12T18:37:03Z,⚡ Bolt: Optimize sequential data fetching in Site People page
+174,MERGED,palette-causa-actions-loading-state-4875237400908123232,2026-10-13T11:56:02Z,🎨 Palette: Refactor shared loading state in CausaManageActions
+175,MERGED,bolt-performance-minutas-count-11323295178626138889,2026-10-14T18:50:45Z,⚡ Bolt: Use _count to prevent fetching related arrays just for length in minutas page
+176,MERGED,palette/aria-current-tabs-16632638784372617010,2026-10-15T19:32:11Z,🎨 Palette: Add aria-current to navigation tabs for screen readers
+177,MERGED,palette-causaeditform-labels-6917175049680717735,2026-10-16T01:26:54Z,🎨 Palette: Add explicit label associations to CausaEditForm
+178,MERGED,bolt/optimize-causa-monitoreo-stats-7188720218539530396,2026-10-16T02:44:30Z,⚡ Bolt: Optimize Monitoreo Stats Aggregation
+179,MERGED,bolt/optimize-doc-text-fetch-7468139408871355832,2026-10-16T18:37:21Z,⚡ Bolt: Optimize large document text fetching in lists
+180,MERGED,palette/firm-settings-busy-state-9074302143476185430,2026-10-17T01:35:57Z,🎨 Palette: [Add loading state to FirmSettingsForm]
+181,MERGED,bolt/optimize-tramites-count-2860639943884050231,2026-10-17T02:30:33Z,⚡ Bolt: optimize tramites aggregate count
+182,MERGED,palette-new-blog-post-labels-13701865352216173450,2026-10-17T18:44:34Z,🎨 Palette: [UX improvement] Add accessible labels to NewBlogPostButton form
+183,MERGED,palette-add-create-group-loading-state-6945127659165190959,2026-10-18T01:31:01Z,🎨 Palette: Add loading state to create group form
+184,MERGED,bolt-optimize-acciones-abiertas-count-959452405369787145,2026-10-18T02:41:58Z,⚡ Bolt: [performance improvement] Optimize open actions count
+185,MERGED,sentinel/fix-scraper-auth-timing-attack-1781277247735643573,2026-10-18T18:53:03Z,🛡️ Sentinel: [CRITICAL] Fix timing attack vulnerability in scraper server auth
+186,MERGED,bolt/reduce-render-array-allocations-4650387752250455214,2026-10-20T02:30:03Z,⚡ Bolt: Optimize render allocations in DocumentoIngestForm
+187,MERGED,bolt-dashboard-minutas-count-15316183718005267695,2026-10-20T18:31:07Z,⚡ Bolt: Use Prisma _count for dashboard minutas to prevent memory bottleneck
+188,MERGED,palette-notification-loading-state-2437977355770836168,2026-10-21T01:51:39Z,🎨 Palette: Add loading states to async notification actions
+189,MERGED,bolt-optimize-create-invoice-panel-6884901180603813712,2026-10-21T02:35:33Z,⚡ Bolt: Optimize array counts in CreateInvoicePanel
+190,MERGED,palette/invoice-actions-loading-1506340365055200037,2026-10-22T01:35:10Z,🎨 Palette: Granular loading state and feedback in InvoiceActions
+191,MERGED,sentinel/fix-timing-attack-13241704232502500608,2026-10-23T02:06:19Z,🛡️ Sentinel: [HIGH] Fix early exit timing attack in string comparison
+192,MERGED,sentinel/fix-timing-attack-early-returns-3180482439304200372,2026-10-23T18:38:14Z,🛡️ Sentinel: [CRITICAL] Fix timing attack vulnerabilities in constant-time comparisons
+193,MERGED,bolt-reduce-filter-length-11059522571207282069,2026-10-24T02:44:25Z,⚡ Bolt: Reduce `.filter().length` memory allocation in Monitoreo API route
+194,MERGED,bolt-calendar-events-opt-17582810911556415382,2026-10-27T02:50:29Z,⚡ Bolt: Optimize calendar events grouping with hash map lookup
+195,MERGED,add-solvecha-provider,2026-10-31T03:38:22Z,Add Solvecha as captcha provider
+196,MERGED,bolt-reduce-allocations-10733716568292323836,2026-10-29T02:26:25Z,⚡ Bolt: Reduce array allocations by replacing filter chains with single-pass reduce
+197,MERGED,sentinel-constant-time-comparison-8002690299703634852,2026-10-30T18:32:39Z,🛡️ Sentinel: [CRITICAL/HIGH] Fix timingSafeEqual length check timing leak
+198,MERGED,bolt-query-optimization-5567931138725856233,2026-10-30T18:40:48Z,⚡ Bolt: Concurrent query optimization in CausaDetailPage
+199,MERGED,cursor/phase4-release-1-0-0-eb19,2026-10-31T00:00:42Z,release: LexOpen 1.0.0 — docs y bump de versión
+200,MERGED,cursor/qa-ojv-funcional-eb19,2026-10-31T00:16:48Z,"fix(pjud): QA OJV — monitoreo, scrape seguro y CSRF"
+201,MERGED,cursor/qa-ojv-b3-b4-b6-eb19,2026-10-31T00:31:40Z,"fix(pjud): B3/B4/B6 — unique movimientos, jobs activos y claim Mis Causas"
+202,CLOSED,cursor/v1.1-roles-equipo-f423,,"feat(1.1): roles, equipo de causa, pendientes y 2FA privilegiado"
+203,CLOSED,cursor/v1.1-notificaciones,,"feat(notify): notificaciones 1.1 — outbox, Telegram, push y PWA"
+204,MERGED,sentinel-fix-weak-randomness-18253332411040128935,2026-10-31T18:39:50Z,🛡️ Sentinel: [HIGH] Fix weak randomness
+205,MERGED,🎨-palette-ux-spinner-4623523505464827996,2026-10-31T18:50:08Z,🎨 Palette: Add loading spinner to async buttons
+206,MERGED,bolt/prisma-latest-balances-10005631592475204448,2026-11-01T02:44:15Z,⚡ Bolt: Optimize Prisma query for latest client balances
+207,MERGED,codex/lexopen-own-core,2026-11-02T01:15:05Z,"Núcleo fiable, equipo y avisos corregidos, y fuentes propias"
+208,MERGED,codex/pdf-legal-research,2026-11-02T01:15:59Z,Páginas PDF verificadas e investigación jurídica propia
+209,MERGED,codex/spaces-drive-official-sources,2026-11-02T01:16:48Z,Integra archivos de espacios y Drive y habilita BCN y SII
+210,MERGED,codex/case-knowledge-library,2026-11-02T01:17:02Z,"Añade hechos, cronología, contradicciones y biblioteca con citas verificadas"
+211,MERGED,codex/personal-law-library,2026-11-02T01:17:46Z,"Crea biblioteca jurídica 3D con RAG, OCR y citas corroboradas"
+212,MERGED,codex/courtroom-workspace,2026-11-02T01:18:01Z,"Añade sentencias, mesa privada de audiencia y transcripciones por causa"
+213,MERGED,codex/integrate-legal-workspace,2026-11-02T01:49:32Z,"Cierra la integración de biblioteca, audiencias y transcripciones"
+214,MERGED,palette-sites-guide-panel-state-14576972215498748354,2026-11-02T02:11:08Z,🎨 Palette: Persist collapsed state of SitesGuidePanel
+215,MERGED,codex/ui-refinement,2026-11-02T03:20:09Z,Refina la interfaz completa de LexOpen y sus herramientas de lectura
+216,CLOSED,palette-causa-equipo-a11y-14469978792297800625,,🎨 Palette: Improve accessibility and loading state in CausaEquipoPanel
+217,MERGED,codex/case-preparation-editorial,2026-11-02T20:02:48Z,Preparar causas y audiencias con hechos y fuentes verificadas
+218,MERGED,codex/case-writing-editor,2026-11-02T20:48:44Z,"Editor de escritos por causa con guardado automático, historial y fuentes"
+219,MERGED,codex/hearing-live-session,2026-11-02T22:12:55Z,Audiencias: sesión en vivo con guion guardado y registros con fuentes
+220,MERGED,codex/hearing-live-transcription,2026-11-02T23:15:19Z,"Audiencias: transcripción en vivo y conversión a hechos, notas y escritos"
+221,MERGED,codex/readme-product-review,2026-11-03T00:13:01Z,Nueva presentación de LexOpen con capturas reales y documentación revisada
+222,MERGED,codex/case-workflow-continuity,2026-11-03T01:22:08Z,"Conservar causa, fuentes y trabajo pendiente entre herramientas jurídicas"
+223,MERGED,codex/codex-and-audience-console,2026-11-03T12:34:58Z,Conexión personal de Codex y panel independiente de audiencias
+224,MERGED,codex/ojv-case-lookup,2026-11-03T14:08:04Z,Mejorar consulta OJV y recuperación de Mis Causas
+225,MERGED,codex/ojv-live-validation,2026-11-03T15:23:46Z,Endurecer validación OJV y documentar los bloqueos del portal real
+226,MERGED,codex/ojv-official-access,2026-11-03T21:37:31Z,Usar los accesos oficiales OJV y corregir los formularios e historial actuales
+227,MERGED,codex/ojv-automatic-sync-validation,2026-11-03T23:03:15Z,Corrige y valida la sincronización real OJV por RIT/ROL y Mis Causas
+228,MERGED,codex/ojv-interface-cuadernos,2026-11-04T00:55:12Z,Integra ingreso manual OJV y sincronización de todos los cuadernos
+229,MERGED,codex/ojv-manual-window-recovery,2026-11-04T02:17:22Z,Permite localizar la ventana oficial del ingreso manual OJV
+230,MERGED,codex/plan-installers-multiplatform,2026-11-04T17:21:55Z,"Mesa por causa, actualización verificada e instaladores multiplataforma"
+231,MERGED,dependabot/github_actions/actions/setup-node-7,2026-11-08T02:48:39Z,build(deps): bump actions/setup-node from 4 to 7
+232,CLOSED,dependabot/github_actions/actions/checkout-7,,build(deps): bump actions/checkout from 4 to 7
+233,CLOSED,dependabot/github_actions/actions/download-artifact-8,,build(deps): bump actions/download-artifact from 4 to 8
+234,CLOSED,dependabot/github_actions/actions/upload-artifact-7,,build(deps): bump actions/upload-artifact from 4 to 7
+235,CLOSED,dependabot/npm_and_yarn/desktop/compatible-desktop-8d201ee2cb,,build(deps): bump the compatible-desktop group across 1 directory with 9 updates
+236,CLOSED,dependabot/npm_and_yarn/compatible-runtime-908c270c39,,build(deps): bump the compatible-runtime group across 1 directory with 18 updates
+237,MERGED,codex/ui-workflow-navigation,2026-11-04T20:33:32Z,Interfaz del estudio: navegación clara y paneles que conservan el trabajo
+238,CLOSED,sentinel-fix-weak-randomness-9081468431971386962,,🛡️ Sentinel: [CRITICAL] Fix weak randomness in operationKey
+239,MERGED,codex/altazor-assistant,2026-11-04T23:44:36Z,"ALTAZOR: conversación, memoria y trabajo académico conectado"
+240,MERGED,codex/altazor-connectors-secrets,2026-11-05T01:44:07Z,"ALTAZOR: conexiones, Secretos y control del escritorio"
+241,CLOSED,palette/task-status-loading-feedback-6457100830443720260,,🎨 Palette: Improve loading feedback for task status actions
+242,MERGED,codex/altazor-live-connectors,2026-11-05T04:15:29Z,Simplifica el ingreso de cuentas y la continuidad del escritorio de ALTAZOR
+243,MERGED,codex/altazor-midnight-workspace,2026-11-05T06:58:52Z,"ALTAZOR persistente, Académico y sincronización documental"
+244,MERGED,codex/altazor-conversation-first,2026-11-05T20:04:49Z,Renueva LexOpen e integra el escritorio de Altazor y Mis Causas
+245,MERGED,codex/altazor-presentacion,2026-11-05T20:35:09Z,Presenta Altazor AI y simplifica el acceso a LexOpen
+246,MERGED,codex/flujo-de-trabajo-altazor,2026-11-05T21:46:54Z,Altazor continuo y flujo de trabajo jurídico y académico
+247,CLOSED,dependabot/npm_and_yarn/compatible-runtime-0a909a8e1c,,build(deps): bump the compatible-runtime group across 1 directory with 20 updates
+248,MERGED,codex/novedades-mis-causas,2026-11-06T03:02:24Z,"Mejora Altazor, Configuración, Feedback y avisos de LexOpen"
+249,MERGED,codex/revision-flujos-lexopen,2026-11-06T11:53:15Z,Integra las correcciones de la auditoría de uso de LexOpen
+250,MERGED,codex/piloto-conexiones-novedades,2026-11-06T19:05:58Z,Refina Novedades y prepara el piloto de conexiones
+251,MERGED,codex/conectar-google-github,2026-11-08T06:23:55Z,Facilita las conexiones de Google y GitHub e ilustra las vistas de trabajo
+252,MERGED,codex/editorial-preview-8,2026-11-08T00:22:42Z,Integra los grabados editoriales y prepara LexOpen 1.1.0-preview.8
+253,CLOSED,dependabot/npm_and_yarn/compatible-runtime-e2769b2822,,build(deps): bump the compatible-runtime group across 1 directory with 17 updates
+254,MERGED,codex/revision-prs-2026-11-07,2026-11-08T06:23:52Z,"Integra el trabajo local: auditoría, modo sin conexión, Altazor y dependencias"
+255,MERGED,codex/integracion-local-segunda-2026-11-08,2026-11-08T08:33:41Z,"Integra Drive por causa, consultas nativas y conexiones locales"
+256,MERGED,feat/reliable-automatic-updates,2026-11-08T17:18:33Z,Prepara 1.1.0-preview.9: actualizaciones fiables y elección de Codex personal o del Host
+257,MERGED,feat/altazor-icaros-permisos,2026-11-08T15:25:10Z,"Integra Altazor como orquestador, Ícaros y permisos por usuario"
+273,MERGED,feat/codex-permisos-bitacora,2026-11-09T03:49:34Z,Adapta Codex y corrige descargas de documentos
+274,MERGED,feat/ojv-jurisprudencia-zip,2026-11-09T13:56:17Z,Busca e incorpora fallos civiles PJUD y valida sesiones OJV
+275,MERGED,feat/pjud-session-recovery,2026-11-09T19:04:43Z,Recupera sesiones vencidas del Buscador Unificado y añade verificación viva
+276,MERGED,feat/pjud-search-access,2026-11-09T19:26:03Z,Revalida permisos antes de buscar en PJUD y prueba el endpoint
+277,OPEN,feat/google-organization-folders,,Una cuenta Google del estudio y carpetas de Organización por cliente y causa
+278,OPEN,dependabot/github_actions/actions/setup-python-7,,build(deps): bump actions/setup-python from 5 to 7
+279,OPEN,dependabot/github_actions/actions/setup-go-7,,build(deps): bump actions/setup-go from 5 to 7
+280,OPEN,dependabot/npm_and_yarn/compatible-runtime-a982a53715,,build(deps-dev): bump the compatible-runtime group with 5 updates
+281,OPEN,feat/jornada-navigation-ux,,"Mejora Inicio, vencidos y búsqueda de apartados y configuración"

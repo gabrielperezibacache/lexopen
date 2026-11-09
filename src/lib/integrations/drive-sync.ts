@@ -1,3 +1,5 @@
+import { isAdmin } from "@/lib/auth/rbac";
+import { resolveStudyDriveAccount, studyDriveMode } from "./google-study-drive";
 /** Opt-in folder pull. Owner-bound account sessions stay on the server. */
 import { randomUUID, createHash } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
@@ -95,7 +97,9 @@ export async function listPersonalDriveFolders(causaId: string, user: CausaAcces
   const client = options.client || prisma;
   const current = await client.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
   await assertCausaCapability(causaId, current, "causa.write", client);
-  const altazor = await resolveAltazorDriveAccount(user, { client });
+  const shared = await studyDriveMode(client);
+  if (shared && !isAdmin(current)) throw error("Usa Preparar carpeta organizada; la administración elige la raíz compartida", 403);
+  const altazor = shared ? await resolveStudyDriveAccount(user, client) : await resolveAltazorDriveAccount(user, { client });
   if (altazor) {
     const revision = await caseDriveRevision(causaId, client);
     if (input.connectionId && input.connectionId !== altazor.connectionId || input.bindingRevision && input.bindingRevision !== altazor.bindingRevision) throw error("La cuenta cambió. Abre de nuevo el selector de carpetas.");
@@ -104,7 +108,7 @@ export async function listPersonalDriveFolders(causaId: string, user: CausaAcces
     await altazor.assertActive(client);
     if (revision !== await caseDriveRevision(causaId, client)) throw error("La carpeta de la causa cambió durante la consulta.");
     await assertCausaCapability(causaId, await client.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } }), "causa.write", client);
-    return { ...data, account: "altazor" as const, connectionId: altazor.connectionId, bindingRevision: altazor.bindingRevision, caseRevision: revision, canManage: altazor.canManage };
+    return { ...data, account: altazor.source || "altazor" as const, connectionId: altazor.connectionId, bindingRevision: altazor.bindingRevision, caseRevision: revision, canManage: altazor.canManage };
   }
   const { requirePersonalDriveSession, assertPersonalDriveConnection } = await import("@/lib/personal-connectors/google-drive/service");
   const session = await requirePersonalDriveSession(user.id, { client });

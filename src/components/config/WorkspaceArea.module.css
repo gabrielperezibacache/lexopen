@@ -232,3 +232,12 @@
     transition: none;
   }
 }
+
+.settingsSearch { display:flex; align-items:center; gap:.75rem; min-width:0; padding:.5rem 0; font-size:.8rem; }
+.settingsSearch>span { flex-shrink:0; color:var(--muted); }
+.settingsSearch input { min-width:0; flex:1; max-width:32rem; }
+.settingsResults { display:flex; flex-wrap:wrap; gap:.4rem; max-height:12rem; overflow:auto; padding-block:.5rem; }
+.settingsResults>p { flex-basis:100%; }
+.settingsResults a { display:flex; align-items:center; gap:.6rem; white-space:normal; }
+.settingsResults small { color:var(--muted); font-weight:400; }
+@media(max-width:600px) { .settingsSearch { align-items:stretch; flex-direction:column; gap:.3rem; } .settingsResults { max-height:10rem; } }
