@@ -35,6 +35,13 @@ test("jornada: vencidos de otros meses, navegación por términos y adaptación 
   await page.goto("/inicio");
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(summary).toBeVisible();
+  const toggle = summary.getByRole("button", { name: /Tu jornada/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeVisible();
+  await toggle.click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("jornada-mobile.png"), fullPage: false });
 });

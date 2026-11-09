@@ -10,7 +10,7 @@ export default async function InicioPage() {
   const { t } = await getI18n();
   return <div className="inicio-altazor-page">
     <h1 className="sr-only">{t("nav.home")}</h1>
-    <Suspense fallback={<div className="mx-auto mb-5 h-36 w-full max-w-[880px] animate-pulse motion-reduce:animate-none rounded-xl bg-[var(--mist)]" aria-hidden="true" />}><DayOverview user={user} /></Suspense>
+    <Suspense fallback={<div className="mx-auto mb-2 h-14 min-[601px]:mb-5 min-[601px]:h-36 w-full max-w-[880px] animate-pulse motion-reduce:animate-none rounded-xl bg-[var(--mist)]" aria-hidden="true" />}><DayOverview user={user} /></Suspense>
     {canSome(user, "assistant.use") && <AltazorHome showDesktopActivity />}
   </div>;
 }
