@@ -50,6 +50,17 @@ function safeFilename(name: string) {
   return cleaned || "download";
 }
 
+/** Return only available originals; never advertise arbitrary text as a PDF. */
+export function documentBodyForDownload(
+  document: { nombre: string; storageKey: string | null; contenido: string | null; mimeType: string | null },
+  stored: Buffer | null,
+): Buffer | null {
+  const body = document.storageKey ? stored : document.contenido === null ? null : Buffer.from(document.contenido);
+  if (!body) return null;
+  if ((["application/pdf", "application/x-pdf"].includes(normalizeMimeType(document.mimeType)) || /\.pdf$/i.test(document.nombre)) && body.subarray(0, 5).toString("ascii") !== "%PDF-") return null;
+  return body;
+}
+
 /** Build Content-Disposition; force attachment for non-inline-safe types. */
 export function contentDispositionFor(
   filename: string,

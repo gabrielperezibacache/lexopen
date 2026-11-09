@@ -18,6 +18,10 @@ contra el repositorio y el protocolo accesibles en esta revisión.
   tipo o por la ruta debe empezar con la firma PDF. Cuando no coincide, se
   conserva la referencia sin adjuntar esos bytes. Se mantienen los
   límites de tamaño, las restricciones de acceso y los demás tipos admitidos.
+- La ruta de descarga del documento responde con contenido no encontrado si
+  falta el original o si un documento identificado como PDF por nombre o tipo
+  no conserva su firma. Un archivo de texto
+  explícitamente vacío sigue siendo descargable.
 - Se agregaron formularios de incidencias y una plantilla de PR con indicaciones
   para no publicar datos reales, en respuesta al issue #269.
 
