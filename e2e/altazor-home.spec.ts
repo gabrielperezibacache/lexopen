@@ -226,10 +226,20 @@ test("memoria privada: grafo confirmado entra al contexto y olvidar oculta el hi
   test.setTimeout(100_000);const {email,user}=await fixture();await loginAs(page,email);await openTools(page);await page.getByRole("button",{name:"Memoria",exact:true}).click();const memory=page.getByTestId("altazor-memory");
   const labels=["Faro de redacción ficticia","Faro de revisión prudente"];
   await memory.getByText("Añadir recuerdo",{exact:true}).click();
-  for(const label of labels){await memory.getByLabel("Qué prefieres recordar",{exact:true}).fill(label);await memory.getByLabel("Detalle opcional",{exact:true}).fill("Prefiero síntesis breves con un cierre explícito.");await memory.getByRole("button",{name:"Guardar propuesta",exact:true}).click();await memory.locator("article").getByRole("button",{name:new RegExp(`^${label}`)}).click();await memory.getByRole("button",{name:"Confirmar recuerdo",exact:true}).click();}
+  for (const label of labels) {
+    await memory.getByLabel("Qué prefieres recordar", { exact: true }).fill(label);
+    await memory.getByLabel("Detalle opcional", { exact: true }).fill("Prefiero síntesis breves con un cierre explícito.");
+    await memory.getByRole("button", { name: "Guardar propuesta", exact: true }).click();
+    const record = memory.locator("article").getByRole("button", { name: new RegExp(`^${label}`) });
+    await record.click();
+    await memory.getByRole("button", { name: "Confirmar recuerdo", exact: true }).click();
+    // A click starts the mutation; the confirmed UI proves its refreshed read finished.
+    await expect(record).toContainText("Confirmado");
+  }
   await expect(memory.locator('g[role="button"]')).toHaveCount(2);await memory.locator('g[role="button"]').first().focus();await page.keyboard.press("Enter");
   await memory.getByText("Conectar dos recuerdos",{exact:true}).click();const graph=await json<{nodes:{id:string;label:string}[]}>(await page.request.get("/api/altazor/memory"));
   await memory.getByRole("combobox",{name:/^Desde/}).selectOption(graph.nodes.find(node=>node.label===labels[0])!.id);await memory.getByRole("combobox",{name:/^Hacia/}).selectOption(graph.nodes.find(node=>node.label===labels[1])!.id);await memory.getByLabel("Cómo se relacionan",{exact:true}).fill("orienta");await memory.getByRole("button",{name:"Proponer relación",exact:true}).click();await memory.getByRole("button",{name:"Confirmar recuerdo",exact:true}).click();
+  await expect(memory.getByText("Relación confirmada", { exact: true })).toBeVisible();
   await page.getByRole("button",{name:"Conversación",exact:true}).click();await expect(page.getByRole("checkbox",{name:"Usar mi memoria confirmada en este espacio"})).toHaveCount(0);const before=modelRequests.length,chat=await send(page,"Usa el faro de redacción y revisión para organizar esta explicación ficticia");
   expect(modelRequests.slice(before).some(messages=>JSON.stringify(messages).includes(labels[0]))).toBe(true);const turn=await db.altazorTurn.findUniqueOrThrow({where:{id:chat.turns[0].id}});expect(JSON.parse(turn.contextJson).memoryDependencies).toHaveLength(3);
   await page.getByRole("button",{name:"Memoria",exact:true}).click();const memoryButton=memory.locator("article").getByRole("button",{name:new RegExp(`^${labels[0]}`)});if(await memoryButton.getAttribute("aria-expanded")!=="true")await memoryButton.click();await memory.getByRole("button",{name:"Olvidar",exact:true}).first().click();await memory.getByRole("button",{name:"Sí, olvidar",exact:true}).click();
