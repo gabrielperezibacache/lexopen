@@ -112,6 +112,7 @@ Requiere Node **22.12 o posterior** y PostgreSQL. [Configuración de ejemplo](.e
 
 ```sh
 npm ci
+npm ci --prefix desktop --ignore-scripts
 npm run typecheck
 npm run lint
 npm test
