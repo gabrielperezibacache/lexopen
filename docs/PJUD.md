@@ -359,3 +359,7 @@ Respuesta lookup: mismo shape que partner API (`movimientos[]` con cuaderno/foli
 ## CSV / webhook
 
 Siguen disponibles como respaldo (ver `docs/WEB-HOST.md`).
+
+### Respuestas de sesión y corpus de fallos
+
+Los lectores rechazan los scripts de retorno al inicio por sesión no disponible antes de procesar el HTML. Esa respuesta no confirma una búsqueda vacía ni un historial sin cambios. El Buscador Unificado de Jurisprudencia es una fuente pública independiente: la investigación permite incorporar individualmente un fallo civil por ID, con sesión anónima propia y conservación del JSON y texto. No usa ClaveÚnica ni añade un canal HTTP de consulta de causas. Véase [alcance y pruebas](INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).

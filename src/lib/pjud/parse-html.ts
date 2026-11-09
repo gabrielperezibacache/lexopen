@@ -1,3 +1,4 @@
+import { assertOjvResponseAvailable } from "./response-state";
 import { classifyMovimiento } from "@/lib/pjud/classify";
 import { scrapeMovimientoIdentity, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 import { parseLocalDateInput } from "@/lib/minutas";
@@ -71,6 +72,7 @@ function hasTable(node: HtmlNode): boolean {
 
 /** An empty history is valid only when OJV labels a recognizable history table. */
 export function hasExplicitEmptyHistory(html: string): boolean {
+  assertOjvResponseAvailable(html);
   const visit = (node: HtmlNode): boolean => {
     if (!("children" in node)) return false;
     if (node.type === "tag" && node.name === "table") {
@@ -232,6 +234,7 @@ export function parseMovimientosFromHtml(
   html: string,
   options: { cuaderno?: string; limit?: number; onIncompleteRow?: () => void } = {}
 ): PjudFetchedMovimiento[] {
+  assertOjvResponseAvailable(html);
   const limit = Number.isFinite(options.limit)
     ? Math.max(1, Math.min(Math.floor(options.limit!), PJUD_MAX_CAUSA_MOVIMIENTOS + 1)) : 500;
   html = DomUtils.getOuterHTML(visibleHistoryDocument(html));
@@ -541,6 +544,7 @@ export type VerDetalleRow = {
  * First TD is usually the detail link; remaining TDs vary by competencia.
  */
 export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
+  assertOjvResponseAvailable(html);
   html = DomUtils.getOuterHTML(visibleDocument(html));
   const out: VerDetalleRow[] = [];
   const tableMatch =

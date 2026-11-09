@@ -36,3 +36,7 @@ HTTPS, hosts y rutas permitidos explícitamente, sin cookies o credenciales del 
 Las pruebas interceptan transporte y comprueban URL no admitida, redirección a localhost, respuesta 401, estructura HTML ausente, formato inesperado, tamaño, cancelación, tiempo límite, identidad XML y versión histórica incompatible. Los errores conservan una respuesta de indisponibilidad o formato, sin fabricar contenido para continuar.
 
 Firecrawl CLI estaba instalado y autenticado, pero devolvió `ENOTFOUND api.firecrawl.dev`. La investigación de viabilidad se contrastó con documentación primaria y solicitudes HTTPS directas. La aplicación no incorpora ese servicio como dependencia necesaria de este flujo.
+
+## Actualización: importación individual de fallos civiles PJUD
+
+Existe un conector experimental del Buscador Unificado para incorporar un fallo por identificador numérico al corpus versionado de investigación. Usa una sesión pública nueva y exige identidad y texto íntegro; no usa previews como sentencia. La conservación de JSON y sus hashes se verifica con transportes simulados. No se acredita disponibilidad viva, cobertura, búsqueda remota por palabras ni otras materias. [Detalle de integración y límites](INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).

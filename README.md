@@ -16,6 +16,12 @@ LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audi
 
 *Las capturas muestran LexOpen con expedientes y conversaciones ficticios. La galería muestra las herramientas de esta versión.*
 
+## OJV y Buscador Unificado de Jurisprudencia
+
+En la investigación jurídica puedes incorporar un fallo civil del Buscador Unificado del Poder Judicial por su identificador numérico. Introduce el ID en **Incorporar una fuente jurídica**, revisa la referencia preparada y pulsa **Recuperar fuente oficial**. LexOpen abre una sesión pública independiente de ClaveÚnica, exige el ID exacto y conserva la respuesta JSON y su texto en el corpus con versiones y hashes. Los previews y marcadores de anonimización sin texto no se incorporan como fallos íntegros.
+
+La integración es experimental: no ofrece búsqueda remota por palabras, cobertura exhaustiva ni páginas de un PDF. Las fuentes incorporadas quedan disponibles para el equipo autorizado. En OJV, una respuesta que devuelve al inicio por sesión vencida produce un error explícito; no confirma que la causa esté sin novedades. [Alcance, pruebas y pendientes de la integración](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).
+
 ## Descargar LexOpen
 
 Elige el archivo para tu equipo en la versión **1.1.0-preview.8**. [Ver la versión y todos sus archivos](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.8)
