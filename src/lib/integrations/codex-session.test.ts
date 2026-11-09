@@ -62,12 +62,39 @@ test("Codex completion restricts tools, filesystem and context and accepts only 
   assert.equal(trace.find(row => row.method === "initialize").params.capabilities.experimentalApi, true);
   assert.equal(thread.ephemeral, true); assert.equal(thread.approvalPolicy, "never"); assert.equal(thread.config["features.shell_tool"], false); assert.equal(thread.config["features.apps"], false); assert.equal(thread.config["features.plugins"], false); assert.equal(thread.config["skills.bundled.enabled"], false); assert.equal(thread.config.web_search, "disabled"); assert.deepEqual(thread.config.mcp_servers, {});
   assert.equal(thread.developerInstructions, "Devuelve una propuesta con las fuentes elegidas."); assert.equal(turn.input[0].text.includes('"role":"system"'), false);
-  assert.equal(thread.permissions, "lexopen_text"); assert.equal(turn.permissions, "lexopen_text"); assert.equal(thread.sandbox, undefined); assert.equal(turn.sandboxPolicy, undefined);
+  assert.match(thread.permissions, /^lexopen_text_[a-f0-9]{32}$/); assert.equal(turn.permissions, thread.permissions); assert.equal(thread.sandbox, undefined); assert.equal(turn.sandboxPolicy, undefined);
   const args: string[] = JSON.parse(await readFile(path.join(base, hash("actor_a"), "fake-arguments.json"), "utf8"));
-  assert.ok(args.includes(`permissions.lexopen_text.filesystem={${JSON.stringify(thread.cwd)}="read"}`));
-  assert.ok(args.includes("permissions.lexopen_text.network.enabled=false"));
-  assert.ok(args.includes('default_permissions="lexopen_text"'));
+  assert.ok(args.includes(`permissions.${thread.permissions}.filesystem={${JSON.stringify(thread.cwd)}="read"}`));
+  assert.ok(args.includes(`permissions.${thread.permissions}.network.enabled=false`));
+  assert.ok(args.includes(`default_permissions=${JSON.stringify(thread.permissions)}`));
   assert.notEqual(thread.cwd, process.cwd()); assert.equal(thread.cwd.startsWith(tmpdir()), true);
+}));
+test("Codex allocates a fresh permission profile per isolated session", async () => run("connected", async (manager, base) => {
+  for (const actor of ["actor_a", "actor_b"]) await manager.complete(actor, [{ role: "user", content: "Dato ficticio" }], { model: "codex-test" });
+  const profiles = await Promise.all(["actor_a", "actor_b"].map(async actor => {
+    const lines = (await readFile(path.join(base, hash(actor), "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+    return lines.find(row => row.method === "thread/start").params.permissions as string;
+  }));
+  assert.match(profiles[0], /^lexopen_text_[a-f0-9]{32}$/);
+  assert.notEqual(profiles[0], profiles[1]);
+}));
+test("Codex permits explicitly disabled inherited MCP entries", async () => run("mcp-disabled", async manager => {
+  const result = await manager.complete("actor_a", [{ role: "user", content: "Dato ficticio" }], { model: "codex-test" });
+  assert.equal(result.content, "Respuesta de prueba.");
+}));
+test("Codex refuses inherited MCP before a thread and still permits disconnect", async () => run("mcp-present", async (manager, base) => {
+  assert.equal((await manager.status("actor_a")).connected, true);
+  await assert.rejects(manager.beginLogin("actor_a"), /servidores MCP/);
+  await assert.rejects(manager.complete("actor_a", [{ role: "user", content: "Dato ficticio" }], { model: "codex-test" }), /servidores MCP/);
+  const trace = (await readFile(path.join(base, hash("actor_a"), "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  assert.equal(trace.some(row => row.method === "thread/start" || row.method === "account/login/start"), false);
+  assert.equal((await manager.disconnect("actor_a")).connected, false);
+}));
+test("Codex rechecks inherited MCP configuration before the turn", async () => run("mcp-late", async (manager, base) => {
+  await assert.rejects(manager.complete("actor_a", [{ role: "user", content: "Dato ficticio" }], { model: "codex-test" }), /servidores MCP/);
+  const trace = (await readFile(path.join(base, hash("actor_a"), "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  assert.equal(trace.filter(row => row.method === "thread/start").length, 1);
+  assert.equal(trace.some(row => row.method === "turn/start"), false);
 }));
 test("Codex rejects server tool requests and unexpected tool activity", async () => {
   for (const scenario of ["tool", "tool-event"]) await run(scenario, async manager => { await assert.rejects(manager.complete("actor_a", [{ role: "user", content: "Hola" }], { model: "codex-test" }), /herramienta/); });

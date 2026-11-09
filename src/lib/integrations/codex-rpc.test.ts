@@ -18,6 +18,9 @@ test("Codex stdio: correlates concurrent replies and initializes once", async ()
 test("Codex stdio: doesn't expose provider diagnostics", async () => rpcRun(async rpc => {
   await assert.rejects(rpc.request("remote-error"), error => error instanceof CodexTransportError && error.code === "remote" && !/SECRET/.test(error.message));
 }));
+test("Codex stdio: reports a safe protocol error code without provider text", async () => rpcRun(async rpc => {
+  await assert.rejects(rpc.request("remote-protocol-error"), error => error instanceof CodexTransportError && error.code === "remote" && /RPC -32600/.test(error.message) && !/SECRET/.test(error.message));
+}));
 test("Codex stdio: malformed or over-limit frames terminate the connection", async () => {
   await rpcRun(async rpc => { await assert.rejects(rpc.request("invalid"), error => error instanceof CodexTransportError && error.code === "protocol"); assert.equal(rpc.alive, false); });
   await rpcRun(async rpc => { await assert.rejects(rpc.request("empty-response"), error => error instanceof CodexTransportError && error.code === "protocol"); });

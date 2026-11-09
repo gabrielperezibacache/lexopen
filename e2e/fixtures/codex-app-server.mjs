@@ -16,6 +16,7 @@ for (const name of ["DATABASE_URL", "E2E_DATABASE_URL", "SESSION_SECRET", "OPENA
 
 const approval = path.join(home, "approval.json"), ledger = path.join(home, "requests.jsonl");
 const email = `codex-${path.basename(home).slice(0, 8)}@example.test`;
+let threadProfile;
 const loginId = "login_e2e", threadId = "thread_e2e", turnId = "turn_e2e";
 let pendingLogin = false;
 function approved() {
@@ -35,6 +36,14 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
   // Record only method names. Prompts, secrets and document content stay out.
   appendFileSync(ledger, JSON.stringify({ method }) + "\n", { mode: 0o600 });
   if (method === "initialize") result(id, { userAgent: "lexopen-codex-browser-fixture" });
+  else if (method === "config/read") {
+    const arg = process.argv.find(value => value.startsWith("default_permissions="));
+    const profile = arg ? JSON.parse(arg.slice("default_permissions=".length)) : "";
+    const fsArg = process.argv.find(value => value.startsWith(`permissions.${profile}.filesystem=`));
+    const fsMatch = fsArg?.slice(fsArg.indexOf("=") + 1).match(/^\{("(?:\\.|[^"\\])*")="read"\}$/);
+    const workspace = fsMatch ? JSON.parse(fsMatch[1]) : process.cwd();
+    result(id, { config: { default_permissions: profile, permissions: { [profile]: { filesystem: { [workspace]: "read" }, network: { enabled: false } } }, mcp_servers: {} } });
+  }
   else if (method === "initialized") {}
   else if (method === "account/read") {
     if (pendingLogin && approved()) { pendingLogin = false; notify("account/login/completed", { loginId, success: true }); }
@@ -50,10 +59,11 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
   } else if (method === "model/list" && approved()) {
     result(id, { data: [{ id: "fixture-model", model: "codex-e2e", displayName: "Codex de demostración", isDefault: true }], nextCursor: null });
   } else if (method === "thread/start" && approved()) {
-    if (params?.permissions !== "lexopen_text" || params?.approvalPolicy !== "never" || params?.ephemeral !== true) { reject(id); continue; }
+    if (!/^lexopen_text_[a-f0-9]{32}$/.test(params?.permissions || "") || params?.approvalPolicy !== "never" || params?.ephemeral !== true) { reject(id); continue; }
+    threadProfile = params.permissions;
     result(id, { thread: { id: threadId, ephemeral: true } });
   } else if (method === "turn/start" && approved()) {
-    if (params?.threadId !== threadId || params?.approvalPolicy !== "never" || params?.permissions !== "lexopen_text") { reject(id); continue; }
+    if (params?.threadId !== threadId || params?.approvalPolicy !== "never" || params?.permissions !== threadProfile) { reject(id); continue; }
     result(id, { turn: { id: turnId, status: "inProgress" } });
     notify("item/agentMessage/delta", { threadId, turnId, itemId: "answer", delta: "Conexión de LexOpen comprobada." });
     notify("turn/completed", { threadId, turn: { id: turnId, status: "completed", items: [] } });

@@ -41,3 +41,6 @@ assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: "pdf", c
 assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, contenido: "", mimeType: "text/plain" }, null)?.length, 0);
 assert.equal(documentBodyForDownload({ nombre: "archivo.PDF", storageKey: null, contenido: "no es PDF", mimeType: null }, null), null);
 assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, contenido: "error", mimeType: "application/x-pdf" }, null), null);
+
+const damagedOriginal = Buffer.from("Original almacenado con formato incorrecto");
+assert.deepEqual(documentBodyForDownload({ nombre: "archivo.pdf", storageKey: "stored", contenido: "texto extraído", mimeType: "application/pdf" }, damagedOriginal), damagedOriginal);
