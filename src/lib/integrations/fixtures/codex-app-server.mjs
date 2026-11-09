@@ -7,6 +7,7 @@ const home = process.env.CODEX_HOME || process.cwd();
 const credential = path.join(home, "fake-auth.json"), trace = path.join(home, "trace.jsonl");
 let connected = ["connected", "hang", "tool", "tool-event", "failed"].includes(scenario) || existsSync(credential) && Boolean(JSON.parse(readFileSync(credential, "utf8"))), loginTimer;
 writeFileSync(path.join(home, "fake-environment.json"), JSON.stringify(process.env));
+writeFileSync(path.join(home, "fake-arguments.json"), JSON.stringify(process.argv.slice(2)));
 const send = value => process.stdout.write(JSON.stringify(value) + "\n");
 const result = (id, value) => send({ id, result: value });
 const notify = (method, params) => send({ method, params });

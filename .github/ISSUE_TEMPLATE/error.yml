@@ -1,0 +1,34 @@
+name: Reportar un error
+description: Describe un fallo reproducible con datos ficticios.
+title: "[Error] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usa ejemplos ficticios. No adjuntes expedientes, nombres, RUT, credenciales ni capturas reales.
+        Consulta la [guía de contribución](https://github.com/gabrielperezibacache/lexopen/blob/main/CONTRIBUTING.md) y [política de privacidad](https://perezibacache.cl/lexopen/privacidad/).
+  - type: input
+    id: version
+    attributes:
+      label: Versión de LexOpen
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Sistema operativo, navegador o versión del Host
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Caso mínimo reproducible y pasos
+      description: Incluye sólo datos ficticios.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado y resultado observado
+    validations:
+      required: true

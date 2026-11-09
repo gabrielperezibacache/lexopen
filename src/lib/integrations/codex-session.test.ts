@@ -50,9 +50,14 @@ test("Codex completion restricts tools, filesystem and context and accepts only 
   assert.deepEqual(result, { content: "Respuesta de prueba.", model: "codex-test", provider: "codex" });
   const trace = (await readFile(path.join(base, hash("actor_a"), "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
   const thread = trace.find(row => row.method === "thread/start").params, turn = trace.find(row => row.method === "turn/start").params;
+  assert.equal(trace.find(row => row.method === "initialize").params.capabilities.experimentalApi, true);
   assert.equal(thread.ephemeral, true); assert.equal(thread.approvalPolicy, "never"); assert.equal(thread.config["features.shell_tool"], false); assert.equal(thread.config["features.apps"], false); assert.equal(thread.config["features.plugins"], false); assert.equal(thread.config["skills.bundled.enabled"], false); assert.equal(thread.config.web_search, "disabled"); assert.deepEqual(thread.config.mcp_servers, {});
   assert.equal(thread.developerInstructions, "Devuelve una propuesta con las fuentes elegidas."); assert.equal(turn.input[0].text.includes('"role":"system"'), false);
-  assert.equal(turn.sandboxPolicy.type, "readOnly"); assert.deepEqual(turn.sandboxPolicy.access.readableRoots, [thread.cwd]); assert.equal(turn.sandboxPolicy.access.includePlatformDefaults, false);
+  assert.equal(thread.permissions, "lexopen_text"); assert.equal(turn.permissions, "lexopen_text"); assert.equal(thread.sandbox, undefined); assert.equal(turn.sandboxPolicy, undefined);
+  const args: string[] = JSON.parse(await readFile(path.join(base, hash("actor_a"), "fake-arguments.json"), "utf8"));
+  assert.ok(args.includes(`permissions.lexopen_text.filesystem={${JSON.stringify(thread.cwd)}="read"}`));
+  assert.ok(args.includes("permissions.lexopen_text.network.enabled=false"));
+  assert.ok(args.includes('default_permissions="lexopen_text"'));
   assert.notEqual(thread.cwd, process.cwd()); assert.equal(thread.cwd.startsWith(tmpdir()), true);
 }));
 test("Codex rejects server tool requests and unexpected tool activity", async () => {

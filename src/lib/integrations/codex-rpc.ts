@@ -39,7 +39,7 @@ export class CodexRpc {
   onClose(listener: (reason: CodexTransportError) => void) { this.closeListeners.add(listener); return () => { this.closeListeners.delete(listener); }; }
 
   async initialize() {
-    await this.request("initialize", { clientInfo: { name: "lexopen", title: "LexOpen", version: "1.0.0" } });
+    await this.request("initialize", { clientInfo: { name: "lexopen", title: "LexOpen", version: "1.0.0" }, capabilities: { experimentalApi: true } });
     this.notify("initialized");
   }
 

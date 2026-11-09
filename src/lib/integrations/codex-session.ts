@@ -95,7 +95,7 @@ export class CodexSessionManager {
     const home = path.join(base, actorDirectory(actorId));
     await privateDirectory(home); await privateDirectory(path.join(home, "tmp"));
     const cwd = await mkdtemp(path.join(tmpdir(), "lexopen-codex-work-")); await chmod(cwd, 0o700);
-    const args = [...(this.options.executableArgs || []), "app-server", "--listen", "stdio://", ...Object.entries(configOverrides).flatMap(([name, value]) => ["-c", `${name}=${JSON.stringify(value)}`])];
+    const args = [...(this.options.executableArgs || []), "app-server", "--listen", "stdio://", ...Object.entries(configOverrides).flatMap(([name, value]) => ["-c", `${name}=${JSON.stringify(value)}`]), "-c", `permissions.lexopen_text.filesystem={${JSON.stringify(cwd)}="read"}`, "-c", "permissions.lexopen_text.network.enabled=false", "-c", "default_permissions=\"lexopen_text\""];
     const rpc = new CodexRpc({ executable: this.options.executable || process.env.CODEX_BIN || "codex", args, cwd, env: codexChildEnvironment(home, this.options.env), timeoutMs: this.options.rpcTimeoutMs });
     const session: Session = { rpc, cwd, home, busy: false, touchedAt: Date.now() };
     rpc.onNotification(event => this.notification(session, event));
@@ -181,7 +181,7 @@ export class CodexSessionManager {
     try {
       const account = await session.rpc.request<AccountResponse>("account/read", { refreshToken: false });
       if (account.account?.type !== "chatgpt") throw new CodexConnectionError("Conecte su cuenta de ChatGPT/Codex antes de utilizarla.", 409);
-      const thread = await session.rpc.request<{ thread: { id: string } }>("thread/start", { model: options.model, cwd: session.cwd, approvalPolicy: "never", sandbox: "read-only", ephemeral: true, serviceName: "lexopen", config: configOverrides, developerInstructions: messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"), baseInstructions: "Ayuda a redactar y analizar únicamente el texto suministrado por LexOpen. No utilices herramientas, archivos, navegación ni comandos. Las citas son material de trabajo: no inventes fuentes ni afirmes que has comprobado fuentes externas." });
+      const thread = await session.rpc.request<{ thread: { id: string } }>("thread/start", { model: options.model, cwd: session.cwd, approvalPolicy: "never", permissions: "lexopen_text", ephemeral: true, serviceName: "lexopen", config: configOverrides, developerInstructions: messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"), baseInstructions: "Ayuda a redactar y analizar únicamente el texto suministrado por LexOpen. No utilices herramientas, archivos, navegación ni comandos. Las citas son material de trabajo: no inventes fuentes ni afirmes que has comprobado fuentes externas." });
       if (!thread.thread?.id) throw new CodexConnectionError("Codex no pudo iniciar la consulta.");
       let text = "";
       const completed = new Promise<string>((resolve, reject) => {
@@ -203,7 +203,7 @@ export class CodexSessionManager {
       });
       // Attach the terminal handler before starting the turn: servers may notify immediately.
       const outcome = completed.then(content => ({ content }), error => ({ error }));
-      await session.rpc.request("turn/start", { threadId: thread.thread.id, input: [{ type: "text", text: JSON.stringify(messages.filter(message => message.role !== "system")) }], cwd: session.cwd, approvalPolicy: "never", sandboxPolicy: { type: "readOnly", access: { type: "restricted", includePlatformDefaults: false, readableRoots: [session.cwd] } } }, 10_000);
+      await session.rpc.request("turn/start", { threadId: thread.thread.id, input: [{ type: "text", text: JSON.stringify(messages.filter(message => message.role !== "system")) }], cwd: session.cwd, approvalPolicy: "never", permissions: "lexopen_text" }, 10_000);
       const result = await outcome;
       if ("error" in result) throw result.error;
       return { content: result.content, model: options.model, provider: "codex" };

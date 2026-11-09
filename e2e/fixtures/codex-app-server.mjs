@@ -49,10 +49,10 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
   } else if (method === "model/list" && approved()) {
     result(id, { data: [{ id: "fixture-model", model: "codex-e2e", displayName: "Codex de demostración", isDefault: true }], nextCursor: null });
   } else if (method === "thread/start" && approved()) {
-    if (params?.sandbox !== "read-only" || params?.approvalPolicy !== "never" || params?.ephemeral !== true) { reject(id); continue; }
+    if (params?.permissions !== "lexopen_text" || params?.approvalPolicy !== "never" || params?.ephemeral !== true) { reject(id); continue; }
     result(id, { thread: { id: threadId, ephemeral: true } });
   } else if (method === "turn/start" && approved()) {
-    if (params?.threadId !== threadId || params?.approvalPolicy !== "never" || params?.sandboxPolicy?.type !== "readOnly") { reject(id); continue; }
+    if (params?.threadId !== threadId || params?.approvalPolicy !== "never" || params?.permissions !== "lexopen_text") { reject(id); continue; }
     result(id, { turn: { id: turnId, status: "inProgress" } });
     notify("item/agentMessage/delta", { threadId, turnId, itemId: "answer", delta: "Conexión de LexOpen comprobada." });
     notify("turn/completed", { threadId, turn: { id: turnId, status: "completed", items: [] } });
