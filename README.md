@@ -20,7 +20,9 @@ LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audi
 
 En la investigación jurídica puedes incorporar un fallo civil del Buscador Unificado del Poder Judicial por su identificador numérico. Introduce el ID en **Incorporar una fuente jurídica**, revisa la referencia preparada y pulsa **Recuperar fuente oficial**. LexOpen abre una sesión pública independiente de ClaveÚnica, exige el ID exacto y conserva la respuesta JSON y su texto en el corpus con versiones y hashes. Los previews y marcadores de anonimización sin texto no se incorporan como fallos íntegros.
 
-La integración es experimental: no ofrece búsqueda remota por palabras, cobertura exhaustiva ni páginas de un PDF. Las fuentes incorporadas quedan disponibles para el equipo autorizado. En OJV, una respuesta que devuelve al inicio por sesión vencida produce un error explícito; no confirma que la causa esté sin novedades. [Alcance, pruebas y pendientes de la integración](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).
+En **Fuentes → Buscar fallos civiles en el Poder Judicial** puedes buscar por términos o ROL y recorrer páginas de diez resultados. Sólo se envían los campos de ese formulario; la consulta local y el expediente permanecen en el Host. Cada página usa una sesión pública nueva. Si se indica ROL y año, se comprueban en los resultados antes de mostrarlos. Seleccionar un resultado prepara su incorporación y exige recuperar el texto íntegro por separado.
+
+La integración es experimental: el portal declara el total y la coincidencia por términos; no acredita cobertura exhaustiva ni páginas de un PDF. Las fuentes incorporadas quedan disponibles para el equipo autorizado. En OJV, una respuesta que devuelve al inicio por sesión vencida produce un error explícito; no confirma que la causa esté sin novedades. [Alcance, pruebas y pendientes de la integración](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).
 
 ## Descargar LexOpen
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PjudJudgmentSearch } from "./PjudJudgmentSearch";
 import { BookmarkCitationButton } from "@/components/knowledge/BookmarkCitationButton";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BookOpen, Copy, Search } from "lucide-react";
@@ -173,6 +174,7 @@ export function LegalResearchWorkbench({ initialCases, initialRunId }: { initial
       </div>}
     </>}
     {view === "sources" && <div className="space-y-6">
+      <PjudJudgmentSearch disabled={!ready || Boolean(busy)} onSelect={selected => { setUrl(selected); setManual(false); setStatus("Referencia preparada. Revise la URL y pulse Recuperar fuente oficial para incorporar el texto íntegro."); }} />
       <form method="post" className="research-source-form space-y-4" onSubmit={e => { e.preventDefault(); void importSource(); }}><fieldset className="min-w-0 space-y-4" disabled={!ready || Boolean(busy)}>
         <h3 className="text-lg font-semibold">Incorporar una fuente jurídica</h3><p className="max-w-[75ch] text-sm text-[var(--ink-soft)]">Se admiten dictámenes de la Dirección del Trabajo, normas de LeyChile, oficios de Renta o IVA del SII y fallos civiles del Buscador Unificado del Poder Judicial. Esta acción consulta únicamente la URL elegida; la pregunta y el expediente permanecen en LexOpen. Las fuentes incorporadas se comparten con el equipo del estudio.</p>
         <div><label htmlFor="research-source-url" className="mb-2 block text-sm font-medium">URL de la publicación oficial</label><input id="research-source-url" className="input w-full" type="url" maxLength={2000} required value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.dt.gob.cl/legislacion/…" /><p className="mt-2 text-sm">Para un fallo civil identificado use https://juris.pjud.cl/busqueda?Civiles#sentencia-ID, reemplazando ID por su identificador numérico. Es una referencia de selección de LexOpen: se recupera el texto por sesión pública, sin ClaveÚnica. No admite enlaces opacos con ?k= ni previews.</p></div>

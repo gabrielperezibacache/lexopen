@@ -23,4 +23,14 @@ No se integró la obtención programática de tokens de CAPTCHA propuesta en `ht
 
 Los informes comerciales proponen digest diario incluso sin novedades, jitter, taxonomía de errores, límites de reintentos, comparación estricta de corte/libro y concurrencia adaptativa. Son propuestas pendientes de una entrega específica: cambiar esas políticas sin pruebas de cola y notificaciones podría alterar el monitoreo existente. La supuesta ausencia de fixtures o de soporte `jurisprudence` en el informe no coincide con esta base: ya existen parser DOM, pruebas de HTML y corpus con esa clase.
 
-Pendientes: búsqueda remota por palabras/ROL con paginación y validación local de filtros (el paquete reporta degradación silenciosa al reutilizar sesión), otras materias, reintento de CSRF con nueva sesión, descarga de PDF generado, validación viva de extremo a extremo y conexión de documentos al escritorio. Los filtros de omnibox deberán ser listas y el ROL deberá separarse en número/año antes de añadir una búsqueda remota. Ninguna captura del ZIP demuestra disponibilidad actual.
+Pendientes: otras materias, reintento de CSRF con nueva sesión, descarga de PDF generado, validación viva de extremo a extremo y conexión de documentos al escritorio. Los filtros de omnibox deberán ser listas y el ROL deberá separarse en número/año antes de añadir una búsqueda remota. Ninguna captura del ZIP demuestra disponibilidad actual.
+
+## Segunda entrega: búsqueda pública paginada
+
+El formulario de Fuentes permite consultas explícitas por términos y ROL, separadas de la investigación local. El ROL se descompone en número y año; el origen recibe `filtros_omnibox: []`. Cada página abre sesión nueva. Se admiten diez resultados por página y veinte páginas como máximo, con doce peticiones por minuto y usuario. La ruta exige personal autorizado con `assistant.use`, CSRF y cuerpo acotado; la respuesta no se almacena en caché.
+
+Se rechazan IDs duplicados, respuestas de estructura incompatible y cualquier fila con número o año de ROL distinto del solicitado. La coincidencia de términos sigue siendo declarada por el servidor, porque el listado no es el fallo completo. El total remoto se etiqueta como declarado y las páginas pueden cambiar si el portal actualiza el índice. Los resultados no se incorporan al corpus ni se convierten en citas hasta recuperar individualmente el texto íntegro.
+
+La interfaz invalida resultados al cambiar filtros, cancela peticiones y descarta respuestas de solicitudes anteriores. El acceso a una página inicia una sesión anónima independiente. Las pruebas deterministas verifican filtros, deriva del ROL/año, sesiones por página, duplicados y cancelación; el recorrido de navegador usa respuestas simuladas del endpoint de búsqueda.
+
+El CI de la primera entrega detectó además un conflicto serializable al auditar cambios simultáneos del país de trabajo. Se reintenta la transacción completa cuando el error de auditoría conserva una causa Prisma `P2034`; otros fallos de auditoría siguen abortando. Se añadió una regresión con conflicto inyectado y auditoría única, ejecutada en PostgreSQL desechable.

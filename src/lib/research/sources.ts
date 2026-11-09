@@ -1,3 +1,4 @@
+import { searchPjud, type PjudSearchInput } from "./pjud-search";
 import { fetchPjudJudgment } from "./pjud-judgments";
 import { request } from "node:https";
 import { lookup } from "node:dns";
@@ -341,4 +342,11 @@ export async function fetchPublicLegalSource(rawUrl: string, options: PublicSour
   catch (error) { if (error && typeof error === "object" && "status" in error) throw error; throw sourceError("No fue posible interpretar el documento oficial", 502, "public_source_format"); }
   if (parsed.text.length > MAX_SOURCE_TEXT) throw sourceError("El texto de la fuente supera el límite de preparación", 413, "public_source_too_large");
   return { ...parsed, canonicalUrl: location.canonicalUrl, retrievalUrl: location.retrievalUrl, mimeType: mime.split(";")[0].trim().toLowerCase(), rawBytes, retrievedAt: new Date() };
+}
+
+/** Explicit public terms only; never forward a case document or a local research question implicitly. */
+export async function searchPublicPjudJudgments(input: PjudSearchInput, options: PublicSourceFetchOptions = {}) {
+  const signal = AbortSignal.any([AbortSignal.timeout(Math.min(PUBLIC_SOURCE_TIMEOUT_MS, Math.max(1, options.timeoutMs || PUBLIC_SOURCE_TIMEOUT_MS))), ...(options.signal ? [options.signal] : [])]);
+  if (signal.aborted) throw sourceError("Consulta cancelada", 503);
+  return searchPjud(input, options.fetch || officialRequest, signal, Math.min(PUBLIC_SOURCE_MAX_BYTES, Math.max(1, options.maxBytes || PUBLIC_SOURCE_MAX_BYTES)), readBounded);
 }

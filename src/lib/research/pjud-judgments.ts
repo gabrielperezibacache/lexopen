@@ -3,9 +3,10 @@ import type { FetchedLegalSource } from "./source-types";
 
 const BASE = "https://juris.pjud.cl";
 const fail = () => Object.assign(new Error("El Buscador Unificado no entregó un fallo íntegro identificable. Reintente o revise la fuente oficial."), { status: 502, code: "pjud_judgment_unavailable" });
-/** One fresh anonymous session per selection: the observed server degrades filters on reuse. */
-export async function fetchPjudJudgment(canonicalUrl: string, id: string, transport: (url: string, init: RequestInit) => Promise<Response>, signal: AbortSignal, maxBytes: number,
-  read: (response: Response, signal: AbortSignal, limit: number) => Promise<Buffer>): Promise<FetchedLegalSource> {
+type Transport = (url: string, init: RequestInit) => Promise<Response>;
+type Reader = (response: Response, signal: AbortSignal, limit: number) => Promise<Buffer>;
+/** A fresh anonymous session per request/page prevents observed filter degradation. */
+export async function requestPjudJudgments(filters: Record<string, unknown>, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader, offset = 0) {
   const request = async (path: string, init: RequestInit = {}) => {
     const response = await transport(`${BASE}${path}`, { ...init, redirect: "error", credentials: "omit", cache: "no-store", signal });
     if (!response.ok || response.redirected) { await response.body?.cancel(); throw fail(); }
@@ -20,13 +21,17 @@ export async function fetchPjudJudgment(canonicalUrl: string, id: string, transp
   const token = DomUtils.findOne(node => node.name === "input" && node.attribs.name === "_token", dom.children, true)?.attribs.value;
   const searchId = /id_buscador_activo\s*=\s*(\d+)/.exec(html)?.[1];
   if (!token || !searchId || !cookies.length) throw fail();
-  const body = new URLSearchParams({ _token: token, id_buscador: searchId, filtros: JSON.stringify({ id: Number(id) }) }).toString();
+  const body = new URLSearchParams({ _token: token, id_buscador: searchId, filtros: JSON.stringify(filters), numero_filas_paginacion: "10", offset_paginacion: String(offset), orden: "1", orden_nombre: "Relevancia" }).toString();
   const response = await request("/busqueda/buscar_sentencias", { method: "POST", body,
     headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest", "X-CSRF-TOKEN": token, Cookie: cookies.join("; ") } });
   if (!/^application\/json\b/i.test(response.headers.get("content-type") || "")) { await response.body?.cancel(); throw fail(); }
   const rawBytes = await read(response, signal, maxBytes);
   let payload;
   try { payload = JSON.parse(rawBytes.toString("utf8")); } catch { throw fail(); }
+  return { payload, rawBytes };
+}
+export async function fetchPjudJudgment(canonicalUrl: string, id: string, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader): Promise<FetchedLegalSource> {
+  const { payload, rawBytes } = await requestPjudJudgments({ id: Number(id) }, transport, signal, maxBytes, read);
   const docs = payload?.response?.docs;
   if (!Array.isArray(docs) || docs.length !== 1 || String(docs[0]?.id) !== id) throw fail();
   const doc = docs[0];

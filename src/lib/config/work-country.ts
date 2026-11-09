@@ -54,7 +54,8 @@ export async function updateWorkCountry(country: WorkCountry | null, user: { id:
         return { country };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
-      if ((error as { code?: string }).code !== "P2034" || attempt >= 2) throw error;
+      const conflict = error instanceof Error && "cause" in error ? error.cause : error;
+      if (!(conflict instanceof Prisma.PrismaClientKnownRequestError) || conflict.code !== "P2034" || attempt >= 2) throw error;
     }
   }
 }
