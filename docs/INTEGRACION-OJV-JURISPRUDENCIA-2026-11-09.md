@@ -52,3 +52,13 @@ PJUD_LIVE_CONFIRM=1 PJUD_LIVE_ROL=C-3630-2023 npm run test:pjud:juris:live
 En un entorno de desarrollo que sólo tiene salida por proxy, con una versión de Node compatible con `NODE_USE_ENV_PROXY`, añadir `PJUD_LIVE_USE_ENV_PROXY=1 NODE_USE_ENV_PROXY=1`. Esto cambia exclusivamente el transporte del script de prueba. El informe identifica el transporte y muestra identidad, tamaños y hashes, sin persistencia, PDF ni uso de modelos.
 
 El PR #274 quedó integrado con todos los controles obligatorios aprobados. El ensamblado opcional de instaladores rechazó la procedencia de darwin-x64 pese a construir los cuatro paquetes nativos; no se relajó la comprobación ni se afirma una nueva publicación de instaladores.
+
+El PR #275 también quedó integrado con el control obligatorio `build` y el CI de la aplicación aprobados.
+
+## Cuarta entrega: autorización del endpoint
+
+La ruta real de búsqueda pública vuelve a consultar la sesión y la capacidad `assistant.use` después de leer el cuerpo y aplicar el límite de consultas. Una revocación, pérdida del rol de personal o cambio de identidad durante esas esperas impide contactar al origen. Una solicitud cancelada tampoco inicia la búsqueda. La comprobación no cancela retroactivamente una consulta pública ya enviada.
+
+Éxitos y errores usan las mismas cabeceras `Cache-Control: private, no-store`, `Vary: Cookie` y `X-Content-Type-Options: nosniff`.
+
+La prueba ejecuta el handler, el esquema y el lector de cuerpo reales; sólo reemplaza sesión, permisos, limitador y conector. Comprueba CSRF, acceso de personal, capacidad, revocación durante la espera, cambio de identidad, límite de frecuencia, JSON inválido, campos no admitidos, límites declarados y efectivos de tamaño y cancelación. Todos los rechazos conservan cabeceras privadas y producen cero llamadas al conector. No usa DB, red ni modelos.
