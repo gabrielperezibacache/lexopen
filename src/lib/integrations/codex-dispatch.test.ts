@@ -1,24 +1,22 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { studyLlmConfigForModel } from "./llm-route";
-import { LOCAL_MODELS } from "./local-model-profiles";
 
 async function main() {
-  const globals = globalThis as unknown as { prisma?: unknown; lexopenCodexSessions?: unknown };
-  const previousPrisma = globals.prisma, previousManager = globals.lexopenCodexSessions, originalFetch = globalThis.fetch;
+  const globals = globalThis as unknown as { prisma?: unknown; lexopenCodexSessions?: unknown; lexopenHostCodexSessions?: unknown };
+  const previousPrisma = globals.prisma, previousManager = globals.lexopenCodexSessions, previousHost = globals.lexopenHostCodexSessions, originalFetch = globalThis.fetch;
   const env = { ...process.env };
   let localOnly = false, enabled = true, revoked = false, fail = false, codexCalls = 0, providerCalls = 0;
-  let expectedModel = "fixture-model", role = "abogado", receivedModel = "";
+  let source = "personal", revision = "first", shared = false, hostRevision = "first-host", hostCalls = 0, codexModel = "fixture-model";
   const activity: { mensaje: string }[] = [];
   globals.prisma = {
-    integrationConfig: { findUnique: async ({ where }: { where: { provider: string } }) => where.provider === "codex:professional_a" ? { provider: where.provider, enabled, configJson: JSON.stringify({ model: "fixture-model" }) } : null },
-    user: { findUnique: async () => ({ role, capabilityGrants: role === "cliente" ? "assistant.use" : "", capabilityRevokes: revoked ? "assistant.use" : "" }) },
+    integrationConfig: { findUnique: async ({ where }: { where: { provider: string } }) => where.provider === "codex:professional_a" ? { provider: where.provider, enabled, configJson: JSON.stringify({ model: "fixture-model", source, revision }) } : where.provider === "codex-host" ? { provider: where.provider, enabled: shared, configJson: JSON.stringify({ revision: hostRevision }) } : null },
+    user: { findUnique: async () => ({ role: "abogado", capabilityGrants: "", capabilityRevokes: revoked ? "assistant.use" : "" }) },
     firmSettings: { findFirst: async () => ({ assistantLlmMode: localOnly ? "local_only" : "remote_allowed", auditLlmPrompts: false, hermesAllowDemo: false }) },
     activity: { create: async ({ data }: { data: { mensaje: string } }) => { activity.push(data); return data; } },
   };
-  globals.lexopenCodexSessions = { complete: async (id: string, messages: unknown, options: { model: string }) => { assert.equal(id, "professional_a"); assert.ok(Array.isArray(messages)); assert.equal(options.model, expectedModel); codexCalls++; if (fail) throw Error("simulated provider failure containing a credential"); return { content: "PRIVATE ANSWER TO REVIEW", model: options.model, provider: "codex" }; } };
+  globals.lexopenCodexSessions = { complete: async (id: string, messages: unknown, options: { model: string }) => { assert.equal(id, "professional_a"); assert.ok(Array.isArray(messages)); assert.equal(options.model, codexModel); codexCalls++; if (fail) throw Error("simulated provider failure containing a credential"); return { content: "PRIVATE ANSWER TO REVIEW", model: options.model, provider: "codex" }; } };
+  globals.lexopenHostCodexSessions = { complete: async (id: string, messages: unknown, options: { model: string; beforeSend?: () => Promise<void> }) => { assert.equal(id, "lexopen_host"); assert.ok(Array.isArray(messages)); await options.beforeSend?.(); hostCalls++; if (fail) throw Error("private Host credential"); return { content: "HOST ANSWER TO REVIEW", model: options.model, provider: "codex" }; } };
   process.env.LLM_API_URL = "https://203.0.113.10/v1"; process.env.LLM_API_KEY = "synthetic-non-secret"; process.env.LLM_ALLOW_DEMO = "0";
-  globalThis.fetch = async (_input, init) => { providerCalls++; receivedModel = JSON.parse(String(init?.body)).model; return new Response(JSON.stringify({ choices: [{ message: { content: "Study provider answer" } }] })); };
+  globalThis.fetch = async () => { providerCalls++; return new Response(JSON.stringify({ choices: [{ message: { content: "Study provider answer" } }] })); };
   try {
     const { askLlm } = await import("./llm");
     const input = { userId: "professional_a", causaId: "case_a", messages: [{ role: "user" as const, content: "Selected fictitious passage" }] };
@@ -38,31 +36,36 @@ async function main() {
     revoked = false; fail = true;
     const failed = await askLlm(input); assert.equal(failed.source, "error"); assert.equal("code" in failed && failed.code, "codex_request_failed"); assert.ok(!JSON.stringify(failed).includes("credential")); assert.equal(providerCalls, 2, "a failed personal request must never fall back to another remote provider");
     fail = false;
-    const study = await askLlm({ ...input, route: { provider: "study", model: "icaro-study-model" } });
-    assert.equal(study.source, "llm"); assert.notEqual(study.provider, "codex"); assert.equal(receivedModel, "icaro-study-model"); assert.equal(providerCalls, 3, "explicit study delegation uses the configured study provider despite personal preference");
-    expectedModel = "icaro-codex-model";
-    const destination = { provider: "codex", model: expectedModel, endpointHash: createHash("sha256").update("codex").digest("hex") };
-    const delegated = await askLlm({ ...input, route: { provider: "codex", model: expectedModel }, expectedDestination: destination });
-    assert.equal(delegated.source, "llm"); assert.equal(delegated.model, expectedModel);
-    const callsBeforeDenials = codexCalls;
-    const changed = await askLlm({ ...input, route: { provider: "codex", model: expectedModel }, expectedDestination: { ...destination, endpointHash: "changed" } });
-    assert.equal("code" in changed && changed.code, "llm_destination_changed"); assert.equal(codexCalls, callsBeforeDenials);
-    enabled = false;
-    const disabled = await askLlm({ ...input, route: { provider: "codex", model: expectedModel } });
-    assert.equal("code" in disabled && disabled.code, "codex_disabled"); assert.equal(providerCalls, 3, "disabled delegated Codex never falls back to another provider");
-    enabled = true; localOnly = true;
-    const forbidden = await askLlm({ ...input, route: { provider: "study", model: "icaro-study-model" } });
-    assert.equal("code" in forbidden && forbidden.code, "llm_remote_forbidden"); assert.equal(providerCalls, 3);
-    localOnly = false; role = "cliente";
-    const portal = await askLlm({ ...input, route: { provider: "study", model: "icaro-study-model" } });
-    assert.equal("code" in portal && portal.code, "llm_forbidden"); assert.equal(providerCalls, 3);
-    const localConfig = { preset: "ollama" as const, apiUrl: "http://127.0.0.1:11434/v1", model: LOCAL_MODELS[0].tag, localProfile: LOCAL_MODELS[0].id, requireApproval: true, allowDemo: false };
-    assert.equal(studyLlmConfigForModel(localConfig, LOCAL_MODELS[1].tag).localProfile, LOCAL_MODELS[1].id);
-    assert.throws(() => studyLlmConfigForModel(localConfig, "unverified-local-model"));
+    const { codexDestinationFor } = await import("./codex-destination");
+    const { personalCodexPreference } = await import("./codex-preference");
+    const destination = async () => ({ provider: "codex", model: "fixture-model", ...await codexDestinationFor("professional_a", await personalCodexPreference("professional_a")) });
+    const personalApproval = await destination();
+    const routeModel = "icaro-codex-model";
+    const routePreference = await personalCodexPreference("professional_a");
+    const routeApproval = { provider: "codex", model: routeModel, ...await codexDestinationFor("professional_a", { ...routePreference, model: routeModel }) };
+    codexModel = routeModel;
+    const callsBeforeRoute = codexCalls;
+    const routed = await askLlm({ ...input, route: { provider: "codex", model: routeModel }, expectedDestination: routeApproval });
+    assert.equal(routed.source, "llm"); assert.equal(routed.model, routeModel); assert.equal(codexCalls, callsBeforeRoute + 1);
+    codexModel = "fixture-model";
+    const beforeSwitch = codexCalls;
+    source = "host"; shared = true;
+    const mismatched = await askLlm({ ...input, expectedDestination: personalApproval }); assert.equal("code" in mismatched && mismatched.code, "llm_destination_changed"); assert.equal(hostCalls, 0); assert.equal(codexCalls, beforeSwitch);
+    const hostApproval = await destination();
+    const hostResponse = await askLlm({ ...input, expectedDestination: hostApproval }); assert.equal(hostResponse.source, "llm"); assert.equal(hostResponse.content, "HOST ANSWER TO REVIEW"); assert.match(hostResponse.note ?? "", /Host/); assert.equal(hostCalls, 1); assert.equal(codexCalls, beforeSwitch);
+    localOnly = true;
+    const localHost = await askLlm(input); assert.equal("code" in localHost && localHost.code, "llm_remote_forbidden"); assert.equal(hostCalls, 1); localOnly = false;
+    shared = false; hostRevision = "revoked-host";
+    const unavailable = await askLlm(input); assert.equal("code" in unavailable && unavailable.code, "codex_host_unavailable"); assert.equal(hostCalls, 1); assert.equal(codexCalls, beforeSwitch); assert.equal(providerCalls, 2);
+    shared = true; hostRevision = "new-host-account";
+    const staleHost = await askLlm({ ...input, expectedDestination: hostApproval }); assert.equal("code" in staleHost && staleHost.code, "llm_destination_changed"); assert.equal(hostCalls, 1);
+    const currentApproval = await destination(); revision = "new-user-choice";
+    const staleUser = await askLlm({ ...input, expectedDestination: currentApproval }); assert.equal("code" in staleUser && staleUser.code, "llm_destination_changed"); assert.equal(hostCalls, 1);
+    fail = true; const failedHost = await askLlm(input); assert.equal(failedHost.source, "error"); assert.ok(!JSON.stringify(failedHost).includes("credential")); assert.equal(codexCalls, beforeSwitch); assert.equal(providerCalls, 2);
   } finally {
-    globals.prisma = previousPrisma; globals.lexopenCodexSessions = previousManager; globalThis.fetch = originalFetch;
+    globals.prisma = previousPrisma; globals.lexopenCodexSessions = previousManager; globals.lexopenHostCodexSessions = previousHost; globalThis.fetch = originalFetch;
     for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key]; Object.assign(process.env, env);
   }
-  console.log("Personal Codex dispatch: policy, capabilities, isolation and fail-closed checks passed (zero network).");
+  console.log("Codex dispatch: personal/Host routing, opt-in, revocation, account-bound approval, capabilities and no fallback passed (zero network).");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

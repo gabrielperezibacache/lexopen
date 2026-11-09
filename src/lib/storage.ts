@@ -42,7 +42,8 @@ async function discardIsolatedObject(key: string) {
  */
 
 function localRoot() {
-  return path.resolve(process.env.STORAGE_PATH || path.join(process.cwd(), "storage"));
+  // Uploaded documents belong to runtime storage, never the application package.
+  return path.resolve(/* turbopackIgnore: true */ process.env.STORAGE_PATH || path.join(process.cwd(), "storage"));
 }
 
 export function storageConfigured() {
@@ -190,7 +191,7 @@ export async function getObject(key: string): Promise<Buffer | null> {
     }
   }
   try {
-    return await fs.readFile(localPathForKey(key));
+    return await fs.readFile(/* turbopackIgnore: true */ localPathForKey(key));
   } catch {
     return null;
   }
@@ -217,7 +218,7 @@ export async function getObjectBounded(key: string, maxBytes = MAX_STORAGE_OBJEC
   }
   let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
-    handle = await fs.open(localPathForKey(key), "r");
+    handle = await fs.open(/* turbopackIgnore: true */ localPathForKey(key), "r");
     if ((await handle.stat()).size > maxBytes) throw tooLarge();
     const chunks: Buffer[] = []; let total = 0;
     for (;;) {

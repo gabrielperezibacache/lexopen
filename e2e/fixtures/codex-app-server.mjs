@@ -5,7 +5,8 @@ import path from "node:path";
 import readline from "node:readline";
 
 const home = path.resolve(process.env.CODEX_HOME || "."), base = path.dirname(home);
-if (!/^lexopen-codex-e2e(?:[-_][a-zA-Z0-9_-]+)?$/.test(path.basename(base)) || !/^[a-f0-9]{64}$/.test(path.basename(home)) || !process.argv.includes("app-server") || !process.argv.includes("stdio://")) {
+const isolatedBase = path.basename(base) === "host" ? path.dirname(base) : base;
+if (!/^lexopen-codex-e2e(?:[-_][a-zA-Z0-9_-]+)?$/.test(path.basename(isolatedBase)) || !/^[a-f0-9]{64}$/.test(path.basename(home)) || !process.argv.includes("app-server") || !process.argv.includes("stdio://")) {
   process.stderr.write("Codex browser fixture requires an isolated test home and stdio app-server.\n");
   process.exit(2);
 }

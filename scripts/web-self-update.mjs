@@ -23,9 +23,40 @@ export function hostCommandEnv(dataDir, env = process.env) {
   return { ...env, ...readEnvFile(path.join(dataDir, ".env")), LEXOPEN_DATA_DIR: dataDir };
 }
 export function isUnreachableDatabaseError(message) { return /P1001|Can't reach database server/i.test(String(message || "")); }
+
+/** A running backup may finish with the Host already stopped when its scheduler is stopped. */
+export async function stopHostForSelfUpdate({ backupScheduler, getChild, stopHost, assertStopped }) {
+  if (backupScheduler) await backupScheduler.stop();
+  if (getChild()) await stopHost();
+  else await assertStopped();
+}
+
 const readJson = file => { try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; } };
 const writeJson = (file, value) => replaceFileAtomic(file, `${JSON.stringify(value, null, 2)}\n`);
 const alive = pid => { if (!Number.isSafeInteger(pid) || pid < 1) return false; try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; } };
+
+/** A service-manager restart must not migrate partially installed source. */
+export function assertSelfUpdateStartupSafe({ dataDir, rootDir = root }) {
+  if (!fs.existsSync(statusPath(dataDir))) return;
+  const receipt = readJson(statusPath(dataDir));
+  const phases = ["idle", "queued", "preflight", "pulling", "backing_up", "applying", "installing", "migrating", "building", "restarting", "awaiting_restart", "done", "failed"];
+  if (!receipt || typeof receipt !== "object" || !phases.includes(receipt.phase)) {
+    throw new Error("No se pudo comprobar el recibo de actualización. Revise el respaldo y la guía de recuperación antes de iniciar el Host.");
+  }
+  if (receipt.recoveryRequired || ["applying", "installing", "migrating", "building", "restarting"].includes(receipt.phase) || receipt.codeApplied && !["done", "awaiting_restart"].includes(receipt.phase)) {
+    throw new Error("La actualización anterior requiere recuperación supervisada. No se iniciaron el Host ni sus migraciones; conserve el respaldo y consulte la guía de recuperación.");
+  }
+  if (receipt.phase !== "awaiting_restart") return;
+  let exact = false;
+  try {
+    const revision = spawnSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], shell: false });
+    const worktree = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], shell: false });
+    const version = JSON.parse(fs.readFileSync(path.join(rootDir, "package.json"), "utf8")).version;
+    const buildId = fs.readFileSync(path.join(rootDir, ".next", "BUILD_ID"), "utf8").trim();
+    exact = revision.status === 0 && worktree.status === 0 && !worktree.stdout.trim() && /^[a-f0-9]{40,64}$/.test(receipt.targetRevision || "") && revision.stdout.trim() === receipt.targetRevision && typeof receipt.toVersion === "string" && version === receipt.toVersion && /^[\w.-]{1,200}$/.test(receipt.expectedBuildId || "") && buildId === receipt.expectedBuildId;
+  } catch { /* Missing source/build identity is not permission to migrate. */ }
+  if (!exact) throw new Error("El código y la compilación preparados no coinciden con el recibo de actualización. No se iniciaron migraciones; conserve el respaldo y revise la recuperación.");
+}
 
 export function claimUpdateLock(dataDir, requestId) {
   if (!/^[a-zA-Z0-9-]{8,100}$/.test(requestId || "")) throw new Error("La solicitud de actualización no tiene identidad válida.");

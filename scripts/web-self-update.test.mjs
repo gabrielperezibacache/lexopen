@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { hostCommandEnv, isUnreachableDatabaseError, migrateDuringSelfUpdate, applySelfUpdate, finalizeSelfUpdate, claimUpdateLock, releaseUpdateLock, lockPath, statusPath, canRestartPreparedUpdate, updaterUsesShell } from "./web-self-update.mjs";
+import { hostCommandEnv, isUnreachableDatabaseError, migrateDuringSelfUpdate, applySelfUpdate, finalizeSelfUpdate, claimUpdateLock, releaseUpdateLock, lockPath, statusPath, canRestartPreparedUpdate, updaterUsesShell, stopHostForSelfUpdate, assertSelfUpdateStartupSafe } from "./web-self-update.mjs";
+import { createLocalBackupScheduler } from "./web-backup-scheduler.mjs";
 
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-self-update-fixtures-")));
 const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, TMPDIR: tmp, HOME: tmp, GIT_CONFIG_GLOBAL: os.devNull, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" } });
@@ -52,6 +53,36 @@ try {
   assert.deepEqual(migrateDuringSelfUpdate({ dataDir: envDir, env, runCommand: () => { throw new Error("P1001"); } }), { skipped: true, reason: "unreachable" });
   assert.throws(() => migrateDuringSelfUpdate({ dataDir: envDir, env: {}, runCommand: () => {} }), /data dir/);
 
+  // An update arriving during an automatic backup must wait for it, then use
+  // its independently verified stop instead of trying to stop a missing child.
+  let child = { pid: 1 }, finishBackup, markBackupStarted;
+  const backupStarted = new Promise(resolve => { markBackupStarted = resolve; });
+  const backupGate = new Promise(resolve => { finishBackup = resolve; });
+  const stopEvents = [];
+  const stopHost = async () => { assert.ok(child, "a stopped Host cannot be stopped twice"); stopEvents.push("stop"); child = null; };
+  const scheduler = createLocalBackupScheduler({
+    dataDir: envDir,
+    env: { LEXOPEN_BACKUP_INTERVAL_MINUTES: "60" },
+    getChild: () => child,
+    stopHost,
+    startHost: () => { stopEvents.push("start"); child = { pid: 2 }; },
+    waitForHost: async () => true,
+    backup: async () => { stopEvents.push("backup"); markBackupStarted(); await backupGate; stopEvents.push("backup_done"); return { destination: "fixture", removed: [] }; },
+    logger: { log() {}, warn() {} },
+  });
+  const backupRun = scheduler.runNow();
+  await backupStarted;
+  const preparing = stopHostForSelfUpdate({ backupScheduler: scheduler, getChild: () => child, stopHost, assertStopped: async () => { assert.equal(child, null); stopEvents.push("assert_stopped"); } });
+  await Promise.resolve();
+  assert.deepEqual(stopEvents, ["stop", "backup"], "preflight waits until the ongoing backup finishes");
+  finishBackup();
+  await Promise.all([backupRun, preparing]);
+  assert.deepEqual(stopEvents, ["stop", "backup", "backup_done", "assert_stopped"]);
+  await assert.rejects(() => stopHostForSelfUpdate({ getChild: () => null, stopHost, assertStopped: async () => { throw new Error("fixture Host still listening"); } }), /still listening/, "a missing child does not establish that the Host is stopped");
+  child = { pid: 3 };
+  await stopHostForSelfUpdate({ getChild: () => child, stopHost, assertStopped: async () => assert.fail("the normal stop already verifies the Host") });
+  assert.equal(child, null);
+
   const first = fixture("successful");
   const before = git(first.checkout, ["rev-parse", "HEAD"]).trim();
   write(path.join(first.checkout, "personal-notes.txt"), "must survive");
@@ -80,6 +111,19 @@ try {
   assert.equal(fs.readFileSync(path.join(result.backupDirectory, "storage", "document.txt"), "utf8"), "synthetic preserved document");
   assert.deepEqual(first.calls.filter(call => call.cmd !== "git").map(call => call.args.join(" ")), ["ci", "--prefix desktop ci", path.join(first.checkout, "desktop", "node_modules", "electron", "install.js"), "run desktop:build"]);
   assert.equal(result.migrationState, "deferred_to_restart", "migrations only start with the verified build on Host restart");
+  assert.doesNotThrow(() => assertSelfUpdateStartupSafe({ dataDir: first.dataDir, rootDir: first.checkout }));
+  write(path.join(first.checkout, "post-build-changes.txt"), "must be reviewed before migrations");
+  assert.throws(() => assertSelfUpdateStartupSafe({ dataDir: first.dataDir, rootDir: first.checkout }), /no coinciden/, "uncommitted changes after the build must not enter restart migrations");
+  fs.unlinkSync(path.join(first.checkout, "post-build-changes.txt"));
+  write(path.join(first.checkout, ".next", "BUILD_ID"), "stale-build");
+  assert.throws(() => assertSelfUpdateStartupSafe({ dataDir: first.dataDir, rootDir: first.checkout }), /no coinciden/);
+  write(path.join(first.checkout, ".next", "BUILD_ID"), "fixture-build-1");
+  const exactReceipt = fs.readFileSync(statusPath(first.dataDir), "utf8");
+  for (const phase of ["applying", "installing", "building", "migrating", "restarting"]) {
+    write(statusPath(first.dataDir), JSON.stringify({ phase, codeApplied: false }));
+    assert.throws(() => assertSelfUpdateStartupSafe({ dataDir: first.dataDir, rootDir: first.checkout }), /recuperación supervisada/, `${phase} is unsafe after an interrupted coordinator`);
+  }
+  write(statusPath(first.dataDir), exactReceipt);
   assert.equal(finalizeSelfUpdate(first.dataDir, randomUUID(), { ok: true }), false, "foreign receipts cannot finalize");
   assert.equal(finalizeSelfUpdate(first.dataDir, id, { ok: true, version: "1.0.1", buildId: "fixture-build-1", sourceRevision: first.target }), true);
   assert.equal(JSON.parse(fs.readFileSync(statusPath(first.dataDir))).phase, "done");
@@ -92,6 +136,7 @@ try {
   const failed = JSON.parse(fs.readFileSync(statusPath(second.dataDir)));
   assert.equal(failed.phase, "failed"); assert.equal(failed.ok, false); assert.equal(failed.codeApplied, true); assert.equal(failed.recoveryRequired, true);
   assert.equal(failed.rollbackImplemented, false);
+  assert.throws(() => assertSelfUpdateStartupSafe({ dataDir: second.dataDir, rootDir: second.checkout }), /recuperación supervisada/, "restarting the coordinator must not bypass failed-build recovery");
   assert.equal(canRestartPreparedUpdate(failed, failedId), false, "the coordinator must not restart a failed build into migrations");
   assert.equal(canRestartPreparedUpdate({ ...failed, codeApplied: false }, failedId), true);
   assert.equal(canRestartPreparedUpdate({ ...failed, phase: "awaiting_restart" }, failedId), true);
@@ -114,5 +159,5 @@ try {
   assert.throws(() => claimUpdateLock(lockDir, randomUUID()), /Otra actualización/, "age does not remove a live owner's lock");
   assert.equal(releaseUpdateLock(lockDir, randomUUID()), false);
   releaseUpdateLock(lockDir, lockId);
-  console.log("source updater: disposable Git repos, dirty guard, pinned installs, backup integrity, build-before-migration, exact restart and owned locks passed");
+  console.log("source updater: backup/update coordination, disposable Git repos, dirty guard, pinned installs, backup integrity, build-before-migration, exact restart and owned locks passed");
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

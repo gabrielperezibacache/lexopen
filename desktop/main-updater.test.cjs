@@ -11,11 +11,26 @@ async function main() {
   fs.writeFileSync(path.join(dataDir, "pgdata", "PG_VERSION"), "17"); fs.writeFileSync(path.join(dataDir, "storage", "fixture.txt"), "fake preserved content");
   fs.writeFileSync(path.join(dataDir, ".env"), `STORAGE_PATH=${path.join(dataDir, "storage")}\n`);
   const cfg = { ...realConfig.DEFAULTS, dataDir, hostDataDir: dataDir, mode: null };
-  const events = [], intervals = [], status = [], dialogs = [], handlers = new Map(), externalUrls = [];
+  const events = [], intervals = [], status = [], dialogs = [], errors = [], handlers = new Map(), externalUrls = [];
   const packageCalls = [];
+  let cacheClears = 0;
+  let removeCacheAfterBackup = false;
+  let mainMenu;
   let completePreparation;
   const updater = new EventEmitter(); let checks = 0;
-  Object.assign(updater, { verifyUpdateCodeSignature: false, checkForUpdates: async () => { checks++; return {}; }, quitAndInstall: () => events.push("install") });
+  const downloadFile = path.join(tmp, "downloaded.AppImage");
+  const downloadBytes = Buffer.from("fictitious verified installer bytes");
+  const downloadHash = require("node:crypto").createHash("sha512").update(downloadBytes).digest("base64");
+  const prepareDownload = version => {
+    fs.writeFileSync(downloadFile, downloadBytes);
+    updater.downloadedUpdateHelper = {
+      file: downloadFile, versionInfo: { version }, fileInfo: { info: { size: downloadBytes.length, sha512: downloadHash } }, downloadedFileInfo: { sha512: downloadHash },
+      async clear() { cacheClears++; fs.rmSync(downloadFile, { force: true }); this.file = null; this.versionInfo = null; this.fileInfo = null; },
+    };
+  };
+  prepareDownload("1.0.1");
+  const signatureVerifier = async () => null;
+  Object.assign(updater, { verifyUpdateCodeSignature: signatureVerifier, setFeedURL() {}, checkForUpdates: async () => { checks++; return {}; }, quitAndInstall: () => { events.push("install"); app.emit("before-quit"); } });
   const app = new EventEmitter(); Object.assign(app, { isPackaged: true, whenReady: () => Promise.resolve(), getPath: () => tmp, getAppPath: () => path.join(tmp, "app"), quit() {}, exit() {} });
   const windows = [];
   class Window extends EventEmitter {
@@ -29,11 +44,12 @@ async function main() {
   const sandbox = { console, __dirname, process: { env: { LEXOPEN_APP_VERSION: "0.0.1-untrusted" }, resourcesPath: path.join(tmp, "resources"), platform: "linux", pid: process.pid }, URL, Date, AbortSignal, AbortController,
     setTimeout: () => ({ unref() {} }), setInterval: (callback, ms) => { intervals.push({ callback, ms }); return { unref() {} }; }, clearInterval() {},
     fixtureHost: { stop: async () => events.push("stop") },
+    fixtureRestart: async () => events.push("restart"),
     require: name => {
-      if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, async openExternal(url) { externalUrls.push(url); } }, Menu: { buildFromTemplate: value => value, setApplicationMenu() {} }, dialog: { showOpenDialog: async () => assert.fail("Automatic preparation must not show a file chooser"), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => { throw new Error(message); } } };
+      if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, async openExternal(url) { externalUrls.push(url); } }, Menu: { buildFromTemplate: value => value, setApplicationMenu: value => { mainMenu = value; } }, dialog: { showOpenDialog: async () => assert.fail("Automatic preparation must not show a file chooser"), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => errors.push(message) } };
       if (name === "electron-updater") return { autoUpdater: updater };
       if (name === "./config.cjs") return { ...realConfig, readConfig: () => ({ ...cfg }), writeConfig: value => Object.assign(cfg, value), readPackageVersion: () => "1.0.0", readAppState: () => ({}) };
-      if (name === "./backup.cjs") return { ...realBackup, createDataBackup: async (...args) => { events.push("backup"); return realBackup.createDataBackup(...args); } };
+      if (name === "./backup.cjs") return { ...realBackup, createDataBackup: async (...args) => { events.push("backup"); const manifest = await realBackup.createDataBackup(...args); if (removeCacheAfterBackup) fs.unlinkSync(downloadFile); return manifest; } };
       if (name === "./media-permissions.cjs") return { attachMicrophoneGuards() {} };
       if (name === "./altazor-toolpack.cjs") return {
         prepareDesktopToolpack: (version, { resourceRoot, progress, signal }) => {
@@ -104,7 +120,7 @@ async function main() {
     assert.equal(packageCalls.length, 2);
     completePreparation({ state: "package-loaded" });
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(updater.verifyUpdateCodeSignature, true);
+    assert.equal(updater.verifyUpdateCodeSignature, signatureVerifier);
     assert.equal(updater.allowDowngrade, false);
     assert.equal(intervals.some(timer => timer.ms === 6 * 60 * 60 * 1000), true);
     await vm.runInContext("checkForUpdates(true)", context); assert.equal(checks, 1);
@@ -121,12 +137,78 @@ async function main() {
     const backupRoot = realBackup.defaultBackupDirectory(dataDir);
     assert.equal(fs.readdirSync(backupRoot).length, 1);
     assert.equal(dialogs.some(row => /respaldo consistente/.test(row.detail || "")), true);
+    const changeMode = mainMenu[0].submenu.find(item => item.label === "Cambiar modo (asistente)");
+    vm.runInContext("quitting = false; maintenanceActive = true; hostHandle = fixtureHost", context);
+    events.length = 0;
+    changeMode.click();
+    assert.equal(cfg.mode, "host", "maintenance prevents changing the running mode");
+    await handlers.get("desktop:retry")();
+    assert.deepEqual(events, [], "retry cannot restart the Host while the updater is backing up or installing");
+    vm.runInContext("maintenanceActive = false", context);
+    changeMode.click();
+    assert.equal(cfg.mode, null);
+    await vm.runInContext("promptInstallUpdate({version:'1.0.1'})", context);
+    assert.deepEqual(events, ["stop", "backup", "install"], "an active Host is backed up even while its setup assistant is open");
     cfg.mode = "client"; events.length = 0;
     vm.runInContext("quitting = false", context);
     await vm.runInContext("promptInstallUpdate({version:'1.0.1'})", context);
     assert.deepEqual(events, ["install"]);
+    assert.deepEqual(errors, []);
+    cfg.mode = "host"; events.length = 0;
+    vm.runInContext("quitting = false; hostHandle = fixtureHost; restartHostAfterMaintenance = async () => { hostHandle = fixtureHost; await fixtureRestart(); }", context);
+    updater.quitAndInstall = () => { events.push("failed-install"); setImmediate(() => updater.emit("error", new Error("fixture asynchronous installer failure"))); };
+    await vm.runInContext("promptInstallUpdate({version:'1.0.1'})", context);
+    assert.deepEqual(events, ["stop", "backup", "failed-install", "restart"]);
+    assert.equal(vm.runInContext("quitting || maintenanceActive", context), false);
+    assert.match(errors.at(-1), /fixture asynchronous installer failure/);
+    cfg.mode = "client"; cfg.remoteUrl = "http://127.0.0.1:3999"; events.length = 0;
+    vm.runInContext("hostHandle = null; startClientVersionWatch(readConfig().remoteUrl)", context);
+    const clientWatchesBeforeFailure = intervals.filter(timer => timer.ms === 10000).length;
+    await vm.runInContext("promptInstallUpdate({version:'1.0.1'})", context);
+    assert.deepEqual(events, ["failed-install"]);
+    assert.equal(vm.runInContext("clientWatchTimer !== null", context), true);
+    assert.equal(intervals.filter(timer => timer.ms === 10000).length, clientWatchesBeforeFailure + 1, "failed installation resumes the client's Host-version watch");
+    // Follow the actual detection -> download event -> installation event flow.
+    cfg.mode = "client"; events.length = 0;
+    vm.runInContext("hostHandle = null", context);
+    updater.checkForUpdates = async () => { updater.emit("update-available", { version: "1.0.2" }); return {}; };
+    updater.downloadUpdate = async () => { prepareDownload("1.0.2"); events.push("download"); updater.emit("update-downloaded", { version: "1.0.2" }); };
+    updater.quitAndInstall = () => { events.push("install"); app.emit("before-quit"); };
+    const installed = new Promise(resolve => app.once("before-quit", resolve));
+    await vm.runInContext("checkForUpdates(true)", context);
+    await installed;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(events, ["download", "install"]);
+    assert.equal(dialogs.filter(row => row.title === "Actualización disponible").length, 1);
+    assert.equal(status.some(row => row.phase === "update-available" && row.updateVersion === "1.0.2"), true);
+    assert.equal(status.some(row => row.phase === "update-downloaded" && row.updateVersion === "1.0.2"), true);
+    // A cleaned cache must fail before stopping the Host and allow another
+    // normal check/download rather than remaining stuck on a downloaded notice.
+    cfg.mode = "host"; events.length = 0;
+    vm.runInContext("quitting = false; hostHandle = fixtureHost", context);
+    fs.unlinkSync(downloadFile);
+    await vm.runInContext("promptInstallUpdate({version:'1.0.2'})", context);
+    assert.deepEqual(events, [], "missing cache is rejected before Host shutdown");
+    assert.equal(cacheClears, 1);
+    assert.equal(vm.runInContext("updateDownloadedInfo", context), null);
+    cfg.mode = "client";
+    vm.runInContext("hostHandle = null", context);
+    const downloadedAgain = new Promise(resolve => app.once("before-quit", resolve));
+    await vm.runInContext("checkForUpdates(true)", context);
+    await downloadedAgain;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(events, ["download", "install"], "a missing cache can be downloaded again in the same session");
+    cfg.mode = "host"; events.length = 0;
+    vm.runInContext("quitting = false; hostHandle = fixtureHost", context);
+    prepareDownload("1.0.3");
+    removeCacheAfterBackup = true;
+    await vm.runInContext("promptInstallUpdate({version:'1.0.3'})", context);
+    removeCacheAfterBackup = false;
+    assert.deepEqual(events, ["stop", "backup", "restart"], "cache loss during backup blocks the installer and resumes the Host");
+    assert.equal(cacheClears, 2);
+    assert.equal(vm.runInContext("quitting || maintenanceActive", context), false);
     assert.equal(handlers.has("desktop:choose-data-directory"), true);
-    console.log("desktop main fixture: shared window.open/navigation/IPC OAuth policy; periodic preference/progress/package identity/Host stop+verified backup/client install passed");
+    console.log("desktop main fixture: shared window.open/navigation/IPC OAuth policy; update preferences/progress, Host backup, maintenance guards, installation failure recovery and client watch passed");
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

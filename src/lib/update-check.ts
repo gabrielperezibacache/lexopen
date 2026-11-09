@@ -8,6 +8,7 @@ import {
   getGithubRepoSlug,
   isNewerVersion,
   normalizeVersionTag,
+  parseSemver,
 } from "@/lib/app-version";
 
 export type UpdateCheckResult = {
@@ -127,7 +128,7 @@ export async function checkForAppUpdate(opts?: {
       prerelease?: boolean;
     };
 
-    if (body.draft || body.prerelease) {
+    if (body.draft || body.prerelease || parseSemver(body.tag_name)?.prerelease.length) {
       const result: UpdateCheckResult = {
         checked: true,
         updateAvailable: false,

@@ -25,7 +25,8 @@ async function loadFileStore() {
   if (fileCache) return;
   loadingFileStore ??= (async () => {
     try {
-      const raw = await fs.readFile(file, "utf8");
+      // The Host's mutable data store is supplied at runtime, never bundled.
+      const raw = await fs.readFile(/* turbopackIgnore: true */ file, "utf8");
       fileCache = JSON.parse(raw) as Record<string, Bucket>;
     } catch {
       fileCache = {};

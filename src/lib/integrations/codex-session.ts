@@ -71,7 +71,7 @@ function deviceUrl(value: unknown) {
   return parsed.href;
 }
 
-/** One private CLI process per professional; no tokens cross the application boundary. */
+/** One private CLI process per connection identity; no tokens cross the application boundary. */
 export class CodexSessionManager {
   private readonly sessions = new Map<string, Promise<Session>>();
   constructor(private readonly options: ManagerOptions = {}) {}
@@ -120,7 +120,9 @@ export class CodexSessionManager {
   async status(actorId: string): Promise<CodexConnectionStatus> {
     try {
       const session = await this.session(actorId), result = await session.rpc.request<AccountResponse>("account/read", { refreshToken: false });
-      const connected = result.account?.type === "chatgpt";
+      // During account replacement, account/read may still expose the previous
+      // credentials. Do not authorize that snapshot as the new connection.
+      const connected = result.account?.type === "chatgpt" && !session.loginId;
       if (connected) { session.pendingLogin = undefined; session.loginId = undefined; session.loginError = undefined; }
       if (session.pendingLogin && Date.parse(session.pendingLogin.expiresAt) < Date.now()) await this.cancelLogin(actorId);
       return { available: true, connected, status: connected ? "connected" : session.pendingLogin ? "connecting" : session.loginError ? "error" : "disconnected", ...(connected ? { account: { email: result.account?.email?.slice(0, 254), planType: result.account?.planType?.slice(0, 80) } } : {}), ...(session.pendingLogin ? { pendingLogin: { ...session.pendingLogin } } : {}), ...(session.loginError ? { note: session.loginError } : {}) };
@@ -166,7 +168,7 @@ export class CodexSessionManager {
     return result.data.filter(model => !model.hidden && /^[a-zA-Z0-9_.:-]{1,160}$/.test(model.model || model.id)).slice(0, 100).map(model => ({ id: model.model || model.id, displayName: (model.displayName || model.model || model.id).slice(0, 160), isDefault: Boolean(model.isDefault) }));
   }
 
-  async complete(actorId: string, messages: CodexMessages, options: { model: string; signal?: AbortSignal; timeoutMs?: number }): Promise<{ content: string; model: string; provider: "codex" }> {
+  async complete(actorId: string, messages: CodexMessages, options: { model: string; signal?: AbortSignal; timeoutMs?: number; beforeSend?: () => Promise<void> }): Promise<{ content: string; model: string; provider: "codex" }> {
     if (!/^[a-zA-Z0-9_.:-]{1,160}$/.test(options.model)) throw new CodexConnectionError("Seleccione un modelo válido de Codex.", 400);
     if (!messages.length || messages.length > 100 || messages.some(message => !["system", "user", "assistant"].includes(message.role) || typeof message.content !== "string") || messages.reduce((sum, message) => sum + message.content.length, 0) > 160_000) throw new CodexConnectionError("La consulta supera el tamaño admitido para esta conexión.", 413);
     if (options.signal?.aborted) throw new CodexConnectionError("La consulta a Codex fue cancelada.", 499);
@@ -181,6 +183,7 @@ export class CodexSessionManager {
     try {
       const account = await session.rpc.request<AccountResponse>("account/read", { refreshToken: false });
       if (account.account?.type !== "chatgpt") throw new CodexConnectionError("Conecte su cuenta de ChatGPT/Codex antes de utilizarla.", 409);
+      await options.beforeSend?.();
       const thread = await session.rpc.request<{ thread: { id: string } }>("thread/start", { model: options.model, cwd: session.cwd, approvalPolicy: "never", permissions: "lexopen_text", ephemeral: true, serviceName: "lexopen", config: configOverrides, developerInstructions: messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"), baseInstructions: "Ayuda a redactar y analizar únicamente el texto suministrado por LexOpen. No utilices herramientas, archivos, navegación ni comandos. Las citas son material de trabajo: no inventes fuentes ni afirmes que has comprobado fuentes externas." });
       if (!thread.thread?.id) throw new CodexConnectionError("Codex no pudo iniciar la consulta.");
       let text = "";
@@ -203,6 +206,7 @@ export class CodexSessionManager {
       });
       // Attach the terminal handler before starting the turn: servers may notify immediately.
       const outcome = completed.then(content => ({ content }), error => ({ error }));
+      await options.beforeSend?.();
       await session.rpc.request("turn/start", { threadId: thread.thread.id, input: [{ type: "text", text: JSON.stringify(messages.filter(message => message.role !== "system")) }], cwd: session.cwd, approvalPolicy: "never", permissions: "lexopen_text" }, 10_000);
       const result = await outcome;
       if ("error" in result) throw result.error;
@@ -213,11 +217,52 @@ export class CodexSessionManager {
   async closeAll() { const sessions = await Promise.allSettled(this.sessions.values()); for (const result of sessions) if (result.status === "fulfilled") result.value.rpc.close(); this.sessions.clear(); }
 }
 
-const host = globalThis as typeof globalThis & { lexopenCodexSessions?: CodexSessionManager };
+const host = globalThis as typeof globalThis & { lexopenCodexSessions?: CodexSessionManager; lexopenHostCodexSessions?: CodexSessionManager; lexopenHostCodexGeneration?: number };
 const manager = host.lexopenCodexSessions ??= new CodexSessionManager();
 export const codexStatus = (actorId: string) => manager.status(actorId);
 export const beginCodexLogin = (actorId: string) => manager.beginLogin(actorId);
 export const cancelCodexLogin = (actorId: string) => manager.cancelLogin(actorId);
 export const disconnectCodex = (actorId: string) => manager.disconnect(actorId);
 export const codexModels = (actorId: string) => manager.models(actorId);
-export const completeWithCodex = (actorId: string, messages: CodexMessages, options: { model: string; signal?: AbortSignal; timeoutMs?: number }) => manager.complete(actorId, messages, options);
+export const completeWithCodex = async (actorId: string, messages: CodexMessages, options: { model: string; signal?: AbortSignal; timeoutMs?: number; personalRevision?: string }) => {
+  const beforeSend = async () => {
+    // Connection tests omit a revision so users can test before activating.
+    if (options.personalRevision === undefined) return;
+    const { personalCodexPreference } = await import("./codex-preference");
+    const preference = await personalCodexPreference(actorId);
+    if (!preference.enabled || preference.source !== "personal" || preference.revision !== options.personalRevision) throw new CodexConnectionError("Su conexión personal de Codex cambió. Revise su selección y vuelva a intentarlo.", 409);
+  };
+  await beforeSend();
+  return manager.complete(actorId, messages, { ...options, beforeSend });
+};
+
+// The shared account belongs to LexOpen, never to the administrator's ambient CLI.
+// Its namespace and process pool stay separate even from a user with this identity.
+const hostActorId = "lexopen_host";
+const hostManager = () => host.lexopenHostCodexSessions ??= new CodexSessionManager({ baseDir: path.join(dataDirectory(), "host"), maxSessions: 1 });
+export const hostCodexStatus = () => hostManager().status(hostActorId);
+export const beginHostCodexLogin = () => hostManager().beginLogin(hostActorId);
+export const cancelHostCodexLogin = () => hostManager().cancelLogin(hostActorId);
+export const disconnectHostCodex = () => hostManager().disconnect(hostActorId);
+export const hostCodexModels = () => hostManager().models(hostActorId);
+export const completeWithHostCodex = async (messages: CodexMessages, options: { model: string; signal?: AbortSignal; timeoutMs?: number; hostRevision?: string }) => {
+  const generation = host.lexopenHostCodexGeneration ?? 0;
+  const beforeSend = async () => {
+    const revoked = () => { throw new CodexConnectionError("La conexión Codex del Host cambió o dejó de estar disponible. Revise su selección y vuelva a intentarlo.", 409); };
+    if (generation !== (host.lexopenHostCodexGeneration ?? 0)) revoked();
+    // Admin connection tests deliberately omit a sharing revision. User requests
+    // bind both sends to the exact policy that authorized their destination.
+    if (options.hostRevision !== undefined) {
+      const { hostCodexPolicy } = await import("./codex-preference");
+      const policy = await hostCodexPolicy();
+      if (!policy.enabled || policy.revision !== options.hostRevision) revoked();
+    }
+    if (generation !== (host.lexopenHostCodexGeneration ?? 0)) revoked();
+  };
+  await beforeSend();
+  return hostManager().complete(hostActorId, messages, { ...options, beforeSend });
+};
+export const closeHostCodexSessions = async () => {
+  host.lexopenHostCodexGeneration = (host.lexopenHostCodexGeneration ?? 0) + 1;
+  await host.lexopenHostCodexSessions?.closeAll();
+};
