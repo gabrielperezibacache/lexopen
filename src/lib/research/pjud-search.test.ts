@@ -5,6 +5,7 @@ async function main() {
   assert.equal(pjudSearchSchema.safeParse({}).success, false);
   for (const input of [{ rol: "C-3630-2023", page: -1 }, { terms: "hola", page: 20 }, { rol: "anything" }, { terms: "x".repeat(201) }]) assert.equal(pjudSearchSchema.safeParse(input).success, false);
   let sessions = 0;
+  let returnedStart: number | undefined;
   let docs = [{ id: 123, rol_era_sup_s: "C-3630-2023", caratulado_s: "Caso de prueba", gls_juz_s: "Civil" }];
   const fetchMock: typeof fetch = async (url, init) => {
     if (String(url).endsWith("?Civiles")) { sessions++; return new Response('<input name="_token" value="csrf"><script>id_buscador_activo=328</script>', { headers: { "Set-Cookie": `session=${sessions}` } }); }
@@ -12,7 +13,7 @@ async function main() {
     assert.equal(filters.rol, "3630"); assert.equal(filters.era, "2023"); assert.deepEqual(filters.filtros_omnibox, []);
     assert.equal(new Headers(init?.headers).get("cookie"), `session=${sessions}`);
     assert.equal(init?.redirect, "error");
-    return new Response(JSON.stringify({ response: { docs, numFound: 30 } }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ response: { docs, numFound: 30, start: returnedStart } }), { headers: { "Content-Type": "application/json" } });
   };
   const input = { rol: "C-3630-2023", terms: "", page: 0 };
   assert.equal((await searchPublicPjudJudgments(input, { fetch: fetchMock })).items[0].id, "123");
@@ -26,6 +27,11 @@ async function main() {
   await assert.rejects(searchPublicPjudJudgments(input, { fetch: fetchMock }), /incompatibles/);
   docs = [{ ...docs[0], rol_era_sup_s: "3630-2023" }, { ...docs[0], rol_era_sup_s: "3630-2023" }];
   await assert.rejects(searchPublicPjudJudgments(input, { fetch: fetchMock }), /incompatibles/);
+  docs = [{ ...docs[0], rol_era_sup_s: "3630-2023" }];
+  returnedStart = 0;
+  await assert.rejects(searchPublicPjudJudgments({ ...input, page: 1 }, { fetch: fetchMock }), /incompatibles/);
+  returnedStart = 10;
+  assert.equal((await searchPublicPjudJudgments({ ...input, page: 1 }, { fetch: fetchMock })).page, 1);
   const controller = new AbortController(); controller.abort();
   await assert.rejects(searchPublicPjudJudgments(input, { fetch: fetchMock, signal: controller.signal }));
   console.log("PJUD search: page sessions, numeric ROL/year, filter drift rejection, duplicates, limits and cancellation OK");

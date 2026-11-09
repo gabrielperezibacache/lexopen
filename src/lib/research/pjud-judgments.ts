@@ -5,10 +5,16 @@ const BASE = "https://juris.pjud.cl";
 const fail = () => Object.assign(new Error("El Buscador Unificado no entregó un fallo íntegro identificable. Reintente o revise la fuente oficial."), { status: 502, code: "pjud_judgment_unavailable" });
 type Transport = (url: string, init: RequestInit) => Promise<Response>;
 type Reader = (response: Response, signal: AbortSignal, limit: number) => Promise<Buffer>;
+class PjudSessionExpired extends Error {}
+
 /** A fresh anonymous session per request/page prevents observed filter degradation. */
-export async function requestPjudJudgments(filters: Record<string, unknown>, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader, offset = 0) {
+async function requestPjudJudgmentsOnce(filters: Record<string, unknown>, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader, offset = 0) {
   const request = async (path: string, init: RequestInit = {}) => {
     const response = await transport(`${BASE}${path}`, { ...init, redirect: "error", credentials: "omit", cache: "no-store", signal });
+    if (response.status === 419 && path === "/busqueda/buscar_sentencias") {
+      await response.body?.cancel();
+      throw new PjudSessionExpired();
+    }
     if (!response.ok || response.redirected) { await response.body?.cancel(); throw fail(); }
     return response;
   };
@@ -29,6 +35,17 @@ export async function requestPjudJudgments(filters: Record<string, unknown>, tra
   let payload;
   try { payload = JSON.parse(rawBytes.toString("utf8")); } catch { throw fail(); }
   return { payload, rawBytes };
+}
+/** A single CSRF retry starts over: no old cookies/token or old request body survive. */
+export async function requestPjudJudgments(filters: Record<string, unknown>, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader, offset = 0) {
+  for (let attempt = 0; ; attempt++) {
+    if (signal.aborted) throw fail();
+    try { return await requestPjudJudgmentsOnce(filters, transport, signal, maxBytes, read, offset); }
+    catch (error) {
+      if (!(error instanceof PjudSessionExpired)) throw error;
+      if (attempt !== 0 || signal.aborted) throw fail();
+    }
+  }
 }
 export async function fetchPjudJudgment(canonicalUrl: string, id: string, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader): Promise<FetchedLegalSource> {
   const { payload, rawBytes } = await requestPjudJudgments({ id: Number(id) }, transport, signal, maxBytes, read);
