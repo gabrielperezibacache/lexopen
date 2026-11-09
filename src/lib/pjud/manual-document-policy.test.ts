@@ -10,7 +10,7 @@ async function main() {
   const origin = "https://oficinajudicialvirtual.pjud.cl";
   Object.defineProperty(globalThis,"location",{ configurable:true,value:{ origin } });
   let requests = 0, cancelled = 0, readers = 0, chunksRead = 0, responseStatus = 401;
-  let mode: "normal" | "oversized-header" | "oversized-stream" = "normal";
+  let mode: "normal" | "invalid-pdf" | "oversized-header" | "oversized-stream" = "normal";
   const bytes = Buffer.from("%PDF-1.4\n" + "x".repeat(341));
   globalThis.fetch = async (input, options) => {
     requests++; assert.equal(new URL(String(input)).origin, origin); assert.equal(options?.redirect,"error"); assert.equal(options?.credentials,"include");
@@ -19,7 +19,7 @@ async function main() {
       cancel: async () => { cancelled++; },
       getReader: () => { readers++; return { read: async () => {
         if (mode === "oversized-stream") { index++; chunksRead++; return index > 30 ? { done:true } : { done:false,value:new Uint8Array(1024 * 1024) }; }
-        return index++ ? { done:true } : { done:false,value:new Uint8Array(bytes) };
+        return index++ ? { done:true } : { done:false,value:new Uint8Array(mode === "invalid-pdf" ? Buffer.from("Sesión no disponible. " + "x".repeat(341)) : bytes) };
       }, cancel: async () => { cancelled++; }, releaseLock: () => undefined }; },
     } } as unknown as Response;
   };
@@ -33,6 +33,10 @@ async function main() {
     responseStatus=200;
     const result=await withManualPjudInteraction(()=>attachDocumentoBytesFromPage(page,rows,{limit:2,delayMs:0}),{downloadDocuments:true});
     assert.equal(result.filter(row=>row.documentoBytes).length,2); assert.equal(requests,4);
+    mode="invalid-pdf";
+    const invalid=await withManualPjudInteraction(()=>attachDocumentoBytesFromPage(page,rows,{limit:1,delayMs:0}),{downloadDocuments:true});
+    assert.equal(invalid[0].documentoBytes,undefined,"a response advertised as PDF is not stored without the PDF signature");
+    assert.equal(invalid[0].documentoRef,rows[0].documentoRef,"the original reference remains available when the download fails validation");
     mode="oversized-header"; const beforeHeader=readers;
     await withManualPjudInteraction(()=>attachDocumentoBytesFromPage(page,rows,{limit:1,delayMs:0}),{downloadDocuments:true});
     assert.equal(readers,beforeHeader,"advertised oversized bodies are cancelled before a reader is acquired");

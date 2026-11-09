@@ -47,6 +47,16 @@ export function looksLikePdf(buf: Buffer) {
   return buf.subarray(0, 5).toString("utf8") === "%PDF-";
 }
 
+/** Reject login/error pages and files advertised as PDF without a PDF signature. */
+export function validPjudDownloadedContent(bytes: Buffer, contentType: string, ref: string, maximum: number) {
+  if (bytes.length < 100 || bytes.length > maximum || /^\s*</.test(bytes.subarray(0, 40).toString("utf8"))) return false;
+  const pdf = looksLikePdf(bytes);
+  let pdfPath = false;
+  try { pdfPath = new URL(ref).pathname.toLowerCase().endsWith(".pdf"); } catch { return false; }
+  if ((pdfPath || /pdf/i.test(contentType)) && !pdf) return false;
+  return pdf || /msword|officedocument|octet-stream/i.test(contentType);
+}
+
 /** PJUD document hosts only — not arbitrary public HTTPS (SSRF / data exfil). */
 function isAllowedPjudDocumentoHost(hostname: string) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
