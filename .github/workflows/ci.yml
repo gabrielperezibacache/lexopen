@@ -68,11 +68,11 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: .tmp/kitties-upstream/go.mod
           cache: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Prepare real PDF inspection fixture
