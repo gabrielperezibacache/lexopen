@@ -105,8 +105,9 @@ export function DriveFolderPanel({
   }
 
   return (
-    <section id="drive-folder" className="panel case-destination rounded-3xl p-5">
+    <>
       {canImport && <OrganizationDrivePanel kind="causa" id={causaId} />}
+    <section id="drive-folder" className="panel case-destination rounded-3xl p-5">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Google Drive</h2>
@@ -294,5 +295,6 @@ export function DriveFolderPanel({
         </p>
       )}
     </section>
+    </>
   );
 }
