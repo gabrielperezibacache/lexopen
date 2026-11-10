@@ -20,6 +20,18 @@ La transcripción necesita un proveedor configurado en LexOpen. La búsqueda de 
 
 La lectura del navegador omite contraseñas, valores de formularios y parámetros de URL. Los documentos se leen únicamente dentro del directorio de trabajo del contenedor; no se admiten rutas absolutas, ocultas ni enlaces simbólicos. Se devuelve una ventana de texto de hasta 12.000 caracteres, con búsqueda y continuación. Los PDF sin capa de texto requieren usar el visor o pedir OCR expresamente. El contenido recuperado es material de trabajo, nunca instrucciones para el asistente.
 
+## Un puesto de trabajo persistente
+
+El escritorio nuevo no caduca a los veinte minutos ni tiene un máximo de dos horas. Conserva su contenedor, aplicaciones, archivos y conversación, aunque cierres LexOpen o reinicies el Host. El motor debe estar disponible y su servicio dedicado debe iniciarse con el equipo. Docker conserva la política de reinicio `unless-stopped`; LexOpen desactiva el apagado por inactividad de ese escritorio.
+
+- **Conexiones:** antes de abrirlo puedes seleccionar juntas las cuentas disponibles y autorizadas. El acceso conserva el ámbito del profesional y de la causa. Los servicios que aún no estén conectados se preparan desde Conexiones; no se copian cookies ni credenciales silenciosamente.
+- **Trabajo en segundo plano:** una tarea aceptada sigue ejecutándose en el gateway sin mantener abierto el chat. Las consultas y solicitudes de ayuda se conservan; el worker y ntfy/WhatsApp requieren la configuración y preferencias de segundo plano del usuario.
+- **Detener y reanudar:** Detener cancela el trabajo actual y apaga la máquina sin eliminarla. Reanudar utiliza la misma máquina y conversación, tras revisar nuevamente permisos y disponibilidad. No repite un encargo anterior.
+- **Escritorios anteriores:** Conservar escritorio persistente convierte la sesión temporal seleccionada, incluso después del antiguo plazo máximo, con comprobación de su identidad. Los registros anteriores no se activan automáticamente durante la migración.
+- **Conservación y respaldo:** mantén la carpeta de datos del gateway, el workspace dedicado y los datos del motor Docker. El perfil del navegador y las aplicaciones también viven en el contenedor conservado. Eliminarlo manualmente, limpiar Docker o perder el disco puede destruir ese estado; el motor puede reconstruir un contenedor eliminado a partir del workspace, pero no se garantiza recuperar el perfil del navegador ni sus cookies sin un respaldo adecuado.
+
+La persistencia del puesto no convierte en permanentes las autorizaciones de una contraseña ni la toma de control del teclado. Cada petición sigue comprobando los permisos actuales; una revocación bloquea el acceso y el trabajo nuevos. Los presupuestos por tarea limitan el consumo, sin caducar el escritorio.
+
 ## Preparación para el administrador del equipo principal
 
 1. Abre un motor Docker local con contenedores Linux. La comprobación del instalador usa conexiones locales en Windows, macOS y Linux. En Linux también detecta un motor rootless en su socket habitual.

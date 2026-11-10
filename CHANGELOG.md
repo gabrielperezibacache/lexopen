@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0-preview.10 — 2026-11-09
+
+- Escritorios nuevos sin caducidad de acceso ni apagado por inactividad; conservar o reanudar el mismo contenedor y conversación con comprobación de permisos.
+- Sesiones temporales anteriores: conversión explícita a persistentes, sin el antiguo máximo de dos horas. Migración compatible que conserva sus datos y autorizaciones previas.
+- Selección conjunta de conexiones disponibles, estado persistente visible y conservación de la ayuda en segundo plano.
+- Autorizaciones de secretos, control manual y presupuestos por tarea mantienen sus límites independientes.
+- Validación de conservación de archivos y carpeta personal tras detener/reanudar, identidad del contenedor, historial, permisos y ausencia de reenvío de tareas.
+
 ## 1.1.0-preview.9 — 2026-11-09
 
 - Google compartido: una autorización del estudio para Drive, Calendar y Gmail; selección de Organización y preparación de carpetas por cliente, causa, espacio y usuario, con permisos y recuperación de escrituras inciertas.

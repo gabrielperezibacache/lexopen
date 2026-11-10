@@ -14,7 +14,7 @@ async function main() {
   process.env.ALTAZOR_COMPUTER_ENABLED = "1";
   let requests = 0, puts = 0, loseNextPut = false, gateReady = true, loseNextApproval = false, approvalPosts = 0, messages = 0;
   const lifecycle: string[] = [];
-  const fleet: { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string }[] = [];
+  const fleet: { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string; auto_off_minutes?: number }[] = [];
   const chats = new Map<string, { id: string; members: string[]; turns: { from: string; text: string }[] }>();
   const approvals: { id: string; kitty: string; chat: string; connector: string; kind: string; action: string; args: Record<string, unknown>; summary: string; status: string; at: string; always?: boolean }[] = [];
   const configured: { name: string; kind: string; settings: Record<string, string>; secrets_set: string[]; needs_sign_in: boolean; auth: string }[] = [];
@@ -35,7 +35,7 @@ async function main() {
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {
       lifecycle.push(`create:${body.start}`);
-      const kitty = { id: `kitty-${fleet.length + 1}`, name: body.name, provider: body.provider, desktop: true, container: `kitty-${body.name}`, status: body.start ? "running" : "created", connectors: body.connectors, approvals: "ask", backup: "" }; fleet.push(kitty); result = { kitty };
+      const kitty = { auto_off_minutes: 0, id: `kitty-${fleet.length + 1}`, name: body.name, provider: body.provider, desktop: true, container: `kitty-${body.name}`, status: body.start ? "running" : "created", connectors: body.connectors, approvals: "ask", backup: "" }; fleet.push(kitty); result = { kitty };
     }
     else if (path === "/v1/chats" && method === "POST") {
       const kitty = fleet.find(row => row.name === body.members[0]); assert.ok(kitty);

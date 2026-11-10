@@ -1,3 +1,4 @@
+import { activeComputerSessionWhere } from "../computer/lifecycle";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
@@ -28,7 +29,7 @@ export async function reconcileComputerHelp(options: { limit?: number; ownerId?:
   const policy = await client.firmSettings.findFirst({ select: { assistantLlmMode: true } });
   if (policy?.assistantLlmMode === "local_only") return result;
   const sessions = await client.altazorComputerSession.findMany({
-    where: { ...(options.ownerId ? { ownerId: options.ownerId } : {}), state: { in: ["ready", "starting"] }, expiresAt: { gt: new Date() }, workspace: { enabled: true } },
+    where: { ...(options.ownerId ? { ownerId: options.ownerId } : {}), state: { in: ["ready", "starting"] }, ...activeComputerSessionWhere(), workspace: { enabled: true } },
     include: { workspace: true, owner: { select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true, altazorCompanion: { select: { backgroundEnabled: true } } } } },
     orderBy: { updatedAt: "asc" }, take: Math.min(100, Math.max(1, options.limit ?? 20)),
   });

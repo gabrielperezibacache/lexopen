@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import type { ComputerSessionSummary, VerifiedComputerFile } from "../src/lib/altazor/computer/types";
 import { loginAs } from "./helpers";
 
-const session: ComputerSessionSummary = { id: "verified-files-ui-fixture", state: "ready", expiresAt: "2031-05-06T18:00:00Z", renewableUntil: "2031-05-06T19:00:00Z", canRenew: false, held: false, createdAt: "2031-05-06T17:00:00Z", connectors: ["altazor-google-0123456789abcdef"], requiresStop: true };
+const session: ComputerSessionSummary = { id: "verified-files-ui-fixture", state: "ready", expiresAt: "2031-05-06T18:00:00Z", persistent: false, renewableUntil: "2031-05-06T19:00:00Z", canRenew: false, held: false, createdAt: "2031-05-06T17:00:00Z", connectors: ["altazor-google-0123456789abcdef"], requiresStop: true };
 const file: VerifiedComputerFile = { state: "desktop_verified", requestId: "owned-ui-request", approvalId: "owned-ui-approval", chatId: "owned-ui-chat", kittyId: "owned-ui-kitty", connector: session.connectors[0], kind: "google-workspace", action: "download_file", target: { id: "synthetic-document" }, localPath: `/home/kitty/work/imports/${"a".repeat(64)}/Programa.pdf`, name: "Programa.pdf", bytes: 4200, sha256: "a".repeat(64), pages: 3 };
 const frame = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64");
 async function fixture(page: Page, verifiedFiles: VerifiedComputerFile[], connectors = session.connectors) {

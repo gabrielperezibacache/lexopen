@@ -2997,7 +2997,7 @@ model AltazorComputerSession {
   chatId String?
   state String @default("creating")
   held Boolean @default(false)
-  expiresAt DateTime
+  expiresAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   actions AltazorComputerAction[]

@@ -56,7 +56,7 @@ async function main() {
     for(let i=0;i<3;i++){
       const id=randomUUID(),causaId=i===2?null:cases[i].id,scopeKey=causaId?`causa:${causaId}`:"personal",endpoint=`http://127.0.0.1:${32000+i+Math.floor(Math.random()*1000)}`;
       const workspace=await prisma.altazorComputerWorkspace.create({data:{id,ownerId:owner.id,causaId,scopeKey,endpoint,providerName:"separate-model",enabled:true,dedicatedDeclaredAt:new Date(),credentialEnc:seal({token:"fictitious-desktop-tool-token"},`altazor:computer:${owner.id}:${id}:${scopeKey}`)}});workspaceIds.push(workspace.id);
-      const session=await prisma.altazorComputerSession.create({data:{ownerId:owner.id,workspaceId:id,requestId:`session-${prefix}-${i}`,kittyId:`kitty-${i}`,kittyName:`altazor-tool-${prefix}-${i}`,chatId:`chat-${i}`,state:"ready",connectorNamesJson:'["clima"]',expiresAt:new Date(Date.now()+300000)}});sessions.push(session);
+      const session=await prisma.altazorComputerSession.create({data:{ownerId:owner.id,workspaceId:id,requestId:`session-${prefix}-${i}`,kittyId:`kitty-${i}`,kittyName:`altazor-tool-${prefix}-${i}`,chatId:`chat-${i}`,state:"ready",connectorNamesJson:'["clima"]',expiresAt:null}});sessions.push(session);
       snapshots.set(endpoint,{kitty:{id:session.kittyId,name:session.kittyName,provider:"separate-model",desktop:true,container:`kitty-${session.kittyName}`,status:"running",connectors:["clima"],approvals:"ask",backup:""},chat:{id:session.chatId,members:[session.kittyId],turns:[]}});
     }
     const ctx: ToolContext={userId:owner.id,role:"abogado",chatId:conversation.id,scope:{causaId:cases[0].id}};

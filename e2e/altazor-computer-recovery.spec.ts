@@ -10,7 +10,7 @@ const workspaceId = "desktop-recovery-fixture";
 const frame = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64");
 const emptyInventory: ConnectorInventory = { catalog: [], connections: [], gateReady: true, version: "synthetic-fixture" };
 function session(id: string, state = "ready"): ComputerSessionSummary {
-  return { id, state, expiresAt: "2030-05-06T18:00:00Z", renewableUntil: "2030-05-06T19:00:00Z", canRenew: false,
+  return { id, state, expiresAt: "2030-05-06T18:00:00Z", persistent: false, renewableUntil: "2030-05-06T19:00:00Z", canRenew: false,
     held: false, createdAt: "2030-05-06T17:00:00Z", connectors: [], requiresStop: state !== "closed" };
 }
 function computer(sessions: ComputerSessionSummary[]): ComputerStatus {
@@ -122,7 +122,7 @@ test("una sesión pasa de iniciándose a disponible también en el selector y co
     await firstRead!.fulfill({ json: { session: ready, runtime: "container", kittyStatus: "running", working: false, approvals: [], turns: [] } });
     firstRead = undefined;
     await expect(picker.locator("option:checked")).toContainText("Escritorio disponible");
-    await expect(panel.getByRole("button", { name: "Mantener sesión 20 min", exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Conservar escritorio persistente", exact: true })).toBeVisible();
     await expect(panel.getByRole("button", { name: "Devolver control", exact: true })).toBeEnabled();
     await expect(start).toBeDisabled();
     await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
@@ -146,7 +146,7 @@ test("una apertura sin confirmar recupera la sesión pendiente y permite detener
     starts++; created = true;
     return route.fulfill({ status: 503, json: { error: "No se pudo confirmar la apertura del escritorio ficticio." } });
   });
-  await page.route(`**/api/altazor/computer/sessions/${uncertain.id}`, route => route.fulfill({ json: { session: { ...uncertain, state: closed ? "closed" : "unknown" }, approvals: [], turns: [] } }));
+  await page.route(`**/api/altazor/computer/sessions/${uncertain.id}`, route => route.fulfill({ json: { session: { ...uncertain, state: closed ? "closed" : "unknown", requiresStop: !closed }, approvals: [], turns: [] } }));
   await page.route(`**/api/altazor/computer/sessions/${uncertain.id}/actions`, route => {
     expect(route.request().postDataJSON().action).toBe("close");
     stops++; closed = true;
@@ -257,4 +257,35 @@ test("una prueba de acceso confirma sólo esa cuenta y se invalida al actualizar
   await expect(saved("ntfy-primary")).toBeVisible(); await expect(saved("ntfy-secondary")).toBeVisible();
   await expect(verified).toHaveCount(0);
   expect(mutations).toEqual(["POST /api/altazor/connectors/ntfy-primary/test"]);
+});
+
+test("escritorio persistente: conserva la sesión tras recargar y reanuda la misma máquina", async ({ page }) => {
+  const desktop = { ...session("persistent-desktop-fixture"), persistent: true, expiresAt: null, renewableUntil: null, createdAt: "2000-01-01T00:00:00Z" };
+  let stopped = false, resumes = 0;
+  await idleActivity(page);
+  await page.route(`**/api/altazor/connectors?workspaceId=${workspaceId}`, route => route.fulfill({ json: { connectors: emptyInventory } }));
+  const current = () => ({ ...desktop, state: stopped ? "closed" : "ready", requiresStop: !stopped });
+  await page.route(/\/api\/altazor\/computer(?:\?.*)?$/, route => route.fulfill({ json: { computer: computer([current()]) } }));
+  await page.route(`**/api/altazor/computer/sessions/${desktop.id}`, route => route.fulfill({ json: { session: current(), runtime: "container", kittyStatus: stopped ? "stopped" : "running", working: false, approvals: [], turns: [] } }));
+  await page.route(`**/api/altazor/computer/sessions/${desktop.id}/screenshot?*`, route => route.fulfill({ body: frame, contentType: "image/png" }));
+  await page.route(`**/api/altazor/computer/sessions/${desktop.id}/actions`, async route => {
+    const body = route.request().postDataJSON();
+    expect(["close", "resume"]).toContain(body.action);
+    if (body.action === "resume") resumes++;
+    stopped = body.action === "close";
+    await route.fulfill({ json: { action: { id: body.requestId, status: "completed", result: { persistent: true, stopped: stopped } } } });
+  });
+  await loginAs(page, "abogado@estudio.cl");
+  await page.goto(`/inicio?altazor=computer&escritorio=${desktop.id}`);
+  const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true }).filter({ has: page.getByLabel("Sesión de este espacio", { exact: true }) });
+  await expect(panel.getByText(/Escritorio persistente · sin vencimiento automático/)).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Conservar escritorio persistente", exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(desktop.id);
+  await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
+  await expect(panel.getByText(/El escritorio está detenido/)).toBeVisible();
+  await panel.getByRole("button", { name: "Reanudar el mismo escritorio", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Tomar control", exact: true })).toBeEnabled();
+  await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(desktop.id);
+  expect(resumes).toBe(1);
 });

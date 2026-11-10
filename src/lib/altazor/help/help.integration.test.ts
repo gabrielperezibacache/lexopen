@@ -29,7 +29,7 @@ async function main() {
     ids.push(owner.id, other.id, admin.id);
     organizationId = (await client.organization.create({ data: { name: "Help fixture", settings: { create: { assistantLlmMode: "remote_allowed", require2faPrivileged: false } } } })).id;
     const workspace = await client.altazorComputerWorkspace.create({ data: { ownerId: owner.id, scopeKey: "personal", endpoint: `https://${tag}.fixture.invalid`, providerName: "fixture", enabled: true, dedicatedDeclaredAt: new Date() } }); workspaceId = workspace.id;
-    const session = await client.altazorComputerSession.create({ data: { ownerId: owner.id, workspaceId, requestId: tag, kittyName: `help-${tag}`, state: "ready", expiresAt: new Date(Date.now() + 60 * 60_000) } }); sessionId = session.id;
+    const session = await client.altazorComputerSession.create({ data: { ownerId: owner.id, workspaceId, requestId: tag, kittyName: `help-${tag}`, state: "ready", expiresAt: null } }); sessionId = session.id;
     const input = { requestKey: `session:${session.id}:turn:1:fingerprint`, question: "Private document fixture that must never leave the Host", computerSessionId: session.id, computerTurnId: "1", scopeKind: "workspace" as const, scopeId: workspace.id };
     const request = await createHelpRequest(owner, input, client);
     assert.equal((await createHelpRequest(owner, input, client)).id, request.id, "detecting the same help does not create another request");
@@ -143,7 +143,7 @@ async function main() {
     assert.equal(publishCalls, beforeChannelSetup + 1, "a completed notification is not repeated after configuration changes");
 
     let resumes = 0, answerOnPoll = false, outcome = "completed", readCount = 0, changeDuringPoll = false;
-    const view: ComputerSessionView = { runtime: "container", kittyStatus: "running", working: true, approvals: [], session: { id: session.id, state: "ready", held: false, expiresAt: session.expiresAt.toISOString(), renewableUntil: session.expiresAt.toISOString(), canRenew: true, createdAt: session.createdAt.toISOString(), connectors: [] }, turns: [{ index: 10, from: "assistant", text: "Plan inicial que no cambia.", working: true, needsHelp: false, help: { stepIndex: 0, question: "Necesito una indicación para continuar." }, steps: [{ action: "ask_help", at: new Date().toISOString() }] }] };
+    const view: ComputerSessionView = { runtime: "container", kittyStatus: "running", working: true, approvals: [], session: { id: session.id, state: "ready", held: false, expiresAt: null, persistent: true, renewableUntil: null, canRenew: false, createdAt: session.createdAt.toISOString(), connectors: [] }, turns: [{ index: 10, from: "assistant", text: "Plan inicial que no cambia.", working: true, needsHelp: false, help: { stepIndex: 0, question: "Necesito una indicación para continuar." }, steps: [{ action: "ask_help", at: new Date().toISOString() }] }] };
     const deps = {
       client,
       read: async () => { readCount++; if (changeDuringPoll && readCount % 2 === 0) return { ...view, turns: [{ ...view.turns[0], help: { stepIndex: view.turns[0].help!.stepIndex + 1, question: "La pregunta cambió durante la consulta." } }] }; return structuredClone(view); },

@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { createSecret } from "@/lib/altazor/secrets/service";
 import { configureComputer, computerScreenshot, computerStatus, controlComputer, prepareComputerSecret, readComputerActivity, renewComputerSession, typeComputerSecret } from "./service";
-import { COMPUTER_LIMITS } from "./policy";
 
 const denied = (expected: number) => (error: unknown) => Number((error as { status?: number }).status) === expected;
 async function main() {
@@ -45,7 +44,7 @@ async function main() {
     const configured = await configureComputer(owner, { causaId: causa.id, endpoint: "http://127.0.0.1:18849", token: "fictitious-renewal-token", provider: "renewal-model", dedicated: true });
     assert.ok(configured.workspaceId); workspaces.push(configured.workspaceId);
     const session = await prisma.altazorComputerSession.create({ data: { ownerId: owner.id, workspaceId: configured.workspaceId, requestId: `session-${stamp}`, kittyId: "renewal-kitty", kittyName: `renewal-${stamp}`, chatId: chat.id, state: "ready", expiresAt: new Date(Date.now() + 60_000) } });
-    kitty = { id: session.kittyId, name: session.kittyName, provider: "renewal-model", desktop: true, container: "renewal-container", connectors: ["-"], approvals: "ask", backup: "", status: "running" };
+    kitty = { auto_off_minutes: 0, id: session.kittyId, name: session.kittyName, provider: "renewal-model", desktop: true, container: "renewal-container", connectors: ["-"], approvals: "ask", backup: "", status: "running" };
     const request = (suffix: string) => ({ requestId: `renew-${stamp}-${suffix}`, causaId: causa.id, confirmed: true as const });
     await assert.rejects(renewComputerSession(owner, session.id, { ...request("unconfirmed"), confirmed: false as unknown as true }), denied(400));
     await assert.rejects(renewComputerSession(other, session.id, request("foreign")), denied(404));
@@ -74,16 +73,15 @@ async function main() {
     const saved = await createSecret(owner, { requestId: `secret-${stamp}`, name: "Fictitious renewal secret", provider: "Fixture", kind: "password", value: "not-an-account-password" });
     const target = { sessionId: session.id, origin: "https://fixture.invalid", field: "password" as const, fieldLabel: "Declared fixture field" };
     const grant = await prepareComputerSecret(owner, session.id, { requestId: `grant-${stamp}`, secretId: saved.secret.id, revision: saved.secret.revision, target, confirmed: true });
-    const beforeRenew = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } }), beforeMutations = mutationCount, beforeTime = Date.now();
+    const beforeRenew = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } }), beforeMutations = mutationCount;
     const renewed = await renewComputerSession(owner, session.id, request("first"));
     assert.equal(renewed.status, "completed");
     const afterRenew = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } });
     assert.equal(afterRenew.kittyId, beforeRenew.kittyId); assert.equal(afterRenew.chatId, beforeRenew.chatId); assert.equal(afterRenew.kittyName, beforeRenew.kittyName);
-    assert.ok(afterRenew.updatedAt > beforeRenew.updatedAt); assert.ok(afterRenew.expiresAt.getTime() >= beforeTime + COMPUTER_LIMITS.sessionMs);
-    assert.ok(afterRenew.expiresAt.getTime() <= Date.now() + COMPUTER_LIMITS.sessionMs); assert.equal(mutationCount, beforeMutations);
+    assert.ok(afterRenew.updatedAt > beforeRenew.updatedAt); assert.equal(afterRenew.expiresAt, null); assert.equal(mutationCount, beforeMutations);
     await assert.rejects(typeComputerSecret(owner, session.id, { grantId: grant.id, target, confirmed: true }), denied(409)); assert.equal(typed, 0);
     assert.deepEqual(await renewComputerSession(owner, session.id, request("first")), renewed);
-    assert.equal((await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } })).expiresAt.getTime(), afterRenew.expiresAt.getTime());
+    assert.equal((await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } })).expiresAt, null);
     const concurrent = await Promise.all([renewComputerSession(owner, session.id, request("concurrent")), renewComputerSession(owner, session.id, request("concurrent"))]);
     assert.deepEqual(concurrent[0], concurrent[1]);
     let release!: () => void, reached!: () => void;
@@ -95,7 +93,7 @@ async function main() {
     const changedSession = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } });
     release(); await assert.rejects(staleRenewal, denied(409));
     const afterStale = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } });
-    assert.equal(afterStale.updatedAt.getTime(), changedSession.updatedAt.getTime()); assert.equal(afterStale.expiresAt.getTime(), changedSession.expiresAt.getTime());
+    assert.equal(afterStale.updatedAt.getTime(), changedSession.updatedAt.getTime()); assert.equal(afterStale.expiresAt, changedSession.expiresAt);
     await controlComputer(owner, session.id, `hold-before-expiry-${stamp}`, true);
     await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { updatedAt: new Date(Date.now() - 6 * 60_000) } });
     assert.equal((await renewComputerSession(owner, session.id, request("aged-manual-control"))).status, "completed");
@@ -111,17 +109,16 @@ async function main() {
     await prisma.altazorComputerSession.update({ where: { id: conflicting.id }, data: { expiresAt: new Date(0) } });
     await assert.rejects(renewComputerSession(owner, session.id, request("parallel-expired-but-not-stopped")), denied(409));
     await prisma.altazorComputerSession.update({ where: { id: conflicting.id }, data: { state: "closed" } });
-    const cappedCreated = new Date(Date.now() - COMPUTER_LIMITS.renewalWindowMs + 60_000);
+    const cappedCreated = new Date(Date.now() - (2 * 60 * 60_000) + 60_000);
     await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { state: "ready", createdAt: cappedCreated } });
-    const cap = cappedCreated.getTime() + COMPUTER_LIMITS.renewalWindowMs;
-    for (const suffix of ["cap-one", "cap-two"]) { const capped = await renewComputerSession(owner, session.id, request(suffix)); assert.equal(capped.result?.expiresAt, new Date(cap).toISOString()); }
-    assert.equal((await computerStatus(owner, causa.id, false, session.id)).sessions.find(row => row.id === session.id)?.canRenew, true);
-    await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { createdAt: new Date(Date.now() - COMPUTER_LIMITS.renewalWindowMs - 1) } });
-    await assert.rejects(renewComputerSession(owner, session.id, request("late-new")), denied(410));
-    await assert.rejects(renewComputerSession(owner, session.id, request("cap-two")), denied(410));
+    for (const suffix of ["cap-one", "cap-two"]) { const capped = await renewComputerSession(owner, session.id, request(suffix)); assert.equal(capped.result?.expiresAt, null); }
     assert.equal((await computerStatus(owner, causa.id, false, session.id)).sessions.find(row => row.id === session.id)?.canRenew, false);
-    assert.equal(await prisma.altazorComputerAction.count({ where: { ownerId: owner.id, kind: "renew" } }), 6);
-    console.log("Renewal PG PASS: explicit human approval, same Kitty/chat, 20min expiry, sequential/concurrent replay once, stale preflight CAS denial, expired starting recovery, 2h cap across fresh IDs, late/revoked/foreign/scope/policy/closed/unknown/gateway/parallel denial, grants invalidated; zero renewal gateway mutations. Fictitious only.");
+    await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { createdAt: new Date(Date.now() - (2 * 60 * 60_000) - 1) } });
+    assert.equal((await renewComputerSession(owner, session.id, request("late-new"))).status, "completed");
+    assert.equal((await renewComputerSession(owner, session.id, request("cap-two"))).status, "completed");
+    assert.equal((await computerStatus(owner, causa.id, false, session.id)).sessions.find(row => row.id === session.id)?.canRenew, false);
+    assert.equal(await prisma.altazorComputerAction.count({ where: { ownerId: owner.id, kind: "renew" } }), 7);
+    console.log("Renewal PG PASS: explicit human approval, same Kitty/chat, persistent lifetime, sequential/concurrent replay once, stale preflight CAS denial, expired starting recovery, no cap across fresh IDs or old desktops, revoked/foreign/scope/policy/closed/unknown/gateway/parallel denial, grants invalidated; zero renewal gateway mutations. Fictitious only.");
   } finally {
     globalThis.fetch = originalFetch;
     await prisma.altazorSecret.deleteMany({ where: { ownerId: { in: users } } }); await prisma.altazorSecretReceipt.deleteMany({ where: { ownerId: { in: users } } });

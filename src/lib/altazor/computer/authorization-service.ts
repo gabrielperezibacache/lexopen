@@ -1,3 +1,4 @@
+import { computerSessionExpired, activeComputerSessionWhere } from "./lifecycle";
 import { prisma } from "@/lib/db";
 import type { AltazorComputerWorkspace, AltazorComputerSession, Prisma, PrismaClient } from "@prisma/client";
 import { altazorActor, altazorScopeKey } from "../access";
@@ -66,7 +67,7 @@ async function activeSession(workspace: AltazorComputerWorkspace, db: DB = prism
 }
 async function writableSession(session: AltazorComputerSession | null, client: KittiesGateway, binding: string, db: DB = prisma) {
   if (!session) return null;
-  if (session.state !== "ready" || !session.chatId || !session.kittyId || session.expiresAt.getTime() <= Date.now()) throw new ConnectorError("computer_policy_session", "Espera a que abra el escritorio o detén el anterior antes de cambiar autorizaciones.", 409);
+  if (session.state !== "ready" || !session.chatId || !session.kittyId || computerSessionExpired(session)) throw new ConnectorError("computer_policy_session", "Espera a que abra el escritorio o detén el anterior antes de cambiar autorizaciones.", 409);
   if (session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelve el control al asistente antes de cambiar autorizaciones.", 409);
   if (await db.altazorComputerAction.count({ where: { sessionId: session.id, ownerId: session.ownerId, kind: { in: ["message", "computer_use_approval"] }, status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("task_unconfirmed", "Hay una tarea en curso o sin confirmar. Compruébala o detén el escritorio antes de cambiar autorizaciones.", 409);
   const chat = await client.chat(session.chatId, session.kittyId);
@@ -98,7 +99,7 @@ export async function readAuthorizationForSession(user: CausaAccessUser, workspa
   const base: ComputerAuthorizationView = { workspaceId: workspace.id, revision: value?.revision ?? 0, desired: fields(value?.choice ?? DEFAULT_COMPUTER_AUTHORIZATION), applied: null, sessionId: session?.id ?? null, state: value ? "saved" : "default", canConfigure: editable, ...(reason ? { reason } : {}) };
   try {
     await client.requireComputerUsePolicy();
-    if (session && session.chatId && session.kittyId && session.state === "ready" && session.expiresAt.getTime() > Date.now()) {
+    if (session && session.chatId && session.kittyId && session.state === "ready" && !computerSessionExpired(session)) {
       const native = await client.computerAuthorization(session.chatId, session.kittyId, computerAuthorizationBinding(workspace));
       base.applied = native;
       const acknowledged = await sessionAck(workspace, session);
@@ -180,7 +181,7 @@ export async function applySavedComputerAuthorization(user: CausaAccessUser, wor
   await prisma.$transaction(async tx => {
     await lockActor(user, tx); await broker.lockWorkspace(workspace, user, tx); await broker.policyAllowsAction(tx);
     const current = await saved(workspace, tx);
-    const session = await tx.altazorComputerSession.findFirst({ where: { id: sessionId, ownerId: workspace.ownerId, workspaceId: workspace.id, kittyId, state: "starting", chatId: null, expiresAt: { gt: new Date() } } });
+    const session = await tx.altazorComputerSession.findFirst({ where: { id: sessionId, ownerId: workspace.ownerId, workspaceId: workspace.id, kittyId, state: "starting", chatId: null, ...activeComputerSessionWhere() } });
     if (!session || !current || current.signature !== value.signature || (await operation(current, tx))?.status !== "completed") throw new ConnectorError("computer_policy_changed", "La elección cambió durante la apertura del escritorio.", 409);
     const native = await client.computerAuthorization(chatId, kittyId, computerAuthorizationBinding(workspace));
     const ack = await client.setComputerAuthorization(chatId, kittyId, computerAuthorizationBinding(workspace), current.choice, native.revision);

@@ -5,10 +5,9 @@ import type { AltazorComputerSession } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { cancelComputerSecret, cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, decideComputerApproval, disableComputer, inputComputer, readComputerSession, renewComputerSession, sendComputerMessage } from "./service";
-import { COMPUTER_LIMITS } from "./policy";
 
 const denied = (status: number) => (error: unknown) => Number((error as { status?: number }).status) === status;
-type Kitty = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
+type Kitty = { auto_off_minutes?: number; id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
 type Chat = { id: string; members: string[]; turns: unknown[] };
 async function main() {
   assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
@@ -56,7 +55,7 @@ async function main() {
     const makeSession = async (label: string, extra: Partial<Pick<AltazorComputerSession, "state" | "kittyId" | "chatId" | "createdAt" | "expiresAt">> = {}) => {
       sequence++; const id = `cleanup-kitty-${sequence}`, chatId = `cleanup-chat-${sequence}`;
       const row = await prisma.altazorComputerSession.create({ data: { ownerId: owner.id, workspaceId: configured.workspaceId!, requestId: `${stamp}-${label}`, kittyName: `cleanup-${label}-${stamp}`, kittyId: id, chatId, state: "ready", held: true, expiresAt: new Date(Date.now() - 1), ...extra } });
-      fleets.get("http://127.0.0.1:18850")!.push({ id, name: row.kittyName, provider: "cleanup-model", desktop: true, container: `cleanup-container-${sequence}`, status: "running", connectors: ["-"], approvals: "ask", backup: "" });
+      fleets.get("http://127.0.0.1:18850")!.push({ auto_off_minutes: 0, id, name: row.kittyName, provider: "cleanup-model", desktop: true, container: `cleanup-container-${sequence}`, status: "running", connectors: ["-"], approvals: "ask", backup: "" });
       chats.set(chatId, { id: chatId, members: [id], turns: [] }); return row;
     };
     const request = (label: string) => `${stamp}-${label}`;
@@ -88,18 +87,18 @@ async function main() {
     await prisma.firmSettings.update({ where: { id: policyId }, data: { assistantLlmMode: "local_only" } });
     const cancelled = await cancelComputerTask(owner, session.id, request("cancel")); assert.equal(cancelled.status, "completed"); assert.equal(cancelled.result?.cancelled, true);
     const afterCancel = calls; assert.deepEqual(await cancelComputerTask(owner, session.id, request("cancel")), cancelled); assert.equal(calls, afterCancel);
-    assert.equal((await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } })).expiresAt.getTime(), session.expiresAt.getTime());
+    assert.equal((await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } })).expiresAt!.getTime(), session.expiresAt!.getTime());
     const closed = await closeComputerSession(owner, session.id, request("close")); assert.equal(closed.status, "completed"); assert.equal(closed.result?.stopped, true);
     const stopped = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } });
-    assert.equal(stopped.state, "closed"); assert.equal(stopped.held, false); assert.equal(stopped.expiresAt.getTime(), session.expiresAt.getTime());
+    assert.equal(stopped.state, "closed"); assert.equal(stopped.held, false); assert.equal(stopped.expiresAt!.getTime(), session.expiresAt!.getTime());
     assert.equal((await computerStatus(owner, causa.id, false, session.id)).sessions.find(row => row.id === session.id)?.state, "closed");
     const afterClose = calls; assert.deepEqual(await closeComputerSession(owner, session.id, request("close")), closed); assert.equal(calls, afterClose);
     await assert.rejects(closeComputerSession(owner, session.id, request("closed-again")), denied(409));
     await assert.rejects(cancelComputerTask(owner, session.id, request("closed-cancel")), denied(409)); assert.equal(calls, afterClose);
     await assert.rejects(cancelComputerTask(owner, session.id, request("close")), denied(409)); assert.equal(calls, afterClose);
     await prisma.firmSettings.update({ where: { id: policyId }, data: { assistantLlmMode: "remote_allowed" } });
-    const late = await makeSession("late", { createdAt: new Date(Date.now() - COMPUTER_LIMITS.renewalWindowMs - 60_000) });
-    await assert.rejects(renewComputerSession(owner, late.id, { requestId: request("late-renew"), causaId: causa.id, confirmed: true }), denied(410));
+    const late = await makeSession("late", { createdAt: new Date(Date.now() - (2 * 60 * 60_000) - 60_000) });
+    assert.equal((await renewComputerSession(owner, late.id, { requestId: request("late-renew"), causaId: causa.id, confirmed: true })).status, "completed");
     assert.equal((await closeComputerSession(owner, late.id, request("late-close"))).status, "completed");
     const partial = await makeSession("partial", { state: "unknown", kittyId: null, chatId: null });
     const partialBefore = posts.length; assert.equal((await closeComputerSession(owner, partial.id, request("partial-close"))).status, "completed");
@@ -117,7 +116,7 @@ async function main() {
       const attempt = closeComputerSession(owner, row.id, request(label)); await barrier; await mutate(row); release();
       await assert.rejects(attempt, denied(409)); assert.equal(posts.length, before); return row;
     };
-    await race("expiry-race", row => prisma.altazorComputerSession.update({ where: { id: row.id }, data: { expiresAt: new Date(row.expiresAt.getTime() - 1), updatedAt: row.updatedAt } }));
+    await race("expiry-race", row => prisma.altazorComputerSession.update({ where: { id: row.id }, data: { expiresAt: new Date(row.expiresAt!.getTime() - 1), updatedAt: row.updatedAt } }));
     const recoveryRace = await race("recovery-race", row => prisma.altazorComputerSession.update({ where: { id: row.id }, data: { state: "closed" } }), { state: "unknown", kittyId: null, chatId: null });
     assert.equal((await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: recoveryRace.id } })).kittyId, null);
     const scopeRace = await race("workspace-race", row => prisma.altazorComputerSession.update({ where: { id: row.id }, data: { workspaceId: personal.workspaceId!, updatedAt: row.updatedAt } }));

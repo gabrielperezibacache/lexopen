@@ -11,7 +11,7 @@
 
 LexOpen es una aplicación de código abierto para profesionales y estudios jurídicos, con herramientas de investigación y docencia. Conserva los documentos y la base de datos en un **Host** que administras. Tu equipo accede a ese servidor con cuentas y permisos propios.
 
-**Versión del código: 1.1.0-preview.9.** Esta entrega integra Google compartido, carpetas de Organización, una jornada con vencidos de todos los meses y búsqueda más simple de apartados y ajustes. [Historial de cambios](CHANGELOG.md) · [Revisión de PR, commits y ramas](docs/REVISION-INTEGRACION-2026-11-09.md)
+**Versión del código: 1.1.0-preview.10.** Esta entrega convierte el escritorio de Altazor en un puesto persistente: conserva archivos y conversación, desactiva el apagado por inactividad y permite reanudar la misma máquina. [Historial de cambios](CHANGELOG.md) · [Revisión de PR, commits y ramas](docs/REVISION-INTEGRACION-2026-11-09.md)
 
 ![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
 
@@ -19,16 +19,16 @@ LexOpen es una aplicación de código abierto para profesionales y estudios jur�
 
 ## Descargar e instalar
 
-[**Publicaciones y descargas verificadas**](https://github.com/gabrielperezibacache/lexopen/releases) · [Versión 1.1.0-preview.9](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.9)
+[**Publicaciones y descargas verificadas**](https://github.com/gabrielperezibacache/lexopen/releases) · [Versión 1.1.0-preview.10](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.10)
 
 La publicación ofrece estos paquetes cuando finalizan las comprobaciones de la aplicación y de las cuatro plataformas. Si la versión todavía no aparece, utiliza la última publicación disponible; un trabajo de CI pendiente no equivale a un instalador publicado.
 
 | Equipo | Archivo que debes elegir |
 | --- | --- |
-| Windows Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.9-win-x64.exe` |
-| Mac con chip Apple | `LexOpen-1.1.0-preview.9-mac-arm64.dmg` |
-| Mac Intel | `LexOpen-1.1.0-preview.9-mac-x64.dmg` |
-| Linux Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.9-linux-amd64.deb` o `LexOpen-1.1.0-preview.9-linux-x86_64.AppImage` |
+| Windows Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.10-win-x64.exe` |
+| Mac con chip Apple | `LexOpen-1.1.0-preview.10-mac-arm64.dmg` |
+| Mac Intel | `LexOpen-1.1.0-preview.10-mac-x64.dmg` |
+| Linux Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.10-linux-amd64.deb` o `LexOpen-1.1.0-preview.10-linux-x86_64.AppImage` |
 
 Los paquetes incluyen el servidor, PostgreSQL y Chromium nativos. No necesitas instalar Node ni npm para abrir el programa. El escritorio de Altazor, los modelos y OCR tienen preparación adicional. Windows ARM y Linux ARM no están en esta matriz.
 
@@ -89,6 +89,8 @@ En **Fuentes → Buscar fallos civiles en el Poder Judicial**, busca por términ
 Se conservan la respuesta y el texto con versiones y hashes. Los previews o marcadores de anonimización sin texto no se aceptan como fallos íntegros. La integración es experimental y no acredita cobertura exhaustiva ni páginas físicas de un PDF. [Alcance y validación](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md) · [OJV/PJUD](docs/PJUD.md)
 
 ### Altazor AI e Ícaros
+
+El escritorio de Altazor es persistente: conserva archivos, aplicaciones y conversación sin vencimiento automático. Puede trabajar en segundo plano, detenerse y reanudarse como la misma máquina. Las conexiones disponibles se seleccionan juntas y mantienen los permisos del estudio. Los escritorios temporales anteriores pueden conservarse expresamente desde Computadora. [Persistencia, respaldo y operación](docs/ESCRITORIO-ALTAZOR.md#un-puesto-de-trabajo-persistente).
 
 Altazor conserva la conversación y sus adjuntos, propone un plan resumido y cuenta las acciones. Puedes consultar los detalles bajo demanda y revisar los cambios preparados. El visor permite seguir una sesión activa del escritorio.
 

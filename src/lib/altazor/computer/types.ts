@@ -4,7 +4,7 @@ export type ComputerStatus = {
   workspaceId: string | null; provider: string | null; version: string | null; lastVerifiedAt: string | null; reason: string | null;
   runtime: "container"; sessions: ComputerSessionSummary[];
 };
-export type ComputerSessionSummary = { id: string; state: string; expiresAt: string; renewableUntil: string; canRenew: boolean; requiresStop?: boolean; held: boolean; createdAt: string; connectors: string[] };
+export type ComputerSessionSummary = { id: string; state: string; persistent: boolean; expiresAt: string | null; renewableUntil: string | null; canRenew: boolean; requiresStop?: boolean; held: boolean; createdAt: string; connectors: string[] };
 export type ComputerTurn = { index: number; from: "user" | "assistant" | "system"; origin?: "connector-result"; text: string; working: boolean; needsHelp: boolean; actionCount?: number; help?: { stepIndex: number; question: string }; steps: { action: string; at: string }[] };
 export function computerTurnNeedsHelp(turn?: ComputerTurn) {
   // A live request pauses inside a working turn. The terminal help flag is set
