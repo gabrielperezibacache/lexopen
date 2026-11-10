@@ -238,6 +238,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
       {["warning", "blocked"].includes(causa.conflictStatus) && <ConflictReviewPanel causaId={causa.id} status={causa.conflictStatus} notes={causa.conflictNotes} />}
       <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
       <CaseStatusPanel key={caseStatus.fingerprint} initial={caseStatus} canUseAi={canUseKnowledge} />
+      <Link href={`/mi-fiscalia?causaId=${causa.id}`} className="btn btn-secondary">Solicitudes a Mi Fiscalía</Link>
       {proximosPlazos.length > 0 && (
         <section className="panel rounded-[var(--radius-lg)] px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">

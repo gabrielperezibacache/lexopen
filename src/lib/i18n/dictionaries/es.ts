@@ -199,6 +199,7 @@ export const es = {
     },
     manualCases: "Causas manuales",
     pjudCases: "PJUD · Chile",
+    miFiscalia: "Mi Fiscalía",
     home: "Inicio",
     panel: "Panel",
     sites: "Espacios",

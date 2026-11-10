@@ -2,6 +2,9 @@
 
 ## En desarrollo
 
+- Mi Fiscalía: apartado de solicitudes por causa con acceso oficial mediante ClaveÚnica, preparación, folios y respuestas registrados manualmente, historial, exportación de texto y seguimiento en el estado automático. Permisos por causa, guardado idempotente y control de edición simultánea.
+- Plazos: los enlaces desde una causa filtran el listado y mantienen el ámbito al cambiar de mes o vista; permite quitar el filtro y volver al expediente.
+
 - Estado de causas: descarta actualizaciones tardías, comprueba acceso antes de regenerar y convierte solo referencias visibles en enlaces; marca citas desconocidas y limita la lista inicial de tareas en espera.
 
 - Estado automático por causa: plazos abiertos y vencidos, esperas judiciales o de tareas, gestiones actuales y datos por comprobar. Lectura de Altazor con fuentes, actualización de registros y reutilización de análisis iguales durante la visita, respetando permisos y la política de IA.

@@ -41,6 +41,7 @@ const ENTRIES: readonly CatalogEntry[] = [
   { id: "inicio", href: "/inicio", labelKey: "nav.home", icon: "home", area: "jornada", access: "staff" },
   { id: "causas", href: "/causas", labelKey: "nav.caseFiles", icon: "cases", area: "causas", access: "staff", keywords: "expediente cartera RIT ROL" },
   { id: "my-matters", href: "/mis-causas", labelKey: "nav.myMatters", icon: "files", area: "causas", access: "staff", keywords: "organizar expediente carpetas documentos Drive" },
+  { id: "mi-fiscalia", href: "/mi-fiscalia", labelKey: "nav.miFiscalia", icon: "portal", area: "causas", access: "staff", keywords: "Ministerio Público penal RUC ClaveÚnica solicitudes diligencias folios Fiscalía" },
   { id: "pjud", href: "/pjud", labelKey: "nav.pjudCases", icon: "monitor", area: "causas", access: "staff", keywords: "PJUD Chile OJV ClaveÚnica RIT ROL tribunales" },
   { id: "sincronizacion", href: "/sincronizacion", labelKey: "nav.synchronization", icon: "monitor", area: "causas", access: "staff", keywords: "OJV ClaveÚnica Mis Causas Drive novedades descargar" },
   { id: "monitoreo", href: "/causas/monitoreo", labelKey: "nav.pjudMonitor", icon: "monitor", area: "causas", access: "staff", keywords: "OJV sincronizar seguimiento" },

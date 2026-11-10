@@ -23,14 +23,17 @@ export async function readCaseStatus(id: string, user: CausaAccessUser, db = pri
   // Repeat the ethical-wall predicate for this second read as membership may expire.
   const today = santiagoDateKey(new Date());
   const taskWhere = taskWorkspaceWhere(user, { causaId: id });
-  const [pendientes, upcoming, tasks, taskCount] = await Promise.all([
+  const fiscaliaWhere = { causaId: id, causa: causaAccessWhere(user), status: { notIn: ["closed", "cancelled"] } };
+  const [pendientes, upcoming, tasks, taskCount, fiscaliaRequests, fiscaliaCount] = await Promise.all([
     db.causaMovimiento.findMany({ where: { causaId: id, pendienteResolucion: true, causa: causaAccessWhere(user) }, orderBy: [{ fecha: "desc" }, { id: "asc" }], take: 20, select: { id: true, titulo: true, fecha: true, fuente: true } }),
     // Many historical overdue records must not hide the next real deadlines.
     db.plazo.findMany({ where: { AND: [plazos, { causaId: id, causa: causaAccessWhere(user), OR: [{ fechaLimite: { gte: santiagoMidnight(today) } }, { fechaLimite: new Date(today) }] }] }, orderBy: [{ fechaLimite: "asc" }, { id: "asc" }], take: 20, select: { id: true, titulo: true, estado: true, fechaLimite: true, esFatal: true } }),
     db.task.findMany({ where: taskWhere, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 40, select: { id: true, title: true, status: true, waitingOn: true, assignee: { select: { name: true } } } }),
     db.task.count({ where: taskWhere }),
+    db.fiscaliaRequest.findMany({ where: fiscaliaWhere, orderBy: [{ followUpDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 20, select: { id: true, title: true, status: true, folio: true, followUpDate: true } }),
+    db.fiscaliaRequest.count({ where: fiscaliaWhere }),
   ]);
-  const status = buildCaseStatus({ ...row, plazos: [...new Map([...row.plazos, ...upcoming].map(p => [p.id, p])).values()], pendientes, tasks, taskCount });
+  const status = buildCaseStatus({ ...row, plazos: [...new Map([...row.plazos, ...upcoming].map(p => [p.id, p])).values()], pendientes, tasks, taskCount, fiscaliaRequests, fiscaliaCount });
   const fingerprint = createHash("sha256").update(JSON.stringify({ user: { id: user.id, role: user.role, grants: user.capabilityGrants, revokes: user.capabilityRevokes }, status })).digest("hex");
   return { status, fingerprint };
 }

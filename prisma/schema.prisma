@@ -55,6 +55,8 @@ model FirmSettings {
 }
 
 model User {
+  fiscaliaRequests FiscaliaRequest[]
+  fiscaliaRequestEvents FiscaliaRequestEvent[]
   altazorIcaros AltazorIcaro[]
   altazorIcaroJobs AltazorIcaroJob[]
   altazorIcaroMemories AltazorIcaroMemory[]
@@ -312,6 +314,7 @@ model Cliente {
 }
 
 model Causa {
+  fiscaliaRequests FiscaliaRequest[]
   altazorIcaros AltazorIcaro[]
   pjudDocumentDownloadsEnabled Boolean @default(false)
   pjudDocumentDownloadOwnerId String?
@@ -3171,4 +3174,40 @@ model Feedback {
   @@unique([ownerId, requestId])
   @@index([ownerId, createdAt, id])
   @@index([createdAt, id])
+}
+
+/// Local preparation/tracking; never an attestation of an authenticated or submitted portal transaction.
+model FiscaliaRequest {
+  id String @id @default(cuid())
+  causaId String
+  causa Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator User @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  title String
+  kind String @default("informacion")
+  body String @default("")
+  ruc String?
+  status String @default("draft")
+  folio String?
+  submittedAt DateTime?
+  responseText String @default("")
+  answeredAt DateTime?
+  followUpDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events FiscaliaRequestEvent[]
+  @@index([causaId, status, followUpDate])
+  @@index([updatedAt, id])
+}
+
+model FiscaliaRequestEvent {
+  id String @id @default(cuid())
+  requestId String
+  request FiscaliaRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId String?
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  status String
+  action String
+  createdAt DateTime @default(now())
+  @@index([requestId, createdAt])
 }
