@@ -31,10 +31,17 @@ export async function reconcileComputerHelp(options: { limit?: number; ownerId?:
   const sessions = await client.altazorComputerSession.findMany({
     where: { ...(options.ownerId ? { ownerId: options.ownerId } : {}), state: { in: ["ready", "starting"] }, ...activeComputerSessionWhere(), workspace: { enabled: true } },
     include: { workspace: true, owner: { select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true, altazorCompanion: { select: { backgroundEnabled: true } } } } },
-    orderBy: { updatedAt: "asc" }, take: Math.min(100, Math.max(1, options.limit ?? 20)),
+    orderBy: [{ lastHelpCheckedAt: { sort: "asc", nulls: "first" } }, { id: "asc" }], take: Math.min(100, Math.max(1, options.limit ?? 20)),
   });
   const polled = new Set<string>();
   for (const session of sessions) {
+    // Advance even when a desktop is held, idle or no longer authorized. This
+    // timestamp is independent of the keyboard/secret lease and action CAS.
+    const claimed = await client.altazorComputerSession.updateMany({
+      where: { id: session.id, ownerId: session.ownerId, lastHelpCheckedAt: session.lastHelpCheckedAt, updatedAt: session.updatedAt },
+      data: { lastHelpCheckedAt: new Date(), updatedAt: session.updatedAt },
+    });
+    if (!claimed.count) continue;
     try {
       if (session.held || session.owner.altazorCompanion?.backgroundEnabled === false || session.workspace.ownerId !== session.ownerId) { result.skipped++; continue; }
       const actor = await altazorActor(session.owner, client);
