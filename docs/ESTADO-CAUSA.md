@@ -14,3 +14,9 @@ El panel comprueba los cambios cada minuto mientras la pestaña está visible y 
 El endpoint de lectura aplica el muro ético de la causa, los permisos de plazos y las restricciones de espacios y fuentes de tareas. Los registros cerrados se excluyen. Se comprueban los permisos en cada petición; si se pierde acceso, el panel oculta sus datos en la próxima comprobación. No se reutilizan respuestas entre usuarios. La IA mantiene su comprobación de permisos y la política de destino local del estudio.
 
 Si la IA falla o solo ofrece demostración, el panel conserva los hechos registrados e informa el motivo; nunca presenta una narración de demostración como estado real. Si falla la actualización de datos, advierte que el estado mostrado puede haber cambiado. La selección y los conteos delimitan la cobertura de expedientes grandes.
+
+## Actualizaciones y referencias
+
+La comprobación más reciente prevalece: se cancelan las lecturas anteriores y se descartan sus respuestas aunque el transporte entregue una respuesta tardía. Una respuesta antigua no puede volver a mostrar una causa cuyo acceso acaba de denegarse. El contexto devuelto por la IA tampoco sustituye la lectura vigente: si su huella difiere, se vuelve a comprobar el estado antes de regenerar el análisis. Al actualizar manualmente, primero se comprueban los datos y el acceso; solo después se regenera la lectura.
+
+Las referencias de Altazor se convierten en enlaces a los apartados de plazos, trámites, actividad o tareas únicamente si su identificador existe en el contexto visible. Los identificadores ajenos o inventados se muestran como «Referencia no comprobada». Los enlaces externos y el HTML escritos por el modelo permanecen como texto. Esta comprobación valida la referencia disponible, no la inferencia jurídica del modelo. La columna de espera muestra hasta cinco tareas y ofrece acceso al resto.
