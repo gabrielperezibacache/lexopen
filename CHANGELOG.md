@@ -2,6 +2,8 @@
 
 ## En desarrollo
 
+- Estado de causas: descarta actualizaciones tardías, comprueba acceso antes de regenerar y convierte solo referencias visibles en enlaces; marca citas desconocidas y limita la lista inicial de tareas en espera.
+
 - Estado automático por causa: plazos abiertos y vencidos, esperas judiciales o de tareas, gestiones actuales y datos por comprobar. Lectura de Altazor con fuentes, actualización de registros y reutilización de análisis iguales durante la visita, respetando permisos y la política de IA.
 
 ## 1.1.0-preview.10 — 2026-11-09
