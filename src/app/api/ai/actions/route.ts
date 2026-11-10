@@ -70,6 +70,9 @@ export async function POST(req: NextRequest) {
     }
 
     const action = body.action;
+    if (action === "causa.estado" && (!body.causaId || body.clienteId || body.documentoId || body.siteId || body.prompt || body.extra)) {
+      return NextResponse.json({ error: "El estado automático solo admite una causa y usa sus registros actuales." }, { status: 400 });
+    }
     const meta = AI_ACTION_META[action];
     const prompt = (body.prompt || "").trim();
     const context = await buildActionContext({
@@ -156,6 +159,7 @@ export async function POST(req: NextRequest) {
       note: "note" in result ? result.note : undefined,
       provider: result.provider,
       model: result.model,
+      ...(action === "causa.estado" ? { caseStatus: JSON.parse(context).caseStatus } : {}),
     });
   } catch (e) {
     return handleRouteError(e);
