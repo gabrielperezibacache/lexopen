@@ -11,9 +11,10 @@ export function caseStatusReferences(text: string, status: CaseStatus): StatusRe
   const taskHref = `/tareas?causaId=${encodeURIComponent(status.causaId)}`;
   for (const t of status.waitingTasks) known.set(`tarea:${t.id}`, { href: taskHref, label: `Tarea: ${t.title}` });
   for (const n of status.needs) if (n.source.startsWith("tarea:")) known.set(n.source, { href: taskHref, label: `Tarea: ${n.title}` });
+  for (const r of status.fiscaliaRequests ?? []) known.set(`fiscalia:${r.id}`, { href: `/mi-fiscalia?causaId=${encodeURIComponent(status.causaId)}`, label: `Mi Fiscalía: ${r.title}` });
   const parts: StatusReference[] = [];
   let cursor = 0;
-  for (const match of text.matchAll(/\[(plazo|tramite|movimiento|tarea):([A-Za-z0-9_-]{1,120})\]/g)) {
+  for (const match of text.matchAll(/\[(plazo|tramite|movimiento|tarea|fiscalia):([A-Za-z0-9_-]{1,120})\]/g)) {
     if (match.index > cursor) parts.push({ text: text.slice(cursor, match.index) });
     const source = known.get(`${match[1]}:${match[2]}`);
     parts.push(source ? { text: match[0], ...source } : { text: match[0], unverified: true });

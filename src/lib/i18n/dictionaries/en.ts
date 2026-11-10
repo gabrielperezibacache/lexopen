@@ -201,6 +201,7 @@ export const en: Dictionary = {
     },
     manualCases: "Manual matters",
     pjudCases: "PJUD · Chile",
+    miFiscalia: "Prosecution requests",
     home: "Home",
     panel: "Panel",
     sites: "Sites",
