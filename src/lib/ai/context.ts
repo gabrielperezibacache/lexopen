@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { minutaConfidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { buildClienteFolderContext } from "@/lib/integrations/client-folder-context";
+import { readCaseStatus } from "@/lib/causas/status-service";
 
 async function textFromDoc(doc: {
   nombre: string;
@@ -39,6 +40,10 @@ export async function buildActionContext(opts: {
   siteId?: string | null;
   extra?: Record<string, unknown>;
 }) {
+  if (opts.action === "causa.estado") {
+    if (!opts.causaId) throw httpError("Seleccione una causa para conocer su estado", 400);
+    return JSON.stringify({ caseStatus: await readCaseStatus(opts.causaId, opts.user) });
+  }
   const parts: unknown[] = [];
 
   if (opts.clienteId) {

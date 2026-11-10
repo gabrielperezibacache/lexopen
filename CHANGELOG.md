@@ -1,5 +1,9 @@
 # Changelog
 
+## En desarrollo
+
+- Estado automático por causa: plazos abiertos y vencidos, esperas judiciales o de tareas, gestiones actuales y datos por comprobar. Lectura de Altazor con fuentes, actualización de registros y reutilización de análisis iguales durante la visita, respetando permisos y la política de IA.
+
 ## 1.1.0-preview.10 — 2026-11-09
 
 - Escritorios nuevos sin caducidad de acceso ni apagado por inactividad; conservar o reanudar el mismo contenedor y conversación con comprobación de permisos.

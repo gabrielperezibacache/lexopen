@@ -1,4 +1,6 @@
 import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
+import { CaseStatusPanel } from "./CaseStatusPanel";
+import { readCaseStatus } from "@/lib/causas/status-service";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CaseAudioManager } from "@/components/audio/CaseAudioManager";
 import { CaseKnowledgePanel } from "@/components/knowledge/CaseKnowledgePanel";
@@ -66,7 +68,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
   const canUseKnowledge = canSome(user, "assistant.use");
   const backHref = connected ? "/pjud" : "/causas";
   const backLabel = connected ? "Volver a PJUD" : "Volver a mis causas";
-  const [causa, responsables, totalAccionesAbiertas, textStatus, preparation] = await Promise.all([
+  const [causa, responsables, totalAccionesAbiertas, textStatus, preparation, caseStatus] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: {
@@ -155,6 +157,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
         take: 201,
       }),
     ]).then(([privateHearingCount, audios]) => ({ privateHearingCount, audios })) : Promise.resolve({ privateHearingCount: 0, audios: [] }),
+    readCaseStatus(id, user),
   ]);
   if (!causa) notFound();
 
@@ -234,6 +237,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
 
       {["warning", "blocked"].includes(causa.conflictStatus) && <ConflictReviewPanel causaId={causa.id} status={causa.conflictStatus} notes={causa.conflictNotes} />}
       <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
+      <CaseStatusPanel key={caseStatus.fingerprint} initial={caseStatus} canUseAi={canUseKnowledge} />
       {proximosPlazos.length > 0 && (
         <section className="panel rounded-[var(--radius-lg)] px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
