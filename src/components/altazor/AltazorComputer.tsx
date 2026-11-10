@@ -154,6 +154,10 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     if (!openedFromLink.current) {
       openedFromLink.current = true;
       if (requested && data.computer.sessions.some((session: { id: string }) => session.id === requested)) selectSession(requested);
+      else if (!requested) {
+        const retained = computer.sessions.find(session => session.requiresStop) ?? computer.sessions.find(session => session.persistent && session.state === "closed");
+        if (retained) selectSession(retained.id);
+      }
     }
     if (computer.configured && computer.workspaceId) {
       try {

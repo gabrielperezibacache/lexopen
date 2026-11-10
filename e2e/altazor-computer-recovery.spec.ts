@@ -276,7 +276,7 @@ test("escritorio persistente: conserva la sesión tras recargar y reanuda la mis
     await route.fulfill({ json: { action: { id: body.requestId, status: "completed", result: { persistent: true, stopped: stopped } } } });
   });
   await loginAs(page, "abogado@estudio.cl");
-  await page.goto(`/inicio?altazor=computer&escritorio=${desktop.id}`);
+  await page.goto("/inicio?altazor=computer");
   const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true }).filter({ has: page.getByLabel("Sesión de este espacio", { exact: true }) });
   await expect(panel.getByText(/Escritorio persistente · sin vencimiento automático/)).toBeVisible();
   await expect(panel.getByRole("button", { name: "Conservar escritorio persistente", exact: true })).toHaveCount(0);
