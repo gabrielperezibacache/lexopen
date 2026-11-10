@@ -124,3 +124,30 @@ test("las referencias de Altazor solo enlazan registros visibles", async ({ page
   await expect(panel.getByText("[Referencia no comprobada]", { exact: true })).toBeVisible();
   await expect(panel.locator('a[href*="malicioso.invalid"]')).toHaveCount(0);
 });
+
+test("el contexto antiguo del modelo no sustituye los registros actuales", async ({ page }) => {
+  await loginAs(page, "socio@estudio.cl");
+  const id = (await (await page.request.get("/api/causas?limit=1")).json())[0].id;
+  const snapshot = await (await page.request.get(`/api/causas/${id}/estado`)).json();
+  const old = { ...snapshot, fingerprint: `${snapshot.fingerprint}-old`, status: { ...snapshot.status, stage: "sentencia" } };
+  let calls = 0;
+  let release!: () => void;
+  let began!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const readStarted = new Promise<void>(resolve => { began = resolve; });
+  await page.route(`**/api/causas/${id}/estado`, async route => { began(); await gate; await route.fulfill({ json: snapshot }); });
+  await page.route("**/api/ai/actions", async route => {
+    if (route.request().postDataJSON().action !== "causa.estado") return route.continue();
+    calls++;
+    await route.fulfill({ json: { source: "llm", content: calls === 1 ? "Lectura antigua del modelo" : "Lectura contrastada", caseStatus: calls === 1 ? old : snapshot } });
+  });
+  await page.goto(`/causas/${id}`);
+  const panel = page.getByTestId("case-status");
+  await readStarted;
+  await expect(panel.getByRole("button", { name: "Comprobando estado…", exact: true })).toBeDisabled();
+  await expect(panel.getByText("Lectura antigua del modelo", { exact: true })).toHaveCount(0);
+  expect(calls).toBe(1);
+  release();
+  await expect(panel.getByText("Lectura contrastada", { exact: true })).toBeVisible();
+  expect(calls).toBe(2);
+});

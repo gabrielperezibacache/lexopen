@@ -69,7 +69,9 @@ export function CaseStatusPanel({ initial, canUseAi }: { initial: Snapshot; canU
       if (!active) return;
       if (!result.ok) { setAnalysis({ fingerprint: snapshot.fingerprint, text: "", error: result.error }); return; }
       if (result.data.caseStatus && result.data.caseStatus.fingerprint !== snapshot.fingerprint) {
-        setSnapshot(result.data.caseStatus); return;
+        // The model's context was read before generation and is not a fresh status read.
+        analyses.delete(snapshot.fingerprint);
+        setChecking(true); setRefresh(value => value + 1); return;
       }
       setAnalysis({ fingerprint: snapshot.fingerprint, text: result.data.source === "llm" ? result.data.content : "", error: result.data.source === "llm" ? "" : "La IA está en demostración: se muestran únicamente los registros de la causa." });
     });
