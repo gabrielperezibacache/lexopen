@@ -2997,12 +2997,14 @@ model AltazorComputerSession {
   chatId String?
   state String @default("creating")
   held Boolean @default(false)
-  expiresAt DateTime
+  lastHelpCheckedAt DateTime?
+  expiresAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   actions AltazorComputerAction[]
   @@unique([ownerId,requestId])
   @@index([ownerId,workspaceId,expiresAt])
+  @@index([lastHelpCheckedAt,id])
 }
 model AltazorComputerAction {
   id String @id @default(cuid())

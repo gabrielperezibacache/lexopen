@@ -1,3 +1,4 @@
+import { computerSessionExpired, activeComputerSessionWhere } from "./lifecycle";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import type { AltazorComputerAction, AltazorComputerSession, AltazorComputerWorkspace, PrismaClient, Prisma } from "@prisma/client";
@@ -5,7 +6,7 @@ import { assertCausaAccess, type CausaAccessUser } from "@/lib/auth/causa-access
 import { altazorActor, altazorScopeKey } from "@/lib/altazor/access";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { ConnectorError, digest, encryptionKey, seal, unseal } from "@/lib/personal-connectors/core";
-import { assertComputerEnabled, assertSessionLive, COMPUTER_LIMITS, computerEnabled, endpointFor, inputSchema, inspectSelectedFiles, type PersonInput } from "./policy";
+import { assertComputerEnabled, assertSessionLive, computerEnabled, endpointFor, inputSchema, inspectSelectedFiles, type PersonInput } from "./policy";
 import { KittiesGateway, type StagedFileApproval, type StagedMetadataApproval } from "./gateway";
 import { computerTurnNeedsHelp, type ComputerActivity, type ComputerActivityState, type ComputerMessage, type ComputerSessionSummary, type ComputerSessionView, type ComputerStatus, type VerifiedComputerFile } from "./types";
 import { assertComputerPolicy, computerPolicyAllowed, COMPUTER_LOCAL_ONLY_REASON } from "./privacy";
@@ -30,7 +31,15 @@ const credentialContext = (row: Pick<AltazorComputerWorkspace, "id" | "ownerId" 
 async function computerPolicy(db: Client = prisma) { return normalizeAssistantFirmPolicy(await db.firmSettings.findFirst({ select: { assistantLlmMode: true } })).assistantLlmMode; }
 async function policyAllowsAction(db: Client = prisma) { assertComputerPolicy(await computerPolicy(db)); }
 function sessionConnectors(row: AltazorComputerSession) { const names: unknown = JSON.parse(row.connectorNamesJson); if (!Array.isArray(names) || names.some(name => typeof name !== "string")) throw new ConnectorError("connector_selection", "La selección de conexiones requiere revisión.", 409); return normalizeConnectorNames(names.length ? names : ["-"]); }
-function summary(row: AltazorComputerSession): ComputerSessionSummary { const names = sessionConnectors(row), renewableUntil = row.createdAt.getTime() + COMPUTER_LIMITS.renewalWindowMs; return { id: row.id, state: row.state === "closed" ? "closed" : row.expiresAt.getTime() <= Date.now() ? "expired" : row.state, expiresAt: row.expiresAt.toISOString(), renewableUntil: new Date(renewableUntil).toISOString(), canRenew: ["ready", "starting"].includes(row.state) && renewableUntil > Date.now(), requiresStop: ["creating", "ready", "starting", "unknown"].includes(row.state), held: row.held && Date.now() - row.updatedAt.getTime() < 5 * 60_000, createdAt: row.createdAt.toISOString(), connectors: names[0] === "-" ? [] : names }; }
+function summary(row: AltazorComputerSession): ComputerSessionSummary {
+  const names = sessionConnectors(row);
+  return { id: row.id, state: row.state === "closed" ? "closed" : computerSessionExpired(row) ? "expired" : row.state,
+    persistent: row.expiresAt === null, expiresAt: row.expiresAt?.toISOString() ?? null, renewableUntil: null,
+    canRenew: row.expiresAt !== null && ["ready", "starting"].includes(row.state),
+    requiresStop: ["creating", "ready", "starting", "unknown"].includes(row.state),
+    held: row.held && Date.now() - row.updatedAt.getTime() < 5 * 60_000,
+    createdAt: row.createdAt.toISOString(), connectors: names[0] === "-" ? [] : names };
+}
 async function scopedActor(user: CausaAccessUser, causaId?: string | null, db: Client = prisma) {
   const actor = await altazorActor(user, db);
   if (causaId) await assertCausaAccess(causaId, actor, { auditOverride: false }, db);
@@ -160,13 +169,14 @@ export async function createComputerSession(user: CausaAccessUser, workspaceId: 
     await lockWorkspace(workspace, user, tx); await policyAllowsAction(tx);
     if (await tx.altazorConnectorOperation.count({ where: { workspaceId, status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("connector_config_pending", "Hay un cambio de conexión sin confirmar. Compruébelo antes de abrir un escritorio.", 409);
     if (await tx.altazorComputerSession.count({ where: { workspaceId, ownerId: actor.id, state: { in: ["creating", "ready", "starting", "unknown"] } } })) throw new ConnectorError("session_active", "Ya hay una sesión activa en este espacio.", 409);
-    return tx.altazorComputerSession.create({ data: { id, ownerId: actor.id, workspaceId, requestId, kittyName, connectorNamesJson, expiresAt: new Date(Date.now() + COMPUTER_LIMITS.sessionMs) } });
+    return tx.altazorComputerSession.create({ data: { id, ownerId: actor.id, workspaceId, requestId, kittyName, connectorNamesJson, expiresAt: null } });
   });
   try {
     await unchangedWorkspace(workspace, user); await policyAllowsAction();
-    let kitty = await client.createKitty(kittyName, workspace.providerName, selected, !connectors.length);
+    let kitty = await client.createKitty(kittyName, workspace.providerName, selected, false);
     await prisma.altazorComputerSession.update({ where: { id }, data: { kittyId: kitty.id, state: "starting" } });
-    if (connectors.length) { for (const name of selected) await client.setApprovalRule(kitty.id, name); await client.startKitty(kitty.id); kitty = await client.kitty(kitty.id, kittyName, workspace.providerName, selected); }
+    if (connectors.length) for (const name of selected) await client.setApprovalRule(kitty.id, name);
+    await client.startKitty(kitty.id); kitty = await client.kitty(kitty.id, kittyName, workspace.providerName, selected);
     await unchangedWorkspace(workspace, user); await policyAllowsAction();
     const chatId = await client.createChat(kitty);
     const { applySavedComputerAuthorization } = await import("./authorization-service");
@@ -180,12 +190,15 @@ export async function createComputerSession(user: CausaAccessUser, workspaceId: 
   }
 }
 export async function readComputerSession(user: CausaAccessUser, id: string, passive = false): Promise<ComputerSessionView> {
-  const { workspace, session } = await sessionFor(id, user), client = await readyGateway(workspace, !passive);
+  const { workspace, session } = await sessionFor(id, user, true);
+  if (session.state !== "closed") assertSessionLive(session);
+  const client = await readyGateway(workspace, !passive);
   if (!session.kittyId || !session.chatId) throw new ConnectorError("session_incomplete", "El gateway no confirmó la creación completa de esta sesión.", 409);
   const names = sessionConnectors(session), hasConnections = names[0] !== "-";
   if (hasConnections) await client.requireConnectorGate();
   const kitty = await client.kitty(session.kittyId, session.kittyName, workspace.providerName, names), chat = await client.chat(session.chatId, session.kittyId);
   const approvals = hasConnections ? await client.pendingApprovals(session.kittyId, session.chatId, names) : [];
+  if (session.state === "closed") return { session: summary(session), runtime: "container", kittyStatus: kitty.status, ...chat, approvals: [] };
   const { readAuthorizationForSession } = await import("./authorization-service");
   const authorization = await readAuthorizationForSession(user, workspace, session, client);
   let computerApprovals: ComputerSessionView["approvals"] = [];
@@ -303,13 +316,12 @@ export async function readComputerActivity(user: CausaAccessUser, causaId?: stri
   return activity(view.working ? "working" : "ready");
 }
 function actionView(row: AltazorComputerAction) { return { id: row.id, status: row.status === "sending" && Date.now() - row.createdAt.getTime() > 60_000 ? "unknown" : row.status, result: row.status === "completed" && row.resultJson ? JSON.parse(row.resultJson) as Record<string, unknown> : null }; }
-function assertRenewable(session: AltazorComputerSession, now = Date.now()) {
+function assertRenewable(session: AltazorComputerSession) {
   if (!["ready", "starting"].includes(session.state) || !session.kittyId || !session.chatId) throw new ConnectorError("session_unavailable", "Sólo puede mantener un escritorio confirmado que siga disponible.", 409);
-  if (session.createdAt.getTime() + COMPUTER_LIMITS.renewalWindowMs <= now) throw new ConnectorError("renewal_window_expired", "Terminó el máximo de dos horas de este escritorio. Abra uno nuevo para continuar.", 410);
 }
-/** Human-only, atomic local authorization extension. It never creates or restarts a Kitty. */
+/** Adopt the same verified legacy desktop permanently; never create another Kitty or chat. */
 export async function renewComputerSession(user: CausaAccessUser, id: string, input: { requestId: string; confirmed: true; causaId?: string | null }) {
-  if (input.confirmed !== true) throw new ConnectorError("renewal_approval_required", "Confirme expresamente mantener este mismo escritorio durante 20 minutos más.", 400);
+  if (input.confirmed !== true) throw new ConnectorError("renewal_approval_required", "Confirme conservar este mismo escritorio de forma persistente.", 400);
   const actor = await altazorActor(user), session = await prisma.altazorComputerSession.findFirst({ where: { id, ownerId: actor.id } });
   if (!session) throw new ConnectorError("session_not_found", "Sesión no encontrada o sin acceso actual.", 404);
   const { workspace } = await workspaceFor(session.workspaceId, actor);
@@ -330,15 +342,16 @@ export async function renewComputerSession(user: CausaAccessUser, id: string, in
     await lockWorkspace(workspace, user, tx); await policyAllowsAction(tx);
     const current = await tx.altazorComputerSession.findFirst({ where: { id, ownerId: actor.id, workspaceId: workspace.id } });
     if (!current) throw new ConnectorError("session_not_found", "Sesión no encontrada o sin acceso actual.", 404);
-    const now = Date.now(); assertRenewable(current, now);
+    const now = Date.now(); assertRenewable(current);
     const existing = await tx.altazorComputerAction.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
     if (existing) { if (existing.sessionId !== id || existing.kind !== "renew" || existing.inputHash !== inputHash) throw new ConnectorError("request_conflict", "La operación corresponde a otra acción.", 409); return actionView(existing); }
-    if (current.updatedAt.getTime() !== session.updatedAt.getTime() || current.expiresAt.getTime() !== session.expiresAt.getTime()) throw new ConnectorError("session_changed", "La sesión cambió. Actualice antes de mantenerla.", 409);
+    if (current.updatedAt.getTime() !== session.updatedAt.getTime() || current.expiresAt?.getTime() !== session.expiresAt?.getTime()) throw new ConnectorError("session_changed", "La sesión cambió. Actualice antes de mantenerla.", 409);
     if (await tx.altazorComputerSession.count({ where: { workspaceId: workspace.id, ownerId: actor.id, id: { not: id }, state: { in: ["creating", "ready", "starting", "unknown"] } } })) throw new ConnectorError("session_active", "Ya hay otro escritorio activo en este espacio. Compruébelo antes de mantener uno anterior.", 409);
-    const expiresAt = new Date(Math.min(now + COMPUTER_LIMITS.sessionMs, current.createdAt.getTime() + COMPUTER_LIMITS.renewalWindowMs));
+    await client.keepKittyPersistent(kitty, workspace.providerName, names);
+    const expiresAt = null;
     const changed = await tx.altazorComputerSession.updateMany({ where: { id, ownerId: actor.id, workspaceId: workspace.id, state: current.state, updatedAt: current.updatedAt, expiresAt: current.expiresAt }, data: { expiresAt, updatedAt: new Date(Math.max(now, current.updatedAt.getTime() + 1)), held: current.held && now - current.updatedAt.getTime() < 5 * 60_000 } });
     if (!changed.count) throw new ConnectorError("session_changed", "La sesión cambió. Actualice antes de mantenerla.", 409);
-    const row = await tx.altazorComputerAction.create({ data: { ownerId: actor.id, sessionId: id, requestId: input.requestId, kind: "renew", inputHash, status: "completed", resultJson: JSON.stringify({ renewed: true, expiresAt: expiresAt.toISOString(), renewableUntil: new Date(current.createdAt.getTime() + COMPUTER_LIMITS.renewalWindowMs).toISOString() }) } });
+    const row = await tx.altazorComputerAction.create({ data: { ownerId: actor.id, sessionId: id, requestId: input.requestId, kind: "renew", inputHash, status: "completed", resultJson: JSON.stringify({ renewed: true, persistent: true, expiresAt: null, renewableUntil: null }) } });
     return actionView(row);
   }, { isolationLevel: "ReadCommitted", timeout: 20_000 });
 }
@@ -346,14 +359,14 @@ function cleanupSession(session: AltazorComputerSession) {
   if (!["creating", "starting", "ready", "unknown"].includes(session.state)) throw new ConnectorError("session_unavailable", "Este escritorio ya está detenido o no admite esta limpieza.", 409);
 }
 function actionSessionWhere(session: AltazorComputerSession, workspaceId: string, cleanup: boolean): Prisma.AltazorComputerSessionWhereInput {
-  return { id: session.id, ownerId: session.ownerId, workspaceId, state: session.state, updatedAt: session.updatedAt, kittyId: session.kittyId, chatId: session.chatId, expiresAt: { equals: session.expiresAt, ...(!cleanup ? { gt: new Date() } : {}) } };
+  return { id: session.id, ownerId: session.ownerId, workspaceId, state: session.state, updatedAt: session.updatedAt, kittyId: session.kittyId, chatId: session.chatId, expiresAt: session.expiresAt, ...(!cleanup ? activeComputerSessionWhere() : {}) };
 }
 function matchingAction(row: AltazorComputerAction, sessionId: string, kind: string, inputHash: string) {
   if (row.sessionId !== sessionId || row.kind !== kind || row.inputHash !== inputHash) throw new ConnectorError("request_conflict", "La operación corresponde a otra acción.", 409);
   return row;
 }
 async function executeAction(user: CausaAccessUser, id: string, kind: string, requestId: string, input: unknown, run: (client: KittiesGateway, row: AltazorComputerSession, tx: Prisma.TransactionClient, actionId: string) => Promise<Record<string, unknown>>) {
-  const cleanup = kind === "cancel" || kind === "close";
+  const cleanup = kind === "cancel" || kind === "close" || kind === "resume";
   const access = await sessionFor(id, user, cleanup), { actor, workspace } = access;
   const needsModelPolicy = !["cancel", "close", "connector_reject", "computer_use_reject"].includes(kind);
   if (needsModelPolicy) await policyAllowsAction();
@@ -361,7 +374,7 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
   const inputHash = computerOperationHash(actor.id, id, kind, input);
   const existing = await prisma.altazorComputerAction.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId } } });
   if (existing) return actionView(matchingAction(existing, id, kind, inputHash));
-  if (cleanup) cleanupSession(session);
+  if (cleanup && kind !== "resume") cleanupSession(session);
   const client = await readyGateway(workspace);
   if (kind === "message") await client.requireAsyncMessages();
   let kittyId = session.kittyId;
@@ -408,7 +421,7 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
       if (needsModelPolicy) await policyAllowsAction(tx);
       if (["message", "computer_use_approval"].includes(kind) && await tx.altazorConnectorOperation.count({ where: { workspaceId: workspace.id, ownerId: actor.id, kind: "computer_policy", status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("computer_policy_pending", "Comprueba el cambio de autorizaciones antes de continuar.", 409);
       if (cleanup) {
-        cleanupSession(liveSession);
+        if (kind !== "resume") cleanupSession(liveSession);
         await client.kitty(liveSession.kittyId!, liveSession.kittyName, workspace.providerName, sessionConnectors(liveSession));
         if (liveSession.chatId) await client.chat(liveSession.chatId, liveSession.kittyId!);
       }
@@ -421,6 +434,10 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
       if (kind === "close") {
         const closed = await tx.altazorComputerSession.updateMany({ where: actionSessionWhere(liveSession, workspace.id, true), data: { state: "closed", held: false } });
         if (!closed.count) throw new ConnectorError("session_changed", "La sesión cambió antes de confirmar su cierre.", 409);
+      }
+      if (kind === "resume") {
+        const resumed = await tx.altazorComputerSession.updateMany({ where: actionSessionWhere(liveSession, workspace.id, true), data: { state: "starting", expiresAt: null, held: false } });
+        if (!resumed.count) throw new ConnectorError("session_changed", "El escritorio cambió antes de confirmar su reanudación.", 409);
       }
       return { result, receipt };
     }, { isolationLevel: "ReadCommitted", timeout: 60_000 });
@@ -530,6 +547,25 @@ export async function closeComputerSession(user: CausaAccessUser, id: string, re
     if (session.chatId) await client.cancel(session.chatId);
     await client.stop(session.kittyId!);
     return { stopped: true };
+  });
+}
+/** Resume the same machine and conversation. Never replay a task or create another Kitty/chat. */
+export async function resumeComputerSession(user: CausaAccessUser, id: string, requestId: string) {
+  return executeAction(user, id, "resume", requestId, {}, async (client, session, tx) => {
+    if (!["closed", "ready", "starting"].includes(session.state)) throw new ConnectorError("session_unavailable", "Comprueba la creación de este escritorio antes de reanudarlo.", 409);
+    if (await tx.altazorComputerSession.count({ where: { workspaceId: session.workspaceId, id: { not: id }, state: { in: ["creating", "ready", "starting", "unknown"] } } })) throw new ConnectorError("session_active", "Detén el otro escritorio de este espacio antes de reanudar éste.", 409);
+    if (await tx.altazorComputerAction.count({ where: { sessionId: id, kind: { in: ["message", "connector_approval", "computer_use_approval"] }, status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("task_unconfirmed", "Revisa la tarea sin confirmación antes de reanudar el escritorio.", 409);
+    const { workspace } = await workspaceFor(session.workspaceId, user, tx);
+    const names = sessionConnectors(session);
+    if (names[0] !== "-") await client.requireConnectorGate();
+    const kitty = await client.kitty(session.kittyId!, session.kittyName, workspace.providerName, names);
+    const chat = await client.chat(session.chatId!, session.kittyId!);
+    if (chat.working) throw new ConnectorError("task_busy", "El escritorio ya está trabajando; comprueba el resultado antes de reanudarlo.", 409);
+    await client.keepKittyPersistent(kitty, workspace.providerName, names);
+    if (kitty.status !== "running") await client.startKitty(kitty.id);
+    const verified = await client.kitty(kitty.id, kitty.name, workspace.providerName, names);
+    if (!["running", "starting"].includes(verified.status)) throw new ConnectorError("resume_unknown", "No se confirmó el encendido del mismo escritorio. Comprueba su estado antes de continuar.", 502);
+    return { resumed: true, persistent: true, kittyId: kitty.id, chatId: session.chatId };
   });
 }
 export async function computerScreenshot(user: CausaAccessUser, id: string, passive = false) {

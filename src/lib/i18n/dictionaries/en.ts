@@ -1,6 +1,18 @@
 import type { Dictionary } from "./es";
 
 export const en: Dictionary = {
+  computerPersistence: {
+    stoppedNotice: "The gateway confirmed this desktop stopped. Resume it to keep working with its files and conversation.",
+    notice: "Persistent desktop. Files, applications and conversation are kept without automatic expiry.",
+    description: "Persistent desktop · no automatic expiry. Files, applications and conversation remain when this page closes or the Host restarts.",
+    legacy: "This older desktop has temporary access. You can keep it persistently with the same files and conversation.",
+    confirm: "I confirm keeping this same desktop without automatic expiry.",
+    adopt: "Keep persistent desktop",
+    resume: "Resume the same desktop",
+    stopped: "The desktop is stopped. Resume it to recover its applications and files; the conversation is retained.",
+    connections: "Connect the firm’s authorized accounts to work with files and services. Review their permissions under Connections.",
+    allConnections: "Select all available connections",
+  },
   computerReading: {
     documentRead: "Read local document text",
     confirmation: "Confirm reading the selected file inside the desktop. Its text will be available to the assistant and its configured provider.",

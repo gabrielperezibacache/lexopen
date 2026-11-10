@@ -4,7 +4,7 @@ import { computerActivityDetail, computerConnectionLabel } from "./activity-deta
 import type { ComputerSessionView } from "./types";
 
 function view(action?: string, connections: string[] = []): Pick<ComputerSessionView, "session" | "turns"> {
-  return { session: { id: "fixture", state: "ready", held: false, createdAt: "", expiresAt: "", renewableUntil: "", canRenew: false, connectors: connections },
+  return { session: { id: "fixture", state: "ready", held: false, createdAt: "", expiresAt: "", persistent: false, renewableUntil: "", canRenew: false, connectors: connections },
     turns: action ? [{ index: 0, from: "assistant", text: "Private document contents", working: true, needsHelp: false, steps: [{ action, at: "2030-05-06T17:01:00Z" }] }] : [] };
 }
 

@@ -146,7 +146,9 @@ test("readiness rejects demo, missing containers, missing providers and foreign 
 test("create uses the official no-connectors sentinel and bounded attended desktop", async () => {
   const paths: string[] = [];
   const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method, body) => {
-    paths.push(path); assert.equal(method, "POST");
+    paths.push(path);
+    if (path === `/v1/kitties/${kitty.id}`) { assert.equal(method, "PATCH"); assert.deepEqual(body, { auto_off_minutes: 0 }); return { kitty: { ...kitty, auto_off_minutes: 0 } }; }
+    assert.equal(method, "POST");
     if (path === "/v1/kitties") { assert.deepEqual(body?.connectors, ["-"]); assert.equal(body?.approvals, "ask"); assert.equal((body?.limits as Record<string, unknown>).attended, true); assert.equal(body?.soul_file, undefined); return { kitty }; }
     if (path === "/v1/chats") { assert.deepEqual(body?.members, [kitty.name]); return { chat: { id: "chat-fixture", members: [kitty.id], turns: [] } }; }
     throw new Error("Unexpected endpoint");
@@ -248,4 +250,17 @@ test("readiness contract works against a synthetic loopback HTTP server", async 
     const client = new KittiesGateway(`http://127.0.0.1:${address.port}`, token);
     assert.deepEqual(await client.readiness("model-fixture", []), { version: "synthetic-contract-fixture", connectorGate: false, persistentOAuth: false, cloudFileOAuth: false, githubPersistentOAuth: false, driveManagement: false });
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+});
+
+test("persistent desktop lifetime survives long inactivity while temporary sessions still expire", () => {
+  assert.doesNotThrow(() => assertSessionLive({ state: "ready", expiresAt: null }, Date.now() + 365 * 86400_000));
+  assert.throws(() => assertSessionLive({ state: "closed", expiresAt: null }));
+  assert.throws(() => assertSessionLive({ state: "unknown", expiresAt: null }));
+});
+test("persistent runtime configuration requires an exact acknowledged desktop", async () => {
+  const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method, body) => {
+    assert.equal(path, `/v1/kitties/${kitty.id}`); assert.equal(method, "PATCH"); assert.deepEqual(body, { auto_off_minutes: 0 });
+    return { kitty: { ...kitty, auto_off_minutes: 15 } };
+  }));
+  await assert.rejects(client.keepKittyPersistent(kitty, kitty.provider, ["-"]), /conservación/);
 });

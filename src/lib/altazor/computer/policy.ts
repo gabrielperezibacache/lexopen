@@ -1,3 +1,4 @@
+import { computerSessionExpired } from "./lifecycle";
 import { z } from "zod";
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import { identifyAudio } from "@/lib/audio/ingest";
@@ -5,7 +6,7 @@ import { readBookZip } from "@/lib/books/formats";
 import type { ComputerFile } from "./types";
 
 export const KITTIES_SOURCE_COMMIT = "6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3";
-export const COMPUTER_LIMITS = { files: 5, totalBytes: 20 * 1024 * 1024, imageBytes: 5 * 1024 * 1024, sessionMs: 20 * 60_000, renewalWindowMs: 2 * 60 * 60_000, bodyBytes: 29 * 1024 * 1024 } as const;
+export const COMPUTER_LIMITS = { files: 5, totalBytes: 20 * 1024 * 1024, imageBytes: 5 * 1024 * 1024, bodyBytes: 29 * 1024 * 1024 } as const;
 export function endpointFor(value: string) {
   let url: URL;
   try { url = new URL(value); } catch { throw new ConnectorError("gateway_url", "Use la dirección local del gateway dedicado."); }
@@ -74,7 +75,7 @@ export function inspectSelectedFiles(files: ComputerFile[]) {
     return { name, mime, data: file.data };
   });
 }
-export function assertSessionLive(row: { state: string; expiresAt: Date }, now = Date.now()) {
-  if (row.expiresAt.getTime() <= now) throw new ConnectorError("session_expired", "La sesión venció y su acceso quedó bloqueado. El gateway puede conservar su escritorio y archivos.", 410);
+export function assertSessionLive(row: { state: string; expiresAt: Date | null }, now = Date.now()) {
+  if (computerSessionExpired(row, now)) throw new ConnectorError("session_expired", "La sesión venció y su acceso quedó bloqueado. El gateway puede conservar su escritorio y archivos.", 410);
   if (!["ready", "starting"].includes(row.state)) throw new ConnectorError("session_unavailable", "La sesión no está disponible. No se repetirá su creación automáticamente.", 409);
 }

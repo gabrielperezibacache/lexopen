@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { attemptContext, digest, randomToken, seal } from "@/lib/personal-connectors/core";
 import { completeLinkedInOAuth, publicLinkedInAccount, receiveLinkedInCallback } from "@/lib/personal-connectors/linkedin/account";
-import { cancelComputerTask, closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerActivity, readComputerSession, sendComputerMessage } from "./service";
+import { cancelComputerTask, closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, resumeComputerSession, inputComputer, readComputerActivity, readComputerSession, sendComputerMessage } from "./service";
 
-type KittyFixture = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
+type KittyFixture = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string; auto_off_minutes?: number };
 type TurnFixture = { from: string; text: string; working?: boolean; needs_help?: boolean; steps?: { action: string }[] };
 const hasStatus = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 const fixtureFrame = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64");
@@ -42,7 +42,11 @@ async function main() {
     } else if (path === "/v1/chats" && method === "POST") {
       const member = fleet.find(kitty => kitty.name === (body.members as string[])[0]); assert.ok(member);
       const chat = { id: `chat-${chats.size + 1}`, members: [member.id], turns: [] as TurnFixture[] }; chats.set(`${target.origin}:${chat.id}`, chat); result = { chat };
-    } else if (/^\/v1\/kitties\/[\w-]+$/.test(path)) result = { kitty: fleet.find(kitty => kitty.id === path.split("/").pop() || kitty.name === path.split("/").pop()) };
+    } else if (/^\/v1\/kitties\/[\w-]+$/.test(path)) {
+      const member = fleet.find(kitty => kitty.id === path.split("/").pop() || kitty.name === path.split("/").pop());
+      if (method === "PATCH") { assert.ok(member); assert.deepEqual(body, { auto_off_minutes: 0 }); member.auto_off_minutes = 0; }
+      result = { kitty: member };
+    } else if (path.endsWith("/start")) { const member = fleet.find(kitty => kitty.id === path.split("/")[3]); assert.ok(member); member.status = "running"; result = { kitty: member }; }
     else if (/^\/v1\/chats\/[\w-]+$/.test(path)) result = { chat: chats.get(`${target.origin}:${path.split("/").pop()}`) };
     else if (path.endsWith("/messages/async")) {
       sends++; const id = path.split("/")[3], chat = chats.get(`${target.origin}:${id}`); assert.ok(chat);
@@ -80,7 +84,7 @@ async function main() {
     const configured = await configureComputer(owner, input); assert.ok(configured.workspaceId); workspaces.push(configured.workspaceId);
     assert.equal(JSON.stringify(configured).includes(input.token), false);
     await assert.rejects(configureComputer(outsider, { ...input, causaId: null }), hasStatus(409));
-    const first = await createComputerSession(owner, configured.workspaceId, `start-${tag}`); assert.equal(first.state, "ready"); assert.equal(kittyCreates, 1);
+    const first = await createComputerSession(owner, configured.workspaceId, `start-${tag}`); assert.equal(first.state, "ready"); assert.equal(first.persistent, true); assert.equal(first.expiresAt, null); assert.equal(fleets.get(input.endpoint)?.[0].auto_off_minutes, 0); assert.equal(kittyCreates, 1);
     const beforeReplay = network; assert.equal((await createComputerSession(owner, configured.workspaceId, `start-${tag}`)).id, first.id); assert.equal(network, beforeReplay);
     const beforeDenied = network; await assert.rejects(readComputerSession(outsider, first.id), hasStatus(404)); await assert.rejects(computerScreenshot(outsider, first.id), hasStatus(404)); assert.equal(network, beforeDenied);
     await assert.rejects(readComputerActivity(outsider, cause.id), hasStatus(404));
@@ -144,6 +148,20 @@ async function main() {
     const completedTurn = chat.turns.at(-1)!;
     completedTurn.working = false; completedTurn.text = "Resultado completamente ficticio";
     assert.equal((await readComputerSession(owner, first.id)).turns.at(-1)?.text, "Resultado completamente ficticio");
+    // The same desktop remains available long after the former two-hour window.
+    await prisma.altazorComputerSession.update({ where: { id: first.id }, data: { createdAt: new Date(Date.now() - 30 * 86400_000) } });
+    assert.equal((await readComputerSession(owner, first.id)).session.persistent, true);
+    await closeComputerSession(owner, first.id, `pause-${tag}`);
+    assert.equal((await readComputerSession(owner, first.id)).session.state, "closed");
+    const beforeResumeCreates = kittyCreates, beforeResumeSends = sends;
+    await assert.rejects(resumeComputerSession(outsider, first.id, `foreign-resume-${tag}`), hasStatus(404));
+    const resumed = await resumeComputerSession(owner, first.id, `resume-${tag}`);
+    assert.equal(resumed.status, "completed");
+    assert.deepEqual(await resumeComputerSession(owner, first.id, `resume-${tag}`), resumed);
+    const restored = await readComputerSession(owner, first.id);
+    assert.equal(restored.session.id, first.id); assert.equal(restored.session.persistent, true);
+    assert.equal(restored.turns.at(-1)?.text, "Resultado completamente ficticio");
+    assert.equal(kittyCreates, beforeResumeCreates); assert.equal(sends, beforeResumeSends, "resume never replays model work");
     loseNextMessage = true;
     const ambiguous = { ...message, requestId: `lost-${tag}`, text: "Tarea ficticia con respuesta perdida", files: [] };
     await assert.rejects(sendComputerMessage(owner, first.id, ambiguous)); assert.equal(sends, 3);

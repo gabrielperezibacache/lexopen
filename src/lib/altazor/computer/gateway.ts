@@ -19,7 +19,7 @@ export type StagedFileApproval = { requestId: string; task: ExplicitFileTask };
 export type StagedMetadataApproval = { requestId: string; metadataTask: ExplicitMetadataTask };
 
 type Fetcher = typeof fetch;
-export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
+export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string; auto_off_minutes?: number };
 const safeId = (value: string) => { if (!/^[A-Za-z0-9_-]{1,100}$/.test(value)) throw new ConnectorError("gateway_identifier", "El gateway devolvió un identificador incompatible.", 502); return encodeURIComponent(value); };
 export class KittiesGateway {
   private endpoint: string;
@@ -55,7 +55,15 @@ export class KittiesGateway {
     if (selected[0] !== "-") await this.requireConnectorGate();
     if (selected.some(name => /^altazor-(?:google|github)-[a-f0-9]{16}$/.test(name))) await this.requireFileReads();
     const result = await this.json("/v1/kitties", "POST", { name, provider, desktop: true, start, connectors: selected, approvals: "ask", backup: "", limits: { max_seconds: 600, max_rounds: 12, max_tokens: 60000, attended: true }, soul: { persona: "ALTAZOR AI", language: "es", instructions: "Trabaja sólo con la tarea y los archivos elegidos por la persona en este espacio. No recibes credenciales de LexOpen ni acceso a sus expedientes. Solicita intervención humana para accesos o decisiones que la requieran. No inventes resultados ni confirmaciones." } });
-    return this.validateKitty(result.kitty, name, provider, selected);
+    return this.keepKittyPersistent(this.validateKitty(result.kitty, name, provider, selected), provider, selected);
+  }
+  /** Disable upstream idle shutdown on this exact owned desktop, with a verified acknowledgement. */
+  async keepKittyPersistent(kitty: KittyRecord, provider: string, connectors: readonly string[]) {
+    if (kitty.auto_off_minutes === 0) return kitty;
+    const result = await this.json(`/v1/kitties/${safeId(kitty.id)}`, "PATCH", { auto_off_minutes: 0 });
+    const updated = this.validateKitty(result.kitty, kitty.name, provider, connectors);
+    if (updated.id !== kitty.id || updated.auto_off_minutes !== 0) throw new ConnectorError("desktop_persistence_unknown", "No se confirmó la conservación del escritorio. Comprueba su estado antes de continuar.", 502);
+    return updated;
   }
   private validateKitty(value: unknown, name: string, provider: string, connectors: readonly string[] = ["-"]): KittyRecord {
     const k = value as Partial<KittyRecord> | null;

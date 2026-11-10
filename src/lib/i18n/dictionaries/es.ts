@@ -1,4 +1,16 @@
 export const es = {
+  computerPersistence: {
+    stoppedNotice: "El gateway confirmó que detuvo este escritorio. Puedes reanudarlo conservando sus archivos y conversación.",
+    notice: "Escritorio persistente. Se conservan sus archivos, aplicaciones y conversación sin vencimiento automático.",
+    description: "Escritorio persistente · sin vencimiento automático. Conserva sus archivos, aplicaciones y conversación al cerrar esta página o reiniciar el Host.",
+    legacy: "Este escritorio anterior tiene acceso temporal. Puedes conservarlo de forma persistente con sus mismos archivos y conversación.",
+    confirm: "Confirmo conservar este mismo escritorio sin vencimiento automático.",
+    adopt: "Conservar escritorio persistente",
+    resume: "Reanudar el mismo escritorio",
+    stopped: "El escritorio está detenido. Reanúdalo para recuperar sus aplicaciones y archivos; la conversación se conserva.",
+    connections: "Conecta las cuentas autorizadas del estudio para trabajar con sus archivos y servicios. Puedes revisar sus permisos en Conexiones.",
+    allConnections: "Seleccionar todas las conexiones disponibles",
+  },
   computerReading: {
     documentRead: "Leer texto del documento local",
     confirmation: "Confirma la lectura del archivo seleccionado dentro del escritorio. Su texto estará disponible para el asistente y su proveedor configurado.",

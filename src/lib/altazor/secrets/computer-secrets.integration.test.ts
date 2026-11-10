@@ -8,7 +8,7 @@ import { configureComputer, controlComputer, createComputerSession, inputCompute
 import { createSecret, deleteSecret, getSecret, listSecrets, rotateSecret } from "./service";
 import type { PrepareSecretUseInput, SecretTarget } from "./policy";
 
-type Kitty = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
+type Kitty = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string; auto_off_minutes?: number };
 const hasStatus = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 async function main() {
   const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL); assert.equal(url, new URL(process.env.DATABASE_URL!).toString());
@@ -34,13 +34,14 @@ async function main() {
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {
       assert.deepEqual(body.connectors, ["-"]); assert.equal(body.approvals, "ask");
-      const kitty: Kitty = { id: `kitty-${fleet.length}`, name: String(body.name), provider: String(body.provider), desktop: true, container: `container-${body.name}`, status: "starting", connectors: ["-"], approvals: "ask", backup: "" };
+      const kitty: Kitty = { auto_off_minutes: 0, id: `kitty-${fleet.length}`, name: String(body.name), provider: String(body.provider), desktop: true, container: `container-${body.name}`, status: "starting", connectors: ["-"], approvals: "ask", backup: "" };
       fleet.push(kitty); result = { kitty };
     } else if (path === "/v1/chats" && method === "POST") {
       const kitty = fleet.find(row => row.name === (body.members as string[])[0]); assert.ok(kitty);
       const chat = { id: `chat-${chats.length}`, members: [kitty.id], turns: [] }; chats.push(chat); result = { chat };
     } else if (/^\/v1\/kitties\/[\w-]+$/.test(path)) result = { kitty: fleet.find(row => row.id === path.split("/").pop()) };
     else if (/^\/v1\/chats\/[\w-]+$/.test(path)) result = { chat: chats.find(row => row.id === path.split("/").pop()) };
+    else if (path.endsWith("/start")) result = { kitty: fleet.find(row => row.id === path.split("/")[3]) };
     else if (path.endsWith("/control")) { held = body.hold === true; if (!held) releaseControls++; result = { held }; }
     else if (path.endsWith("/input")) {
       assert.equal(held, true);

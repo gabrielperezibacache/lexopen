@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CircleAlert, ExternalLink, FileText, Maximize2, Minimize2, Monitor, MousePointer2, RefreshCw, Square } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
@@ -120,12 +121,12 @@ export function AltazorComputer(props: PanelProps) {
 }
 
 function ComputerPanel({ causaId, active = true, preferredSessionId, review }: PanelProps) {
+  const { t } = useI18n();
   const uid = useId(), tokenRef = useRef<HTMLInputElement>(null), openedFromLink = useRef(false), selectedRef = useRef(""), selectionEpoch = useRef(0);
   const statusVersion = useRef(0), statusRequest = useRef<AbortController | null>(null), sessionVersion = useRef(0), creationPending = useRef(false);
   const [status, setStatus] = useState<ComputerStatus | null>(null), [view, setView] = useState<ComputerSessionView | null>(null), [selected, setSelected] = useState("");
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [linkFailure, setLinkFailure] = useState(false);
-  const [observedAt, setObservedAt] = useState(0);
   const [renewConfirmed, setRenewConfirmed] = useState(false), [renewKey, setRenewKey] = useState("");
   const [text, setText] = useState(""), [files, setFiles] = useState<File[]>([]), [approved, setApproved] = useState(false), [messageKey, setMessageKey] = useState(""), [createKey, setCreateKey] = useState("");
   const [frame, setFrame] = useState(0), [manualText, setManualText] = useState("");
@@ -149,11 +150,14 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     if (!current()) return null;
     if (!response.ok) throw new Error(data.error || "No se pudo consultar el computador opcional.");
     const computer = data.computer as ComputerStatus;
-    setObservedAt(Date.now());
     setStatus(computer);
     if (!openedFromLink.current) {
       openedFromLink.current = true;
       if (requested && data.computer.sessions.some((session: { id: string }) => session.id === requested)) selectSession(requested);
+      else if (!requested) {
+        const retained = computer.sessions.find(session => session.requiresStop) ?? computer.sessions.find(session => session.persistent && session.state === "closed");
+        if (retained) selectSession(retained.id);
+      }
     }
     if (computer.configured && computer.workspaceId) {
       try {
@@ -174,7 +178,6 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     const version = ++sessionVersion.current;
     const response = await fetch(`${api}/sessions/${encodeURIComponent(id)}`, { cache: "no-store", signal }), data = await response.json();
     if (signal?.aborted || selectedRef.current !== id || epoch !== selectionEpoch.current || version !== sessionVersion.current) return;
-    setObservedAt(Date.now());
     if (!response.ok) {
       setView(null);
       if ([403, 404].includes(response.status)) { selectSession(""); setLinkFailure(true); }
@@ -263,14 +266,14 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     selectionEpoch.current++;
     setRenewConfirmed(false); setRenewKey(""); setLinkFailure(false);
     await refresh().catch(() => {}); await loadSession(selected).catch(() => {});
-    setNotice("Acceso mantenido. Se conservó la misma sesión del escritorio y sus aplicaciones.");
+    setNotice(t("computerPersistence.notice"));
   }
   async function action(body: Record<string, unknown>) {
     if (!selected) return;
     const result = await mutate<ActionReply>(`${api}/sessions/${encodeURIComponent(selected)}/actions`, { ...body, requestId: operationKey(), confirmed: true });
     if (!result) return;
     if (result.action.status !== "completed") { setNotice("El gateway no confirmó la acción. Compruebe el escritorio antes de repetirla."); return; }
-    if (body.action === "close" && result.action.result?.stopped) { selectSession(""); await refresh().catch(() => {}); setNotice("El gateway confirmó que detuvo este escritorio. Sus archivos pueden permanecer en el gateway."); return; }
+    if (body.action === "close" && result.action.result?.stopped) { await refresh().catch(() => {}); await loadSession(selected).catch(() => { setView(null); }); setNotice(t("computerPersistence.stoppedNotice")); return; }
     if (body.action === "cancel") setNotice(result.action.result?.cancelled ? "El gateway confirmó la cancelación de la tarea." : "El gateway no encontró una tarea cancelable en ese momento. Compruebe el chat.");
     if (body.action === "computer_approval") setNotice(body.approve === false ? "Acción rechazada. No se ejecutó." : result.action.result?.state === "executed" ? "El computador ejecutó esta acción una vez. Comprueba su efecto en el monitor." : "No se confirmó el resultado. Revisa el monitor; no se repetirá automáticamente.");
     if (body.action === "connector_approval") setNotice(body.approve === false ? "Consulta rechazada." : result.action.result?.failed ? "No se confirmó el resultado de la consulta. Revisa el escritorio antes de preparar otro encargo." : result.action.result?.metadataReady ? "Consulta completada. Los nombres devueltos están disponibles abajo; no se abrió ni descargó su contenido." : result.action.result?.verifiedFile?.state === "desktop_verified" ? `Archivo descargado y verificado: ${result.action.result.verifiedFile.name}.` : result.action.result?.continued ? "Lectura autorizada. Altazor continúa trabajando con el resultado de la consulta en este escritorio." : result.action.result?.authorizationPending ? "Lectura autorizada. Comprueba las autorizaciones del escritorio en Configuración antes de pedirle que continúe." : result.action.result?.continuationUnknown ? "Lectura autorizada. No se confirmó si Altazor pudo continuar; comprueba el avance antes de repetir el encargo. No se reenviará automáticamente." : result.action.result?.continuationPending ? "Lectura autorizada. El escritorio sigue trabajando; comprueba su avance. Cuando termine, puedes pedirle que continúe." : "Operación autorizada. Revisa el avance en el escritorio.");
@@ -296,8 +299,10 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
   }
   const held = Boolean(view?.session.held), selectedSummary = status?.sessions.find(session => session.id === selected);
   const selectedState = view?.session.state || selectedSummary?.state;
-  const selectedExpiry = view?.session.expiresAt || selectedSummary?.expiresAt, renewableUntil = view?.session.renewableUntil || selectedSummary?.renewableUntil;
-  const canRenew = Boolean(selectedSummary?.canRenew && renewableUntil && Date.parse(renewableUntil) > observedAt && status?.policyAllowed);
+  const selectedExpiry = view ? view.session.expiresAt : selectedSummary?.expiresAt;
+  const persistent = selectedExpiry === null;
+  const canRenew = Boolean(selectedSummary?.canRenew && status?.policyAllowed);
+  const canResume = Boolean(selected && view && ["closed", "stopped"].includes(selectedState || "") && status?.policyAllowed);
   const canAct = Boolean(selected && view && selectedState === "ready"), canWork = canAct && Boolean(status?.policyAllowed);
   const canCleanup = Boolean(selected && selectedSummary && selectedState !== "closed");
   const needsStop = Boolean(status?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
@@ -320,7 +325,8 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
       )}
       {status?.configured && !needsStop && <fieldset className={styles.applications} disabled={busy}>
         <legend>Aplicaciones para este escritorio</legend>
-        <p>Elige las cuentas que Altazor podrá consultar. Cada operación espera tu autorización.</p>
+        <p>{t("computerPersistence.connections")}</p>
+        {readyConnections.length > 0 && <button type="button" onClick={() => { setConnections(readyConnections.map(connection => connection.name)); setCreateKey(""); }}>{t("computerPersistence.allConnections")}</button>}
         {readyConnections.length > 0 ? <div className={styles.applicationChoices}>{readyConnections.map(connection => {
           const shortLabel = computerConnectionLabel(connection.name);
           const label = shortLabel !== connection.name ? shortLabel : inventory?.catalog.find(entry => entry.id === connection.kind)?.label || connection.kind;
@@ -333,15 +339,16 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
         <button type="button" disabled={busy} onClick={verify}><RefreshCw size={15} aria-hidden="true" />Comprobar conexión</button>
       </div>}
     </div>
-    {needsStop && <p className={styles.expiry}>Antes de abrir otro escritorio o cambiar sus conexiones, seleccione la sesión anterior y pulse Detener escritorio. El vencimiento del acceso no confirma su cierre.</p>}
+    {needsStop && <p className={styles.expiry}>Antes de abrir otro escritorio o cambiar sus conexiones, seleccione la sesión anterior y pulse Detener escritorio. Detenerlo conserva los archivos y la conversación para reanudar el mismo escritorio.</p>}
     {status?.canConfigure && <details className={styles.setup}><summary>Configurar gateway local dedicado</summary><form onSubmit={configure}><label htmlFor={`${uid}-endpoint`}>Dirección local de esta instancia</label><input id={`${uid}-endpoint`} name="endpoint" type="url" required defaultValue="http://127.0.0.1:7488" disabled={busy} /><label htmlFor={`${uid}-provider`}>Nombre del proveedor configurado en el gateway</label><input id={`${uid}-provider`} name="provider" required maxLength={100} disabled={busy} /><label htmlFor={`${uid}-token`}>Autorización del gateway</label><input ref={tokenRef} id={`${uid}-token`} name="token" type="password" autoComplete="off" required minLength={16} maxLength={16000} disabled={busy} /><label className={styles.check}><input name="dedicated" type="checkbox" required disabled={busy} />Esta instancia y sus datos son exclusivos de este profesional y este espacio. Configuré el proveedor directamente en el gateway.</label><button type="submit" disabled={busy}>Comprobar y guardar autorización</button></form></details>}
     {status?.sessions.length ? <div className={styles.sessions}><label htmlFor={`${uid}-session`}>Sesión de este espacio</label><select id={`${uid}-session`} value={selected} disabled={busy} onChange={event => { selectSession(event.target.value); setText(""); setFiles([]); setApproved(false); setMessageKey(""); }}><option value="">Seleccione una sesión</option>{status.sessions.map(session => <option key={session.id} value={session.id}>{stateLabel[session.state] || session.state} · {new Date(session.createdAt).toLocaleString("es-CL")}</option>)}</select></div> : null}
     {selected && <div className={styles.work}>
-      <div className={styles.toolbar}><strong>{stateLabel[selectedState || ""] || "Comprobando escritorio…"}</strong><div className={styles.actions}><button type="button" disabled={busy || !canWork} onClick={() => action({ action: "control", hold: !held })}><MousePointer2 size={15} aria-hidden="true" />{held ? "Devolver control" : "Tomar control"}</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "cancel" })}>Cancelar tarea</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "close" })}><Square size={14} aria-hidden="true" />Detener escritorio</button></div></div>
-      {selectedExpiry && <p className={styles.expiry}>Acceso hasta {new Date(selectedExpiry).toLocaleTimeString("es-CL")}.{renewableUntil && <> Puede mantener este mismo escritorio hasta las {new Date(renewableUntil).toLocaleTimeString("es-CL")}.</>} Al vencer se bloquea el acceso desde ALTAZOR; el gateway puede conservar el escritorio y sus archivos.</p>}
-      {canRenew && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void renew(); }}><label className={styles.check}><input type="checkbox" checked={renewConfirmed} disabled={busy} onChange={event => setRenewConfirmed(event.target.checked)} />Confirmo mantener este mismo escritorio durante 20 minutos más, sin superar dos horas desde su apertura.</label><button type="submit" disabled={busy || !renewConfirmed}>Mantener sesión 20 min</button></form>}
+      <div className={styles.toolbar}><strong>{stateLabel[selectedState || ""] || "Comprobando escritorio…"}</strong><div className={styles.actions}>{canResume && <button type="button" disabled={busy} onClick={() => action({ action: "resume" })}>{t("computerPersistence.resume")}</button>}<button type="button" disabled={busy || !canWork} onClick={() => action({ action: "control", hold: !held })}><MousePointer2 size={15} aria-hidden="true" />{held ? "Devolver control" : "Tomar control"}</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "cancel" })}>Cancelar tarea</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "close" })}><Square size={14} aria-hidden="true" />Detener escritorio</button></div></div>
+      {persistent && <p className={styles.expiry}>{t("computerPersistence.description")}</p>}
+      {selectedExpiry && <p className={styles.expiry}>{t("computerPersistence.legacy")}</p>}
+      {canRenew && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void renew(); }}><label className={styles.check}><input type="checkbox" checked={renewConfirmed} disabled={busy} onChange={event => setRenewConfirmed(event.target.checked)} />{t("computerPersistence.confirm")}</label><button type="submit" disabled={busy || !renewConfirmed}>{t("computerPersistence.adopt")}</button></form>}
       {canAct ? <>
-        <ComputerScreen key={selected} sessionId={selected} frame={frame} active={active} working={Boolean(view?.working)} held={held} busy={busy} canWork={canWork} onFrame={setFrame} onAction={action} />
+        <ComputerScreen key={selected} sessionId={selected} frame={frame} active={active && canAct} working={Boolean(view?.working)} held={held} busy={busy} canWork={canWork} onFrame={setFrame} onAction={action} />
         <ComputerReadingPanel key={`reading:${selected}:${canWork && !held}`} sessionId={selected} available={canWork && !held} />
         {held && canWork && <>
           <div className={styles.actions} aria-label="Teclado del escritorio">
@@ -355,7 +362,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
             <button type="submit" disabled={busy || !manualText}>Escribir en escritorio</button><p>Se envía al teclado del contenedor, sin incorporarse al chat del modelo.</p>
           </form>
         </>}
-      </> : <p className={styles.waiting}><CircleAlert size={18} aria-hidden="true" />El escritorio todavía no está disponible. No se muestra una imagen de demostración.</p>}
+      </> : selectedState === "closed" ? <p className={styles.expiry}>{t("computerPersistence.stopped")}</p> : <p className={styles.waiting}><CircleAlert size={18} aria-hidden="true" />El escritorio todavía no está disponible. No se muestra una imagen de demostración.</p>}
       {held && canWork && <AltazorSecretUse key={selected} sessionId={selected} onBusyChange={setBusy} />}
       {view?.session.connectors?.length ? <p className={styles.expiry}>Aplicaciones autorizadas para esta sesión: {view.session.connectors.map(computerConnectionLabel).join(" · ")}.</p> : null}
       {view?.authorization && <section className={styles.authorization} aria-label="Autorizaciones del escritorio"><div><strong>{view.authorization.state === "applied" ? computerAuthorizationModePresentation(view.authorization.applied!.mode).label : "Autorizaciones pendientes de confirmar"}</strong><p>{view.authorization.reason || (view.authorization.state === "applied" ? "Los permisos de este espacio están confirmados por el escritorio." : "El monitor y el control manual siguen disponibles. Elige los permisos en Configuración.")}</p></div><a className={styles.preparationLink} href={`/configuracion?escritorioEspacio=${encodeURIComponent(view.authorization.workspaceId)}#autorizaciones-escritorio`}>Ver autorizaciones</a></section>}

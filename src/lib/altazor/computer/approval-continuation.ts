@@ -1,3 +1,4 @@
+import { computerSessionExpired } from "./lifecycle";
 import { setTimeout as pause } from "node:timers/promises";
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import type { KittiesGateway } from "./gateway";
@@ -7,7 +8,7 @@ import { computerUserMessagePresentation } from "./presentation";
 /** Called under the broker's owner/workspace/session locks, never as a detached job. */
 export async function continueApprovedRead(
   client: Pick<KittiesGateway, "chat" | "send">,
-  target: { chatId: string; kittyId: string; actionId: string; expiresAt: Date; task: string },
+  target: { chatId: string; kittyId: string; actionId: string; expiresAt: Date | null; task: string },
   authorize: () => Promise<void>,
   wait: (milliseconds: number) => Promise<unknown> = pause,
 ) {
@@ -19,13 +20,13 @@ Conserva únicamente nombres, rutas e identificadores realmente devueltos. Si pi
   // The original worker may still be finishing its 'waiting for approval' reply.
   // Wait only for that worker; a new task or a retry is never launched in parallel.
   for (let attempt = 0; attempt < 9; attempt++) {
-    if (target.expiresAt.getTime() <= Date.now()) return { continued: false, continuationPending: true };
+    if (computerSessionExpired(target)) return { continued: false, continuationPending: true };
     let view: Awaited<ReturnType<KittiesGateway["chat"]>>;
     try { view = await client.chat(target.chatId, target.kittyId); }
     catch { return { continued: false, continuationPending: true }; }
     if (!view.working) {
       await authorize();
-      if (target.expiresAt.getTime() <= Date.now()) return { continued: false, continuationPending: true };
+      if (computerSessionExpired(target)) return { continued: false, continuationPending: true };
       const request = metadataRequest(target.task);
       if (request) {
         const lastUser = view.turns.findLastIndex(turn => turn.from === "user");

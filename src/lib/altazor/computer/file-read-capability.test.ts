@@ -8,7 +8,7 @@ const run = async (supportsFiles: boolean) => {
     const path = new URL(String(url)).pathname, method = String(options?.method || "GET");
     calls.push({ path, method });
     if (path === "/v1/health") return Response.json({ ok: true, lexopen_connector_gate: "v1", ...(supportsFiles ? { lexopen_file_reads: "v1" } : {}) });
-    if (path === "/v1/kitties" && method === "POST") return Response.json({ kitty: { id: "owned-kitty", name: "owned-kitty", provider: "local-model", desktop: true, container: "real-container", status: "stopped", connectors: [connector], approvals: "ask", backup: "" } });
+    if (path === "/v1/kitties" && method === "POST") return Response.json({ kitty: { auto_off_minutes: 0, id: "owned-kitty", name: "owned-kitty", provider: "local-model", desktop: true, container: "real-container", status: "stopped", connectors: [connector], approvals: "ask", backup: "" } });
     throw new Error("Unexpected request");
   };
   const client = new KittiesGateway("http://127.0.0.1:7494", "fictitious-gateway-token", fetcher);

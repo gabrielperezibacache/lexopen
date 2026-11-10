@@ -1,3 +1,4 @@
+import { computerSessionExpired } from "../computer/lifecycle";
 import { randomBytes, createHash } from "node:crypto";
 import type { AltazorHelpRequest, Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -43,7 +44,7 @@ async function helpAccess(row: Pick<AltazorHelpRequest, "ownerId" | "conversatio
   if (row.conversationId) causaId = (await conversationFor(row.conversationId, actor, client, true)).conversation.causaId;
   if (row.computerSessionId) {
     const session = await client.altazorComputerSession.findFirst({ where: { id: row.computerSessionId, ownerId: actor.id }, include: { workspace: true } });
-    if (!session || session.workspace.ownerId !== actor.id || !session.workspace.enabled || ["closed", "expired"].includes(session.state) || session.expiresAt <= new Date()) throw httpError("La sesión de escritorio ya no está disponible.", 409);
+    if (!session || session.workspace.ownerId !== actor.id || !session.workspace.enabled || ["closed", "expired"].includes(session.state) || computerSessionExpired(session)) throw httpError("La sesión de escritorio ya no está disponible.", 409);
     if (row.scopeKind === "workspace" && row.scopeId !== session.workspaceId) throw httpError("La ayuda no corresponde a este escritorio.", 409);
     if (causaId && session.workspace.causaId !== causaId) throw httpError("Los alcances de la ayuda no coinciden.", 409);
     causaId = session.workspace.causaId;

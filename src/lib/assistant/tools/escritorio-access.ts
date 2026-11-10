@@ -1,3 +1,4 @@
+import { activeComputerSessionWhere } from "@/lib/altazor/computer/lifecycle";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
@@ -43,10 +44,10 @@ export async function desktopSession(ctx: ToolContext, sessionId: string, live: 
 export async function listDesktopSessions(ctx: ToolContext, db: Client = prisma) {
   const scope = await desktopScope(ctx, db);
   const sessions = await db.altazorComputerSession.findMany({ where: {
-    ownerId: scope.actor.id, state: { in: ["ready", "starting"] }, expiresAt: { gt: new Date() }, kittyId: { not: null }, chatId: { not: null },
+    ownerId: scope.actor.id, state: { in: ["ready", "starting"] }, ...activeComputerSessionWhere(), kittyId: { not: null }, chatId: { not: null },
     workspace: { ownerId: scope.actor.id, causaId: scope.causaId, scopeKey: scope.scopeKey, enabled: true, credentialEnc: { not: null } },
   }, select: { id: true, state: true, expiresAt: true, held: true, updatedAt: true, connectorNamesJson: true, workspace: { select: { id: true, providerName: true } } }, take: 10, orderBy: { createdAt: "desc" } });
-  return sessions.map(row => ({ id: row.id, state: row.state, expiresAt: row.expiresAt.toISOString(), held: row.held && Date.now() - row.updatedAt.getTime() < 5 * 60_000, workspaceId: row.workspace.id, provider: row.workspace.providerName, connectors: desktopConnectorNames(row.connectorNamesJson), causaId: scope.causaId }));
+  return sessions.map(row => ({ id: row.id, state: row.state, expiresAt: row.expiresAt?.toISOString() ?? null, held: row.held && Date.now() - row.updatedAt.getTime() < 5 * 60_000, workspaceId: row.workspace.id, provider: row.workspace.providerName, connectors: desktopConnectorNames(row.connectorNamesJson), causaId: scope.causaId }));
 }
 /** Called by the planner and history reader as well as direct tool entry points. */
 export async function assertDesktopToolInputAccess(id: string, input: Record<string, unknown>, ctx: ToolContext, write: boolean, db: Client = prisma) {

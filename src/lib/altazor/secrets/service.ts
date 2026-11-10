@@ -1,3 +1,4 @@
+import { computerSessionExpired, activeComputerSessionWhere } from "../computer/lifecycle";
 import { randomUUID } from "node:crypto";
 import type { AltazorSecret, AltazorSecretGrant, Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -93,7 +94,7 @@ async function targetAccess(db: Client, user: CausaAccessUser, target: SecretTar
   assertComputerPolicy(policy.assistantLlmMode);
   const session = await db.altazorComputerSession.findFirst({ where: { id: target.sessionId, ownerId: actor.id } });
   if (!session) throw new SecretError("secret_session_not_found", "Sesión no encontrada o sin acceso actual.", 404);
-  if (session.state !== "ready" || !session.kittyId || !session.chatId || session.expiresAt.getTime() <= now || !session.held || now - session.updatedAt.getTime() >= SECRET_LIMITS.holdMs) throw new SecretError("secret_hold_required", "Abra el escritorio y tome el control manual antes de usar un secreto.", 409);
+  if (session.state !== "ready" || !session.kittyId || !session.chatId || computerSessionExpired(session, now) || !session.held || now - session.updatedAt.getTime() >= SECRET_LIMITS.holdMs) throw new SecretError("secret_hold_required", "Abra el escritorio y tome el control manual antes de usar un secreto.", 409);
   const workspace = await db.altazorComputerWorkspace.findFirst({ where: { id: session.workspaceId, ownerId: actor.id } });
   if (!workspace || !workspace.enabled || !workspace.credentialEnc || workspace.scopeKey !== altazorScopeKey(workspace.causaId)) throw new SecretError("secret_workspace_unavailable", "El espacio de este escritorio ya no está disponible.", 409);
   if (workspace.causaId) await assertCausaAccess(workspace.causaId, actor, { auditOverride: false }, db);
@@ -122,7 +123,7 @@ export async function prepareSecretUse(user: CausaAccessUser, input: PrepareSecr
       if (!grant || grant.expiresAt.getTime() <= clock(options) || grant.state !== "pending" || !constantEqual(grant.sessionHash, current.sessionHash)) throw new SecretError("secret_grant_expired", "La autorización ya no está disponible. Confirme una nueva solicitud.", 409);
       return grantView(grant);
     }
-    const grant = await tx.altazorSecretGrant.create({ data: { id: randomUUID(), ownerId: current.actor.id, secretId: secret.id, secretRevision: secret.revision, sessionId: current.session.id, targetJson: JSON.stringify(target), targetHash: secretReceipt(current.actor.id, "target", target, options.material), sessionHash: current.sessionHash, expiresAt: new Date(Math.min(clock(options) + SECRET_LIMITS.grantMs, current.session.expiresAt.getTime())) } });
+    const grant = await tx.altazorSecretGrant.create({ data: { id: randomUUID(), ownerId: current.actor.id, secretId: secret.id, secretRevision: secret.revision, sessionId: current.session.id, targetJson: JSON.stringify(target), targetHash: secretReceipt(current.actor.id, "target", target, options.material), sessionHash: current.sessionHash, expiresAt: new Date(Math.min(clock(options) + SECRET_LIMITS.grantMs, current.session.expiresAt?.getTime() ?? Infinity)) } });
     await tx.altazorSecretReceipt.create({ data: { ownerId: current.actor.id, requestId: body.requestId, kind: "prepare", inputHash: hash, resourceId: grant.id } });
     return grantView(grant);
   });
@@ -157,7 +158,7 @@ export async function redeemSecretUse(user: CausaAccessUser, input: { grantId: s
       // Row locks serialize rotation/deletion, ACL revocation and session release with typing.
       const userLock = await tx.user.updateMany({ where: { id: live.actor.id, role: live.actor.role, capabilityGrants: live.actor.capabilityGrants, capabilityRevokes: live.actor.capabilityRevokes }, data: { capabilityRevokes: live.actor.capabilityRevokes } });
       const workspaceLock = await tx.altazorComputerWorkspace.updateMany({ where: { id: live.workspace.id, ownerId: live.actor.id, enabled: true, credentialEnc: live.workspace.credentialEnc }, data: { updatedAt: live.workspace.updatedAt } });
-      const sessionLock = await tx.altazorComputerSession.updateMany({ where: { id: live.session.id, ownerId: live.actor.id, state: "ready", held: true, expiresAt: { gt: new Date(clock(options)) }, updatedAt: live.session.updatedAt }, data: { updatedAt: live.session.updatedAt } });
+      const sessionLock = await tx.altazorComputerSession.updateMany({ where: { id: live.session.id, ownerId: live.actor.id, state: "ready", held: true, ...activeComputerSessionWhere(new Date(clock(options))), updatedAt: live.session.updatedAt }, data: { updatedAt: live.session.updatedAt } });
       const secretLock = await tx.altazorSecret.updateMany({ where: { id: found.secretId, ownerId: live.actor.id, revision: found.secretRevision }, data: { revision: found.secretRevision } });
       const grantLock = await tx.altazorSecretGrant.updateMany({ where: { id: found.id, ownerId: live.actor.id, state: "consuming", expiresAt: { gt: new Date(clock(options)) } }, data: { state: "consuming" } });
       if (![userLock, workspaceLock, sessionLock, secretLock, grantLock].every(result => result.count === 1)) throw changed();

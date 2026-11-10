@@ -10,7 +10,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { KITTIES_SOURCE_COMMIT } from "@/lib/altazor/computer/policy";
-import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage, prepareComputerSecret, typeComputerSecret } from "@/lib/altazor/computer/service";
+import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, resumeComputerSession, inputComputer, readComputerSession, sendComputerMessage, prepareComputerSecret, typeComputerSecret } from "@/lib/altazor/computer/service";
 import { createSecret, deleteSecret } from "@/lib/altazor/secrets/service";
 import { gatewayRequestCategory, gatewayStartupSummary, runtimeFailureSummary } from "./computer-smoke-diagnostics";
 import { desktopToolchainVerified } from "./desktop-toolchain.mjs";
@@ -136,10 +136,13 @@ async function main() {
     stage = "broker-kitty-inspect";
     const stored = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } });
     check(stored.kittyId && stored.chatId, "Actual gateway identifiers missing");
+    check(stored.expiresAt === null && session.persistent, "New desktops must persist without an access deadline");
     const kittyReply = await originalFetch(`${endpoint}/v1/kitties/${encodeURIComponent(stored.kittyId)}`, { headers: { Authorization: `Bearer ${token}` } }).then(response => { lastGatewayOperation = "kitty_read"; lastGatewayHttpStatus = response.status; return response.json(); });
     check(kittyReply.kitty.desktop === true && kittyReply.kitty.provider === provider && !kittyReply.kitty.container.startsWith("demo-"), "Desktop must be a real configured container");
+    check(kittyReply.kitty.auto_off_minutes === 0, "The actual gateway must disable idle shutdown for this desktop");
     stage = "broker-container-inspect";
     const inspected = JSON.parse(await run("docker", ["inspect", kittyReply.kitty.container]))[0]; containerId = inspected.Id;
+    check(inspected.HostConfig.RestartPolicy.Name === "unless-stopped", "Engine restart must retain the same owned desktop");
     check(/^[a-f0-9]{64}$/.test(containerId) && inspected.Image === imageId && inspected.State.Running, "The desktop must run the pre-verified immutable local image");
     check(!inspected.HostConfig.Privileged && inspected.HostConfig.PidMode !== "host" && inspected.HostConfig.IpcMode !== "host" && inspected.HostConfig.NetworkMode === network, "Desktop must not share privileged host namespaces");
     check(!inspected.HostConfig.Devices?.length && !inspected.HostConfig.SecurityOpt?.includes("seccomp=unconfined"), "Desktop must not receive host devices or unconfined seccomp");
@@ -187,6 +190,19 @@ async function main() {
     check(providerCalls > 0 && !fixtureError && lastProviderPayload.includes(text) && lastProviderPayload.includes(file.toString("utf8").trim()), "Actual gateway must deliver the selected task/upload to the local provider fixture");
     const sendsBeforeReplay = providerCalls; await sendComputerMessage(owner, session.id, task); check(providerCalls === sendsBeforeReplay, "Same request must not resend the model task");
     const copies = join(root, "upload-copy"); await run("docker", ["cp", `${containerId}:/home/kitty/work/uploads`, copies]); check(await containsFile(copies, file), "Selected bytes must actually reach this container's upload directory");
+    stage = "persistent-desktop-stop-resume";
+    const beforeResumeCalls = providerCalls;
+    await run("docker", ["exec", containerId, "sh", "-c", "printf persistent-fixture > /home/kitty/.lexopen-persistence-fixture"]);
+    await closeComputerSession(owner, session.id, `persistent-stop-${randomUUID()}`);
+    await resumeComputerSession(owner, session.id, `persistent-resume-${randomUUID()}`);
+    await until(() => readComputerSession(owner, session.id), view => view.session.state === "ready");
+    const restored = JSON.parse(await run("docker", ["inspect", kittyReply.kitty.container]))[0];
+    check(restored.Id === containerId, "Resume must use the exact same container");
+    check((await run("docker", ["exec", containerId, "cat", "/home/kitty/.lexopen-persistence-fixture"])).trim() === "persistent-fixture", "Desktop home must survive stop/resume");
+    const resumedCopies = join(root, "resumed-upload-copy");
+    await run("docker", ["cp", `${containerId}:/home/kitty/work/uploads`, resumedCopies]);
+    check(await containsFile(resumedCopies, file), "Selected files must survive stop/resume");
+    check(providerCalls === beforeResumeCalls, "Resume must not repeat a model task");
     stage = "policy-acl-ttl-cancel-and-close";
     await prisma.firmSettings.update({ where: { organizationId }, data: { assistantLlmMode: "local_only" } });
     const beforePolicy = traffic;
@@ -200,7 +216,7 @@ async function main() {
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: owner.id } });
     await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { expiresAt: new Date(0) } }); const beforeExpiry = traffic;
     await assert.rejects(computerScreenshot(owner, session.id), error => (error as { status?: number }).status === 410); check(traffic === beforeExpiry, "Expired access must precede gateway traffic");
-    await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { expiresAt: new Date(Date.now() + 60_000) } });
+    await prisma.altazorComputerSession.update({ where: { id: session.id }, data: { expiresAt: null } });
     // The FIRST inference remains pending: acceptance and cancellation must work
     // before the provider has returned any tool call or response.
     modelMode = "hang-task";
