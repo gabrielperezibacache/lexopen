@@ -59,3 +59,9 @@ node scripts/altazor/pack-desktop-image.mjs /ruta/al/summary.json /ruta/a/carpet
 El programa empaqueta la imagen que coincide con la evidencia y genera un recibo con tamaño, huella, arquitectura y revisión. Si una versión posterior ofrece la descarga, el instalador sólo aceptará el archivo `LexOpen-<versión>-altazor-linux-<arquitectura>.tar.gz` de su publicación oficial. Comprueba su tamaño y huella y aplica un límite de 2 GB comprimidos. [Metadatos de archivos publicados](https://docs.github.com/en/rest/releases/assets) · [Runners Linux de GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 Fuentes de los paquetes principales. [LibreOffice en Debian](https://packages.debian.org/trixie/libreoffice) · [Poppler](https://packages.debian.org/trixie/poppler-utils) · [Tesseract en español](https://packages.debian.org/trixie/tesseract-ocr-spa) · [Pandoc](https://packages.debian.org/trixie/pandoc) · [FFmpeg](https://packages.debian.org/trixie/ffmpeg).
+
+## Recibos históricos de descargas
+
+En **Computadora → Historial de descargas**, cada usuario consulta sus recibos del espacio personal o de la causa seleccionada. Se pueden filtrar por fecha de solicitud (hora de Chile), conexión y estado: confirmada, fallida o rechazada, y sin confirmar. Anterior y Siguiente recorren el historial, incluidas las páginas sin coincidencias con un filtro.
+
+Funciona con sesiones cerradas o vencidas y con el gateway desactivado. La consulta comprueba los permisos actuales; no abre sesiones ni ejecuta descargas. Solo una confirmación vinculada a su solicitud original acredita una descarga. Un resultado pendiente, incompleto o inconsistente se muestra sin confirmar. El historial omite el contenido y las rutas locales del archivo; la existencia actual del archivo se comprueba desde el escritorio.
