@@ -1,3 +1,4 @@
+import { automaticRefreshCycle, SCHEDULED_REFRESH_NOTE } from "@/lib/pjud/daily-refresh";
 import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
 
     if (cron && await getCaseManagementMode() !== "pjud_cl") return json({ ok: true, paused: true });
     await assertPjudManagementEnabled();
+    if (cron && !await automaticRefreshCycle()) return json({ ok: true, skipped: true, enqueued: 0, synced: 0, note: SCHEDULED_REFRESH_NOTE });
     const body = await parseMisCausasRequest(req);
 
     if (body?.action === "clear_errors") {
@@ -143,6 +145,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await syncMisCausas({
+      automatic: Boolean(cron),
       actorId,
       syncMovimientos,
       processJobsInline: false,

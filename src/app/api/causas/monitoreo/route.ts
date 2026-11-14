@@ -1,3 +1,4 @@
+import { automaticRefreshCycle, SCHEDULED_REFRESH_NOTE } from "@/lib/pjud/daily-refresh";
 import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { can, canSome } from "@/lib/auth/permissions";
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
 
     if (cron && await getCaseManagementMode() !== "pjud_cl") return NextResponse.json({ ok: true, paused: true, enqueued: 0, synced: 0 });
     await assertPjudManagementEnabled();
+    if (cron && !await automaticRefreshCycle()) return NextResponse.json({ ok: true, skipped: true, enqueued: 0, synced: 0, note: SCHEDULED_REFRESH_NOTE });
     const body = await parseBody(
       req,
       z
@@ -173,6 +175,7 @@ export async function POST(req: NextRequest) {
               materia: row.materia || undefined,
               actorId,
               syncNow: body.syncNow === true,
+              automatic: Boolean(cron),
               origin: "csv",
             })
           );
@@ -241,6 +244,7 @@ export async function POST(req: NextRequest) {
       });
       const results = await processPendingSyncJobs({
         actorId,
+        automatic: Boolean(cron),
         limit: body.limit,
         jobIds: requeued.map((j) => j.id),
       });
@@ -268,6 +272,7 @@ export async function POST(req: NextRequest) {
     if (body?.action === "process-queue") {
       const results = await processPendingSyncJobs({
         actorId,
+        automatic: Boolean(cron),
         limit: body.limit,
       });
       return NextResponse.json({
@@ -328,6 +333,7 @@ export async function POST(req: NextRequest) {
 
     const pipeline = await runDueSyncPipeline({
       actorId,
+      automatic: Boolean(cron),
       limit: body?.limit,
     });
 

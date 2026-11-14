@@ -1,3 +1,5 @@
+import { mock } from "node:test";
+import { nextCaseRefreshAt } from "./daily-schedule.mjs";
 /** Real disposable PostgreSQL pipeline, synthetic session callbacks, no OJV/network. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -7,6 +9,11 @@ import { syncMisCausas, type MisCausasSessionSource } from "@/lib/pjud/claveunic
 import { getPjudQueueStatus, processPendingSyncJobs, requeueFailedJobs, reclaimStuckRunningJobs, enqueueDueSyncJobs, PJUD_MANUAL_SESSION_TRIGGER, PJUD_MANUAL_SESSION_JOB_TTL_MS } from "@/lib/pjud/queue";
 import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { scrapeMovimientoIdentity, type MisCausasItem } from "@/lib/pjud/types";
+
+async function scheduledEnqueue(opts: Parameters<typeof enqueueDueSyncJobs>[0]) {
+  mock.timers.enable({ apis: ["Date"], now: nextCaseRefreshAt() });
+  try { return await enqueueDueSyncJobs(opts); } finally { mock.timers.reset(); }
+}
 
 async function main() {
   const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
@@ -272,7 +279,7 @@ async function main() {
       const expired = await prisma.pjudSyncJob.findMany({ where: { id: { in: expiredIds } } });
       assert.ok(expired.every(job => job.status === "failed" && job.trigger === PJUD_MANUAL_SESSION_TRIGGER && job.attempts === 0));
       assert.equal((await requeueFailedJobs({ causaIds: ownIds })).length, 0, "expired session jobs must not acquire a generic provider on retry");
-      assert.equal((await enqueueDueSyncJobs({ causaIds: ownIds, trigger: "cron" })).length, 0,
+      assert.equal((await scheduledEnqueue({ causaIds: ownIds, trigger: "cron" })).length, 0,
         "an incomplete manual reservation must also prevent a new cron job from silently switching provider");
       await prisma.causa.updateMany({ where: { id: { in: ownIds } }, data: { pjudNextSyncAt: new Date(0) } });
       const independentDue = await prisma.causa.create({ data: {
@@ -280,7 +287,7 @@ async function main() {
         pjudMonitoreoActivo: true, pjudNextSyncAt: new Date(Date.now() - 1000),
       } });
       causaIds.push(independentDue.id);
-      const independentScheduled = await enqueueDueSyncJobs({ trigger: "cron", limit: 1, reclaimStuckRunning: false });
+      const independentScheduled = await scheduledEnqueue({ trigger: "cron", limit: 1, reclaimStuckRunning: false });
       assert.deepEqual(independentScheduled.map(job => job.causaId), [independentDue.id],
         "held causes must be excluded before the candidate limit so other scheduled causes do not starve");
       await prisma.causa.delete({ where: { id: independentDue.id } });
@@ -289,7 +296,7 @@ async function main() {
       process.env.PJUD_PUBLIC_SCRAPE = "1";
       const recoveredAfterExpiry = await syncMisCausas({ sessionSource: recoveredSource, processJobsInline: true });
       assert.equal(recoveredAfterExpiry.syncOk, 2, "a fresh explicit session can recover expired reservations");
-      const scheduledAfterRecovery = await enqueueDueSyncJobs({ causaIds: ownIds, trigger: "cron" });
+      const scheduledAfterRecovery = await scheduledEnqueue({ causaIds: ownIds, trigger: "cron" });
       assert.equal(scheduledAfterRecovery.length, 2, "a successful manual refresh permits subsequent scheduled monitoring");
       assert.ok(scheduledAfterRecovery.every(job => job.trigger === "cron"));
       await prisma.pjudSyncJob.deleteMany({ where: { id: { in: scheduledAfterRecovery.map(job => job.id) } } });

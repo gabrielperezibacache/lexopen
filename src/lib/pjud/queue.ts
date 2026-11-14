@@ -1,3 +1,4 @@
+import { automaticRefreshCycle } from "./daily-refresh";
 import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -135,6 +136,8 @@ export async function enqueueDueSyncJobs(opts?: {
   if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
   if (await getCaseManagementMode() !== "pjud_cl") return [];
   const trigger = opts?.trigger || "cron";
+  const slot = trigger === "cron" ? await automaticRefreshCycle() : null;
+  if (trigger === "cron" && !slot) return [];
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 200);
 
   await expireManualSessionSyncJobs({ causaIds: opts?.causaIds });
@@ -145,9 +148,14 @@ export async function enqueueDueSyncJobs(opts?: {
   const awaitingRecovery = trigger === "cron"
     ? await causaIdsAwaitingManualRecovery(opts?.causaIds)
     : new Set<string>();
+  if (slot) {
+    const used = await prisma.pjudRefreshReservation.findMany({ where: { slot, scope: { startsWith: "case:" } }, select: { scope: true } });
+    for (const row of used) awaitingRecovery.add(row.scope.slice(5));
+  }
   const causas = await prisma.causa.findMany({
     where: {
       ...dueSyncWhere({ causaIds: opts?.causaIds }),
+      ...(trigger !== "cron" && opts?.causaIds === undefined ? { OR: undefined } : {}),
       ...(awaitingRecovery.size ? { NOT: { id: { in: [...awaitingRecovery] } } } : {}),
     },
     select: { id: true },
@@ -189,6 +197,7 @@ export async function enqueueDueSyncJobs(opts?: {
 
 export async function processPendingSyncJobs(opts?: {
   actorId?: string | null;
+  automatic?: boolean;
   concurrency?: number;
   limit?: number;
   jobIds?: string[];
@@ -224,6 +233,7 @@ export async function processPendingSyncJobs(opts?: {
   const concurrency = opts?.fetchMovimientos ? 1 : opts?.concurrency ?? pjudSyncConcurrency();
   await mapWithConcurrency(pending, concurrency, async (job) => {
     if (await getCaseManagementMode() !== "pjud_cl") return;
+    if ((opts?.automatic ?? job.trigger === "cron") && !await automaticRefreshCycle()) return;
     await opts?.assertActive?.();
     const claimed = await prisma.pjudSyncJob.updateMany({
       where: {
@@ -240,6 +250,7 @@ export async function processPendingSyncJobs(opts?: {
     try {
       const result = await syncCausaPjud(job.causaId, {
         actorId: opts?.actorId,
+        automatic: opts?.automatic,
         force: job.trigger !== "cron",
         trigger: (job.trigger as "cron" | "manual" | "retry" | typeof PJUD_MANUAL_SESSION_TRIGGER) || "cron",
         existingJobId: job.id,
@@ -284,16 +295,20 @@ export async function processPendingSyncJobs(opts?: {
 /** Enqueue due causas and process pending queue (cron path). */
 export async function runDueSyncPipeline(opts?: {
   actorId?: string | null;
+  automatic?: boolean;
   causaIds?: string[];
   limit?: number;
 }) {
+  const automatic = opts?.automatic ?? (!opts?.actorId && opts?.causaIds === undefined);
+  if (await getCaseManagementMode() !== "pjud_cl" || (automatic && !await automaticRefreshCycle())) return { enqueued: 0, synced: 0, results: [] };
   const enqueued = await enqueueDueSyncJobs({
     causaIds: opts?.causaIds,
-    trigger: opts?.causaIds?.length ? "manual" : "cron",
+    trigger: automatic ? "cron" : "manual",
     limit: opts?.limit,
   });
   const results = await processPendingSyncJobs({
     actorId: opts?.actorId,
+    automatic,
     limit: opts?.limit,
     // Cron drains the oldest pending jobs; manual runs stay within their selection.
     jobIds: opts?.causaIds !== undefined ? enqueued.map((j) => j.id) : undefined,

@@ -66,19 +66,19 @@ async function main() {
     assert.deepEqual(await enqueueDueSyncJobs({ causaIds: [cause.id] }), []);
     assert.deepEqual(await runDueSyncPipeline({ causaIds: [cause.id] }), { enqueued: 0, synced: 0, results: [] });
     const provider = async () => { providerCalls++; return { provider: "scrape" as const, demo: false, note: "Proveedor sintético", movimientos: [] }; };
-    assert.deepEqual(await processPendingSyncJobs({ actorId: owner.id, jobIds: [job.id], fetchMovimientos: provider }), []);
+    assert.deepEqual(await processPendingSyncJobs({ actorId: owner.id, automatic: false, jobIds: [job.id], fetchMovimientos: provider }), []);
     const download = (async () => { downloads++; return new Response(Buffer.from("%PDF-1.4\n" + "Fictitious test bytes. ".repeat(20)), { headers: { "Content-Type": "application/pdf" } }); }) as typeof import("@/lib/net/safe-url").fetchSafeOutbound;
     assert.deepEqual(await processPendingPjudDocumentJobs({ causaId: cause.id, fetch: download }), []);
     assert.equal(providerCalls, 0); assert.equal(downloads, 0); assert.equal(network, 0);
     await updateCaseManagementMode("pjud_cl", admin, db);
     assert.equal((await db.pjudSyncJob.findUniqueOrThrow({ where: { id: job.id } })).status, "pending");
     assert.equal((await db.pjudDocumentJob.findUniqueOrThrow({ where: { id: receipt.id } })).status, "pending");
-    // Switching modes while a provider is in flight must preserve the pause and prevent commit.
-    const stopped = await processPendingSyncJobs({ actorId: owner.id, jobIds: [job.id], fetchMovimientos: async () => { providerCalls++; await updateCaseManagementMode("manual", admin, db); return { provider: "scrape", demo: false, note: "Proveedor sintético detenido", movimientos: [] }; } });
+    // This foreground manual refresh may run at any hour. Switching modes in flight must preserve the pause and prevent commit.
+    const stopped = await processPendingSyncJobs({ actorId: owner.id, automatic: false, jobIds: [job.id], fetchMovimientos: async () => { providerCalls++; await updateCaseManagementMode("manual", admin, db); return { provider: "scrape", demo: false, note: "Proveedor sintético detenido", movimientos: [] }; } });
     assert.deepEqual(stopped, []); assert.equal((await db.pjudSyncJob.findUniqueOrThrow({ where: { id: job.id } })).status, "paused");
     assert.equal((await db.causa.findUniqueOrThrow({ where: { id: cause.id } })).pjudFailCount, 0);
     await updateCaseManagementMode("pjud_cl", admin, db);
-    assert.equal((await processPendingSyncJobs({ actorId: owner.id, jobIds: [job.id], fetchMovimientos: provider })).length, 1);
+    assert.equal((await processPendingSyncJobs({ actorId: owner.id, automatic: false, jobIds: [job.id], fetchMovimientos: provider })).length, 1);
     await processPendingPjudDocumentJobs({ causaId: cause.id, fetch: download, enqueue: () => true });
     assert.equal(downloads, 1); assert.equal((await db.pjudDocumentJob.findUniqueOrThrow({ where: { id: receipt.id } })).status, "saved");
     await updateCaseManagementMode("manual", admin, db);
