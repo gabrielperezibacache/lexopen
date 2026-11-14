@@ -1,3 +1,4 @@
+import { claimAutomaticRefresh, assertRefreshCycleActive, nextCaseRefreshAt, SCHEDULED_REFRESH_NOTE } from "./daily-refresh";
 import { assertPjudManagementEnabled, getCaseManagementMode, pausePjudManagementJobs } from "@/lib/causas/management-mode";
 import { causaAccessWhere, assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
@@ -11,7 +12,6 @@ import {
   fetchPjudMovimientos,
   pjudLiveIngestConfigured,
   pjudProviderConfigured,
-  pjudSyncIntervalMs,
   type PjudFetchResult,
 } from "@/lib/pjud/provider";
 import { captchaSolverConfigured, captchaSolverStatusPublic } from "@/lib/pjud/captcha-solver";
@@ -56,15 +56,7 @@ function externalKey(rit: string | null, tribunal: string) {
   return `${(rit || "").toUpperCase()}|${tribunal}`.slice(0, 180);
 }
 
-function nextSyncAtFrom(now = new Date(), failCount = 0, intervalMinutes?: number | null) {
-  const base = intervalMinutes && intervalMinutes >= 15 && intervalMinutes <= 1440 ? intervalMinutes * 60_000 : pjudSyncIntervalMs();
-  // Exponential backoff on repeated failures (cap 8× interval).
-  const factor =
-    failCount <= 0
-      ? 1
-      : Math.min(8, 2 ** Math.min(Math.max(failCount - 1, 0), 3));
-  return new Date(now.getTime() + base * factor);
-}
+const nextSyncAtFrom = nextCaseRefreshAt;
 
 /** Promote a compatible historical fingerprint in place, preserving its documents. */
 export async function persistFetchedPjudMovimientos(
@@ -141,6 +133,7 @@ export async function syncCausaPjud(
   opts?: {
     actorId?: string | null;
     force?: boolean;
+    automatic?: boolean;
     trigger?: "manual" | "manual-session" | "cron" | "retry" | "webhook" | "import";
     existingJobId?: string | null;
     /** Internal session callback; the ordinary provider remains the default. */
@@ -195,6 +188,15 @@ export async function syncCausaPjud(
     };
   }
 
+  const automatic = opts?.automatic ?? trigger === "cron";
+  const slot = automatic ? await claimAutomaticRefresh(`case:${causaId}`) : null;
+  if (automatic && !slot) {
+    return { causaId, inserted: 0, skipped: 0, provider: "none", demo: false,
+      note: SCHEDULED_REFRESH_NOTE, status: "disabled", jobId: opts?.existingJobId ?? null, ...baseMeta() };
+  }
+  const assertSchedule = () => { if (slot) assertRefreshCycleActive(slot); };
+  assertSchedule();
+
   const job = opts?.existingJobId
     ? await prisma.pjudSyncJob.update({
         where: { id: opts.existingJobId },
@@ -217,10 +219,12 @@ export async function syncCausaPjud(
   let fetchResult: PjudFetchResult;
   try {
     await assertPjudManagementEnabled();
+    assertSchedule();
     await opts?.assertActive?.();
     const fetchMovimientos: PjudMovimientosFetcher = opts?.fetchMovimientos ?? ((ref) => fetchPjudMovimientos(ref, {
       assertActive: async () => {
         await assertPjudManagementEnabled();
+        assertSchedule();
         await opts?.assertActive?.();
       },
     }));
@@ -233,12 +237,12 @@ export async function syncCausaPjud(
       caratula: causa.caratula,
     });
     await assertPjudManagementEnabled();
+    assertSchedule();
     await opts?.assertActive?.();
   } catch (e) {
     if (await getCaseManagementMode() !== "pjud_cl") { await pausePjudManagementJobs(); throw httpError("Actualización judicial pausada por la modalidad manual.", 409); }
     const note = e instanceof Error ? e.message : "Error de sync";
-    const failCountAfter = (causa.pjudFailCount || 0) + 1;
-    const next = nextSyncAtFrom(new Date(), failCountAfter, causa.pjudSyncIntervalMinutes);
+    const next = nextSyncAtFrom(new Date());
     await prisma.$transaction([
       prisma.causa.update({
         where: { id: causaId },
@@ -267,8 +271,7 @@ export async function syncCausaPjud(
   }
 
   if (fetchResult.provider === "none") {
-    const failCountAfter = (causa.pjudFailCount || 0) + 1;
-    const next = nextSyncAtFrom(new Date(), failCountAfter, causa.pjudSyncIntervalMinutes);
+    const next = nextSyncAtFrom(new Date());
     await prisma.$transaction([
       prisma.causa.update({
         where: { id: causaId },
@@ -318,7 +321,7 @@ export async function syncCausaPjud(
   let inserted = 0;
   let skipped = 0;
   const newRelevant: string[] = [];
-  const next = nextSyncAtFrom(new Date(), partial ? causa.pjudFailCount + 1 : 0, causa.pjudSyncIntervalMinutes);
+  const next = nextSyncAtFrom(new Date());
 
   await prisma.$transaction(async (tx) => {
     await assertPjudManagementEnabled(tx);
@@ -412,6 +415,7 @@ export async function syncCausaPjud(
     });
     if (!mov || mov.documentoRef?.startsWith("doc:")) continue;
     try {
+      assertSchedule();
       await opts?.assertActive?.();
       const id = await ingestPjudDocumentBuffer({
         causaId,
@@ -799,7 +803,9 @@ export function providerStatusPublic() {
       process.env.PJUD_ALLOW_DEMO === "1" ||
       (process.env.NODE_ENV !== "production" &&
         process.env.PJUD_ALLOW_DEMO !== "0"),
-    syncIntervalMinutes: Math.round(pjudSyncIntervalMs() / 60000),
+    syncIntervalMinutes: null,
+    scheduleHours: [8, 22],
+    timeZone: "America/Santiago",
     honesty: pjudLiveIngestConfigured()
       ? scraperSidecarConfigured()
         ? "La consulta en vivo está disponible mediante el servicio auxiliar del Host. Su ClaveÚnica se guarda cifrada aquí; la Oficina Judicial Virtual y el CAPTCHA se consultan por internet."

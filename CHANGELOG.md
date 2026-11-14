@@ -2,6 +2,8 @@
 
 ## En desarrollo
 
+- Actualización automática de causas y Mis Causas a las 08:00 y 22:00, hora de Chile. Reservas persistentes por turno evitan duplicados y reintentos adicionales; los cambios manuales y la importación personal siguen disponibles a cualquier hora. Preferencias y documentación muestran el horario fijo.
+
 - Mi Fiscalía: apartado de solicitudes por causa con acceso oficial mediante ClaveÚnica, preparación, folios y respuestas registrados manualmente, historial, exportación de texto y seguimiento en el estado automático. Permisos por causa, guardado idempotente y control de edición simultánea.
 - Plazos: los enlaces desde una causa filtran el listado y mantienen el ámbito al cambiar de mes o vista; permite quitar el filtro y volver al expediente.
 

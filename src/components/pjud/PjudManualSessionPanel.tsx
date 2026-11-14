@@ -51,7 +51,6 @@ export function PjudManualSessionPanel() {
   const [page, setPage] = useState(0);
   const [reviewingNextBatch, setReviewingNextBatch] = useState(false);
   const [downloadDocuments, setDownloadDocuments] = useState(false);
-  const [intervalMinutes, setIntervalMinutes] = useState(60);
   const snapshot = useRef<ManualOjvUiResponse | null>(null);
   const mounted = useRef(false);
   const revision = useRef(0);
@@ -143,7 +142,7 @@ export function PjudManualSessionPanel() {
     setError("");
     const body = { action, ...(action !== "start" ? { sessionId: data?.session?.id } : {}),
       ...(action === "list" && materia !== "all" ? { materias: [materia] } : {}),
-      ...(action === "import" ? { candidateIds: [...selected], downloadDocuments, intervalMinutes } : {}) };
+      ...(action === "import" ? { candidateIds: [...selected], downloadDocuments } : {}) };
     const timeout = window.setTimeout(() => controller.abort(), 30_000);
     try {
       const response = await apiMutation<ManualOjvUiResponse>(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
@@ -268,7 +267,7 @@ export function PjudManualSessionPanel() {
           <div className="pjud-manual-pagination"><p>{filtered.length ? `${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, filtered.length)} de ${filtered.length}` : "Sin coincidencias"}</p><div><button className="btn btn-ghost" type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Anterior</button><button className="btn btn-ghost" type="button" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>Siguiente</button></div></div>
           <div className="pjud-manual-import"><div><h3>Incorporar a mi cartera</h3><p>Se incorporarán las causas seleccionadas y sus cuadernos disponibles.</p>
             <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={downloadDocuments} onChange={event => setDownloadDocuments(event.target.checked)} disabled={Boolean(busy)} /><span>Guardar también las resoluciones y documentos nuevos en cada causa.</span></label>
-            <details className="pjud-manual-options"><summary>Frecuencia de revisión</summary><label className="mt-2 block text-sm">Revisar novedades<select className="input mt-1" value={intervalMinutes} disabled={Boolean(busy)} onChange={event => setIntervalMinutes(Number(event.target.value))}>{[[15,"Cada 15 minutos"],[30,"Cada 30 minutos"],[60,"Cada hora"],[180,"Cada 3 horas"],[360,"Cada 6 horas"],[1440,"Una vez al día"]].map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></label><p className="mt-2 text-xs">Las causas pausadas conservan su pausa.</p></details>
+            <p className="mt-2 text-xs">Revisión automática a las 08:00 y 22:00, hora de Chile. Puede actualizar manualmente en cualquier momento. Las causas pausadas conservan su pausa.</p>
             {selected.size > 0 && <ul className="pjud-manual-selected" aria-label="Causas seleccionadas">{candidates.filter(item => selected.has(item.id)).map(item => <li key={item.id}><span><strong>{item.rit}</strong> · {item.tribunal}</span><button type="button" className="btn btn-ghost" disabled={!canRead || Boolean(busy)} aria-label={`Quitar ${item.rit}, ${item.tribunal} de la selección`} onClick={() => toggle(item.id)}><X size={17} aria-hidden="true" /></button></li>)}</ul>}
           </div><button className="btn btn-primary" type="button" disabled={!canRead || Boolean(busy) || selected.size === 0 || selected.size > limit} onClick={() => void act("import")}>Importar {selected.size || "las"} {selected.size === 1 ? "causa" : "causas seleccionadas"}</button></div>
         </> : <p className="pjud-manual-empty">La OJV no devolvió causas en esta consulta. Puede probar otra materia o volver a consultar; esta respuesta no acredita ausencia de causas.</p>}

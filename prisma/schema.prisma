@@ -3211,3 +3211,13 @@ model FiscaliaRequestEvent {
   createdAt DateTime @default(now())
   @@index([requestId, createdAt])
 }
+
+/// Reservations survive Host restarts. Each scope may run at most once in each Chilean 08/22 cycle.
+model PjudRefreshReservation {
+  id String @id @default(cuid())
+  scope String
+  slot String
+  createdAt DateTime @default(now())
+  @@unique([scope, slot])
+  @@index([slot])
+}

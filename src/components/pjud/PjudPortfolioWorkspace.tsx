@@ -286,7 +286,7 @@ export default function MonitoreoCausasPage() {
       )}
 
       <PjudQuickAddPanel />
-      {scheduler && <details className="text-sm text-[var(--muted)]"><summary className="flex min-h-11 cursor-pointer items-center underline underline-offset-4">Estado de la conexión</summary><p className="max-w-prose leading-7">{scheduler.configured ? `Revisión programada cada ${scheduler.intervalMinutes} minutos.` : "La revisión automática está pendiente de configuración."} {scheduler.note}{" "}<Link href="/configuracion#pjud" className="text-[var(--sea)] underline underline-offset-4">Revisar configuración</Link></p></details>}
+      {scheduler && <details className="text-sm text-[var(--muted)]"><summary className="flex min-h-11 cursor-pointer items-center underline underline-offset-4">Estado de la conexión</summary><p className="max-w-prose leading-7">{scheduler.configured ? "Revisión automática a las 08:00 y 22:00, hora de Chile. Actualizaciones manuales disponibles a cualquier hora." : "La revisión automática está pendiente de configuración."} {scheduler.note}{" "}<Link href="/configuracion#pjud" className="text-[var(--sea)] underline underline-offset-4">Revisar configuración</Link></p></details>}
       {resumen && <p className="text-sm text-[var(--muted)]">{resumen.total} causas · {resumen.monitoreadas} en seguimiento{resumen.fallidas ? ` · ${resumen.fallidas} por revisar` : ""}</p>}
 
       {fallidos.length > 0 && (

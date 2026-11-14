@@ -107,7 +107,7 @@ Use esta lista antes de cargar información real del estudio:
 5. **Secretos:** `SESSION_SECRET` y, si usa PJUD/cron,
    `PJUD_SECRETS_KEY` + `CRON_SECRET` aleatorios (≥16 caracteres).
 6. **Schedulers (opcionales, recomendados en operación diaria):**
-   `PJUD_SYNC_INTERVAL_MINUTES=240`, `PLAZOS_ALERTAS_INTERVAL_MINUTES=60`,
+   `PJUD_SYNC_INTERVAL_MINUTES=1`, `PLAZOS_ALERTAS_INTERVAL_MINUTES=60`,
    `UF_SYNC_INTERVAL_MINUTES=1440` (UF diaria para facturación; `0` = off),
    `LEXOPEN_BACKUP_INTERVAL_MINUTES` + `LEXOPEN_BACKUP_DIR` **fuera** del data dir.
    Cualquier intervalo `*_INTERVAL_MINUTES` > 0 exige `CRON_SECRET` (`prod:check` lo valida).
@@ -331,7 +331,7 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
   ```dotenv
   CRON_SECRET=<secreto-aleatorio>
-  PJUD_SYNC_INTERVAL_MINUTES=240
+  PJUD_SYNC_INTERVAL_MINUTES=1
   PJUD_SYNC_CONCURRENCY=5
   # Opcional: alertas de plazos (in-app; email si PLAZOS_ALERTAS_EMAIL=1)
   PLAZOS_ALERTAS_INTERVAL_MINUTES=60
@@ -446,3 +446,5 @@ npm run web:backup -- --rotate \
 
 El comando manual también valida que no exista `postmaster.pid`; no copie
 `pgdata` mientras PostgreSQL esté activo.
+
+Las variables históricas `PJUD_SYNC_INTERVAL_MINUTES` y `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` habilitan el horario fijo de causas con cualquier valor positivo: **08:00 y 22:00 America/Santiago**. `0` lo desactiva. Se requiere `CRON_SECRET` y el Host encendido en esos horarios; las actualizaciones manuales no tienen restricción horaria. Las reservas persistentes evitan duplicados y el turno perdido no se recupera fuera de horario.

@@ -1,3 +1,4 @@
+import { claimAutomaticRefresh, assertRefreshCycleActive, nextCaseRefreshAt, SCHEDULED_REFRESH_NOTE } from "./daily-refresh";
 import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
@@ -451,6 +452,7 @@ export async function claimMisCausasSync(opts?: {
 }
 
 export async function syncMisCausas(opts?: {
+  automatic?: boolean;
   actorId?: string | null;
   syncMovimientos?: boolean;
   /**
@@ -481,6 +483,10 @@ export async function syncMisCausas(opts?: {
   await opts?.sessionSource?.assertActive?.();
   const actor = opts?.actorId ? await prisma.user.findUnique({ where: { id: opts.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } }) : null;
   if (opts?.actorId && (!actor || (opts.sessionSource && !manualMisCausasAllowed(actor)))) throw httpError("No tiene permiso para importar causas.", 403);
+  const slot = opts?.automatic ? await claimAutomaticRefresh("portfolio") : null;
+  if (opts?.automatic && !slot) throw httpError(SCHEDULED_REFRESH_NOTE, 409);
+  const assertSchedule = () => { if (slot) assertRefreshCycleActive(slot); };
+  assertSchedule();
   const { settings } = await getOrCreateFirmSettings();
   let claimedAt = opts?.claim?.claimedAt ?? null;
   if (opts?.claim && (
@@ -519,6 +525,7 @@ export async function syncMisCausas(opts?: {
     if (opts?.sessionSource && (!claveUnicaAutomationAllowed(true) || !publicScrapeEnabled())) {
       throw httpError("La consulta de la sesión OJV está deshabilitada en este servidor.", 409);
     }
+    assertSchedule();
     const items = opts?.sessionSource
       ? await opts.sessionSource.listMisCausas()
       : await resolveMisCausasList();
@@ -529,10 +536,12 @@ export async function syncMisCausas(opts?: {
 
     for (const item of items) {
       await assertPjudManagementEnabled();
-  await opts?.sessionSource?.assertActive?.();
+      assertSchedule();
+      await opts?.sessionSource?.assertActive?.();
       const existing = await findExistingCausa(item, actor);
       await assertPjudManagementEnabled();
-  await opts?.sessionSource?.assertActive?.();
+      assertSchedule();
+      await opts?.sessionSource?.assertActive?.();
       let causaId = existing?.id;
       if (!causaId) {
         const createdCausa = await prisma.causa.create({
@@ -552,12 +561,12 @@ export async function syncMisCausas(opts?: {
             pjudMonitoreoActivo: true,
             pjudDocumentDownloadsEnabled: opts?.sessionSource?.downloadDocuments === true && Boolean(opts.actorId),
             ...(opts?.sessionSource?.downloadDocuments === true && opts.actorId ? { pjudDocumentDownloadOwnerId: opts.actorId } : {}),
-            ...(opts?.sessionSource?.syncIntervalMinutes ? { pjudSyncIntervalMinutes: opts.sessionSource.syncIntervalMinutes } : {}),
+            pjudSyncIntervalMinutes: null,
             pjudFromMisCausas: true,
             pjudOrigin: "claveunica",
             pjudSource: "claveunica",
             pjudLastSyncStatus: "never",
-            pjudNextSyncAt: new Date(),
+            pjudNextSyncAt: nextCaseRefreshAt(),
             pjudLastSyncNote: "Importada desde Mis Causas (ClaveÚnica).",
           },
         });
@@ -570,10 +579,10 @@ export async function syncMisCausas(opts?: {
           data: {
             pjudFromMisCausas: true,
             ...(opts?.sessionSource?.downloadDocuments === true && opts.actorId ? { pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: opts.actorId } : {}),
-            ...(opts?.sessionSource?.syncIntervalMinutes ? { pjudSyncIntervalMinutes: opts.sessionSource.syncIntervalMinutes } : {}),
+            pjudSyncIntervalMinutes: null,
             ...(existing?.pjudOrigin ? {} : { pjudOrigin: "claveunica" }),
             pjudSource: "claveunica",
-            ...(existing?.pjudMonitoreoActivo ? { pjudNextSyncAt: new Date() } : {}),
+            ...(existing?.pjudMonitoreoActivo ? { pjudNextSyncAt: nextCaseRefreshAt() } : {}),
             ...(!isPlaceholderTribunal(item.tribunal)
               ? { tribunal: item.tribunal }
               : {}),
@@ -606,11 +615,12 @@ export async function syncMisCausas(opts?: {
       const uniqueIds = [...new Set(causaIdsForSync)];
       for (let offset = 0; offset < uniqueIds.length; offset += 100) {
         await assertPjudManagementEnabled();
-  await opts?.sessionSource?.assertActive?.();
+        assertSchedule();
+        await opts?.sessionSource?.assertActive?.();
         const batch = uniqueIds.slice(offset, offset + 100);
         jobs.push(...await enqueueDueSyncJobs({
           causaIds: batch,
-          trigger: opts?.sessionSource ? PJUD_MANUAL_SESSION_TRIGGER : "manual",
+          trigger: opts?.automatic ? "cron" : opts?.sessionSource ? PJUD_MANUAL_SESSION_TRIGGER : "manual",
           limit: batch.length,
           ...(opts?.sessionSource ? { reclaimStuckRunning: false } : {}),
           onJobEnqueued: jobId => { enqueuedJobIds.push(jobId); },
@@ -625,8 +635,10 @@ export async function syncMisCausas(opts?: {
           : [jobs];
         for (const batch of batches) {
           await assertPjudManagementEnabled();
-  await opts?.sessionSource?.assertActive?.();
+          assertSchedule();
+          await opts?.sessionSource?.assertActive?.();
           processed.push(...await processPendingSyncJobs({
+            automatic: opts?.automatic,
             actorId: opts?.actorId,
             limit: Math.min(batch.length || 20, 40),
             jobIds: batch.map((job) => job.id),

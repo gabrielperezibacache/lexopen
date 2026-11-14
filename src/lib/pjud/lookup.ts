@@ -44,6 +44,8 @@ export function lookupReadiness() {
 export async function addCausaByRol(opts: {
   rit: string; tribunal: string; titulo?: string; ruc?: string | null; materia?: string;
   actorId?: string | null; syncNow?: boolean; origin?: CausaOrigin;
+  /** Internal scheduler context; never read from request data. */
+  automatic?: boolean;
 }): Promise<LookupCreateResult> {
   await assertPjudManagementEnabled();
   const { rit, tribunal } = lookupIdentity(opts);
@@ -82,7 +84,7 @@ export async function addCausaByRol(opts: {
   }
   let sync: LookupCreateResult["sync"] = null, syncError: string | undefined;
   if (opts.syncNow !== false) {
-    try { sync = await syncCausaPjud(saved.causaId, { actorId: opts.actorId, force: true, trigger: "manual" }); }
+    try { sync = await syncCausaPjud(saved.causaId, { actorId: opts.actorId, force: true, trigger: opts.automatic ? "cron" : "manual", ...(opts.automatic !== undefined ? { automatic: opts.automatic } : {}) }); }
     catch { syncError = "La causa quedó guardada, pero su sincronización no pudo completarse. Puede reintentarla desde el expediente."; }
   }
   return { ...saved, sync, ...(syncError ? { syncError } : {}), note: saved.created

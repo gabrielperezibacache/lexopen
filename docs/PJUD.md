@@ -162,7 +162,7 @@ El scrape invitado **falla** si el tribunal o el RIT no coinciden (no abre otra 
 | `PJUD_SECRETS_KEY` | Vault AES-256-GCM local para password ClaveÚnica (fallback: `SESSION_SECRET`) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
 | `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
-| `PJUD_SYNC_INTERVAL_MINUTES` | Intervalo `pjudNextSyncAt` tras sync OK (default **240** = 4h) |
+| `PJUD_SYNC_INTERVAL_MINUTES` | `>0` habilita las 08:00 y 22:00 `America/Santiago`; `0` desactiva. Nombre histórico, ya no expresa minutos. |
 | `PJUD_PDF_BACKUP` | Tras sync: URL `documentoRef` → `Documento`. Default **on** si `PJUD_PUBLIC_SCRAPE=1` (ponga `=0` para apagar). Preferible: PDF capturados en el scrape con cookies OJV. |
 | `PJUD_DOC_DOWNLOAD_DELAY_MS` | Pausa entre descargas secuenciales (botón en ficha + scrape). Default `2500`, máx. `30000`. |
 | `PJUD_DOC_DOWNLOAD_MAX` | Máximo de PDFs por corrida de import/scrape. Default `20`, máx. `50`. |
@@ -268,11 +268,11 @@ El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
 
 - `POST /api/causas/monitoreo` encola causas con `pjudMonitoreoActivo` y `pjudNextSyncAt` null/`<= now` (dedupe si ya hay pending/running), reclama jobs stuck en `running`, luego procesa `PjudSyncJob` pending → running → ok/failed con concurrency `PJUD_SYNC_CONCURRENCY`.
 - `GET /api/pjud/queue` → stats estilo CM (`waiting`/`active`/`completed`/`failed`/`delayed`).
-- Fallos aplican **backoff** exponencial sobre el intervalo base (`pjudFailCount`).
+- Máximo un intento automático por causa y por turno (08:00 y 22:00 `America/Santiago`). Un fallo consume su turno y espera al siguiente; no hay reintento automático intermedio. PostgreSQL conserva las reservas ante reinicios y llamadas simultáneas.
+- Los turnos se inician en el minuto 00; sus lotes pueden terminar durante esa hora. Si el Host no inició el turno, no recupera consultas fuera de horario. Las llamadas cron fuera de turno responden sin consultar el proveedor. Las actualizaciones manuales autenticadas siguen disponibles a cualquier hora.
 - Retry fallidos: `action: retry-fallidos` re-encola fallidos y parciales ordinarios; los de `manual-session` requieren recuperar el ingreso manual como se explica arriba.
-- Host local (`scripts/web-host.mjs`): programe con `PJUD_SYNC_INTERVAL_MINUTES=240`,
-  `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` y `PJUD_DIGEST_INTERVAL_MINUTES` (p. ej. digest
-  cercano a las 08:00 del Host) más `CRON_SECRET`.
+- Host local (`scripts/web-host.mjs`): habilite con `PJUD_SYNC_INTERVAL_MINUTES=1`, `PJUD_MIS_CAUSAS_INTERVAL_MINUTES=1` y `CRON_SECRET`. Cualquier valor positivo heredado habilita el mismo horario fijo; `0` conserva la desactivación. El Host debe permanecer encendido.
+- Los digests, correo, notificaciones y alertas de plazos mantienen sus programadores independientes; leer el estado guardado no consulta la OJV.
 
 ## Correo PJUD (solo `pjud.cl` → carpetas)
 

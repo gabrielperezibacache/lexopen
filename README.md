@@ -44,6 +44,12 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 
+## Actualización de causas
+
+Las consultas **automáticas** se inician a las **08:00 y 22:00, hora de Chile** (`America/Santiago`, con cambio de hora). Cada causa y la consulta de Mis Causas tienen como máximo un intento por turno; los fallos esperan al siguiente turno. Las **actualizaciones manuales** y el ingreso personal con ClaveÚnica siguen disponibles a cualquier hora.
+
+El Host debe estar encendido en esos horarios. Las reservas en PostgreSQL evitan repetir consultas al reiniciar o recibir llamadas simultáneas; una revisión iniciada puede terminar sus lotes durante esa hora. Un turno perdido no se recupera automáticamente fuera de horario. En un Host web, un valor positivo de `PJUD_SYNC_INTERVAL_MINUTES` o `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` habilita el horario correspondiente con `CRON_SECRET`; `0` lo desactiva. Los nombres antiguos ya no fijan intervalos de minutos. Las alertas de plazos y la lectura del estado local conservan su frecuencia. [Configuración y cola](docs/PJUD.md#cron--cola)
+
 ## Google y organización de documentos
 
 Una **cuenta Google compartida para todo el estudio** evita repetir conexiones por función. La administración elige la raíz; los profesionales trabajan desde las causas y espacios a los que tienen acceso.
