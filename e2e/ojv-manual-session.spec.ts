@@ -75,9 +75,8 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   expect(payloads.some(body => body.action === "import")).toBeFalsy();
   await expect(panel.getByRole("checkbox", { name: /Guardar también las resoluciones y documentos nuevos/ })).not.toBeChecked();
   await expect(panel.getByRole("combobox", { name: "Revisar novedades", exact: true })).toHaveCount(0);
-  await panel.getByText("Frecuencia de revisión", { exact: true }).click();
-  await expect(panel.getByRole("combobox", { name: "Revisar novedades", exact: true })).toHaveValue("60");
-  await panel.getByText("Frecuencia de revisión", { exact: true }).click();
+  await expect(panel.getByText(/Revisión automática a las 08:00 y 22:00, hora de Chile/)).toBeVisible();
+  await expect(panel.getByText(/Puede actualizar manualmente en cualquier momento/)).toBeVisible();
   const choices = panel.locator(".pjud-manual-case-list input");
   await choices.nth(0).check(); await choices.nth(1).check();
   await panel.getByLabel("Filtrar el listado").fill("revisión 3");
@@ -99,7 +98,7 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await expect(panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true })).toHaveCount(0);
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeFocused();
-  expect(payloads.find(body => body.action === "import")).toEqual({ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0", "opaque-fixture-1"], downloadDocuments: false, intervalMinutes: 60 });
+  expect(payloads.find(body => body.action === "import")).toEqual({ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0", "opaque-fixture-1"], downloadDocuments: false });
   const reports = panel.locator(".pjud-manual-result .pjud-cuadernos");
   await expect(reports.nth(0)).toHaveAttribute("data-status", "complete");
   await expect(reports.nth(1)).toHaveAttribute("data-status", "partial");
@@ -148,12 +147,12 @@ test("descargar documentos requiere una elección y conserva el recibo y los pen
   await expect(downloads).not.toBeChecked();
   await panel.locator(".pjud-manual-case-list input").first().check();
   await downloads.check();
-  await panel.getByText("Frecuencia de revisión", { exact: true }).click();
-  await panel.getByRole("combobox", { name: "Revisar novedades", exact: true }).selectOption("30");
+  await expect(panel.getByRole("combobox", { name: "Revisar novedades", exact: true })).toHaveCount(0);
+  await expect(panel.getByText(/Revisión automática a las 08:00 y 22:00, hora de Chile/)).toBeVisible();
   expect(payloads).toEqual([]);
   await panel.getByRole("button", { name: "Importar 1 causa", exact: true }).click();
   await expect(panel.getByRole("heading", { name: "Resultado de la importación", exact: true })).toBeFocused();
-  expect(payloads).toEqual([{ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0"], downloadDocuments: true, intervalMinutes: 30 }]);
+  expect(payloads).toEqual([{ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0"], downloadDocuments: true }]);
   await expect(panel.getByText("1 causa creada · 0 vinculadas · 14 movimientos nuevos", { exact: true })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Guardando documentos", exact: true })).toBeVisible();
   await expect(panel.getByText("C-100-2024 · 1 de 5 revisados en este grupo.", { exact: true })).toBeVisible();
