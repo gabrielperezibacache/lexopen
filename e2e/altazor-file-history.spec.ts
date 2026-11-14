@@ -42,3 +42,12 @@ test("la revocación elimina los recibos anteriores y una respuesta tardía no r
   await summary.click();await expect(receipts).toHaveCount(0);await (pending as unknown as Route).fulfill({json:first}).catch(()=>{});await expect(receipts).toHaveCount(0);
   hold=false;await summary.click();await expect(receipts).toContainText(first.items[0].name);
 });
+
+test("una sesión vencida informa cómo continuar y omite el cuerpo de error",async({page})=>{
+  await page.route(history,route=>route.fulfill({status:401,contentType:"text/html",body:"<h1>fictitious-private-error</h1>"}));
+  const panel=await open(page);await panel.getByText("Historial de descargas",{exact:true}).click();
+  const receipts=panel.getByRole("region",{name:"Recibos históricos de descargas"});
+  await expect(receipts.getByRole("alert")).toContainText("Inicie sesión de nuevo");
+  await expect(receipts).not.toContainText("fictitious-private-error");
+  await expect(receipts.getByRole("button",{name:"Consultar",exact:true})).toBeEnabled();
+});

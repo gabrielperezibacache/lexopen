@@ -25,12 +25,20 @@ export function AltazorFileHistory({ causaId }: { causaId: string | null }) {
     const cursor = next.at(-1); if (cursor) query.set("cursor", cursor);
     try {
       const response = await fetch(`/api/altazor/computer/files/history?${query}`, { cache: "no-store", signal: controller.signal });
-      const result = await response.json();
       if (version !== epoch.current) return;
-      if (!response.ok) { setConnectors([]); throw new Error("No se pudo consultar el historial. Compruebe su acceso y vuelva a cargar."); }
-      setPage(result as FileHistoryPage); setConnectors((result as FileHistoryPage).connectors); setPositions(next);
-    } catch (failure) {
-      if (version === epoch.current && (!controller.signal.aborted || controller.signal.reason === "timeout")) setError(failure instanceof Error ? failure.message : "No se pudo consultar el historial.");
+      if (!response.ok) {
+        setConnectors([]);
+        setError(response.status === 401 ? "Inicie sesión de nuevo para consultar sus recibos."
+          : response.status === 403 || response.status === 404 ? "Su cuenta ya no tiene acceso a estos recibos."
+          : response.status === 429 ? "Espere un momento antes de volver a consultar."
+          : "No se pudo consultar el historial. Inténtelo nuevamente.");
+        return;
+      }
+      const result = await response.json() as FileHistoryPage;
+      if (version !== epoch.current) return;
+      setPage(result); setConnectors(result.connectors); setPositions(next);
+    } catch {
+      if (version === epoch.current && (!controller.signal.aborted || controller.signal.reason === "timeout")) setError(controller.signal.reason === "timeout" ? "La consulta tardó demasiado. Inténtelo nuevamente." : "No se pudo consultar el historial. Compruebe su conexión e inténtelo nuevamente.");
     } finally { window.clearTimeout(timeout); if (version === epoch.current) setBusy(false); }
   }
   function toggle(next: boolean) {
