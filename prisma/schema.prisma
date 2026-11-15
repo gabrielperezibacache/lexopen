@@ -163,6 +163,7 @@ model User {
   bookPreference UserBookPreference?
   libraryWritingDrafts LibraryWritingDraft[]
   caseWritingDrafts CaseWritingDraft[]
+  assignedCaseWritings CaseWritingDraft[] @relation("CaseWritingReviewer")
   hearingWorkspaces HearingWorkspace[] @relation("HearingWorkspaceOwner")
   uploadedCaseAudios CaseAudio[] @relation("CaseAudioUploader")
   reviewedCaseAudios CaseAudio[] @relation("CaseAudioReviewer")
@@ -2180,6 +2181,11 @@ model CaseWritingDraft {
   id String @id @default(cuid())
   causaId String
   ownerId String
+  reviewerId String?
+  reviewAssignedRevision Int?
+  reviewAssignmentVersion Int @default(0)
+  reviewer User? @relation("CaseWritingReviewer",fields:[reviewerId],references:[id],onDelete:SetNull)
+  @@index([reviewerId,reviewAssignedRevision])
   requestId String
   createInputSha256 String
   title String

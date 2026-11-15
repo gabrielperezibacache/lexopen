@@ -12,4 +12,6 @@ export const writingSourceInputSchema = z.discriminatedUnion("kind", [
 ]);
 export const writingAddSourceSchema = z.object({ requestId: writingRequestId, expectedRevision: writingRevision, source: writingSourceInputSchema }).strict();
 export const writingRestoreSchema = z.object({ requestId: writingRequestId, expectedRevision: writingRevision, targetRevision: writingRevision }).strict();
-export const writingReviewSchema = z.object({ requestId: writingRequestId, expectedRevision: writingRevision, decision: z.enum(["approved", "changes_requested"]), citationsChecked: z.boolean(), note: z.string().trim().max(4000).default("") }).strict().refine(input => input.decision !== "approved" || input.citationsChecked, { message: "Confirme el cotejo de las citas antes de aprobar", path: ["citationsChecked"] });
+export const writingReviewSchema = z.object({ requestId: writingRequestId, expectedRevision: writingRevision, expectedAssignmentVersion: z.number().int().min(1), decision: z.enum(["approved", "changes_requested"]), citationsChecked: z.boolean(), note: z.string().trim().max(4000).default("") }).strict().refine(input => input.decision !== "approved" || input.citationsChecked, { message: "Confirme el cotejo de las citas antes de aprobar", path: ["citationsChecked"] });
+
+export const writingAssignSchema = z.object({ requestId: writingRequestId, expectedRevision: writingRevision, expectedAssignmentVersion: z.number().int().min(0), reviewerId: writingId.nullable() }).strict();

@@ -8,6 +8,10 @@ export type WritingDraftView = {
   references: WritingReferenceView[]; canWrite: boolean; createdAt: string; updatedAt: string; warnings: string[];
   review?: WritingReviewView | null;
   canReview?: boolean;
+  canAssignReview?: boolean;
+  canExportApproved?: boolean;
+  assignment?: { reviewerId: string; reviewerName: string; revision: number; version: number } | null;
+  assignmentVersion?: number;
 };
 export type WritingListItem = { id: string; available: false } | {
   id: string; available: true; title: string; revision: number; updatedAt: string;

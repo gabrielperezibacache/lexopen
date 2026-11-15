@@ -2,6 +2,8 @@
 
 ## En desarrollo
 
+- Escritos: asignación y revocación de segundo revisor por versión, lectura limitada al material asignado, permisos independientes de edición, decisiones auditables e idempotentes y nueva asignación tras cambios.
+
 - Altazor: historial de recibos de descargas disponible con el escritorio cerrado o desactivado. Filtros por fecha en Chile, estado y conexión, paginación estable, comprobación de permisos vigente y proyección de metadatos sin contenido, secretos ni rutas locales.
 
 - Actualización automática de causas y Mis Causas a las 08:00 y 22:00, hora de Chile. Reservas persistentes por turno evitan duplicados y reintentos adicionales; los cambios manuales y la importación personal siguen disponibles a cualquier hora. Preferencias y documentación muestran el horario fijo.

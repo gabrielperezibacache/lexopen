@@ -94,6 +94,8 @@ En **Fuentes → Buscar fallos civiles en el Poder Judicial**, busca por términ
 
 Se conservan la respuesta y el texto con versiones y hashes. Los previews o marcadores de anonimización sin texto no se aceptan como fallos íntegros. La integración es experimental y no acredita cobertura exhaustiva ni páginas físicas de un PDF. [Alcance y validación](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md) · [OJV/PJUD](docs/PJUD.md)
 
+Los escritos permiten asignar una versión a un segundo profesional con acceso vigente a la causa y sus fuentes. Solo la persona asignada registra la decisión; la asignación permite revisar y mantiene la edición en manos del autor. Cambiar el texto exige una nueva asignación.
+
 ### Altazor AI e Ícaros
 
 Al abrir una causa, **Estado de la causa** muestra automáticamente sus plazos abiertos y vencidos, escritos pendientes de resolución, tareas en espera y gestiones actuales. Altazor genera una lectura con referencias a esos registros usando la IA configurada. El panel comprueba cambios cada minuto mientras está visible y, durante la visita, evita repetir consultas iguales al modelo mientras no cambien los datos o el día en Chile. Si el proveedor falla o está en demostración, conserva los hechos registrados sin presentar una respuesta ficticia como análisis real. Las referencias de la lectura enlazan solo registros del contexto visible; las desconocidas se señalan y las respuestas tardías no sustituyen una comprobación más reciente. [Fuentes, actualización y límites del estado automático](docs/ESTADO-CAUSA.md).
