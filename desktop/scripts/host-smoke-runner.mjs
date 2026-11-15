@@ -1,3 +1,4 @@
+import { smokeAuthenticate, smokeEnrollTotp } from "./host-smoke-auth.mjs";
 /** Runs only against a newly-created, marked temporary data directory. */
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
@@ -51,14 +52,7 @@ async function treeDigest(root) {
   }
   await visit(root);return checksum.digest("hex");
 }
-async function authenticate(url,password) {
-  const loginPage=await fetch(`${url}/login`), initial=loginPage.headers.getSetCookie();
-  const csrf=initial.join(";").match(/(?:^|[;,]\s*)lexopen_csrf=([^;]+)/)?.[1];assert(csrf);
-  const response=await fetch(`${url}/api/auth/login`,{method:"POST",headers:{"Content-Type":"application/json",Origin:url,Cookie:`lexopen_csrf=${csrf}`,"x-csrf-token":csrf},body:JSON.stringify({email:"installer-fixture@example.test",password})});
-  assert.equal(response.status,200);const body=await response.json();assert.equal(body.needsTotp,undefined);assert.equal(body.user.email,"installer-fixture@example.test");
-  const cookies=new Map([...initial,...response.headers.getSetCookie()].map(line=>{const pair=line.split(";",1)[0],at=pair.indexOf("=");return[pair.slice(0,at),pair.slice(at+1)];}));
-  return {Cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join("; "),Origin:url,"x-csrf-token":cookies.get("lexopen_csrf")};
-}
+
 try {
   active = await start();
   phase = "initial-health";
@@ -101,11 +95,18 @@ try {
   assert.equal(setupState.needsSetup, false);
   const values = await envValues();
   const secretHashes = Object.fromEntries(["DATABASE_URL", "SESSION_SECRET", "STORAGE_PATH"].map(key => { assert(values[key]); return [key, digest(values[key])]; }));
-  phase = "fictitious-document-and-settings";
-  const credentials=await authenticate(active.url,password);
+  phase = "fixture-login";
+  const sourceAuth=await smokeAuthenticate(active.url,password);
+  phase = "fixture-factor-enrollment";
+  const totpSecret=await smokeEnrollTotp(active.url,sourceAuth);
+  const credentials=sourceAuth.headers();
+  phase = "fixture-document-upload";
   const documentBytes=Buffer.from("Fictitious legal document for native backup restoration. Información sintética.\n","utf8");
   const form=new FormData();form.set("nombre","Restore fixture.txt");form.set("tipo","otro");form.set("file",new Blob([documentBytes],{type:"text/plain"}),"restore-fixture.txt");
-  const created=await fetch(`${active.url}/api/documentos`,{method:"POST",headers:credentials,body:form});assert.equal(created.status,201);const document=await created.json();assert(document.id);assert(document.storageKey);
+  const created=await fetch(`${active.url}/api/documentos`,{method:"POST",headers:credentials,body:form});assert.equal(created.status,201);const document=await created.json();assert(document.id);
+  phase = "verify-source-document";
+  const sourceDownload=await fetch(`${active.url}/api/documentos/${encodeURIComponent(document.id)}/content`,{headers:credentials});assert.equal(sourceDownload.status,200);assert(Buffer.from(await sourceDownload.arrayBuffer()).equals(documentBytes));
+  phase = "fixture-settings";
   const {PrismaClient}=requireBundled("@prisma/client");
   const sourceClient=new PrismaClient({datasources:{db:{url:values.DATABASE_URL}}});
   let organizationId;
@@ -151,7 +152,8 @@ try {
   phase="start-restored-host";
   process.env.CODEX_DATA_DIR=path.join(destination,"disabled-codex");process.env.CODEX_BIN=path.join(destination,"not-installed");
   active=await start(destination);assert.equal(active.needsSetup,false);
-  const restoredCredentials=await authenticate(active.url,password);
+  const restoredAuth=await smokeAuthenticate(active.url,password,totpSecret);assert.equal(restoredAuth.userId,sourceAuth.userId);
+  const restoredCredentials=restoredAuth.headers();
   const downloaded=await fetch(`${active.url}/api/documentos/${encodeURIComponent(document.id)}/content`,{headers:restoredCredentials});assert.equal(downloaded.status,200);assert(Buffer.from(await downloaded.arrayBuffer()).equals(documentBytes));
   const restoredValues=await envValues(destination);
   assert.equal(digest(restoredValues.SESSION_SECRET),secretHashes.SESSION_SECRET);

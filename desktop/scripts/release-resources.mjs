@@ -191,7 +191,7 @@ export function verifyNativeRuntime(resources, nodeModules, target) {
 }
 export function verifyReleaseResources(resources, nodeModules, target) {
   const files = allFiles(resources).map(file => path.relative(resources, file).split(path.sep).join("/")), app = path.join(resources, "app-standalone");
-  for (const name of ["server.js", ".next/BUILD_ID", "package.json", "tsconfig.json", "src/lib/db.ts", "scripts/local-host-schedulers.mjs", "scripts/host-smoke-runner.mjs", "lexopen-release.json"]) required(path.join(app, name));
+  for (const name of ["server.js", ".next/BUILD_ID", "package.json", "tsconfig.json", "src/lib/db.ts", "scripts/local-host-schedulers.mjs", "scripts/host-smoke-runner.mjs", "scripts/host-smoke-auth.mjs", "lexopen-release.json"]) required(path.join(app, name));
   required(path.join(resources, "prisma/schema.prisma")); required(path.join(app, "prisma/seed.ts"));
   if (!files.some(name => /^prisma\/migrations\/[^/]+\/migration\.sql$/.test(name))) throw new Error("Missing Prisma migrations");
   if (!files.some(name => name.startsWith("app-standalone/.next/static/"))) throw new Error("Missing Next static assets");
