@@ -2,6 +2,8 @@
 
 ## En desarrollo
 
+- Seguridad: equipos recordados por 30 días tras verificar 2FA, inventario propio, revocación individual o total y comprobación de confianza en el servidor. Contraseña y segundo factor invalidan los equipos; metadatos acotados sin IP ni ubicación y auditoría sin tokens.
+
 - Escritos: asignación y revocación de segundo revisor por versión, lectura limitada al material asignado, permisos independientes de edición, decisiones auditables e idempotentes y nueva asignación tras cambios.
 
 - Altazor: historial de recibos de descargas disponible con el escritorio cerrado o desactivado. Filtros por fecha en Chile, estado y conexión, paginación estable, comprobación de permisos vigente y proyección de metadatos sin contenido, secretos ni rutas locales.

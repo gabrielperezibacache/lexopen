@@ -1,3 +1,4 @@
+import { issueTrustedDevice, TRUSTED_DEVICE_COOKIE } from "@/lib/auth/trusted-devices";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
         }),
         z.object({
           action: z.literal("verify-login"),
+          rememberDevice: z.boolean().optional(),
           code: z.string().min(6).max(64),
         }),
       ])
@@ -106,11 +108,13 @@ export async function POST(req: NextRequest) {
       if (!ok) {
         return NextResponse.json({ error: "Código 2FA inválido" }, { status: 401 });
       }
+      let trusted: Awaited<ReturnType<typeof issueTrustedDevice>> | null = null;
       await prisma.$transaction(async (tx) => {
         if (backupJson !== user.totpBackupCodes) {
           const consumed = await tx.user.updateMany({ where: { id: user.id, sessionVersion: user.sessionVersion, totpBackupCodes: user.totpBackupCodes }, data: { totpBackupCodes: backupJson } });
           if (consumed.count !== 1) throw Object.assign(new Error("Código ya utilizado"), { status: 409 });
         }
+        if (body.rememberDevice) trusted = await issueTrustedDevice(user,req.headers.get("user-agent") || "",tx);
         await writeAuditStrict({ actorId: user.id, action: "auth.totp_login", entityType: "User", entityId: user.id }, tx);
       });
       const session = buildSessionCookieValue(
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest) {
         ...cookieBase,
         httpOnly: false,
       });
+      if (trusted) { const device = trusted as Awaited<ReturnType<typeof issueTrustedDevice>>; res.cookies.set(TRUSTED_DEVICE_COOKIE,device.token,baseCookieOptions({maxAge:device.maxAge})); }
       res.cookies.set(TOTP_PENDING_COOKIE, "", { ...cookieBase, maxAge: 0 });
       appendCsrfCookie(res);
       return res;
@@ -175,7 +180,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Código inválido" }, { status: 400 });
     }
     await prisma.$transaction(async (tx) => {
-      const changed = await tx.user.updateMany({ where: { id: user.id, sessionVersion: user.sessionVersion, totpSecretEnc: row.totpSecretEnc, totpBackupCodes: row.totpBackupCodes }, data: { totpEnabled: false, totpSecretEnc: null, totpBackupCodes: null, sessionVersion: { increment: 1 } } });
+      const changed = await tx.user.updateMany({ where: { id: user.id, sessionVersion: user.sessionVersion, totpSecretEnc: row.totpSecretEnc, totpBackupCodes: row.totpBackupCodes }, data: { totpEnabled: false, totpSecretEnc: null, totpBackupCodes: null, trustedDeviceVersion: { increment: 1 }, sessionVersion: { increment: 1 } } });
       if (changed.count !== 1) throw Object.assign(new Error("El factor cambió. Intente de nuevo."), { status: 409 });
       await writeAuditStrict({ actorId: user.id, action: "auth.totp_disable", entityType: "User", entityId: user.id }, tx);
     });

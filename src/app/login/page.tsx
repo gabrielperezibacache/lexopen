@@ -48,6 +48,7 @@ function LoginCredentials({ demo, next }: { demo: boolean; next: string }) {
           body: JSON.stringify({
             action: "verify-login",
             code: fd.get("totp"),
+            rememberDevice: fd.get("rememberDevice") === "on",
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -170,6 +171,7 @@ function LoginCredentials({ demo, next }: { demo: boolean; next: string }) {
                 />
               </label>
             )}
+            {needsTotp && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="rememberDevice" />Recordar este navegador durante 30 días</label>}
             {error && (
               <p className="login-error" role="alert">
                 {error}

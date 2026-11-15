@@ -50,7 +50,7 @@
     "pjud:claveunica:form": "tsx scripts/pjud-claveunica-form-probe.ts",
     "e2e": "playwright test --project chromium",
     "e2e:install": "playwright install chromium firefox webkit",
-    "test:auth:integration": "node --import tsx src/lib/auth/boundaries.integration.test.ts",
+    "test:auth:integration": "node --import tsx src/lib/auth/trusted-devices.integration.test.ts && node --import tsx src/lib/auth/boundaries.integration.test.ts",
     "test:assistant:integration": "node --import tsx src/lib/assistant/commands.integration.test.ts",
     "test:notify:integration": "node --import tsx src/lib/notify/notification-pipeline.integration.test.ts && node --import tsx src/lib/notify/providers/smtp.integration.test.ts && node --import tsx src/lib/notify/whatsapp.integration.test.ts",
     "test:documents:integration": "node --import tsx src/lib/causas/document-intake.integration.test.ts && node --import tsx src/lib/causas/updates.integration.test.ts && node --import tsx src/lib/document-processing-queue.integration.test.ts && node --import tsx src/lib/evidence/evidence.integration.test.ts && node --import tsx src/lib/evidence/pdf-evidence.integration.test.ts && node --import tsx src/lib/evidence/site-file-evidence.integration.test.ts && node --import tsx src/lib/integrations/drive-import.integration.test.ts && node --import tsx src/lib/causas/status.integration.test.ts && node --import tsx src/lib/fiscalia/service.integration.test.ts",

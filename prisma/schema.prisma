@@ -55,6 +55,8 @@ model FirmSettings {
 }
 
 model User {
+  trustedDevices TrustedDevice[]
+  trustedDeviceVersion Int @default(0)
   fiscaliaRequests FiscaliaRequest[]
   fiscaliaRequestEvents FiscaliaRequestEvent[]
   altazorIcaros AltazorIcaro[]
@@ -3227,4 +3229,19 @@ model PjudRefreshReservation {
   createdAt DateTime @default(now())
   @@unique([scope, slot])
   @@index([slot])
+}
+
+model TrustedDevice {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  tokenHash String @unique
+  credentialBinding String
+  securityVersion Int
+  label String
+  createdAt DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  @@index([userId,revokedAt,expiresAt])
 }
