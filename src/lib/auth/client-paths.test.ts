@@ -38,3 +38,6 @@ assert.equal(isClientAllowedPath("/api/search"), true);
 assert.equal(isClientAllowedPath("/api/health"), true);
 
 console.log("client-paths.test.ts: ok");
+
+assert.equal(isClientAllowedPath("/api/auth/devices"), true);
+assert.equal(isClientAllowedPath("/api/auth/devices/foreign"), false);
