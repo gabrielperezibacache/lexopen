@@ -46,8 +46,16 @@ async function main(){
     const accepted=await Promise.all([reviewCaseWriting(cause.id,draft.id,decision,other),reviewCaseWriting(cause.id,draft.id,decision,other)]);
     assert.equal(accepted[0].draft.review?.id,accepted[1].draft.review?.id);assert.equal(accepted[0].draft.review?.reviewerId,other.id);
     await assert.rejects(reviewCaseWriting(cause.id,draft.id,{...decision,note:"Changed"},other),status(409));
+    await withRejectedAudit(owner.id,"case.writing.export",async()=>{
+      await assert.rejects(exportCaseWritingDocx(cause.id,draft.id,owner,prisma,{purpose:"approved"}),status(500));
+      assert.equal(await prisma.caseWritingExport.count({where:{draftId:draft.id}}),0);
+    });
     const output=await exportCaseWritingDocx(cause.id,draft.id,owner,prisma,{purpose:"approved"});
     const receipt=await prisma.caseWritingExport.findUniqueOrThrow({where:{id:output.receiptId}});assert.equal(receipt.contentSha256,createHash("sha256").update(output.content).digest("hex"));
+    await prisma.user.update({where:{id:owner.id},data:{capabilityRevokes:"escrito.approve"}});
+    await assert.rejects(exportCaseWritingDocx(cause.id,draft.id,owner,prisma,{purpose:"approved"}),status(403));
+    await exportCaseWritingDocx(cause.id,draft.id,owner);
+    await prisma.user.update({where:{id:owner.id},data:{capabilityRevokes:""}});
     draft=(await saveCaseWriting(cause.id,draft.id,{requestId:randomUUID(),expectedRevision:draft.revision,title:draft.title,body:"Nueva versión"},owner)).draft;
     assert.equal(draft.review?.current,false);
     await assert.rejects(readCaseWriting(cause.id,draft.id,other),status(404));
@@ -55,6 +63,9 @@ async function main(){
     await assert.rejects(exportCaseWritingDocx(cause.id,draft.id,owner,prisma,{purpose:"approved"}),status(409));
     draft=(await assignCaseWritingReview(cause.id,draft.id,{...base(),reviewerId:other.id},owner)).draft;
     await assert.rejects(readCaseWritingRevision(cause.id,draft.id,1,other),status(404));
+    draft=(await saveCaseWriting(cause.id,draft.id,{requestId:randomUUID(),expectedRevision:draft.revision,title:draft.title,body:"Cita sin respaldo [^R999]."},owner)).draft;
+    draft=(await assignCaseWritingReview(cause.id,draft.id,{...base(),reviewerId:other.id},owner)).draft;
+    await assert.rejects(reviewCaseWriting(cause.id,draft.id,review(),other),status(409));
     await prisma.causaMiembro.delete({where:{causaId_userId:{causaId:cause.id,userId:other.id}}});
     await assert.rejects(reviewCaseWriting(cause.id,draft.id,review(),other),status(404));
     console.log("Assigned review: exact revision, separate read/review/edit rights, current source/case permissions, revoke/reassign, concurrent replay, atomic audits and approved export passed.");
