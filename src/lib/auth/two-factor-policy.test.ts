@@ -89,3 +89,6 @@ if (prevE2e === undefined) delete process.env.LEXOPEN_E2E;
 else process.env.LEXOPEN_E2E = prevE2e;
 
 console.log("two-factor-policy.test.ts OK");
+
+assert.equal(isTwoFactorExemptPath("/api/auth/devices"), true);
+assert.equal(isTwoFactorExemptPath("/api/auth/devices/foreign"), false);

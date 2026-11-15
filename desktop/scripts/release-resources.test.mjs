@@ -134,6 +134,7 @@ try {
     "tsconfig.json": "{}",
     "scripts/local-host-schedulers.mjs": "// scheduler fixture",
     "desktop/scripts/host-smoke-runner.mjs": "// smoke fixture",
+    "desktop/scripts/host-smoke-auth.mjs": "// smoke auth fixture",
     "desktop/oauth-clients.cjs": "module.exports = {}; // shared profile parser fixture",
     "prisma/database.sql": "PRIVATE_DUMP_CANARY",
     "prisma/migrations/20261104000000_fixture/dump.sql": "PRIVATE_DUMP_CANARY",

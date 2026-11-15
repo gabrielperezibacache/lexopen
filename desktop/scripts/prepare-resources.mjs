@@ -45,12 +45,12 @@ export async function preparePrismaRuntimeEngines(sourceRepo, output, target, { 
 }
 export function copyTrackedRuntimeResources(sourceRepo, output, { stripped = [] } = {}) {
   const app = path.join(output, "app-standalone");
-  const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "desktop/oauth-clients.cjs", "LICENSE"]);
+  const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "desktop/scripts/host-smoke-auth.mjs", "desktop/oauth-clients.cjs", "LICENSE"]);
   for (const file of trackedPublicFiles(sourceRepo)) {
     if (!(file.startsWith("src/") || file.startsWith("public/") || file.startsWith("prisma/") || runtimeFiles.has(file)) || privateResourcePath(file)) continue;
     const source = path.join(sourceRepo, file), stat = fs.lstatSync(source);
     if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`Public source must be a regular file: ${file}`);
-    const destination = file === "desktop/scripts/host-smoke-runner.mjs" ? "scripts/host-smoke-runner.mjs" : file;
+    const destination = ["desktop/scripts/host-smoke-runner.mjs", "desktop/scripts/host-smoke-auth.mjs"].includes(file) ? file.replace("desktop/", "") : file;
     // Keep the repository-relative identity when copying one file: migration.sql
     // is public only inside prisma/migrations/<id>, unlike an arbitrary SQL dump.
     copyResourceTree(source, path.join(app, destination), { stripped, boundary: sourceRepo, relative: file });

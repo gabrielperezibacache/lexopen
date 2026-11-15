@@ -44,11 +44,15 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 
+En **Mi cuenta → Equipos recordados** puedes consultar el último uso y revocar la confianza de un navegador o de todos. Al completar 2FA puedes recordarlo durante 30 días; un cambio de contraseña o del segundo factor invalida esa confianza. [Gestión y alcance de los equipos recordados](docs/EQUIPOS-RECORDADOS.md)
+
 ## Actualización de causas
 
 Las consultas **automáticas** se inician a las **08:00 y 22:00, hora de Chile** (`America/Santiago`, con cambio de hora). Cada causa y la consulta de Mis Causas tienen como máximo un intento por turno; los fallos esperan al siguiente turno. Las **actualizaciones manuales** y el ingreso personal con ClaveÚnica siguen disponibles a cualquier hora.
 
 El Host debe estar encendido en esos horarios. Las reservas en PostgreSQL evitan repetir consultas al reiniciar o recibir llamadas simultáneas; una revisión iniciada puede terminar sus lotes durante esa hora. Un turno perdido no se recupera automáticamente fuera de horario. En un Host web, un valor positivo de `PJUD_SYNC_INTERVAL_MINUTES` o `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` habilita el horario correspondiente con `CRON_SECRET`; `0` lo desactiva. Los nombres antiguos ya no fijan intervalos de minutos. Las alertas de plazos y la lectura del estado local conservan su frecuencia. [Configuración y cola](docs/PJUD.md#cron--cola)
+
+El recorrido de pruebas nativas del Host comprueba ahora el respaldo y la restauración en una carpeta vacía, con cuenta, documento y configuración ficticios. Verifica también que el origen permanezca intacto y que una restauración fallida conserve la copia anterior. Los recibos identifican plataforma y arquitectura. [Alcance de la restauración comprobada](docs/ACTUALIZACIONES.md#restauración-comprobada-en-la-prueba-nativa)
 
 ## Google y organización de documentos
 
@@ -93,6 +97,8 @@ Las herramientas del Poder Judicial de Chile son opcionales. En OJV, una sesión
 En **Fuentes → Buscar fallos civiles en el Poder Judicial**, busca por términos o ROL y recorre páginas de diez resultados. Se utiliza una sesión pública independiente de ClaveÚnica. Sólo se envían los campos de búsqueda; la consulta local y el expediente permanecen en el Host. Seleccionar un resultado prepara su incorporación: recuperar y comprobar el texto íntegro es un paso separado. También puedes incorporar un fallo por su identificador numérico.
 
 Se conservan la respuesta y el texto con versiones y hashes. Los previews o marcadores de anonimización sin texto no se aceptan como fallos íntegros. La integración es experimental y no acredita cobertura exhaustiva ni páginas físicas de un PDF. [Alcance y validación](docs/INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md) · [OJV/PJUD](docs/PJUD.md)
+
+Los escritos permiten asignar una versión a un segundo profesional con acceso vigente a la causa y sus fuentes. Solo la persona asignada registra la decisión; la asignación permite revisar y mantiene la edición en manos del autor. Cambiar el texto exige una nueva asignación.
 
 ### Altazor AI e Ícaros
 

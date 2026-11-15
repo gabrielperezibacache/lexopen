@@ -7,12 +7,15 @@ import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable browser database required");
-test("revisión por versión, Word aprobado con recibo y edición que invalida la aprobación", async ({ page }, info) => {
+test("revisión por versión, Word aprobado con recibo y edición que invalida la aprobación", async ({ page, browser }, info) => {
   test.setTimeout(120_000);
-  const tag = randomUUID(); let userId = "", causeId = "";
+  const tag = randomUUID(); let userId = "", reviewerId = "", causeId = "";
+  const reviewerContext=await browser.newContext({locale:"es-CL"});const reviewerPage=await reviewerContext.newPage();
   try {
     const user = await prisma.user.create({ data: { email: `${tag}@review-browser.invalid`, name: "Revisor ficticio", role: "abogado", password: await hash("lexopen", 10) } }); userId = user.id;
     const cause = await prisma.causa.create({ data: { titulo: tag, tribunal: "Ficticio", materia: "civil", acceso: "equipo", abogadoId: userId } }); causeId = cause.id;
+    const reviewer=await prisma.user.create({data:{email:`${tag}-reviewer@review-browser.invalid`,name:"Segundo profesional ficticio",role:"abogado",password:await hash("lexopen",10),capabilityRevokes:"causa.write"}});reviewerId=reviewer.id;
+    await prisma.causaMiembro.create({data:{causaId:cause.id,userId:reviewer.id,rol:"supervisor"}});
     await loginAs(page, user.email); await authenticateApiRequests(page);
     const base = `/api/causas/${causeId}/writings`;
     const created = await apiRequest(page).post(base, { data: { requestId: randomUUID(), title: "Escrito ficticio para revisar", body: "Texto de autor ficticio para cotejo." } }); expect(created.status()).toBe(201);
@@ -26,17 +29,25 @@ test("revisión por versión, Word aprobado con recibo y edición que invalida l
     await openExport();
     const panel = page.locator("dialog.context-panel");
     await expect(panel.getByRole("button", { name: "Descargar versión aprobada", exact: true })).toBeDisabled();
-    await panel.getByRole("checkbox", { name: "He revisado el texto y cotejado sus citas con los respaldos incorporados", exact: true }).check();
-    await panel.getByRole("textbox", { name: "Observaciones de revisión", exact: true }).fill("Revisión enteramente ficticia.");
+    await panel.getByRole("button",{name:"Consultar profesionales autorizados",exact:true}).click();
+    await panel.getByRole("combobox",{name:"Profesional revisor"}).selectOption(reviewer.id);
+    await panel.getByRole("button",{name:"Asignar esta versión",exact:true}).click();
+    await loginAs(reviewerPage,reviewer.email);await reviewerPage.goto(`/causas/${causeId}/escritos?draft=${draft.id}`);
+    await expect(reviewerPage.getByRole("textbox",{name:"Texto del escrito",exact:true})).toBeDisabled();
+    const reviewerTools=reviewerPage.locator(".writing-toolstrip details");await reviewerTools.locator("summary").click();await reviewerTools.getByRole("button",{name:"Exportar",exact:true}).click();
+    const reviewerPanel=reviewerPage.locator("dialog.context-panel");
+    await reviewerPanel.getByRole("checkbox", { name: "He revisado el texto y cotejado sus citas con los respaldos incorporados", exact: true }).check();
+    await reviewerPanel.getByRole("textbox", { name: "Observaciones de revisión", exact: true }).fill("Revisión enteramente ficticia.");
     for (const viewport of [{ width: 360, height: 800 }, { width: 1440, height: 1000 }]) {
       await page.setViewportSize(viewport);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
       await page.screenshot({ path: info.outputPath(`writing-review-${viewport.width}.png`), animations: "disabled" });
     }
-    await panel.getByRole("button", { name: "Aprobar esta versión", exact: true }).click();
-    await expect(panel).not.toBeVisible();
+    await reviewerPanel.getByRole("button", { name: "Aprobar esta versión", exact: true }).click();
+    await expect(reviewerPanel).not.toBeVisible();
+    await page.reload();
     await openExport();
-    await expect(panel.getByText(/Versión aprobada · Revisor ficticio/)).toBeVisible();
+    await expect(panel.getByText(/Versión aprobada · Segundo profesional ficticio/)).toBeVisible();
     const download = page.waitForEvent("download");
     await panel.getByRole("button", { name: "Descargar versión aprobada", exact: true }).click();
     const file = await download, bytes = await readFile((await file.path())!);
@@ -53,7 +64,8 @@ test("revisión por versión, Word aprobado con recibo y edición que invalida l
     expect(await prisma.caseWritingReview.count({ where: { draftId: draft.id } })).toBe(1);
     expect((await prisma.caseWritingDraft.findUniqueOrThrow({ where: { id: draft.id } })).revision).toBeGreaterThan(1);
   } finally {
+    await reviewerContext.close();
     if (causeId) { await prisma.caseWritingDraft.deleteMany({ where: { causaId: causeId } }); await prisma.causa.deleteMany({ where: { id: causeId } }); }
-    await prisma.auditEvent.deleteMany({ where: { actorId: userId } }); if (userId) await prisma.user.delete({ where: { id: userId } }); await prisma.$disconnect();
+    await prisma.auditEvent.deleteMany({ where: { actorId: {in:[userId,reviewerId]} } }); await prisma.user.deleteMany({ where: { id: {in:[userId,reviewerId]} } }); await prisma.$disconnect();
   }
 });

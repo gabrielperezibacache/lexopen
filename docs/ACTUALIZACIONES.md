@@ -132,3 +132,9 @@ En el ensayo del DEB publicado `1.1.0-preview.8`, el Host no superó la comproba
 Windows y macOS siguen pendientes de una instalación y actualización firmadas en sus sistemas nativos; los paquetes preliminares publicados carecen de firma de editor y notarización. Las pruebas con sustitutos no resuelven ese requisito.
 
 Estos resultados no sustituyen un ensayo de actualización firmada, permisos del sistema operativo, pérdida de energía, volumen real ni actualización mayor de PostgreSQL. La entrega de distribución debe registrar por separado los paquetes construidos e instalados, sus huellas, plataformas y limitaciones.
+
+## Restauración comprobada en la prueba nativa
+
+La prueba del Host empaquetado crea únicamente una cuenta, un documento y configuración ficticios en carpetas temporales marcadas. Con el Host detenido genera una copia, la restaura en otro directorio vacío y comprueba autenticación con el segundo factor original, bytes del documento, configuración y ubicación física de PostgreSQL después del arranque. La huella del origen debe permanecer idéntica; también se comprueba que una restauración rechazada conserva el destino anterior.
+
+Los recibos `lexopen-smoke-<plataforma>-<arquitectura>.json` incluyen las verificaciones de base, archivos, configuración, conservación del origen y recuperación. El ensamblado de una publicación exige estos campos. La reubicación automatizada cubre un Host embebido con rutas administradas locales, dentro de la misma plataforma y arquitectura; las bases externas, enlaces, cambios mayores de PostgreSQL y migraciones entre sistemas requieren su propio procedimiento. Esta prueba de CI no sustituye la instalación y restauración manual en equipos reales.

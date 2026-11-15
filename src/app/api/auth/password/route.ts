@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id, sessionVersion: user.sessionVersion },
-        data: { password, sessionVersion: { increment: 1 } },
+        data: { password, trustedDeviceVersion: { increment: 1 }, sessionVersion: { increment: 1 } },
       });
       await writeAuditStrict({
         actorId: user.id,

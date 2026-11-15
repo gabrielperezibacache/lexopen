@@ -6,7 +6,7 @@ import { httpError } from "@/lib/auth/access";
 import { writeAuditStrict } from "@/lib/audit";
 import { sha256 } from "@/lib/evidence/fragments";
 import { captureWritingSource, verifyWritingSource } from "./sources";
-import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema, writingSourceInputSchema, writingReviewSchema } from "./schemas";
+import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema, writingSourceInputSchema, writingReviewSchema, writingAssignSchema } from "./schemas";
 import { writingActor, writingChanged, writingMissing, writingTransaction, writingUnavailable, type WritingClient } from "./access";
 import type { WritingChange, WritingDraftList, WritingDraftView, WritingHistory, WritingMutationResult, WritingReference, WritingReferenceView, WritingRevisionView } from "./types";
 import type { StoredWritingSource } from "./source-types";
@@ -51,15 +51,22 @@ function warnings(body: string, refs: WritingReferenceView[]) {
 }
 async function rowFor(causaId: string, id: string, user: CausaAccessUser, client: WritingClient, write = false) {
   const access = await writingActor(causaId, user, client, write);
-  const row = await client.caseWritingDraft.findFirst({ where: { id, causaId, ownerId: access.actor.id } });
+  const row = await client.caseWritingDraft.findFirst({ where: { id, causaId, ...(write ? { ownerId: access.actor.id } : { OR: [{ ownerId: access.actor.id }, { reviewerId: access.actor.id, reviewAssignedRevision: { equals: client.caseWritingDraft.fields.revision } }] }) } });
   if (!row) throw writingMissing();
-  return { ...access, row };
+  if (row.ownerId !== access.actor.id && !access.canReview) throw writingMissing();
+  return { ...access, row, canWrite: row.ownerId === access.actor.id && access.canWrite };
 }
 async function view(row: DraftRow, user: CausaAccessUser, client: WritingClient, canWrite: boolean, cache?: Map<string, unknown>): Promise<WritingDraftView> {
   const refs = await verifiedReferences(row.causaId, row.referencesJson, user, client, cache);
-  const { canReview } = await writingActor(row.causaId, user, client);
+  const access = await writingActor(row.causaId, user, client);
+  const canReview = access.canReview && row.reviewerId === user.id && row.reviewAssignedRevision === row.revision;
+  const assigned = row.reviewerId ? await client.user.findUnique({ where: { id: row.reviewerId }, select: { name: true } }) : null;
   const review = await client.caseWritingReview.findFirst({ where: { draftId: row.id }, orderBy: { revision: "desc" } });
-  return { id: row.id, causaId: row.causaId, title: row.title, body: row.body, revision: row.revision, references: refs, canWrite, canReview, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), warnings: warnings(row.body, refs), review: review ? {
+  return { id: row.id, causaId: row.causaId, title: row.title, body: row.body, revision: row.revision, references: refs, canWrite, canReview,
+    canAssignReview: canWrite && row.ownerId === user.id, canExportApproved: access.canReview,
+    assignmentVersion: row.reviewAssignmentVersion,
+    assignment: row.reviewerId && assigned && row.reviewAssignedRevision ? { reviewerId: row.reviewerId, reviewerName: assigned.name, revision: row.reviewAssignedRevision, version: row.reviewAssignmentVersion } : null,
+    createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), warnings: warnings(row.body, refs), review: review ? {
     id: review.id, revision: review.revision, current: review.revision === row.revision && review.contentSha256 === sha256(JSON.stringify([row.title, row.body])) && review.referencesSha256 === sha256(row.referencesJson),
     reviewerId: review.reviewerId, reviewerName: review.reviewerName, decision: review.decision as "approved" | "changes_requested", note: review.note, createdAt: review.createdAt.toISOString(),
   } : null };
@@ -151,8 +158,9 @@ export async function createCaseWritingFromSource(causaId: string, raw: z.input<
 export async function listCaseWritings(causaId: string, user: CausaAccessUser, after?: string, client: PrismaClient = prisma): Promise<WritingDraftList> {
   return writingTransaction(client, async tx => {
     const { actor, canWrite } = await writingActor(causaId, user, tx);
-    if (after && !await tx.caseWritingDraft.count({ where: { id: after, causaId, ownerId: actor.id } })) throw writingMissing();
-    const rows = await tx.caseWritingDraft.findMany({ where: { causaId, ownerId: actor.id }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], ...(after ? { cursor: { id: after }, skip: 1 } : {}), take: WRITING_LIMITS.listPage + 1 });
+    const visible = { causaId, OR: [{ ownerId: actor.id }, ...( (await writingActor(causaId, actor, tx)).canReview ? [{ reviewerId: actor.id, reviewAssignedRevision: { equals: tx.caseWritingDraft.fields.revision } }] : [])] };
+    if (after && !await tx.caseWritingDraft.count({ where: { id: after, ...visible } })) throw writingMissing();
+    const rows = await tx.caseWritingDraft.findMany({ where: visible, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], ...(after ? { cursor: { id: after }, skip: 1 } : {}), take: WRITING_LIMITS.listPage + 1 });
     const drafts: WritingDraftList["drafts"] = [], cache = new Map<string, unknown>();
     for (const row of rows.slice(0, WRITING_LIMITS.listPage)) {
       try { await verifiedReferences(causaId, row.referencesJson, actor, tx, cache); drafts.push({ id: row.id, available: true, title: row.title, revision: row.revision, updatedAt: row.updatedAt.toISOString() }); }
@@ -208,15 +216,16 @@ export async function addCaseWritingSource(causaId: string, id: string, raw: z.i
 }
 export async function listCaseWritingHistory(causaId: string, id: string, user: CausaAccessUser, before?: number, client: PrismaClient = prisma): Promise<WritingHistory> {
   return writingTransaction(client, async tx => {
-    await rowFor(causaId, id, user, tx);
-    const rows = await tx.caseWritingRevision.findMany({ where: { draftId: id, ...(before ? { revision: { lt: before } } : {}) }, orderBy: { revision: "desc" }, take: WRITING_LIMITS.historyPage + 1, select: { revision: true, createdAt: true, change: true, restoredFrom: true } });
+    const access = await rowFor(causaId, id, user, tx);
+    const rows = await tx.caseWritingRevision.findMany({ where: { draftId: id, AND: [...(access.row.ownerId !== access.actor.id ? [{ revision: access.row.revision }] : []), ...(before ? [{ revision: { lt: before } }] : [])] }, orderBy: { revision: "desc" }, take: WRITING_LIMITS.historyPage + 1, select: { revision: true, createdAt: true, change: true, restoredFrom: true } });
     // Only neutral metadata: source-derived titles/bodies are checked on explicit preview.
     return { revisions: rows.slice(0, WRITING_LIMITS.historyPage).map(row => ({ revision: row.revision, available: true as const, title: `Versión ${row.revision}`, createdAt: row.createdAt.toISOString(), change: row.change as WritingChange, restoredFrom: row.restoredFrom })), limited: rows.length > WRITING_LIMITS.historyPage, nextBefore: rows.length > WRITING_LIMITS.historyPage ? rows[WRITING_LIMITS.historyPage - 1].revision : null };
   });
 }
 export async function readCaseWritingRevision(causaId: string, id: string, revision: number, user: CausaAccessUser, client: PrismaClient = prisma): Promise<WritingRevisionView> {
   return writingTransaction(client, async tx => {
-    const { actor, canWrite } = await rowFor(causaId, id, user, tx);
+    const { actor, row: draft, canWrite } = await rowFor(causaId, id, user, tx);
+    if (draft.ownerId !== actor.id && revision !== draft.reviewAssignedRevision) throw writingMissing();
     const row = await tx.caseWritingRevision.findUnique({ where: { draftId_revision: { draftId: id, revision } } });
     if (!row) throw writingMissing();
     return revisionView(causaId, row, actor, tx, canWrite);
@@ -243,8 +252,10 @@ export async function restoreCaseWriting(causaId: string, id: string, raw: z.inp
 export async function reviewCaseWriting(causaId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma): Promise<WritingMutationResult> {
   const input = writingReviewSchema.parse(raw), hash = inputHash("review", input);
   return writingTransaction(client, async tx => {
-    const { actor, row, canWrite } = await rowFor(causaId, id, user, tx, true);
+    await tx.$queryRaw`SELECT id FROM "CaseWritingDraft" WHERE id = ${id} FOR UPDATE`;
+    const { actor, row, canWrite } = await rowFor(causaId, id, user, tx);
     await assertCausaCapability(causaId, actor, "escrito.approve", tx);
+    if (row.reviewerId !== actor.id || row.reviewAssignedRevision !== row.revision || row.reviewAssignmentVersion !== input.expectedAssignmentVersion) throw httpError("La revisión no está asignada a su cuenta para esta versión", 403);
     const checked = await view(row, actor, tx, canWrite);
     const previous = await tx.caseWritingReview.findUnique({ where: { draftId_requestId: { draftId: id, requestId: input.requestId } } });
     if (previous) {
@@ -262,5 +273,42 @@ export async function reviewCaseWriting(causaId: string, id: string, raw: unknow
     } });
     await writeAuditStrict({ actorId: actor.id, action: "case.writing.review", entityType: "CaseWritingDraft", entityId: id, after: { causaId, revision: row.revision, reviewId: review.id, decision: review.decision } }, tx);
     return { draft: await view(row, actor, tx, canWrite), reused: false };
+  });
+}
+
+/** Assignment changes never modify content or grant editing rights. */
+export async function assignCaseWritingReview(causaId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma): Promise<WritingMutationResult> {
+  const input = writingAssignSchema.parse(raw), hash = inputHash("assign-review", input);
+  return writingTransaction(client, async tx => {
+    await tx.$queryRaw`SELECT id FROM "CaseWritingDraft" WHERE id = ${id} FOR UPDATE`;
+    const { actor, row, canWrite } = await rowFor(causaId, id, user, tx, true);
+    if (await receipt(tx, row, input.requestId, hash)) return { draft: await view(row, actor, tx, canWrite), reused: true };
+    expected(row, input.expectedRevision);
+    if (row.reviewAssignmentVersion !== input.expectedAssignmentVersion) throw writingChanged();
+    if (input.reviewerId) {
+      if (await tx.caseWritingReview.count({ where: { draftId: id, revision: row.revision } })) throw httpError("Esta versión ya tiene una decisión; prepare una nueva versión para otra revisión", 409);
+      if (input.reviewerId === actor.id) throw httpError("Seleccione a otro profesional para la revisión", 422);
+      const reviewer = await tx.user.findUnique({ where: { id: input.reviewerId } });
+      if (!reviewer) throw writingMissing();
+      const access = await writingActor(causaId, reviewer, tx);
+      if (!access.canReview) throw httpError("El profesional no tiene permiso para revisar escritos de esta causa", 403);
+      await verifiedReferences(causaId, row.referencesJson, access.actor, tx);
+    }
+    const next = await tx.caseWritingDraft.update({ where: { id }, data: { reviewerId: input.reviewerId, reviewAssignedRevision: input.reviewerId ? row.revision : null, reviewAssignmentVersion: { increment: 1 } } });
+    await recordRequest(tx, next, input.requestId, hash);
+    await writeAuditStrict({ actorId: actor.id, action: input.reviewerId ? "case.writing.review_assigned" : "case.writing.review_revoked", entityType: "CaseWritingDraft", entityId: id, after: { causaId, revision: row.revision, reviewerId: input.reviewerId, assignmentVersion: next.reviewAssignmentVersion } }, tx);
+    return { draft: await view(next, actor, tx, canWrite), reused: false };
+  });
+}
+export async function listWritingReviewers(causaId: string, id: string, user: CausaAccessUser, query = "", client: PrismaClient = prisma) {
+  return writingTransaction(client, async tx => {
+    const { actor } = await rowFor(causaId, id, user, tx, true);
+    const candidates = await tx.user.findMany({ where: { id: { not: actor.id }, ...(query.trim() ? { name: { contains: query.trim().slice(0,100), mode: "insensitive" } } : {}) }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" }, take: 201 });
+    const reviewers: Array<{id: string; name: string}> = [];
+    for (const candidate of candidates.slice(0,200)) {
+      try { if ((await writingActor(causaId, candidate, tx)).canReview) reviewers.push({ id: candidate.id, name: candidate.name }); }
+      catch (error) { if (![403,404].includes(Number((error as {status?:number}).status))) throw error; }
+    }
+    return { reviewers, limited: candidates.length > 200 };
   });
 }

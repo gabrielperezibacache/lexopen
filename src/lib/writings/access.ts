@@ -12,7 +12,7 @@ export async function writingActor(causaId: string, user: CausaAccessUser, clien
   const actor = await actorFor(user, client);
   const access = write ? await assertCausaCapability(causaId, actor, "causa.write", client) : await assertCausaAccess(causaId, actor, { auditOverride: false }, client);
   const canWrite = can(actor, "causa.write", { causaRol: access.causaRol });
-  return { actor, canWrite, canReview: canWrite && can(actor, "escrito.approve", { causaRol: access.causaRol }) };
+  return { actor, canWrite, canReview: can(actor, "escrito.approve", { causaRol: access.causaRol }) };
 }
 export async function writingTransaction<T>(client: WritingClient, action: (tx: Prisma.TransactionClient) => Promise<T>) {
   if (!("$transaction" in client)) return action(client);

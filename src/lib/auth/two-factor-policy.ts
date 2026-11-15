@@ -34,6 +34,7 @@ export function mustEnrollTwoFactor(opts: PermissionSubject & {
 export function isTwoFactorExemptPath(pathname: string) {
   if (pathname === "/cuenta" || pathname.startsWith("/cuenta/")) return true;
   if (/^\/api\/auth\/(me|logout|password|totp)(?:\/|$)/.test(pathname)) return true;
+  if (pathname === "/api/auth/devices") return true;
   if (pathname === "/api/health" || pathname === "/api/locale") return true;
   if (pathname === "/login" || pathname === "/logout") return true;
   return false;

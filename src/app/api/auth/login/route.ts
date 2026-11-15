@@ -1,3 +1,4 @@
+import { acceptTrustedDevice, TRUSTED_DEVICE_COOKIE } from "@/lib/auth/trusted-devices";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (user.totpEnabled && user.totpSecretEnc) {
+    if (user.totpEnabled && user.totpSecretEnc && !await acceptTrustedDevice(user.id,user.sessionVersion,req.cookies.get(TRUSTED_DEVICE_COOKIE)?.value)) {
       const pending = mintTotpPendingToken(user.id, user.sessionVersion);
       const res = NextResponse.json({
         ok: true,

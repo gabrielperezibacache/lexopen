@@ -35,7 +35,7 @@ export async function confirmTotpEnrollment(token: string | undefined, userId: s
   const backupCodes = generateBackupCodes(8);
   const backupJson = await hashBackupCodes(backupCodes);
   const user = await client.$transaction(async (tx) => {
-    const changed = await tx.user.updateMany({ where: { id: userId, sessionVersion: version, totpSecretEnc: pending.previousSecret, totpEnabled: pending.enabled }, data: { totpEnabled: true, totpSecretEnc: sealTotpSecret(pending.secret), totpBackupCodes: backupJson, sessionVersion: { increment: 1 } } });
+    const changed = await tx.user.updateMany({ where: { id: userId, sessionVersion: version, totpSecretEnc: pending.previousSecret, totpEnabled: pending.enabled }, data: { totpEnabled: true, totpSecretEnc: sealTotpSecret(pending.secret), totpBackupCodes: backupJson, trustedDeviceVersion: { increment: 1 }, sessionVersion: { increment: 1 } } });
     if (changed.count !== 1) throw httpError("El factor o la sesión cambió. Reinicie la configuración.", 409);
     await writeAuditStrict({ actorId: userId, action: "auth.totp_enable", entityType: "User", entityId: userId }, tx);
     return tx.user.findUniqueOrThrow({ where: { id: userId } });

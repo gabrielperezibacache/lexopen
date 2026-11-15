@@ -231,7 +231,34 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
   }
 }
 
-async function restoreDataDirectory(dataDir, backupDir) {
+/** Relocate only a declared managed embedded Host, never external storage/databases. */
+async function relocateRestoredHost(target, manifest) {
+  const { parseEnvFile, serializeEnv } = require("./config.cjs");
+  const file = path.join(target, ".env");
+  const stat = await fs.lstat(file);
+  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("La configuración restaurada no es un archivo local.");
+  const parsed = parseEnvFile(await fs.readFile(file, "utf8")), oldRoot = absolute(manifest.sourceDataDir);
+  if (parsed.map.LEXOPEN_DESKTOP !== "1" || !manifest.sourceDataDir || absolute(parsed.map.LEXOPEN_DATA_DIR) !== oldRoot) throw new Error("La reubicación requiere un respaldo de Host embebido identificado.");
+  if (isWithin(oldRoot,target) || isWithin(target,oldRoot)) throw new Error("La reubicación necesita un destino separado del origen.");
+  const db = new URL(parsed.map.DATABASE_URL);
+  if (!["postgres:","postgresql:"].includes(db.protocol) || !["127.0.0.1","localhost","[::1]"].includes(db.hostname) || db.search || db.hash) throw new Error("No se reubicó una base externa o con opciones no administradas.");
+  for (const key of ["STORAGE_PATH", "OBSIDIAN_VAULT_PATH", "LEXOPEN_DATA_DIR", "CODEX_DATA_DIR"]) {
+    if (!parsed.map[key]) continue;
+    const previous = absolute(parsed.map[key]);
+    if (!isWithin(oldRoot, previous)) throw new Error("El respaldo usa rutas externas; requiere una recuperación preparada.");
+    parsed.map[key] = path.join(target, path.relative(oldRoot, previous));
+  }
+  // PostgreSQL tablespace/config links must not point back into the original installation.
+  async function localTree(dir) { for (const entry of await fs.readdir(dir,{withFileTypes:true})) { const item=path.join(dir,entry.name); if(entry.isSymbolicLink())throw new Error("La base restaurada incluye enlaces externos.");if(entry.isDirectory())await localTree(item); } }
+  for (const name of ["pgdata", "storage", "obsidian-vault"]) {
+    const item=path.join(target,name);if(!await exists(item))continue;
+    if((await fs.lstat(item)).isSymbolicLink())throw new Error("La restauración incluye una carpeta enlazada.");
+    await localTree(item);
+  }
+  await fs.writeFile(file, serializeEnv(parsed.map, parsed.order), {mode:0o600});
+}
+
+async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = false } = {}) {
   const target = absolute(dataDir);
   const { root, manifest } = await validateBackupDirectory(backupDir);
   if (target === root || isWithin(target, root) || isWithin(root, target)) {
@@ -243,10 +270,13 @@ async function restoreDataDirectory(dataDir, backupDir) {
     parent,
     `.${path.basename(target)}.before-restore-${Date.now()}`
   );
+  if (!await exists(target)) await fs.mkdir(target,{recursive:true,mode:0o700});
+  if ((await fs.lstat(target)).isSymbolicLink()) throw new Error("El destino no puede ser un enlace.");
   await fs.rename(target, rollback);
   try {
     await fs.cp(root, target, { recursive: true, force: false });
     await fs.rm(path.join(target, "manifest.json"), { force: true });
+    if (relocateManagedHost) await relocateRestoredHost(target, manifest);
     if (await exists(path.join(target, ".env"))) {
       await fs.chmod(path.join(target, ".env"), 0o600);
     }

@@ -1,3 +1,4 @@
+import { TrustedDevicesPanel } from "@/components/TrustedDevicesPanel";
 import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
 import { Bell, MessageSquare, Settings } from "lucide-react";
@@ -50,6 +51,7 @@ export default async function CuentaPage() {
       <div id="seguridad" className="space-y-6">
         <PasswordChangeForm />
         <TotpSettingsPanel />
+        <TrustedDevicesPanel key={user.id} />
       </div>
       <MyPermissions user={user} locale={locale} />
       {dailyBrief && <AltazorDailyBriefSettings key={`daily-brief:${user.id}`} initial={dailyBrief} locale={locale} />}

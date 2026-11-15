@@ -59,7 +59,7 @@ async function generateExport(causaId: string, id: string, format: "markdown" | 
     const { draft, caseIdentity } = await readCaseWritingForExport(causaId, id, user, tx);
     if (options.expectedRevision !== undefined && options.expectedRevision !== draft.revision) throw httpError("El escrito cambió. Revise la versión actual antes de exportar", 409);
     const purpose = options.purpose || "draft";
-    if (purpose === "approved" && !draft.canReview) throw httpError("No tiene permiso para aprobar o liberar escritos", 403);
+    if (purpose === "approved" && !draft.canExportApproved) throw httpError("No tiene permiso para aprobar o liberar escritos", 403);
     if (purpose === "approved" && (!draft.review?.current || draft.review.decision !== "approved")) throw httpError("Esta versión no tiene una aprobación vigente", 409);
     const rendered = { ...draft, review: purpose === "approved" ? draft.review : null };
     const content = format === "docx" ? renderCaseWritingDocx(rendered, caseIdentity) : renderCaseWriting(rendered, caseIdentity, format);

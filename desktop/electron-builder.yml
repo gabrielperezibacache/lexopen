@@ -39,6 +39,7 @@ asarUnpack:
   # Electron's Node mode needs the complete dependency graph on the filesystem.
   - "node_modules/**/*"
   - host-runtime.mjs
+  - backup.cjs
   - config.cjs
   - oauth-clients.cjs
   - package.json
