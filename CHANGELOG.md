@@ -2,6 +2,8 @@
 
 ## En desarrollo
 
+- Respaldo: prueba nativa de restauración en directorio limpio, autenticación y lectura del documento restaurado, configuración y comprobación del origen intacto. Reubicación explícita de rutas administradas, recuperación ante fallos y recibos de restauración exigidos al ensamblar una publicación.
+
 - Seguridad: equipos recordados por 30 días tras verificar 2FA, inventario propio, revocación individual o total y comprobación de confianza en el servidor. Contraseña y segundo factor invalidan los equipos; metadatos acotados sin IP ni ubicación y auditoría sin tokens.
 
 - Escritos: asignación y revocación de segundo revisor por versión, lectura limitada al material asignado, permisos independientes de edición, decisiones auditables e idempotentes y nueva asignación tras cambios.

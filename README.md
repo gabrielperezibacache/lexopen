@@ -52,6 +52,8 @@ Las consultas **automáticas** se inician a las **08:00 y 22:00, hora de Chile**
 
 El Host debe estar encendido en esos horarios. Las reservas en PostgreSQL evitan repetir consultas al reiniciar o recibir llamadas simultáneas; una revisión iniciada puede terminar sus lotes durante esa hora. Un turno perdido no se recupera automáticamente fuera de horario. En un Host web, un valor positivo de `PJUD_SYNC_INTERVAL_MINUTES` o `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` habilita el horario correspondiente con `CRON_SECRET`; `0` lo desactiva. Los nombres antiguos ya no fijan intervalos de minutos. Las alertas de plazos y la lectura del estado local conservan su frecuencia. [Configuración y cola](docs/PJUD.md#cron--cola)
 
+El recorrido de pruebas nativas del Host comprueba ahora el respaldo y la restauración en una carpeta vacía, con cuenta, documento y configuración ficticios. Verifica también que el origen permanezca intacto y que una restauración fallida conserve la copia anterior. Los recibos identifican plataforma y arquitectura. [Alcance de la restauración comprobada](docs/ACTUALIZACIONES.md#restauración-comprobada-en-la-prueba-nativa)
+
 ## Google y organización de documentos
 
 Una **cuenta Google compartida para todo el estudio** evita repetir conexiones por función. La administración elige la raíz; los profesionales trabajan desde las causas y espacios a los que tienen acceso.

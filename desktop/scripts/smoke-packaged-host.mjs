@@ -66,7 +66,7 @@ try {
       else { try { process.kill(-child.pid, "SIGTERM"); } catch {} }
       forceTimer = setTimeout(() => { if (platform !== "win32") { try { process.kill(-child.pid, "SIGKILL"); } catch {} } }, 15000);
       forceTimer.unref();
-    }, 300000);
+    }, 600000);
     timer.unref();
     child.once("error", error => { clearTimeout(timer); clearTimeout(forceTimer); reject(error); });
     child.once("exit", (code, signal) => { clearTimeout(timer); clearTimeout(forceTimer); resolve({ code, signal }); });

@@ -86,7 +86,7 @@ export async function assembleRelease({ input, output, version, revision, withTo
     } else if (!verificationOnly) throw new Error(`Missing public OAuth release profile: ${target}`);
     if (distributedOAuth === undefined) distributedOAuth = verifiedProfile;
     else if (JSON.stringify(distributedOAuth) !== JSON.stringify(verifiedProfile)) throw new Error(`Public OAuth release profiles differ across targets: ${target}`);
-    for (const key of ["standaloneHealthy", "bundledDocumentConversion", "bundledChromiumLaunched", "firstAdministratorCreated", "restartPreservedDatabase", "restartPreservedFiles", "restartPreservedSecrets"]) if (smoke[key] !== true) throw new Error(`Incomplete Host smoke: ${target}/${key}`);
+    for (const key of ["standaloneHealthy", "bundledDocumentConversion", "bundledChromiumLaunched", "firstAdministratorCreated", "restartPreservedDatabase", "restartPreservedFiles", "restartPreservedSecrets", "backupRestoredDatabase", "backupRestoredFiles", "backupRestoredSettings", "backupSourcePreserved", "backupRollbackVerified"]) if (smoke[key] !== true) throw new Error(`Incomplete Host smoke: ${target}/${key}`);
     if (smoke.externalNodeUsed !== false || smoke.demoSeedUsed !== false) throw new Error(`Non-self-contained Host smoke: ${target}`);
     if (!preview && platform !== "linux" && (signature.publisherAuthenticated !== true || platform === "darwin" && signature.notarized !== true)) throw new Error(`Stable release requires publisher authentication: ${target}`);
     signatures.push(signature);

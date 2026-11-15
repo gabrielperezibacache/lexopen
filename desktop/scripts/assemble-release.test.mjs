@@ -24,7 +24,7 @@ async function fixture(version = "1.1.0-preview.1") {
     }
     const base = { version, platform, arch }, buildId = `build-${target}`;
     await fs.writeFile(path.join(dir, `lexopen-packaged-${target}.json`), JSON.stringify({ ...base, sourceRevision: revision, sourceDirty: false, buildId, distributedOAuth: publicOAuth }));
-    await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, externalNodeUsed: false, demoSeedUsed: false }));
+    await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false }));
     await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, publisherAuthenticated: false, notarized: false }));
     const feed = `${channel}${platform === "darwin" ? "-mac" : platform === "linux" ? "-linux" : ""}.yml`;
     await fs.writeFile(path.join(dir, feed), JSON.stringify({ version, files: entries }));
@@ -45,6 +45,11 @@ await check("four native targets assemble with both macOS architectures and exac
   const sumLines = (await fs.readFile(path.join(f.output, "SHA256SUMS"), "utf8")).trim().split("\n");
   for (const line of sumLines) { const [hash, file] = line.split("  "); assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(f.output, file))).digest("hex"), hash); }
   await assert.rejects(assembleRelease(f), /EEXIST/);
+});
+await check("publication rejects a native package without tested backup restoration", async f => {
+  const file=path.join(f.input,"linux-x64","lexopen-smoke-linux-x64.json"),report=JSON.parse(await fs.readFile(file,"utf8"));
+  delete report.backupRestoredDatabase;await fs.writeFile(file,JSON.stringify(report));
+  await assert.rejects(assembleRelease(f),/Incomplete Host smoke/);
 });
 await check("publication requires all three identities even without desktop toolpacks", async f => {
   await changeProfile(f, "win32-x64", undefined);
