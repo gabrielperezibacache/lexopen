@@ -104,6 +104,8 @@ El escritorio de Altazor es persistente: conserva archivos, aplicaciones y conve
 
 Altazor conserva la conversación y sus adjuntos, propone un plan resumido y cuenta las acciones. Puedes consultar los detalles bajo demanda y revisar los cambios preparados. El visor permite seguir una sesión activa del escritorio.
 
+En **Computadora → Historial de descargas** puedes consultar recibos anteriores por fecha, estado y conexión, incluso con el escritorio cerrado. Se distinguen confirmaciones verificadas, fallos y resultados sin confirmar. El historial conserva los permisos actuales de cada usuario y causa, y muestra solo metadatos.
+
 El escritorio prioriza leer texto del navegador y de los documentos antes de recurrir a capturas. **Ícaros** permite delegar análisis a especialistas con modelo y memoria propios. **Ayuda a distancia** conserva una solicitud en espera y permite responder por ntfy o WhatsApp cuando el canal está conectado. Estas capacidades requieren configurar el perfil de escritorio, el worker y los canales correspondientes.
 
 Los profesionales pueden utilizar Codex personal o la conexión compartida habilitada por el Host. La disponibilidad y las credenciales se comprueban en la configuración de esa conexión; LexOpen no incluye una suscripción a Codex. También admite proveedores de IA compatibles y modelos locales según la preparación del equipo.

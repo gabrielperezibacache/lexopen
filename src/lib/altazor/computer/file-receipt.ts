@@ -1,3 +1,4 @@
+import type { ExplicitFileTask } from "./file-task";
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import type { VerifiedComputerFile } from "./types";
 import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
@@ -47,4 +48,16 @@ export function normalizeVerifiedFileReceipt(value: unknown, expected: FileRecei
 export function normalizeStoredFileReceipt(value: unknown, expected: FileReceiptBinding): VerifiedComputerFile {
   if (!record(value)) throw invalid();
   return normalizeVerifiedFileReceipt({ state: value.state, request_id: value.requestId, approval_id: value.approvalId, chat_id: value.chatId, kitty: value.kittyId, connector: value.connector, kind: value.kind, action: value.action, target: value.target, local_path: value.localPath, name: value.name, bytes: value.bytes, sha256: value.sha256, ...(value.pages === undefined ? {} : { pages: value.pages }), ...(value.firstLine === undefined ? {} : { first_line: value.firstLine }) }, expected);
+}
+
+export function stagedFileRequest(row: { id: string; kind: string; status: string; resultJson: string | null }, names: readonly string[]) {
+  if (row.kind !== "message" || row.status !== "completed" || !row.resultJson) return null;
+  try {
+    const value: unknown = JSON.parse(row.resultJson);
+    if (!record(value) || value.staged !== true || value.accepted !== true || value.state !== "pending" || value.requestId !== row.id || typeof value.approvalId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(value.approvalId) || !record(value.fileTask)) return null;
+    const task = value.fileTask;
+    if (!["google-workspace", "github", "dropbox"].includes(String(task.kind)) || typeof task.connector !== "string" || !names.includes(task.connector) || task.action !== "download_file" || !record(task.args)) return null;
+    assertEasyConnectorRead({ kind: task.kind as "github" | "google-workspace" | "dropbox", connector: task.connector, action: task.action, args: { action: task.action, ...task.args } });
+    return { approvalId: value.approvalId, requestId: row.id, task: task as ExplicitFileTask };
+  } catch { return null; }
 }

@@ -16,6 +16,7 @@ import { computerConnectionLabel } from "@/lib/altazor/computer/activity-detail"
 import { computerFileReadPresentation, computerUserMessagePresentation } from "@/lib/altazor/computer/presentation";
 import { computerAuthorizationModePresentation } from "@/lib/altazor/computer/authorization-policy";
 import { ConnectorOperationPreview } from "./ConnectorOperationPreview";
+import { AltazorFileHistory } from "./AltazorFileHistory";
 import { VerifiedComputerFiles } from "./AltazorDesktopActivity";
 import { COMPUTER_ATTACHMENT_FORMATS, computerTurnNeedsHelp, type ComputerFile, type ComputerReview, type ComputerSessionView, type ComputerStatus } from "@/lib/altazor/computer/types";
 import styles from "./AltazorComputer.module.css";
@@ -313,6 +314,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
   }) : [];
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="altazor-computer-panel">
     <header className={styles.header}><div><h2 id={`${uid}-title`} ref={title} tabIndex={-1}>Escritorio de Altazor</h2><p>Encarga una tarea con los archivos que elijas o toma el control para revisar el trabajo.</p></div><Monitor size={24} aria-hidden="true" /></header>
+    <AltazorFileHistory key={causaId || "personal"} causaId={causaId ?? null} />
     {error && <p className={styles.error} role="alert">{error}{linkFailure && <> <a href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>Volver a los escritorios de este ámbito</a></>}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.status} aria-busy={loading}>
       <strong>{loading ? "Consultando escritorio…" : status ? stateLabel[status.state] : "Estado no disponible"}</strong>

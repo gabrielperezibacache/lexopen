@@ -19,9 +19,8 @@ import { computerReadSchema, type ComputerReading } from "./reading";
 import { computerHelpIdentity } from "./help-identity";
 import { computerActivityDetail } from "./activity-detail";
 import { continueApprovedRead } from "./approval-continuation";
-import { prepareExplicitFileTask, type ExplicitFileTask } from "./file-task";
-import { normalizeStoredFileReceipt } from "./file-receipt";
-import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
+import { prepareExplicitFileTask } from "./file-task";
+import { normalizeStoredFileReceipt, stagedFileRequest } from "./file-receipt";
 import { desktopConnectorTask } from "@/lib/assistant/tools/desktop-connector-task";
 import { prepareExplicitMetadataTask, validateExplicitMetadataTask } from "./metadata-task";
 import { metadataRequest } from "./file-metadata-task";
@@ -215,21 +214,10 @@ export async function readComputerSession(user: CausaAccessUser, id: string, pas
 }
 
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
-function stagedAction(row: Pick<AltazorComputerAction, "id" | "kind" | "status" | "resultJson">, names: readonly string[]) {
-  if (row.kind !== "message" || row.status !== "completed" || !row.resultJson) return null;
-  try {
-    const value: unknown = JSON.parse(row.resultJson);
-    if (!object(value) || value.staged !== true || value.accepted !== true || value.state !== "pending" || value.requestId !== row.id || typeof value.approvalId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(value.approvalId) || !object(value.fileTask)) return null;
-    const task = value.fileTask;
-    if (!["google-workspace", "github", "dropbox"].includes(String(task.kind)) || typeof task.connector !== "string" || !names.includes(task.connector) || task.action !== "download_file" || !object(task.args)) return null;
-    assertEasyConnectorRead({ kind: task.kind as "github" | "google-workspace" | "dropbox", connector: task.connector, action: task.action, args: { action: task.action, ...task.args } });
-    return { approvalId: value.approvalId, requestId: row.id, task: task as ExplicitFileTask };
-  } catch { return null; }
-}
 async function stagedApproval(session: AltazorComputerSession, approvalId: string, names: readonly string[], tx: Client): Promise<StagedFileApproval | StagedMetadataApproval | undefined> {
   const rows = await tx.altazorComputerAction.findMany({ where: { sessionId: session.id, ownerId: session.ownerId, kind: "message", status: "completed" }, orderBy: { createdAt: "desc" }, take: 200 });
   for (const row of rows) {
-    const file = stagedAction(row, names);
+    const file = stagedFileRequest(row, names);
     if (file?.approvalId === approvalId) return file;
     try {
       const value: unknown = JSON.parse(row.resultJson || "null");
@@ -243,7 +231,7 @@ async function stagedApproval(session: AltazorComputerSession, approvalId: strin
 async function verifiedSessionFiles(session: AltazorComputerSession, names: readonly string[]): Promise<VerifiedComputerFile[]> {
   if (!session.chatId || !session.kittyId) return [];
   const rows = await prisma.altazorComputerAction.findMany({ where: { sessionId: session.id, ownerId: session.ownerId, kind: { in: ["message", "connector_approval"] }, status: "completed" }, orderBy: { createdAt: "desc" }, take: 200 });
-  const staged = new Map(rows.map(row => stagedAction(row, names)).filter(value => value !== null).map(value => [value.requestId, value]));
+  const staged = new Map(rows.map(row => stagedFileRequest(row, names)).filter(value => value !== null).map(value => [value.requestId, value]));
   const files: VerifiedComputerFile[] = [], seen = new Set<string>();
   for (const row of rows) {
     if (row.kind !== "connector_approval" || !row.resultJson) continue;

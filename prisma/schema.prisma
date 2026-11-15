@@ -3024,6 +3024,7 @@ model AltazorComputerAction {
   updatedAt DateTime @updatedAt
   @@unique([ownerId,requestId])
   @@index([sessionId,createdAt])
+  @@index([ownerId,kind,status,createdAt,id])
 }
 
 model AltazorAcademicSearch {
