@@ -51,7 +51,7 @@ export default async function CuentaPage() {
       <div id="seguridad" className="space-y-6">
         <PasswordChangeForm />
         <TotpSettingsPanel />
-        <TrustedDevicesPanel />
+        <TrustedDevicesPanel key={user.id} />
       </div>
       <MyPermissions user={user} locale={locale} />
       {dailyBrief && <AltazorDailyBriefSettings key={`daily-brief:${user.id}`} initial={dailyBrief} locale={locale} />}
