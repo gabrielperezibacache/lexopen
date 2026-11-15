@@ -44,7 +44,7 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 
-En **Mi cuenta → Equipos recordados** puedes consultar el último uso y revocar la confianza de un navegador o de todos. Al completar 2FA puedes recordarlo durante 30 días; un cambio de contraseña o del segundo factor invalida esa confianza.
+En **Mi cuenta → Equipos recordados** puedes consultar el último uso y revocar la confianza de un navegador o de todos. Al completar 2FA puedes recordarlo durante 30 días; un cambio de contraseña o del segundo factor invalida esa confianza. [Gestión y alcance de los equipos recordados](docs/EQUIPOS-RECORDADOS.md)
 
 ## Actualización de causas
 
