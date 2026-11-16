@@ -83,3 +83,9 @@ test("redirected catalogs never cause remote generation", async () => {
   try { const r = await evaluateLocalModels({ models: ["fixture:installed"], baseUrl: wrong.origin, tasks: ["extract"] }); assert.equal(r.status, "incomplete"); assert.match(r.models[0].tasks[0].error, /otro modelo/); }
   finally { await wrong.close(); }
 });
+
+test("token-limited responses are incomplete even when done is true", async () => {
+  const f = await fixture(route => route === "/api/status" ? { cloud: { disabled: true } } : route === "/api/tags" ? { models: [{ name: "fixture:installed" }] } : { done: true, done_reason: "length", message: { content: JSON.stringify(answers[0]) } });
+  try { const r = await evaluateLocalModels({ models: ["fixture:installed"], baseUrl: f.origin, tasks: ["extract"] }); assert.equal(r.status, "incomplete"); assert.equal(r.models[0].tasks[0].status, "failed"); assert.equal(r.models[0].tasks[0].metrics, undefined); }
+  finally { await f.close(); }
+});

@@ -74,6 +74,7 @@ export async function evaluateLocalModels({ models, baseUrl = "http://127.0.0.1:
         const response = await request(origin, "/api/chat", timeoutMs, { model, stream: false, format: "json", options: report.options, messages: [{ role: "system", content: "Trabaja únicamente con el texto ficticio proporcionado. Devuelve el objeto JSON pedido, sin herramientas ni información externa." }, { role: "user", content: example.source + "\n\n" + example.instruction }] });
         if (response.remote_host || response.remote_model) throw Error("El motor informó ejecución remota");
         if (response.model && response.model !== model) throw Error("El motor respondió con otro modelo");
+        if (response.done_reason !== undefined && response.done_reason !== "stop") throw Error("Generación interrumpida o limitada por tokens");
         if (typeof response.message?.content !== "string" || response.done !== true) throw Error("Generación incompleta o sin texto");
         const wallMs = performance.now() - start;
         let memory = { ollamaReportedBytes: null, ollamaReportedVramBytes: null, available: false };
