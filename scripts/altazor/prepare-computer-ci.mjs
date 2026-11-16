@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile), gatewayUser = "lexopen-kitties-ci";
+let phase = "environment";
 const sourceCommit = "6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3";
 const bits = text => [...text].reduce((value, char, index) => value | (char === "-" ? 0 : 4 >> index), 0);
 const permissions = value => [4, 2, 1].map((bit, index) => value & bit ? "rwx"[index] : "-").join("");
@@ -45,31 +46,39 @@ function ancestors(target) {
 async function main() {
   assert.ok(process.platform === "linux" && process.env.CI === "true" && process.env.LEXOPEN_ALTAZOR_TEST_DOCKER === "1", "Explicit Linux CI opt-in required");
   const runnerTemp = await realpath(process.env.RUNNER_TEMP), source = await realpath(process.argv[2]);
+  phase = "source-identity";
   assert.ok(source.startsWith(runnerTemp + sep), "Pinned public source must remain in RUNNER_TEMP");
   assert.equal((await readFile(join(source, ".lexopen-source-commit"), "utf8")).trim(), sourceCommit);
   assert.equal(await lstat(join(source, ".git")).catch(() => null), null, "Archived public source must not contain Git metadata");
   const binary = await realpath(join(source, "dist/kitties"));
+  phase = "binary-identity";
   assert.ok(binary.startsWith(source + sep) && (await lstat(binary)).isFile(), "Pinned binary must be a regular file within the archived source");
   const uid = (await run("id", ["-u", gatewayUser])).stdout.trim(); assert.match(uid, /^[1-9][0-9]*$/);
+  phase = "owned-audit-directory";
   const beforeHash = createHash("sha256").update(await readFile(binary)).digest("hex");
   const audit = await mkdtemp(join(runnerTemp, "lexopen-computer-ci-acls-"));
   await writeFile(join(audit, ".owned-computer-ci-acls"), "public-ci-runtime-acl-only\n", { mode: 0o600 });
   let grants = 0;
   async function grant(target, requested) {
+    phase = "acl-read";
     const before = (await run("getfacl", ["-c", "-p", "-n", "-E", target])).stdout;
+    phase = "acl-plan";
     const change = narrowAclChange(before, uid, requested);
     const backup = (await run("getfacl", ["-p", "-n", target])).stdout;
     await writeFile(join(audit, `before-${grants}.acl`), backup, { mode: 0o600 });
+    phase = "acl-apply";
     await run("sudo", ["-n", "setfacl", "-n", "-m", change, target]); grants++;
   }
   for (const target of ancestors(dirname(binary))) {
+    phase = "ancestor-access";
     assert.ok((await lstat(target)).isDirectory(), "Expected a resolved ancestor directory");
     if (!await asGateway("-x", target)) await grant(target, "--x");
     assert.ok(await asGateway("-x", target), "Gateway UID still cannot traverse a required ancestor");
   }
   if (!await asGateway("-r", binary) || !await asGateway("-x", binary)) await grant(binary, "r-x");
+  phase = "executable-access";
   assert.ok(await asGateway("-r", binary) && await asGateway("-x", binary) && await asGateway("-x", source), "Gateway UID executable/source preflight failed");
   assert.equal(createHash("sha256").update(await readFile(binary)).digest("hex"), beforeHash, "ACL preparation must not change the pinned binary");
   console.log(`Computer CI permission preflight PASS: dedicated UID, ${grants} narrow ACL grants, preserved other subjects and unchanged pinned binary.`);
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(() => { console.error("Computer CI permission preflight FAILED: owned path, source pin, ACL preservation or dedicated UID access. No private paths or command output printed."); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(() => { console.error(`Computer CI permission preflight FAILED: phase=${phase}. No private paths or command output printed.`); process.exitCode = 1; });

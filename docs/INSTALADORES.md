@@ -27,7 +27,16 @@ La carpeta de datos se preserva al actualizar y al desinstalar. No se coloca den
 
 ## Firma, actualizaciones y alcance de validación
 
-Los paquetes preliminares pueden carecer de firma de editor y notarización. El sistema puede impedir su apertura o mostrar avisos; no se recomienda desactivar sus protecciones. macOS necesita firma compatible para su actualización automática. `SHA256SUMS` comprueba integridad del archivo, pero no certifica la identidad del editor.
+Las publicaciones antiguas, incluida preview 10, pueden carecer de firma de editor y notarización y macOS puede impedir su apertura. Desde la preparación de preview 11, toda publicación pública de macOS, incluidas las previews, exige firma íntegra de Developer ID, notarización y aceptación de Gatekeeper. Los artefactos sin esas comprobaciones sólo sirven para verificación de CI y se identifican como no publicables. `SHA256SUMS` comprueba integridad, pero no certifica la identidad del editor.
+
+### Credenciales protegidas de publicación
+
+Configurar el GitHub Environment `desktop-release` con revisión requerida y acceso sólo a etiquetas de publicación. Los PR y las comprobaciones manuales utilizan `desktop-verification`, sin credenciales de firma. El workflow entrega secretos al empaquetador sólo al construir una etiqueta.
+
+- macOS: `MAC_CSC_LINK` (certificado Developer ID Application en P12 codificado en base64), `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` y `APPLE_TEAM_ID`.
+- Windows: `WIN_CSC_LINK` y `WIN_CSC_KEY_PASSWORD`, compatibles con el mecanismo de firma de electron-builder y el certificado contratado. Una versión estable exige Authenticode válido.
+
+No añadir certificados al repositorio ni a los recursos. Sin credenciales de Apple, la construcción de una etiqueta falla antes de compilar; las pruebas de PR pueden continuar sin utilizarlas. El recibo de firma distingue `codeSignatureValid`, `publisherAuthenticated`, `notarized` y `gatekeeperAccepted`. Configurar los secretos no acredita que el certificado o la notarización funcionen: debe pasar el recorrido nativo y la instalación real del paquete descargado.
 
 El canal **estable** excluye versiones preliminares. **Vista previa** es una decisión explícita en Desktop. No se fuerza una versión inferior al cambiar de canal. Antes de instalar una actualización en modo Host se detienen los servicios y se crea un respaldo comprobado; un fallo impide continuar. Véase [actualizaciones](ACTUALIZACIONES.md).
 

@@ -1,0 +1,43 @@
+name: Contributor environment
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: devcontainer-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  disposable-development:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LEXOPEN_DEV_INSTANCE: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Start isolated development services
+        run: docker compose -f .devcontainer/compose.yaml up -d --wait
+      - name: Install and initialize fictitious development data
+        run: docker compose -f .devcontainer/compose.yaml exec -T app bash -lc 'cd /workspaces/lexopen && npm ci && npm ci --prefix desktop --ignore-scripts && npm run setup && npm run typecheck'
+      - name: Start the documented development command
+        run: docker compose -f .devcontainer/compose.yaml exec -T -d app bash -lc 'cd /workspaces/lexopen && npm run dev > /tmp/lexopen-dev.log 2>&1'
+      - name: Check the actual development server
+        run: |
+          docker compose -f .devcontainer/compose.yaml exec -T app node --input-type=module <<'NODE'
+          let ready = false;
+          for (let attempt = 0; attempt < 60; attempt++) {
+            try {
+              const response = await fetch('http://127.0.0.1:3000/api/health');
+              const body = await response.json();
+              if (response.ok && body.ok === true && body.db === 'up') { ready = true; break; }
+            } catch {}
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          if (!ready) throw new Error('Disposable developer Host did not start');
+          if (!(await fetch('http://127.0.0.1:3000/login')).ok) throw new Error('Login unavailable');
+          NODE
+      - name: Remove only this run's disposable services and volumes
+        if: always()
+        run: docker compose -f .devcontainer/compose.yaml down --volumes --remove-orphans

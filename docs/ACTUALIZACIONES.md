@@ -28,6 +28,8 @@ La descarga y la instalación requieren decisiones separadas. No se instala auto
 
 La copia conserva datos y configuración de esa carpeta. Si la instalación utiliza almacenamiento externo, enlaces o una base remota, requiere preparación específica; el actualizador no simula un respaldo completo ni mueve esos servicios automáticamente. El respaldo contiene información y secretos de la instalación: conservarlo en un destino protegido forma parte de la operación del estudio. La copia no añade cifrado por sí sola.
 
+Los nuevos manifiestos de formato 2 incluyen obligatoriamente `integrity.algorithm=sha256` e inventario de rutas relativas, tamaños, archivos y carpetas. Antes de reemplazar el destino se comprueban archivos alterados, ausentes o adicionales y se rechazan enlaces; la copia se vuelve a comprobar antes de reubicar la configuración del Host. Si falla la segunda comprobación, se recupera el destino anterior. Los manifiestos v1 anteriores sin índice continúan siendo legibles y su validación devuelve `integrityVerified=false`; no se les atribuye verificación criptográfica. Las huellas detectan cambios respecto del manifiesto, pero no sustituyen la protección de la copia y del propio manifiesto ni una restauración en otro equipo.
+
 En modo **Cliente** se actualiza el shell de ese equipo; no se crea un respaldo de la base del Host remoto ni se detiene ese servidor.
 
 ### Firmas y paquetes de prueba

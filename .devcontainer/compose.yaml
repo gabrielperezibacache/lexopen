@@ -1,0 +1,33 @@
+name: lexopen-dev-${LEXOPEN_DEV_INSTANCE:-local}
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+    command: sleep infinity
+    network_mode: service:postgres
+    volumes:
+      - ..:/workspaces/lexopen:cached
+    environment:
+      LEXOPEN_DEV_CONTAINER: "1"
+      DATABASE_URL: postgresql://lexopen:fictitious-dev-only@127.0.0.1:5432/lexopen_dev_e2e
+      E2E_DATABASE_URL: postgresql://lexopen:fictitious-dev-only@127.0.0.1:5432/lexopen_dev_e2e
+      SESSION_SECRET: fictitious-dev-container-session-secret-2026-only
+      STORAGE_PATH: /tmp/lexopen-dev-storage
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: lexopen
+      POSTGRES_PASSWORD: fictitious-dev-only
+      POSTGRES_DB: lexopen_dev_e2e
+    volumes:
+      - dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U lexopen -d lexopen_dev_e2e"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  dev-db:

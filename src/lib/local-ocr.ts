@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 
 const execFile = promisify(execFileCallback);
 let capabilityPromise: Promise<OcrCapability> | null = null;
+let capabilityKey = "", capabilityExpiresAt = 0;
 
 export type OcrCapability = {
   enabled: boolean;
@@ -14,6 +15,7 @@ export type OcrCapability = {
   reason?: string;
   bin?: string;
   hint?: string;
+  missingLanguages?: string[];
 };
 
 function configuredInteger(value: string | undefined, fallback: number, min: number, max: number) {
@@ -180,8 +182,19 @@ export function getOcrCapability(): Promise<OcrCapability> {
   if (process.env.OCR_ENABLED === "0") {
     return Promise.resolve({ enabled: false, available: false, provider: "disabled" });
   }
-  if (!capabilityPromise) capabilityPromise = detectOcrCapability();
+  const key = [process.env.OCR_LANGUAGE, process.env.OCR_TESSERACT_BIN, process.env.OCR_PDFTOPPM_BIN, process.env.TESSDATA_PREFIX, process.env.PATH].join("\n");
+  if (!capabilityPromise || key !== capabilityKey || performance.now() >= capabilityExpiresAt) {
+    capabilityKey = key; capabilityExpiresAt = performance.now() + 30_000;
+    capabilityPromise = detectOcrCapability();
+  }
   return capabilityPromise;
+}
+
+export function missingOcrLanguages(requested: string, output: string) {
+  const languages = requested.split("+");
+  if (!languages.length || languages.some(language => !/^[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)?$/.test(language))) throw new Error("Configuración de idioma OCR inválida.");
+  const installed = new Set(output.split(/\r?\n/).map(line => line.trim()).filter(line => /^[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)?$/.test(line)));
+  return [...new Set(languages)].filter(language => !installed.has(language));
 }
 
 async function detectOcrCapability(): Promise<OcrCapability> {
@@ -195,6 +208,13 @@ async function detectOcrCapability(): Promise<OcrCapability> {
       hint: ocrInstallHint(),
     };
   }
+
+  const languages = await probeBin(found.bin, ["--list-langs"]);
+  if (!languages.ok) return { enabled: true, available: false, provider: "unavailable", reason: "ocr_languages_unavailable", hint: "No se pudieron comprobar los idiomas instalados de Tesseract." };
+  let missingLanguages: string[];
+  try { missingLanguages = missingOcrLanguages(process.env.OCR_LANGUAGE || "spa+eng", languages.stdout + "\n" + languages.stderr); }
+  catch { return { enabled: true, available: false, provider: "unavailable", reason: "ocr_language_invalid", hint: "Revise OCR_LANGUAGE; use los identificadores de idioma de Tesseract separados por +." }; }
+  if (missingLanguages.length) return { enabled: true, available: false, provider: "unavailable", version: found.version, bin: found.bin, missingLanguages, reason: "ocr_languages_missing", hint: `Faltan datos de idioma de Tesseract: ${missingLanguages.join(", ")}. Instálelos o seleccione un idioma disponible mediante OCR_LANGUAGE.` };
 
   // Physical page extraction renders only the pages that need recognition.
   // An importable OCR binding alone does not guarantee a working renderer.

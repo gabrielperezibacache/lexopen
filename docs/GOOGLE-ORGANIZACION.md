@@ -47,3 +47,7 @@ Cambiar Organización sólo afecta a destinos nuevos. Las causas con una carpeta
 `npm run test:drive:organization` exige PostgreSQL local desechable (`DATABASE_URL` y `E2E_DATABASE_URL`). Simula Google y comprueba estructura compartida, reutilización entre causas y profesionales, espacio independiente, carpeta personal, pérdida de confirmación, reserva de IDs, reconciliación, bytes exactos, revocación y buzón administrativo sin duplicar tokens.
 
 Chromium comprueba la selección de raíz y la preparación de una carpeta personal con respuestas simuladas. Estas pruebas no modifican cuentas reales ni acreditan el consentimiento o permisos de una cuenta concreta. Las políticas del estudio y de Google deben contemplar que la cuenta es compartida. Este cambio no migra automáticamente archivos ni buzones personales existentes.
+
+## Módulos de implementación
+
+`google-session.ts` conserva OAuth, configuración y renovación de tokens; `google-calendar.ts` implementa Calendar y `google-corporate-drive.ts` las operaciones de Drive del estudio. `google.ts` mantiene las importaciones públicas existentes como fachada. El conector personal de Drive continúa separado; esta refactorización no fusiona cuentas ni amplía alcances.

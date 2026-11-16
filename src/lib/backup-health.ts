@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-const BACKUP_FORMAT_VERSION = 1;
+const BACKUP_FORMAT_VERSIONS = [1, 2];
 const BACKUP_PREFIX = "lexopen-backup-";
 const MAX_RETENTION = 365;
 
@@ -51,7 +51,8 @@ async function latestBackup(directory: string) {
         await fs.readFile(path.join(directory, entry.name, "manifest.json"), "utf8")
       );
       if (
-        manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
+        !BACKUP_FORMAT_VERSIONS.includes(manifest.formatVersion) ||
+        manifest.formatVersion === 2 && (manifest.integrity?.algorithm !== "sha256" || !Array.isArray(manifest.integrity?.entries)) ||
         manifest.type !== "lexopen-host-data"
       ) {
         continue;

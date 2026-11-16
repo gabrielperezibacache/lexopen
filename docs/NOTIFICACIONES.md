@@ -1,8 +1,7 @@
 # Notificaciones LexOpen 1.1
 
 Multicanal con outbox en Postgres, preferencias por usuario y canales sin
-exponer el Host (SMTP/Gmail, Telegram long-poll, Web Push). WhatsApp queda
-como **interfaz** (`ChannelProvider`) para 1.2.
+exponer el Host (SMTP/Gmail, Telegram long-poll, Web Push). WhatsApp dispone de adaptadores Meta y Twilio para plantillas aprobadas y vinculación; el uso real requiere credenciales y su piloto de entrega.
 
 ## Piezas
 
@@ -102,7 +101,7 @@ E2E_BASE_URL=http://127.0.0.1:3210 npm run e2e -- e2e/notify-reconciliation.spec
 ## Límites actuales
 
 - WhatsApp envía plantillas aprobadas sin variables mediante Meta o Twilio. Requiere credenciales y webhook HTTPS; no implementa conversaciones ni confirmación de lectura.
-- PWA: instalable y push, con espacio cifrado de escritos previamente preparados. El trabajo sin conexión de otros módulos requiere implementación específica.
+- PWA: instalable y push. El espacio cifrado cubre los módulos detallados en [Trabajo sin conexión](TRABAJO-SIN-CONEXION.md); no implica que toda la aplicación pueda utilizarse sin red.
 - La entrega externa y la confirmación en PostgreSQL no forman una transacción distribuida. No se promete exactamente una entrega: los casos ambiguos requieren conciliación.
 - Los handlers de la cola genérica `Job` deben ser idempotentes: una lease vencida puede ejecutar nuevamente su trabajo.
 - Web Push admite los servicios de navegador declarados (Google, Mozilla, Apple y Windows), HTTPS y transporte sin redirecciones; un endpoint arbitrario no es un destino válido.

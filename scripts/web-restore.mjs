@@ -27,6 +27,7 @@ if (fs.existsSync(postmasterPid)) {
 }
 
 const replacement = await restoreDataDirectory(dataDir, path.resolve(source));
+console.log(replacement.integrityVerified ? "Inventario de archivos verificado antes y después de copiar." : "Copia antigua sin índice de integridad: compruebe sus archivos y la recuperación completa.");
 console.log("Restauración aplicada.");
 console.log(`Rollback temporal conservado en: ${replacement.rollback}`);
 console.log("Inicie `npm run web:host` para validar el arranque.");

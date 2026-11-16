@@ -128,7 +128,7 @@ async function main() {
         assert.ok(error instanceof ManualOjvSessionError && error.code === "action-failed");
         assert.equal(error.diagnostic?.operation, "list");
         assert.equal(error.diagnostic?.originalErrorName, "PjudScrapeError");
-        assert.ok(error.diagnostic?.locations.every(location => /^src\/lib\/pjud\/(?:public-scrape|manual-session|ojv-dom)\.ts:\d+:\d+$/.test(location)));
+        assert.ok(error.diagnostic?.locations.every(location => /^src\/lib\/pjud\/(?:public-scrape|public-browser|ojv-authenticated|manual-session|ojv-dom)\.ts:\d+:\d+$/.test(location)));
         assert.doesNotMatch(JSON.stringify(error), /PRIVATE|PARTY|20-2024|Corte Suprema|https:/);
         return true;
       });

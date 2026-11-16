@@ -46,6 +46,14 @@ async function main() {
     assert.equal((await fiscaliaWorkspace(owner, { causaId: cause.id })).rows.length, 1);
     assert.equal((await fiscaliaWorkspace(owner, { causaId: cause.id, status: "cancelled" })).rows.length, 1);
     assert.equal((await readCaseStatus(cause.id, owner)).status.fiscaliaCount, 1);
+    const pagingDate = new Date("2026-01-01T12:00:00Z");
+    await prisma.fiscaliaRequest.createMany({ data: Array.from({ length: 103 }, (_, i) => ({ id: `${tag}-${String(i).padStart(3, "0")}`, causaId: cause.id, creatorId: owner.id, title: "Paging fixture", kind: "copia", body: "Fictitious", status: "draft", updatedAt: pagingDate, followUpDate: i < 51 ? pagingDate : null })) });
+    const firstPage = await fiscaliaWorkspace(owner, { causaId: cause.id });
+    assert.equal(firstPage.rows.length, 100); assert(firstPage.nextCursor);
+    const secondPage = await fiscaliaWorkspace(owner, { causaId: cause.id, after: firstPage.nextCursor });
+    assert.equal(secondPage.rows.length, 4); assert.equal(secondPage.nextCursor, null);
+    assert.equal(new Set([...firstPage.rows, ...secondPage.rows].map(r => r.id)).size, 104);
+    await assert.rejects(fiscaliaWorkspace(outside, { causaId: cause.id, after: firstPage.nextCursor }), code(404));
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: outside.id } });
     await assert.rejects(saveFiscaliaRequest(owner, body, key), code(404));
     await assert.rejects(exportFiscaliaRequest(first.id, owner), code(404));

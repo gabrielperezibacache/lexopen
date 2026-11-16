@@ -1,4 +1,5 @@
 "use client";
+import { importAudioRecoveryKey } from "@/lib/audio/pending-crypto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Mic, MonitorUp, RefreshCw, Square } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
@@ -70,8 +71,9 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
   onCaptureState?: (state: HearingCaptureState | null) => void;
   registerStopCapture?: (stop: (() => void) | null) => void;
 }) {
+  const recoveryKey = useRef<CryptoKey | null>(null);
   const base = `/api/causas/${causaId}/hearings/${workspaceId}/live/audio`;
-  const cacheKey = `${causaId}:${workspaceId}`;
+  const cacheKey = useRef("");
   const [view, setView] = useState<AudioView>(), [detail, setDetail] = useState<SessionDetail>();
   const [title, setTitle] = useState("Captura de audiencia"), [source, setSource] = useState<"microphone" | "tab">("microphone"), [consent, setConsent] = useState(false);
   const [recording, setRecording] = useState(false), [busy, setBusy] = useState(false), [pending, setPending] = useState<PendingClip[]>([]), [selected, setSelected] = useState("");
@@ -90,7 +92,7 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
   const chosenClip = useRef<{ id: string; sequence: number; sessionId: string } | null>(null);
   const callbacks = useRef({ onChanged, onAccessLost, onBusy, onSelection, onCitationUnavailable });
   useEffect(() => { callbacks.current = { onChanged, onAccessLost, onBusy, onSelection, onCitationUnavailable }; }, [onChanged, onAccessLost, onBusy, onSelection, onCitationUnavailable]);
-  const publishQueue = useCallback(() => { if (!denied.current) rememberAudio(cacheKey, session.current?.id, queue.current); if (mounted.current) setPending([...queue.current]); }, [cacheKey]);
+  const publishQueue = useCallback(() => { if (!denied.current) rememberAudio(cacheKey.current, session.current?.id, queue.current); if (mounted.current) setPending([...queue.current]); }, [cacheKey]);
   const release = useCallback(() => {
     capturing.current = false; if (timer.current) clearTimeout(timer.current); timer.current = null;
     const current = recorder.current; if (current && current.state !== "inactive") { finalizing.current = true; current.stop(); }
@@ -99,8 +101,8 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
   }, []);
   const deny = useCallback((reason: Failure) => {
     if (![401, 403, 404].includes(reason.status || 0)) return false;
-    denied.current = true; purgeDurable.current = reason.status !== 401; captureGeneration.current++; release(); queue.current = []; session.current = undefined; selectedRef.current = "";
-    revokeAudio(cacheKey);
+    recoveryKey.current = null; denied.current = true; purgeDurable.current = reason.status !== 401; captureGeneration.current++; release(); queue.current = []; session.current = undefined; selectedRef.current = "";
+    revokeAudio(cacheKey.current);
     if (purgeDurable.current && durableScope.current) void clearPendingCaptures(durableScope.current).catch(() => {});
     if (mounted.current) { setBlocked(true); setDetail(undefined); setView(undefined); setPending([]); setOlder([]); setConsent(false); setClosing(false); setError(reason.message); callbacks.current.onAccessLost(reason.message); }
     return true;
@@ -113,29 +115,35 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
     try {
       const value = await readAudio(base + (id ? `?sessionId=${encodeURIComponent(id)}` : ""));
       if (!mounted.current || denied.current) return;
-      setView(value);
+      const { localRecoveryKey, ...snapshot } = value;
+      setView(snapshot);
       const scope = pendingCaptureScope(value.actorId, causaId, workspaceId);
+      if (durableScope.current && durableScope.current !== scope) {
+        deny(Object.assign(new Error("La cuenta cambió. Vuelva a abrir la mesa."), { status: 403 })); return;
+      }
+      cacheKey.current = scope;
       durableScope.current = scope;
-      if (!loadedStorage.current) {
+      recoveryKey.current = localRecoveryKey ? await importAudioRecoveryKey(localRecoveryKey) : null;
+      if (!loadedStorage.current && recoveryKey.current) {
         loadedStorage.current = true;
         try {
-          const saved = await loadPendingCaptures(scope);
+          const saved = await loadPendingCaptures(scope, recoveryKey.current);
           if (!mounted.current || denied.current) return;
-          const previous = cachedAudio(cacheKey), savedSession = saved.find(row => value.sessions.some(item => item.id === row.sessionId))?.sessionId;
-          if (savedSession && !previous?.finalization && !queue.current.length && !capturing.current) rememberAudio(cacheKey, savedSession, saved.filter(row => row.sessionId === savedSession).map(row => row.clip), true);
+          const previous = cachedAudio(cacheKey.current), savedSession = saved.find(row => value.sessions.some(item => item.id === row.sessionId))?.sessionId;
+          if (savedSession && !previous?.finalization && !queue.current.length && !capturing.current) rememberAudio(cacheKey.current, savedSession, saved.filter(row => row.sessionId === savedSession).map(row => row.clip), true);
         } catch { setStorageError("La recuperación local no está disponible. Mantenga la pestaña abierta o descargue una copia de los tramos pendientes."); }
       }
       if (capturing.current && (!value.canWrite || !value.config.canCapture)) { autoSave.current = false; wantClose.current = true; setClosing(true); release(); setNotice("La configuración o el acceso cambió. La captura se detuvo; revise el audio pendiente antes de continuar."); }
       if (id && selectedRef.current === id && value.session) {
         publishSession(value.session); setOlder([]); setCursor(undefined);
-        let held = cachedAudio(cacheKey);
+        let held = cachedAudio(cacheKey.current);
         if (!restored.current && held?.sessionId === id && held.recoverable) {
           if (held.finalization) await held.finalization;
           if (!mounted.current || denied.current || selectedRef.current !== id) return;
-          held = cachedAudio(cacheKey);
+          held = cachedAudio(cacheKey.current);
           if (held?.sessionId === id && held.clips.length) { restored.current = true; queue.current = [...held.clips]; autoSave.current = false; wantClose.current = true; setRecording(false); setBusy(false); setClosing(true); publishQueue(); setNotice("Se recuperó audio pendiente de esta pestaña después de comprobar su acceso. Revise y guarde los tramos; no se enviaron automáticamente. Los tramos finalizados se conservan en este navegador hasta ocho horas, incluso después de recargar. La grabación no se reanuda sola."); }
         }
-      } else if (!selectedRef.current && value.sessions[0]) { const held = cachedAudio(cacheKey), selected = value.sessions.find(item => item.id === held?.sessionId)?.id || value.sessions[0].id; selectedRef.current = selected; setSelected(selected); }
+      } else if (!selectedRef.current && value.sessions[0]) { const held = cachedAudio(cacheKey.current), selected = value.sessions.find(item => item.id === held?.sessionId)?.id || value.sessions[0].id; selectedRef.current = selected; setSelected(selected); }
       const chosen = chosenClip.current;
       if (chosen) {
         let checked = value.session?.id === chosen.sessionId ? value.session.clips.find(clip => clip.id === chosen.id) : undefined;
@@ -151,7 +159,7 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
     const result = await apiMutation<AudioMutation>(`${base}/${current.id}/stop`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: stopRequest.current.requestId }) });
     if (!mounted.current) return;
     if (!result.ok) { if (!deny(Object.assign(new Error(result.error), { status: result.status }))) setError(result.error); return; }
-    stopRequest.current = null; wantClose.current = false; pendingAudio.delete(cacheKey); setClosing(false); publishSession(result.data.session); setNotice("Captura cerrada. Los originales y las transcripciones guardadas permanecen en la causa.");
+    stopRequest.current = null; wantClose.current = false; pendingAudio.delete(cacheKey.current); setClosing(false); publishSession(result.data.session); setNotice("Captura cerrada. Los originales y las transcripciones guardadas permanecen en la causa.");
   }, [base, deny, publishSession, cacheKey]);
   const drain = useCallback(async () => {
     if (uploading.current || denied.current || !session.current) return;
@@ -187,7 +195,7 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
     mounted.current = true; denied.current = false; const supportCheck = setTimeout(() => setSupported({ microphone: typeof navigator.mediaDevices?.getUserMedia === "function" && typeof MediaRecorder !== "undefined", tab: typeof navigator.mediaDevices?.getDisplayMedia === "function" && typeof MediaRecorder !== "undefined" }), 0);
     const visibility = () => { if (document.hidden && capturing.current) stopCapture("Captura detenida al ocultar la pestaña. Revise el último tramo antes de continuar.", false); };
     document.addEventListener("visibilitychange", visibility);
-    return () => { mounted.current = false; autoSave.current = false; restored.current = false; const finalization = currentFinalization.current; if (!denied.current) rememberAudio(cacheKey, session.current?.id, queue.current, true, finalization && !finalization.completed ? finalization.promise : undefined); clearTimeout(supportCheck); invalidateCapture(); release(); document.removeEventListener("visibilitychange", visibility); };
+    return () => { mounted.current = false; autoSave.current = false; restored.current = false; const finalization = currentFinalization.current; if (!denied.current) rememberAudio(cacheKey.current, session.current?.id, queue.current, true, finalization && !finalization.completed ? finalization.promise : undefined); clearTimeout(supportCheck); invalidateCapture(); release(); document.removeEventListener("visibilitychange", visibility); };
   }, [release, stopCapture, invalidateCapture, cacheKey]);
   useEffect(() => { if (!active || blocked) return; const first = setTimeout(() => void refresh(), 0), poll = setInterval(() => void refresh(), 15_000); return () => { clearTimeout(first); clearInterval(poll); }; }, [active, blocked, refresh]);
   useEffect(() => { if (!selected || detail?.id === selected || blocked) return; void refresh(selected); }, [selected, detail?.id, blocked, refresh]);
@@ -200,7 +208,7 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
   useEffect(() => { const unload = (event: BeforeUnloadEvent) => { if (startRequest.current || opening.current || capturing.current || finalizing.current || uploading.current || queue.current.length || wantClose.current) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", unload); return () => window.removeEventListener("beforeunload", unload); }, []);
   async function start() {
     if (opening.current || busy || capturing.current || queue.current.length || wantClose.current || !view?.config.canCapture || !consent || !active || !canWrite) return;
-    const held = cachedAudio(cacheKey);
+    const held = cachedAudio(cacheKey.current);
     if (held?.recoverable && (held.clips.length || held.finalization)) { selectedRef.current = held.sessionId; setSelected(held.sessionId); setNotice("Compruebe y conserve el audio pendiente antes de iniciar otra captura."); void refresh(held.sessionId); return; }
     opening.current = true; setBusy(true); setError(""); setNotice(""); const generation = ++captureGeneration.current;
     try {
@@ -223,19 +231,19 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
         const limit = session.current.maxClips || view.maxClips;
         if (nextSequence.current >= limit || session.current.totalBytes + queue.current.reduce((sum, clip) => sum + clip.blob.size, 0) >= session.current.maxBytes) { stopCapture("Se alcanzó el alcance de esta captura. Conserve los tramos pendientes y cree otra captura si necesita continuar."); return; }
         const chunks: Blob[] = [], currentRecorder = new MediaRecorder(audioOnly, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 64_000 }), sequence = nextSequence.current;
-        const buffer = beginFinalization(cacheKey, session.current.id), requestId = operationKey(); currentFinalization.current = buffer;
+        const buffer = beginFinalization(cacheKey.current, session.current.id), requestId = operationKey(); currentFinalization.current = buffer;
         recorder.current = currentRecorder;
         currentRecorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
         currentRecorder.onerror = () => { stopCapture("El navegador interrumpió la captura. Conserve el audio recibido antes de volver a comenzar.", false); setError("No se pudo completar el tramo actual. Revise los tramos conservados y el permiso del micrófono."); };
         currentRecorder.onstop = async () => {
           finalizing.current = true;
           if (timer.current) clearTimeout(timer.current); timer.current = null;
-          if (denied.current || !buffer.valid) { finishFinalization(cacheKey, buffer); return; }
+          if (denied.current || !buffer.valid) { finishFinalization(cacheKey.current, buffer); return; }
           const blob = new Blob(chunks, { type: currentRecorder.mimeType || mime || "audio/webm" });
           const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
           const item = { requestId, sequence, blob, name: `audiencia-tramo-${sequence + 1}.${extension}` };
           if (blob.size) {
-            try { await savePendingCapture(durableScope.current, buffer.sessionId, item); if (mounted.current) setStorageError(""); }
+            try { if (!recoveryKey.current) throw new Error("Audio recovery key unavailable"); await savePendingCapture(durableScope.current, buffer.sessionId, item, recoveryKey.current); if (mounted.current) setStorageError(""); }
             catch {
               autoSave.current = false;
               if (mounted.current) { stopCapture(undefined, false); setStorageError("No se pudo conservar el tramo en este dispositivo. Mantenga la pestaña abierta, guárdelo en la causa o descargue una copia antes de salir."); }
@@ -244,12 +252,12 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
           finalizing.current = false;
           if (denied.current || !buffer.valid) {
             if (purgeDurable.current && durableScope.current) await removePendingCapture(durableScope.current, buffer.sessionId, requestId).catch(() => {});
-            finishFinalization(cacheKey, buffer); return;
+            finishFinalization(cacheKey.current, buffer); return;
           }
           if (!mounted.current || generation !== captureGeneration.current) {
-            const previous = cachedAudio(cacheKey), held = previous?.sessionId === buffer.sessionId ? [...previous.clips] : [];
+            const previous = cachedAudio(cacheKey.current), held = previous?.sessionId === buffer.sessionId ? [...previous.clips] : [];
             if (blob.size && !held.some(item => item.requestId === requestId)) { const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm"; held.push({ requestId, sequence, blob, name: `audiencia-tramo-${sequence + 1}.${extension}` }); }
-            rememberAudio(cacheKey, buffer.sessionId, held, true); finishFinalization(cacheKey, buffer); return;
+            rememberAudio(cacheKey.current, buffer.sessionId, held, true); finishFinalization(cacheKey.current, buffer); return;
           }
           if (blob.size) {
             nextSequence.current = sequence + 1;
@@ -257,13 +265,13 @@ export function HearingLiveAudioPanel({ causaId, workspaceId, active, canWrite, 
             queue.current.push({ requestId, sequence, blob, name: `audiencia-tramo-${sequence + 1}.${extension}` }); publishQueue();
             if (blob.size > view.maxBytes) { autoSave.current = false; stopCapture("El tramo supera el tamaño permitido. Descárguelo para conservarlo y ajuste la captura.", false); }
           } else { stopCapture("El navegador no entregó sonido en el último tramo. Se detuvo la captura; revise el permiso y la fuente de audio."); }
-          finishFinalization(cacheKey, buffer);
+          finishFinalization(cacheKey.current, buffer);
           if (capturing.current && queue.current.length < maxQueue && activeRef.current) beginClip.current();
           else if (capturing.current) { stopCapture("Captura pausada porque el servicio sigue procesando. Se conservan los tramos recibidos; vuelva a iniciar cuando termine."); }
           if (autoSave.current) void drainRef.current();
           else if (!queue.current.length && wantClose.current) void closeRef.current();
         };
-        try { currentRecorder.start(); } catch (reason) { finishFinalization(cacheKey, buffer); throw reason; }
+        try { currentRecorder.start(); } catch (reason) { finishFinalization(cacheKey.current, buffer); throw reason; }
         timer.current = setTimeout(() => { if (currentRecorder.state !== "inactive") { finalizing.current = true; currentRecorder.stop(); } }, Math.max(1, view.clipSeconds) * 1000);
       };
       beginClip.current = record; capturing.current = true; setRecording(true);

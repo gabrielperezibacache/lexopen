@@ -1,3 +1,5 @@
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import styles from "@/components/config/WorkspaceArea.module.css";
 import { EmptyState } from "@/components/EmptyState";
 import { NewSiteButton } from "@/components/sites/NewSiteButton";
@@ -19,7 +21,7 @@ const LIST_TAKE = 100;
 export default async function SitesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tipo?: string; estado?: string; portal?: string }>;
+  searchParams: Promise<{ q?: string; tipo?: string; estado?: string; portal?: string; after?: string }>;
 }) {
   const user = await requireUser();
   const { t, dict } = await getI18n();
@@ -35,8 +37,8 @@ export default async function SitesPage({
         : rawEstado;
   const portalOnly = sp.portal === "1";
 
-  const sites = await prisma.site.findMany({
-    where: { AND: [scopedsiteAccessWhere(user), {
+  const siteRows = await prisma.site.findMany({
+    where: { AND: [listCursorWhere(sp.after, "updatedAt"), scopedsiteAccessWhere(user), {
       AND: [
         isCliente(user.role) ? clientSiteWhere(user.id) : {},
         q
@@ -68,10 +70,11 @@ export default async function SitesPage({
       causa: { select: { id: true, rit: true, titulo: true } },
       _count: { select: { files: { where: clientVisibleFileWhere(user) }, tasks: { where: taskAccessWhere(user) }, members: true, isheets: { where: isCliente(user.role) ? { id: "__client_hidden__" } : {} } } },
     },
-    orderBy: { updatedAt: "desc" },
-    take: LIST_TAKE,
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: LIST_TAKE + 1,
   });
 
+  const { items: sites, next } = listWindow(siteRows, LIST_TAKE, "updatedAt");
   const staff = !isCliente(user.role);
 
   return (
@@ -86,6 +89,7 @@ export default async function SitesPage({
         }
       />
 
+      <ListPagination path="/sites" filters={{ q, tipo, estado: sp.estado, portal: sp.portal }} after={sp.after} next={next} count={sites.length} />
       {staff && <SitesGuidePanel />}
       {staff && <SitesFilters defaultStatus={estado || "active"} />}
 

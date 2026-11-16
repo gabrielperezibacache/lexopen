@@ -1,3 +1,5 @@
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
@@ -15,14 +17,16 @@ import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { documentoListSelect } from "@/lib/sites/file-select";
 import Link from "next/link";
 
-export default async function DocumentosPage() {
+export default async function DocumentosPage({ searchParams }: { searchParams: Promise<{ q?: string; after?: string }> }) {
+  const query = await searchParams;
+  const q = query.q?.trim().slice(0, 200) || "";
   const user = await requireStaff();
   const { dict } = await getI18n();
   const h = dict.hubs.documentos;
   const LIST_TAKE = 100;
-  const [rawDocumentos, causas] = await Promise.all([
+  const [documentRows, causas] = await Promise.all([
     prisma.documento.findMany({
-      where: { AND: [scopeddocumentReadWhere(user), confidentialWhere(user)] },
+      where: { AND: [scopeddocumentReadWhere(user), confidentialWhere(user), listCursorWhere(query.after, "updatedAt"), ...(q ? [{ OR: [{ nombre: { contains: q, mode: "insensitive" as const } }, { causa: { titulo: { contains: q, mode: "insensitive" as const } } }, { causa: { rit: { contains: q, mode: "insensitive" as const } } }] }] : [])] },
       select: {
         ...documentoListSelect,
         storageKey: true,
@@ -30,8 +34,8 @@ export default async function DocumentosPage() {
         causa: { select: { id: true, rit: true, titulo: true } },
         autor: { select: publicUserSelect },
       },
-      orderBy: { updatedAt: "desc" },
-      take: LIST_TAKE,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: LIST_TAKE + 1,
     }),
     prisma.causa.findMany({ where: scopedcausaAccessWhere(user),
       select: { id: true, rit: true, titulo: true },
@@ -40,6 +44,7 @@ export default async function DocumentosPage() {
     }),
   ]);
 
+  const { items: rawDocumentos, next } = listWindow(documentRows, LIST_TAKE, "updatedAt");
   const docIds = rawDocumentos.map(d => d.id);
   const textStatus = docIds.length > 0 ? await prisma.$queryRaw<{id: string, has_text: boolean, has_markdown: boolean}[]>`
     SELECT id,
@@ -72,6 +77,11 @@ export default async function DocumentosPage() {
         }
       />
 
+      <form role="search" className="panel flex flex-wrap items-end gap-3 p-4">
+        <label className="min-w-0 flex-1">Buscar documentos o causas<input className="input" name="q" defaultValue={q} maxLength={200} /></label>
+        <button className="btn btn-secondary" type="submit">Buscar</button>
+      </form>
+      <ListPagination path="/documentos" filters={{ q }} after={query.after} next={next} count={rawDocumentos.length} />
       <details className="group">
         <summary className="btn btn-primary w-fit cursor-pointer">Añadir archivos</summary>
         <div className="mt-4"><DocumentoIngestForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} /></div>

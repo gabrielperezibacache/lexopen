@@ -1,5 +1,7 @@
 # Cobertura funcional de Altazor
 
+> Registro histórico de la revisión indicada. El estado vigente, cambios posteriores y validaciones abiertas se distinguen en [Fiabilidad diaria](FIABILIDAD-DIARIA.md). El segundo revisor, la recuperación persistente de audio y la restauración automatizada ya tienen implementación posterior.
+
 Referencia funcional auditada el 5 de noviembre de 2026 en la revisión `48736184863dadc19163ac9e955fbfb85b39bfac`. Se revisaron el sitio en español, los manuales de autonomía, escritorio, aplicaciones, configuración, API, arquitectura e instalación, y el catálogo de adaptadores con sus acciones adicionales. La [imagen que usa LexOpen](../desktop/altazor-desktop-profile.json) está fijada a una revisión anterior. Las funciones de una revisión reciente requieren integración y pruebas propias antes de ofrecerse en LexOpen.
 
 **Disponible** indica que LexOpen tiene un recorrido propio en el código. **Condicionado** requiere configuración, una cuenta, una plataforma o un entorno concreto. **Parcial** indica que existe una parte del recorrido. **Pendiente** indica que el recorrido aún requiere implementación en LexOpen. **Restringido** identifica una decisión de seguridad. La revisión de código y las pruebas con datos ficticios no acreditan cuentas reales conectadas ni ejecución real en un dispositivo determinado.

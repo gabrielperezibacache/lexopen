@@ -176,7 +176,8 @@ export function RuntimeSettingsPanel() {
           />
           <Row label="Retención" value={backups.keep ?? backups.retention ?? "—"} hint="LEXOPEN_BACKUP_KEEP" />
           <Row label="Directorio" value={backups.dirSet ? "definido" : "no"} hint="LEXOPEN_BACKUP_DIR" />
-          <Row label="Estado" value={backups.enabled ? backups.status : "desactivados"} />
+          <Row label="Antigüedad y disponibilidad" value={backups.enabled ? backups.status : "desactivados"} />
+          <p className="mt-2 text-xs">La integridad completa se verifica al restaurar. Este estado no acredita una prueba de recuperación ni cifra la copia.</p>
           <Row
             label="Último backup"
             value={

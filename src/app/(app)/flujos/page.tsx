@@ -1,3 +1,5 @@
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -10,11 +12,12 @@ import { getI18n } from "@/lib/i18n/server";
 import { safeJsonParse } from "@/lib/safe-json";
 import Link from "next/link";
 
-export default async function WorkflowsGlobalPage() {
+export default async function WorkflowsGlobalPage({ searchParams }: { searchParams: Promise<{ after?: string }> }) {
+  const sp = await searchParams;
   const user = await requireStaff();
   const { dict } = await getI18n();
   const h = dict.hubs.flujos;
-  const workflows = await prisma.workflow.findMany({ where: scopedsiteRelatedWhere(user),
+  const rows = await prisma.workflow.findMany({ where: { AND: [scopedsiteRelatedWhere(user), listCursorWhere(sp.after, "createdAt")] },
     include: {
       site: true,
       instances: {
@@ -23,13 +26,15 @@ export default async function WorkflowsGlobalPage() {
         take: 6,
       },
     },
-    orderBy: { createdAt: "desc" },
-    take: 50,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 51,
   });
 
+  const { items: workflows, next } = listWindow(rows, 50, "createdAt");
   return (
     <div className="space-y-6">
       <ModuleHeader artwork="workflows" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ListPagination path="/flujos" after={sp.after} next={next} count={workflows.length} />
       {workflows.length === 0 ? (
         <EmptyState
           title={h.emptyTitle}

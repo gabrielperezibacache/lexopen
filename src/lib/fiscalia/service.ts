@@ -1,3 +1,4 @@
+import { fiscaliaCursor, fiscaliaCursorWhere } from "./pagination";
 import { prisma } from "@/lib/db";
 import { type Prisma } from "@prisma/client";
 import { assertCausaAccess, assertCausaCapability, causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
@@ -16,13 +17,13 @@ function fields(input: FiscaliaInput) {
     folio: input.folio || null, submittedAt: date(input.submittedAt), responseText: input.responseText,
     answeredAt: date(input.answeredAt), followUpDate: date(input.followUpDate) };
 }
-export async function fiscaliaWorkspace(user: CausaAccessUser, filters: { causaId?: string; status?: string } = {}) {
+export async function fiscaliaWorkspace(user: CausaAccessUser, filters: { causaId?: string; status?: string; after?: string } = {}) {
   const actor = await currentStaffActor(user, prisma);
   if (filters.causaId) await assertCausaAccess(filters.causaId, actor, { auditOverride: false });
   const [causes, rows] = await Promise.all([
     prisma.causa.findMany({ where: causaAccessWhere(actor), select: causeSelect(actor.id), orderBy: [{ titulo: "asc" }, { id: "asc" }] }),
     prisma.fiscaliaRequest.findMany({
-      where: { causa: causaAccessWhere(actor), ...(filters.causaId ? { causaId: filters.causaId } : {}),
+      where: { AND: [fiscaliaCursorWhere(filters.after)], causa: causaAccessWhere(actor), ...(filters.causaId ? { causaId: filters.causaId } : {}),
         ...(filters.status === "all" ? {} : filters.status && filters.status !== "open" ? { status: filters.status } : { status: { notIn: ["closed", "cancelled"] } }) },
       include: { causa: { select: causeSelect(actor.id) }, events: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15, include: { actor: { select: { name: true } } } } },
       orderBy: [{ followUpDate: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }, { id: "asc" }], take: 101,
@@ -30,7 +31,8 @@ export async function fiscaliaWorkspace(user: CausaAccessUser, filters: { causaI
   ]);
   const editable = (cause: typeof causes[number]) => can(actor, "causa.write", { causaRol: cause.abogadoId === actor.id ? "responsable" : cause.miembros[0]?.rol });
   return { causes: causes.map(c => ({ id: c.id, titulo: c.titulo, ruc: c.ruc, canEdit: editable(c) })),
-    rows: rows.slice(0, 100).map(r => ({ ...r, causa: { id: r.causa.id, titulo: r.causa.titulo }, canEdit: editable(r.causa) })), truncated: rows.length > 100 };
+    rows: rows.slice(0, 100).map(r => ({ ...r, causa: { id: r.causa.id, titulo: r.causa.titulo }, canEdit: editable(r.causa) })), truncated: rows.length > 100,
+    nextCursor: rows.length > 100 ? fiscaliaCursor(rows[99]) : null };
 }
 export async function saveFiscaliaRequest(user: CausaAccessUser, raw: unknown, key: string, update = false) {
   const patch = update ? fiscaliaUpdate.parse(raw) : null;

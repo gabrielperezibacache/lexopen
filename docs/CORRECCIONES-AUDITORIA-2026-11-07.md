@@ -1,5 +1,7 @@
 # Continuación de la auditoría de LexOpen
 
+> Registro histórico de la revisión indicada. El estado vigente, cambios posteriores y validaciones abiertas se distinguen en [Fiabilidad diaria](FIABILIDAD-DIARIA.md). El segundo revisor, la recuperación persistente de audio y la restauración automatizada ya tienen implementación posterior.
+
 Fecha: 7 de noviembre de 2026. Cambios locales sobre la aplicación existente, con bases y archivos ficticios para la validación.
 
 ## Conservación y revisión del trabajo

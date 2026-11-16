@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { EmptyState } from "@/components/EmptyState";
@@ -20,12 +20,14 @@ type User = { id: string; name: string; email: string; role?: string };
 export function MessagesClient({
   initialMessages,
   directory,
+  pagination,
 }: {
   initialMessages: Msg[];
   directory: User[];
+  pagination?: ReactNode;
 }) {
   const router = useRouter();
-  const [messages, setMessages] = useState(initialMessages);
+  const messages = initialMessages;
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -34,9 +36,7 @@ export function MessagesClient({
   const [body, setBody] = useState("");
 
   async function refresh() {
-    const res = await fetch("/api/messages");
-    const m = await res.json().catch(() => []);
-    setMessages(Array.isArray(m) ? m : []);
+    router.push("/mensajes");
     router.refresh();
   }
 
@@ -84,6 +84,7 @@ export function MessagesClient({
           </button>
         }
       />
+      {pagination}
       {error && (
         <p
           className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"

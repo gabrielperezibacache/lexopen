@@ -1,8 +1,9 @@
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const { createReadStream } = require("node:fs");
 
-const BACKUP_FORMAT_VERSION = 1;
+const BACKUP_FORMAT_VERSION = 2;
 const AUTO_BACKUP_PREFIX = "lexopen-backup-";
 const BACKUP_LOCK_NAME = ".lexopen-backup.lock";
 const DEFAULT_BACKUP_RETENTION = 7;
@@ -20,6 +21,20 @@ function isWithin(parent, child) {
     childPath === parentPath ||
     childPath.startsWith(`${parentPath}${path.sep}`)
   );
+}
+
+// Resolve existing ancestors before creating any directories. An alias must
+// not turn an apparently external destination into a copy inside the source.
+async function resolvedDestination(file) {
+  let current = absolute(file);
+  const missing = [];
+  for (;;) {
+    try { return path.join(await fs.realpath(current), ...missing); }
+    catch (error) {
+      if (error?.code !== "ENOENT" || path.dirname(current) === current) throw error;
+      missing.unshift(path.basename(current)); current = path.dirname(current);
+    }
+  }
 }
 
 function defaultBackupDirectory(dataDir) {
@@ -146,12 +161,46 @@ async function assertEmptyOrMissingDirectory(directory) {
   }
 }
 
+// Read actual paths, never paths supplied by the manifest. Links cannot escape
+// the backup or silently substitute another installation's files.
+async function backupInventory(root) {
+  const entries = [];
+  async function visit(directory) {
+    const children = await fs.readdir(directory, { withFileTypes: true });
+    children.sort((a, b) => a.name.localeCompare(b.name, "en"));
+    for (const child of children) {
+      const file = path.join(directory, child.name);
+      const relative = path.relative(root, file).split(path.sep).join("/");
+      if (relative === "manifest.json") continue;
+      if (child.isSymbolicLink()) throw new Error("El respaldo contiene enlaces; prepare una copia local independiente.");
+      if (child.isDirectory()) {
+        entries.push({ path: relative, type: "directory" });
+        await visit(file);
+      } else if (child.isFile()) {
+        const hash = crypto.createHash("sha256"); let size = 0;
+        for await (const chunk of createReadStream(file)) { hash.update(chunk); size += chunk.length; }
+        entries.push({ path: relative, type: "file", size, sha256: hash.digest("hex") });
+      } else throw new Error("El respaldo contiene un archivo especial no compatible.");
+    }
+  }
+  await visit(root);
+  return entries;
+}
+
+async function verifyBackupIntegrity(root, manifest) {
+  if (manifest.integrity === undefined && manifest.formatVersion === 1) return false;
+  if (manifest.integrity?.algorithm !== "sha256" || !Array.isArray(manifest.integrity.entries)) throw new Error("Índice de integridad del respaldo inválido.");
+  if (JSON.stringify(await backupInventory(root)) !== JSON.stringify(manifest.integrity.entries)) throw new Error("Integridad del respaldo inválida: hay archivos alterados, ausentes o adicionales.");
+  return true;
+}
+
 async function validateBackupDirectory(backupDir) {
   const root = absolute(backupDir);
   const manifestPath = path.join(root, "manifest.json");
+  if ((await fs.lstat(root)).isSymbolicLink() || !(await fs.lstat(manifestPath)).isFile() || (await fs.lstat(manifestPath)).isSymbolicLink()) throw new Error("El respaldo y su manifiesto deben ser archivos locales independientes.");
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
   if (
-    manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
+    ![1, BACKUP_FORMAT_VERSION].includes(manifest.formatVersion) ||
     manifest.type !== "lexopen-host-data"
   ) {
     throw new Error("Formato de respaldo LexOpen no compatible");
@@ -171,7 +220,8 @@ async function validateBackupDirectory(backupDir) {
       throw new Error(`Respaldo incompleto: falta ${requiredPath}`);
     }
   }
-  return { root, manifest };
+  const integrityVerified = await verifyBackupIntegrity(root, manifest);
+  return { root, manifest, integrityVerified };
 }
 
 async function createDataBackup(dataDir, destination, metadata = {}) {
@@ -183,6 +233,10 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
   if (!(await exists(source))) {
     throw new Error("El directorio de datos del Host no existe");
   }
+  if ((await fs.lstat(source)).isSymbolicLink()) throw new Error("El directorio de datos no puede ser un enlace para este respaldo.");
+  const realSource = await fs.realpath(source), realOutput = await resolvedDestination(output);
+  if (isWithin(realSource, realOutput) || isWithin(realOutput, realSource)) throw new Error("El respaldo debe quedar fuera y separado del directorio de datos, incluidos sus enlaces.");
+  if ((await fs.lstat(output).catch(() => null))?.isSymbolicLink()) throw new Error("El destino del respaldo no puede ser un enlace.");
   await assertEmptyOrMissingDirectory(output);
 
   const parent = path.dirname(output);
@@ -195,6 +249,8 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
 
   try {
     await fs.cp(source, temporary, { recursive: true, force: false });
+    const entries = await backupInventory(temporary);
+    await fs.chmod(temporary, 0o700);
     if (await exists(path.join(temporary, ".env"))) {
       await fs.chmod(path.join(temporary, ".env"), 0o600);
     }
@@ -216,6 +272,7 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
         "app-state.json",
       ],
       sensitive: true,
+      integrity: { algorithm: "sha256", entries },
     };
     await fs.writeFile(
       path.join(temporary, "manifest.json"),
@@ -260,7 +317,13 @@ async function relocateRestoredHost(target, manifest) {
 
 async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = false } = {}) {
   const target = absolute(dataDir);
-  const { root, manifest } = await validateBackupDirectory(backupDir);
+  const { root, manifest, integrityVerified } = await validateBackupDirectory(backupDir);
+  const realRoot = await fs.realpath(root), realTarget = await resolvedDestination(target);
+  if (isWithin(realRoot, realTarget) || isWithin(realTarget, realRoot)) throw new Error("El respaldo y el destino deben permanecer separados, incluidos sus enlaces.");
+  if (relocateManagedHost && typeof manifest.sourceDataDir === "string") {
+    const original = await fs.realpath(manifest.sourceDataDir).catch(() => null);
+    if (original && (isWithin(original, realTarget) || isWithin(realTarget, original))) throw new Error("La reubicación necesita un destino separado del origen, incluidos sus enlaces.");
+  }
   if (target === root || isWithin(target, root) || isWithin(root, target)) {
     throw new Error("El respaldo no puede estar dentro del directorio de datos del Host");
   }
@@ -275,12 +338,13 @@ async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = 
   await fs.rename(target, rollback);
   try {
     await fs.cp(root, target, { recursive: true, force: false });
+    await verifyBackupIntegrity(target, manifest);
     await fs.rm(path.join(target, "manifest.json"), { force: true });
     if (relocateManagedHost) await relocateRestoredHost(target, manifest);
     if (await exists(path.join(target, ".env"))) {
       await fs.chmod(path.join(target, ".env"), 0o600);
     }
-    return { rollback, manifest };
+    return { rollback, manifest, integrityVerified };
   } catch (error) {
     await fs.rm(target, { recursive: true, force: true });
     await fs.rename(rollback, target);
@@ -319,7 +383,8 @@ async function listRotatingBackups(backupDirectory) {
       );
       const createdAt = Date.parse(manifest.createdAt);
       if (
-        manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
+        ![1, BACKUP_FORMAT_VERSION].includes(manifest.formatVersion) ||
+        manifest.formatVersion === 2 && (manifest.integrity?.algorithm !== "sha256" || !Array.isArray(manifest.integrity?.entries)) ||
         manifest.type !== "lexopen-host-data" ||
         !Number.isFinite(createdAt)
       ) {

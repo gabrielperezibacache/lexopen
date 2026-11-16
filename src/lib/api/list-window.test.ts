@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { listWindow, listCursorWhere, readListCursor, listPageHref } from "./list-window";
+const date = new Date("2026-11-16T08:00:00Z");
+const rows = ["z", "y", "x"].map(id => ({ id, createdAt: date }));
+const first = listWindow(rows, 2, "createdAt");
+assert.deepEqual(first.items.map(r => r.id), ["z", "y"]);
+assert.deepEqual(readListCursor(first.next!), { at: date, id: "y" });
+assert.deepEqual(listCursorWhere(first.next!, "createdAt"), { OR: [{ createdAt: { lt: date } }, { createdAt: date, id: { lt: "y" } }] });
+assert.equal(listWindow(rows.slice(2), 2, "createdAt").next, null);
+for (const raw of ["invalid", "a".repeat(513), Buffer.from(JSON.stringify(["not-a-date", "id"])).toString("base64url")]) assert.equal(readListCursor(raw), null);
+assert.equal(listPageHref("/documentos", { q: "cliente & causa", after: "old" }, first.next), `/documentos?q=cliente+%26+causa&after=${first.next}`);
+console.log("List windows: tied timestamps, end, malformed cursor and preserved filters passed.");
