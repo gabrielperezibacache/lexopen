@@ -145,6 +145,8 @@ npm run build
 
 Las pruebas de integración y navegador necesitan una base **local desechable** con nombre de prueba. El runner de navegador la reinicia. Consulta `CONTRIBUTING.md` antes de ejecutarlas. En instalaciones reales utiliza las migraciones de despliegue y conserva respaldos.
 
+La búsqueda y los modelos locales tienen [evaluadores reproducibles](docs/EVALUACION-JURIDICA-IA.md) con extractos públicos y tareas ficticias. No descargan modelos ni consultan cuentas reales. El corpus inicial es provisional y todavía requiere revisión profesional y mediciones en los equipos del estudio.
+
 [CI de la aplicación](https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml) · [Instaladores nativos](https://github.com/gabrielperezibacache/lexopen/actions/workflows/desktop-release.yml) · [Inventario de integración](docs/REVISION-INTEGRACION-2026-11-09.md)
 
 ## Ayuda y licencia
