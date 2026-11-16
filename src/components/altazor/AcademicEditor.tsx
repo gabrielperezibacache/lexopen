@@ -215,6 +215,7 @@ export function AcademicEditor({ workspaceId, artifact, causas, onDirty, onSaved
     <label className="altazor-check"><input type="checkbox" checked={reviewed} disabled={busy} onChange={event => { setReviewed(event.target.checked); setSaveState(current => current === "error" ? "error" : "pending"); }}/> He revisado este contenido y sus fuentes</label>
     <div className={styles.editorToolbar} role="group" aria-label="Descargar el texto actual">
       <a className="btn btn-outline" aria-disabled={dirty || busy} href={exportHref("docx", savedState.revision)} onClick={event => { if (dirty || busy) event.preventDefault(); }}><Download size={16} aria-hidden="true" /> Descargar Word</a>
+      <a className="btn btn-ghost" aria-disabled={dirty || busy} href={`/offline.html?kind=academic&record=${encodeURIComponent(artifact.id)}`} onClick={event => { if (dirty || busy) event.preventDefault(); }}>Trabajar sin conexión</a>
       <a className="btn btn-ghost" aria-disabled={dirty || busy} href={exportHref("md", savedState.revision)} onClick={event => { if (dirty || busy) event.preventDefault(); }}>Markdown</a>
       {hasSources && <a className="btn btn-ghost" aria-disabled={dirty || busy} href={exportHref("references", savedState.revision)} onClick={event => { if (dirty || busy) event.preventDefault(); }}>Descargar fuentes del texto actual</a>}
     </div>

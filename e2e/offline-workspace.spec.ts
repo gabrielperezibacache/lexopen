@@ -51,7 +51,7 @@ test("copia cifrada, recarga sin red, shell público y sincronización manual si
     await expect(page.getByLabel("Clave del espacio local")).toBeVisible(); await expect(page.locator("#body")).toHaveValue("");
     await page.getByLabel("Clave del espacio local").fill("wrong-key-at-least-twelve"); await page.getByRole("button", { name: "Desbloquear", exact: true }).click(); await expect(page.locator("#message")).toContainText("La clave no permite abrir");
     await unlock(page); await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveValue("Texto redactado sin red y recuperable tras recargar");
-    const cached = await page.evaluate(async () => { const cache = await caches.open("lexopen-offline-shell-v8"); return (await cache.keys()).map(r => new URL(r.url).pathname); });
+    const cached = await page.evaluate(async () => { const cache = await caches.open("lexopen-offline-shell-v9"); return (await cache.keys()).map(r => new URL(r.url).pathname); });
     expect(cached.sort()).toEqual(["/offline.html", "/offline/vault.js", "/offline/workspace.css", "/offline/workspace.js", "/offline/records.js", "/offline/bindings.js", "/offline/memos.js", "/offline/files.js", "/offline/operations.js"].sort());
     expect(await page.evaluate(async api => { try { await fetch(api); return "unexpected network/cache"; } catch { return "offline"; } }, f.api)).toBe("offline");
     for (const viewport of [{ width: 360, height: 800 }, { width: 1440, height: 1000 }]) { await page.setViewportSize(viewport); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.screenshot({ path: info.outputPath(`offline-${viewport.width}.png`), animations: "disabled" }); }

@@ -1,3 +1,4 @@
+import { readPersonalEntity, syncPersonalEntity } from "./personal-service";
 import { readMemoEntity, syncMemoEntity } from "./memo-service";
 import { readOperation, syncOperation } from "./operations-service";
 import { readLegalEntity, syncLegalEntity } from "./legal-service";
@@ -37,6 +38,7 @@ async function mutable(kind: Kind, id: string, actor: Actor, tx: Prisma.Transact
 export async function readOfflineEntity(user: StaffActor, kind: string, id: string) {
   const valid = offlineKind.parse(kind);
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw httpError("Identidad inválida", 400);
+  if (valid === "academic" || valid === "booknote") return serializable(async tx => readPersonalEntity(valid, id, await currentStaffActor(user, tx), tx));
   if (valid === "evento" || valid === "tramite") return serializable(async tx => readOperation(valid, id, await currentStaffActor(user, tx), tx));
   if (valid === "nota" || valid === "minuta") return serializable(async tx => readMemoEntity(valid, id, await currentStaffActor(user, tx), tx));
   if (valid === "causa" || valid === "plazo") return serializable(async tx => readLegalEntity(valid, id, await currentStaffActor(user, tx), tx));
@@ -44,6 +46,7 @@ export async function readOfflineEntity(user: StaffActor, kind: string, id: stri
 }
 export async function syncOfflineEntity(user: StaffActor, raw: unknown) {
   const input = offlineSyncSchema.parse(raw);
+  if (input.kind === "academic" || input.kind === "booknote") return syncPersonalEntity(user, input);
   if (input.kind === "evento" || input.kind === "tramite") return syncOperation(user, input);
   if (input.kind === "nota" || input.kind === "minuta") return syncMemoEntity(user, input);
   if (input.kind === "causa" || input.kind === "plazo") return syncLegalEntity(user, input);

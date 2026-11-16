@@ -38,12 +38,12 @@ export default defineConfig({
     },
     {
       name: "firefox",
-      testMatch: ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "whatsapp-link.spec.ts"],
+      testMatch: ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "offline-personal.spec.ts", "whatsapp-link.spec.ts"],
       use: { ...devices["Desktop Firefox"], launchOptions: { timeout: 30_000 } },
     },
     {
       name: "webkit",
-      testMatch: ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "whatsapp-link.spec.ts"],
+      testMatch: ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "offline-personal.spec.ts", "whatsapp-link.spec.ts"],
       use: { ...devices["Desktop Safari"] },
     },
   ],

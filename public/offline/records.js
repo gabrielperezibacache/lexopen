@@ -37,6 +37,8 @@ const plazoFields = [
   ["estado", "Estado del plazo", [["pendiente", "Pendiente"], ["cumplido", "Cumplido"], ["vencido", "Vencido"], ["suspendido", "Suspendido"]]],
 ];
 const config = {
+  academic: { noun: "manuscrito", plural: "Manuscritos", fields: [["body", "Texto del manuscrito", "textarea", 100000]], title: "title", defaults: { title: "", body: "" } },
+  booknote: { noun: "nota de lectura", plural: "Notas de lectura", fields: [["title", "Título personal", "text", 200], ["notes", "Mis notas privadas", "textarea", 20000], ["bookmarkKind", "Tipo de marcador", [["", "Sin marcador"], ["page", "Página física"], ["fragment", "Fragmento"]]], ["bookmarkNumber", "Número de página o fragmento", "text", 8]], title: "title", defaults: { title: "", notes: "", bookmarkKind: "", bookmarkNumber: "" } },
   ...memoConfigs,
   ...operationConfigs,
   cliente: { noun: "cliente", plural: "Clientes", fields: clienteFields, title: "razonSocial", defaults: { razonSocial: "", rut: null, email: null, telefono: null, tipo: "persona", estado: "activo", notas: null } },
@@ -46,7 +48,9 @@ const config = {
 };
 const defaults = kind => copy(typeof config[kind].defaults === "function" ? config[kind].defaults() : config[kind].defaults);
 const canonicalParts = parts => copy(parts).sort((a,b) => canonical(a) < canonical(b) ? -1 : canonical(a) > canonical(b) ? 1 : 0);
-const normalize = (kind, fields) => normalizeOperation(kind, Object.fromEntries(Object.keys(defaults(kind)).map(key => [key,
+const normalize = (kind, fields) => ["academic", "booknote"].includes(kind)
+  ? Object.fromEntries(Object.keys(defaults(kind)).map(key => [key, key === "title" && kind === "booknote" ? (fields[key] || "").trim() : fields[key] ?? ""]))
+  : normalizeOperation(kind, Object.fromEntries(Object.keys(defaults(kind)).map(key => [key,
   ["tags", "participantes"].includes(key) ? fields[key] ?? "" : key === "acciones" ? fields[key].map(a => ({ ...a, descripcion: a.descripcion?.trim() || "", responsable: a.responsable || null, fechaLimite: a.fechaLimite?.length === 10 ? new Date(a.fechaLimite + "T00:00:00.000Z").toISOString() : a.fechaLimite || null })) : key === "partes" ? canonicalParts(fields[key]) : key.startsWith("fecha") && fields[key] && fields[key].length === 10 ? new Date(fields[key] + "T00:00:00.000Z").toISOString()
   : [config[kind].title, "tribunal", "materia"].includes(key) && typeof fields[key] === "string" ? fields[key].trim() : key === "email" ? fields[key]?.trim() || null : fields[key] === "" ? null : fields[key]])));
 function civilDate(value) {
@@ -112,14 +116,15 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
   }
   function render() {
     const data = getData(); $("writing-space").hidden = kind !== "writing"; $("records-space").hidden = kind === "writing" || fileArea.isKind(kind); fileArea.render(kind);
-    for (const [id, value] of [["tab-writings", "writing"], ["tab-clientes", "cliente"], ["tab-tasks", "task"], ["tab-causes", "causa"], ["tab-deadlines", "plazo"], ["tab-notes", "nota"], ["tab-minutes", "minuta"], ["tab-documents", "documento"], ["tab-attachments", "adjunto"], ["tab-events", "evento"], ["tab-procedures", "tramite"]]) $(id).setAttribute("aria-pressed", String(kind === value));
+    for (const [id, value] of [["tab-academic", "academic"], ["tab-booknotes", "booknote"], ["tab-writings", "writing"], ["tab-clientes", "cliente"], ["tab-tasks", "task"], ["tab-causes", "causa"], ["tab-deadlines", "plazo"], ["tab-notes", "nota"], ["tab-minutes", "minuta"], ["tab-documents", "documento"], ["tab-attachments", "adjunto"], ["tab-events", "evento"], ["tab-procedures", "tramite"]]) $(id).setAttribute("aria-pressed", String(kind === value));
     if (!data) { renderOperation(null); bindings.render(null); memoActions.render(null); selected = ""; $("record-picker").replaceChildren(); $("record-fields").replaceChildren(); $("party-list").replaceChildren(); $("deadline-reviewed").checked = false; return; }
     data.records ||= [];
     if (kind === "writing" || fileArea.isKind(kind)) { renderOperation(null); bindings.render(null); memoActions.render(null); return; }
     const rows = list().filter(item => item.kind === kind);
     if (!rows.some(item => item.localId === selected)) selected = rows.find(item => item.remoteId === requestedId)?.localId || rows[0]?.localId || "";
     $("records-heading").textContent = config[kind].plural;
-    $("record-new").textContent = ({ cliente: "Nuevo cliente local", task: "Nueva tarea local", causa: "Nueva causa local", plazo: "Nuevo plazo local", nota: "Nueva nota local", minuta: "Nueva minuta local", evento: "Nuevo evento local", tramite: "Nuevo trámite local" })[kind];
+    $("record-new").textContent = ({ cliente: "Nuevo cliente local", task: "Nueva tarea local", causa: "Nueva causa local", plazo: "Nuevo plazo local", nota: "Nueva nota local", minuta: "Nueva minuta local", evento: "Nuevo evento local", tramite: "Nuevo trámite local" })[kind] || "Prepare un registro existente";
+    $("record-new").hidden = ["academic", "booknote"].includes(kind);
     $("record-pin").textContent = "Preparar " + noun();
     $("record-pin").hidden = kind !== requestedKind || !/^[A-Za-z0-9_-]{1,100}$/.test(requestedId || "") || rows.some(item => item.remoteId === requestedId);
     $("record-picker-label").textContent = kind === "evento" ? "Eventos locales" : config[kind].plural + " locales";
@@ -128,7 +133,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
     $("record-picker").replaceChildren(...options); $("record-picker").value = selected;
     const item = entry(); $("record-editor").hidden = !item;
     bindings.render(item);
-    if (item) { $("record-local-state").textContent = "Copia local guardada"; fields(item); $("record-revision").textContent = item.remoteId ? "Copia vinculada al servidor" : "Nuevo registro · aún no enviado"; $("record-refresh").disabled = !item.remoteId; }
+    if (item) { $("record-local-state").textContent = "Copia local guardada"; fields(item); $("record-revision").textContent = (item.remoteId ? "Copia vinculada al servidor" : "Nuevo registro · aún no enviado") + (item.baseRelations?.warning ? " · " + item.baseRelations.warning : ""); $("record-refresh").disabled = !item.remoteId; }
   }
   async function getRemote(itemKind, id) {
     const res = await fetch(`/api/offline/entities?kind=${itemKind}&id=${encodeURIComponent(id)}`, { cache: "no-store", redirect: "error" });
@@ -136,8 +141,9 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
     if (!res.ok || !value?.version) throw new Error(value?.error || "No se pudo preparar el registro. Compruebe su sesión y sus permisos.");
     return value;
   }
-  for (const [id, value] of [["tab-writings", "writing"], ["tab-clientes", "cliente"], ["tab-tasks", "task"], ["tab-causes", "causa"], ["tab-deadlines", "plazo"], ["tab-notes", "nota"], ["tab-minutes", "minuta"], ["tab-documents", "documento"], ["tab-attachments", "adjunto"], ["tab-events", "evento"], ["tab-procedures", "tramite"]]) $(id).onclick = () => void run(async () => { await flush(); kind = value; selected = ""; render(); });
+  for (const [id, value] of [["tab-academic", "academic"], ["tab-booknotes", "booknote"], ["tab-writings", "writing"], ["tab-clientes", "cliente"], ["tab-tasks", "task"], ["tab-causes", "causa"], ["tab-deadlines", "plazo"], ["tab-notes", "nota"], ["tab-minutes", "minuta"], ["tab-documents", "documento"], ["tab-attachments", "adjunto"], ["tab-events", "evento"], ["tab-procedures", "tramite"]]) $(id).onclick = () => void run(async () => { await flush(); kind = value; selected = ""; render(); });
   $("record-new").onclick = () => void run(async () => {
+    if (["academic", "booknote"].includes(kind)) throw new Error("Prepare una copia desde su libro o manuscrito con conexión.");
     await flush(); const item = { localId: crypto.randomUUID(), kind, fields: defaults(kind), baseFields: null };
     getData().records ||= []; getData().records.push(item);
     try { await write(); } catch (error) { getData().records.pop(); throw error; }
