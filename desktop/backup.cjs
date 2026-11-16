@@ -3,7 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { createReadStream } = require("node:fs");
 
-const BACKUP_FORMAT_VERSION = 1;
+const BACKUP_FORMAT_VERSION = 2;
 const AUTO_BACKUP_PREFIX = "lexopen-backup-";
 const BACKUP_LOCK_NAME = ".lexopen-backup.lock";
 const DEFAULT_BACKUP_RETENTION = 7;
@@ -174,7 +174,7 @@ async function backupInventory(root) {
 }
 
 async function verifyBackupIntegrity(root, manifest) {
-  if (manifest.integrity === undefined) return false; // Historical format v1.
+  if (manifest.integrity === undefined && manifest.formatVersion === 1) return false;
   if (manifest.integrity?.algorithm !== "sha256" || !Array.isArray(manifest.integrity.entries)) throw new Error("Índice de integridad del respaldo inválido.");
   if (JSON.stringify(await backupInventory(root)) !== JSON.stringify(manifest.integrity.entries)) throw new Error("Integridad del respaldo inválida: hay archivos alterados, ausentes o adicionales.");
   return true;
@@ -186,7 +186,7 @@ async function validateBackupDirectory(backupDir) {
   if ((await fs.lstat(root)).isSymbolicLink() || !(await fs.lstat(manifestPath)).isFile() || (await fs.lstat(manifestPath)).isSymbolicLink()) throw new Error("El respaldo y su manifiesto deben ser archivos locales independientes.");
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
   if (
-    manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
+    ![1, BACKUP_FORMAT_VERSION].includes(manifest.formatVersion) ||
     manifest.type !== "lexopen-host-data"
   ) {
     throw new Error("Formato de respaldo LexOpen no compatible");
@@ -299,7 +299,7 @@ async function relocateRestoredHost(target, manifest) {
 
 async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = false } = {}) {
   const target = absolute(dataDir);
-  const { root, manifest } = await validateBackupDirectory(backupDir);
+  const { root, manifest, integrityVerified } = await validateBackupDirectory(backupDir);
   if (target === root || isWithin(target, root) || isWithin(root, target)) {
     throw new Error("El respaldo no puede estar dentro del directorio de datos del Host");
   }
@@ -320,7 +320,7 @@ async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = 
     if (await exists(path.join(target, ".env"))) {
       await fs.chmod(path.join(target, ".env"), 0o600);
     }
-    return { rollback, manifest };
+    return { rollback, manifest, integrityVerified };
   } catch (error) {
     await fs.rm(target, { recursive: true, force: true });
     await fs.rename(rollback, target);
@@ -359,7 +359,8 @@ async function listRotatingBackups(backupDirectory) {
       );
       const createdAt = Date.parse(manifest.createdAt);
       if (
-        manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
+        ![1, BACKUP_FORMAT_VERSION].includes(manifest.formatVersion) ||
+        manifest.formatVersion === 2 && (manifest.integrity?.algorithm !== "sha256" || !Array.isArray(manifest.integrity?.entries)) ||
         manifest.type !== "lexopen-host-data" ||
         !Number.isFinite(createdAt)
       ) {

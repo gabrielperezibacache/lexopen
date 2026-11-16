@@ -31,6 +31,8 @@ const { createDataBackup, validateBackupDirectory, restoreDataDirectory } = requ
     assert.equal(await fs.readFile(path.join(target, "keep"), "utf8"), "prior installation");
     const manifestPath = path.join(backup, "manifest.json"), manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
     delete manifest.integrity; await fs.writeFile(manifestPath, JSON.stringify(manifest));
+    await assert.rejects(validateBackupDirectory(backup), /Índice/);
+    manifest.formatVersion = 1; await fs.writeFile(manifestPath, JSON.stringify(manifest));
     assert.equal((await validateBackupDirectory(backup)).integrityVerified, false, "legacy backups remain explicitly unverified");
     console.log("Backup integrity: modification, missing/extra file, directory, link, copy corruption and legacy compatibility passed.");
   } finally { await fs.rm(root, { recursive: true, force: true }); }

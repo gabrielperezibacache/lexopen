@@ -648,7 +648,7 @@ async function restoreHostBackup() {
       type: "info",
       title: "Restauración completada",
       message: "El Host fue restaurado y reiniciado correctamente.",
-      detail: `Respaldo utilizado: ${backupDir}`,
+      detail: `Respaldo utilizado: ${backupDir}\n${replacement.integrityVerified ? "Inventario de archivos verificado antes y después de copiar." : "Copia antigua sin índice de integridad: el arranque correcto no acredita todos sus archivos."}`,
     });
   } catch (error) {
     try {

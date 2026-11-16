@@ -13,7 +13,7 @@ async function main(){
   assert.equal(restored.STORAGE_PATH,path.join(target,"storage"));assert.equal(restored.LEXOPEN_DATA_DIR,target);assert.equal(restored.SESSION_SECRET,"fictitious-preserved-secret");
   assert.equal(await fs.readFile(path.join(source,".env"),"utf8"),env);await finalizeRestore(result.rollback);
   const bad=path.join(root,"bad");await fs.cp(backup,bad,{recursive:true});await fs.writeFile(path.join(bad,".env"),env.replace(path.join(source,"storage"),path.join(root,"outside")));
-  const legacy=JSON.parse(await fs.readFile(path.join(bad,"manifest.json"),"utf8"));delete legacy.integrity;await fs.writeFile(path.join(bad,"manifest.json"),JSON.stringify(legacy));
+  const legacy=JSON.parse(await fs.readFile(path.join(bad,"manifest.json"),"utf8"));delete legacy.integrity;legacy.formatVersion=1;await fs.writeFile(path.join(bad,"manifest.json"),JSON.stringify(legacy));
   await assert.rejects(restoreDataDirectory(target,bad,{relocateManagedHost:true}),/rutas externas/);
   assert.equal(await fs.readFile(path.join(target,"storage","fixture.txt"),"utf8"),"Fictitious bytes","prior destination survives a failure after copy");
   const cp=fs.cp;fs.cp=async(_source,destination)=>{await fs.mkdir(destination,{recursive:true});await fs.writeFile(path.join(destination,"partial"),"partial");throw Error("Fictitious partial-copy failure");};
