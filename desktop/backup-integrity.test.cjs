@@ -13,6 +13,14 @@ const { createDataBackup, validateBackupDirectory, restoreDataDirectory } = requ
     await fs.writeFile(path.join(source, "storage", "document.txt"), "fictitious original");
     await fs.mkdir(target); await fs.writeFile(path.join(target, "keep"), "prior installation");
     await createDataBackup(source, backup);
+    const alias = path.join(root, "source-alias"), backupAlias = path.join(root, "backup-alias");
+    await fs.symlink(source, alias, "junction"); await fs.symlink(backup, backupAlias, "junction");
+    await assert.rejects(createDataBackup(source, path.join(alias, "nested", "backup")), /separado/);
+    assert.equal(await fs.access(path.join(source, "nested")).then(() => true, () => false), false);
+    await assert.rejects(restoreDataDirectory(path.join(backupAlias, "nested", "target"), backup), /separados/);
+    assert.equal(await fs.access(path.join(backup, "nested")).then(() => true, () => false), false);
+    await assert.rejects(restoreDataDirectory(path.join(alias, "nested", "restored"), backup, { relocateManagedHost: true }), /separado/);
+    assert.equal(await fs.access(path.join(source, "nested")).then(() => true, () => false), false);
     assert.equal((await validateBackupDirectory(backup)).integrityVerified, true);
     for (const change of ["changed", "missing", "added", "directory", "link"]) {
       const copy = path.join(root, change); await fs.cp(backup, copy, { recursive: true });

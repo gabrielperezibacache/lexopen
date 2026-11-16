@@ -23,6 +23,20 @@ function isWithin(parent, child) {
   );
 }
 
+// Resolve existing ancestors before creating any directories. An alias must
+// not turn an apparently external destination into a copy inside the source.
+async function resolvedDestination(file) {
+  let current = absolute(file);
+  const missing = [];
+  for (;;) {
+    try { return path.join(await fs.realpath(current), ...missing); }
+    catch (error) {
+      if (error?.code !== "ENOENT" || path.dirname(current) === current) throw error;
+      missing.unshift(path.basename(current)); current = path.dirname(current);
+    }
+  }
+}
+
 function defaultBackupDirectory(dataDir) {
   const source = absolute(dataDir);
   const base = path.basename(source) || "lexopen-data";
@@ -219,6 +233,10 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
   if (!(await exists(source))) {
     throw new Error("El directorio de datos del Host no existe");
   }
+  if ((await fs.lstat(source)).isSymbolicLink()) throw new Error("El directorio de datos no puede ser un enlace para este respaldo.");
+  const realSource = await fs.realpath(source), realOutput = await resolvedDestination(output);
+  if (isWithin(realSource, realOutput) || isWithin(realOutput, realSource)) throw new Error("El respaldo debe quedar fuera y separado del directorio de datos, incluidos sus enlaces.");
+  if ((await fs.lstat(output).catch(() => null))?.isSymbolicLink()) throw new Error("El destino del respaldo no puede ser un enlace.");
   await assertEmptyOrMissingDirectory(output);
 
   const parent = path.dirname(output);
@@ -300,6 +318,12 @@ async function relocateRestoredHost(target, manifest) {
 async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = false } = {}) {
   const target = absolute(dataDir);
   const { root, manifest, integrityVerified } = await validateBackupDirectory(backupDir);
+  const realRoot = await fs.realpath(root), realTarget = await resolvedDestination(target);
+  if (isWithin(realRoot, realTarget) || isWithin(realTarget, realRoot)) throw new Error("El respaldo y el destino deben permanecer separados, incluidos sus enlaces.");
+  if (relocateManagedHost && typeof manifest.sourceDataDir === "string") {
+    const original = await fs.realpath(manifest.sourceDataDir).catch(() => null);
+    if (original && (isWithin(original, realTarget) || isWithin(realTarget, original))) throw new Error("La reubicación necesita un destino separado del origen, incluidos sus enlaces.");
+  }
   if (target === root || isWithin(target, root) || isWithin(root, target)) {
     throw new Error("El respaldo no puede estar dentro del directorio de datos del Host");
   }
