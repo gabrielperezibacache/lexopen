@@ -1,0 +1,10 @@
+{
+  "name": "LexOpen — desarrollo desechable",
+  "dockerComposeFile": "compose.yaml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/lexopen",
+  "remoteUser": "node",
+  "forwardPorts": [3000],
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "npm ci && npm ci --prefix desktop --ignore-scripts && npx prisma generate"
+}

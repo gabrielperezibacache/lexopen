@@ -25,7 +25,7 @@ async function fixture(version = "1.1.0-preview.1") {
     const base = { version, platform, arch }, buildId = `build-${target}`;
     await fs.writeFile(path.join(dir, `lexopen-packaged-${target}.json`), JSON.stringify({ ...base, sourceRevision: revision, sourceDirty: false, buildId, distributedOAuth: publicOAuth }));
     await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false }));
-    await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, publisherAuthenticated: false, notarized: false }));
+    await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, codeSignatureValid: platform === "darwin", gatekeeperAccepted: platform === "darwin", publisherAuthenticated: platform === "darwin", notarized: platform === "darwin", dmgVerified: platform === "darwin", artifactCodeSignatureValid: platform === "darwin", artifactGatekeeperAccepted: platform === "darwin" }));
     const feed = `${channel}${platform === "darwin" ? "-mac" : platform === "linux" ? "-linux" : ""}.yml`;
     await fs.writeFile(path.join(dir, feed), JSON.stringify({ version, files: entries }));
   }
@@ -50,6 +50,13 @@ await check("publication rejects a native package without tested backup restorat
   const file=path.join(f.input,"linux-x64","lexopen-smoke-linux-x64.json"),report=JSON.parse(await fs.readFile(file,"utf8"));
   delete report.backupRestoredDatabase;await fs.writeFile(file,JSON.stringify(report));
   await assert.rejects(assembleRelease(f),/Incomplete Host smoke/);
+});
+for (const field of ["codeSignatureValid", "publisherAuthenticated", "notarized", "gatekeeperAccepted", "dmgVerified", "artifactCodeSignatureValid", "artifactGatekeeperAccepted"]) await check(`macOS publication requires ${field}, including previews`, async f => {
+  const file = path.join(f.input, "darwin-arm64", "lexopen-signature-darwin-arm64.json");
+  const report = JSON.parse(await fs.readFile(file, "utf8")); report[field] = false;
+  await fs.writeFile(file, JSON.stringify(report));
+  await assert.rejects(assembleRelease(f), /Public macOS release/);
+  assert.equal((await assembleRelease({ ...f, verificationOnly: true })).publishable, false);
 });
 await check("publication requires all three identities even without desktop toolpacks", async f => {
   await changeProfile(f, "win32-x64", undefined);

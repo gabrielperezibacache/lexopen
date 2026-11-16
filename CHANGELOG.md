@@ -1,6 +1,13 @@
 # Changelog
 
-## En desarrollo
+## 1.1.0-preview.11 — en preparación (no publicada)
+
+- Historias completas mediante paginación en Documentos, Clientes, Espacios, Mensajes, Flujos, Auditoría y Mi Fiscalía; filtros de auditoría sobre todos los eventos y búsqueda de documentos por nombre o causa.
+- Respaldo con inventario SHA-256, comprobación antes del reemplazo y tras copiar, rechazo de enlaces y compatibilidad explícita con copias antiguas sin índice.
+- Audio pendiente cifrado en el navegador, clave del Host ligada a usuario, causa y mesa, recuperación sin reenvío y memoria separada por cuenta.
+- Preparación de firma protegida para etiquetas; una publicación de Mac exige firma válida, Developer ID, notarización y aceptación de Gatekeeper. La configuración de certificados y el piloto real permanecen pendientes.
+- Un fallo de consulta de la cola judicial se informa como indisponible en lugar de mostrar una cola vacía confirmada.
+
 
 - Respaldo: prueba nativa de restauración en directorio limpio, autenticación y lectura del documento restaurado, configuración y comprobación del origen intacto. Reubicación explícita de rutas administradas, recuperación ante fallos y recibos de restauración exigidos al ensamblar una publicación.
 

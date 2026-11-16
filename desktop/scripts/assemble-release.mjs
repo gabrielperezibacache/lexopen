@@ -88,6 +88,7 @@ export async function assembleRelease({ input, output, version, revision, withTo
     else if (JSON.stringify(distributedOAuth) !== JSON.stringify(verifiedProfile)) throw new Error(`Public OAuth release profiles differ across targets: ${target}`);
     for (const key of ["standaloneHealthy", "bundledDocumentConversion", "bundledChromiumLaunched", "firstAdministratorCreated", "restartPreservedDatabase", "restartPreservedFiles", "restartPreservedSecrets", "backupRestoredDatabase", "backupRestoredFiles", "backupRestoredSettings", "backupSourcePreserved", "backupRollbackVerified"]) if (smoke[key] !== true) throw new Error(`Incomplete Host smoke: ${target}/${key}`);
     if (smoke.externalNodeUsed !== false || smoke.demoSeedUsed !== false) throw new Error(`Non-self-contained Host smoke: ${target}`);
+    if (!verificationOnly && platform === "darwin" && ["codeSignatureValid", "publisherAuthenticated", "notarized", "gatekeeperAccepted", "dmgVerified", "artifactCodeSignatureValid", "artifactGatekeeperAccepted"].some(field => signature[field] !== true)) throw new Error(`Public macOS release requires a valid publisher signature, notarization and Gatekeeper acceptance: ${target}`);
     if (!preview && platform !== "linux" && (signature.publisherAuthenticated !== true || platform === "darwin" && signature.notarized !== true)) throw new Error(`Stable release requires publisher authentication: ${target}`);
     signatures.push(signature);
   }

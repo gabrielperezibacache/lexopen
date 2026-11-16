@@ -63,6 +63,7 @@ jobs:
             platform: darwin
             arch: arm64
     runs-on: ${{ matrix.runner }}
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'desktop-release' || 'desktop-verification' }}
     timeout-minutes: 60
     env:
       DATABASE_URL: postgresql://build_only:build_only@127.0.0.1:1/lexopen_build
@@ -133,6 +134,12 @@ jobs:
         env:
           # Type checking exceeds the default 2 GiB V8 heap on macOS arm64.
           NODE_OPTIONS: --max-old-space-size=4096
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ startsWith(github.ref, 'refs/tags/') && 'true' || 'false' }}
+          CSC_LINK: ${{ startsWith(github.ref, 'refs/tags/') && (matrix.platform == 'darwin' && secrets.MAC_CSC_LINK || matrix.platform == 'win32' && secrets.WIN_CSC_LINK) || '' }}
+          CSC_KEY_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/') && (matrix.platform == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || matrix.platform == 'win32' && secrets.WIN_CSC_KEY_PASSWORD) || '' }}
+          APPLE_ID: ${{ startsWith(github.ref, 'refs/tags/') && matrix.platform == 'darwin' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/') && matrix.platform == 'darwin' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ startsWith(github.ref, 'refs/tags/') && matrix.platform == 'darwin' && secrets.APPLE_TEAM_ID || '' }}
         run: npm run desktop:dist -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Exercise packaged Host without external Node or npm
         run: npm run desktop:smoke

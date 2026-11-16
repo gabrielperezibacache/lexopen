@@ -11,7 +11,7 @@
 
 LexOpen es una aplicación de código abierto para profesionales y estudios jurídicos, con herramientas de investigación y docencia. Conserva los documentos y la base de datos en un **Host** que administras. Tu equipo accede a ese servidor con cuentas y permisos propios.
 
-**Versión del código: 1.1.0-preview.10.** Esta entrega convierte el escritorio de Altazor en un puesto persistente: conserva archivos y conversación, desactiva el apagado por inactividad y permite reanudar la misma máquina. [Historial de cambios](CHANGELOG.md) · [Revisión de PR, commits y ramas](docs/REVISION-INTEGRACION-2026-11-09.md)
+**Versión del código: 1.1.0-preview.11, en preparación.** La última descarga publicada es la preview 10; no contiene todas las mejoras actuales de `main`. Esta preparación añade historiales paginados, búsqueda completa de documentos y auditoría, verificación de integridad de respaldos y protección del audio pendiente. La publicación de Mac requiere firma, notarización y aceptación de Gatekeeper. [Historial de cambios](CHANGELOG.md) · [Fiabilidad y validaciones pendientes](docs/FIABILIDAD-DIARIA.md)
 
 ![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
 
@@ -54,6 +54,8 @@ El Host debe estar encendido en esos horarios. Las reservas en PostgreSQL evitan
 
 El recorrido de pruebas nativas del Host comprueba ahora el respaldo y la restauración en una carpeta vacía, con cuenta, documento y configuración ficticios. Verifica también que el origen permanezca intacto y que una restauración fallida conserve la copia anterior. Los recibos identifican plataforma y arquitectura. [Alcance de la restauración comprobada](docs/ACTUALIZACIONES.md#restauración-comprobada-en-la-prueba-nativa)
 
+Los nuevos respaldos incluyen un inventario SHA-256 de archivos y carpetas, comprobado antes de sustituir datos y después de copiar. Los respaldos antiguos siguen siendo compatibles, pero carecen de esa comprobación completa. El índice no cifra ni autentica al autor de la copia: conserva el respaldo y sus secretos en un destino cifrado y protegido.
+
 ## Google y organización de documentos
 
 Una **cuenta Google compartida para todo el estudio** evita repetir conexiones por función. La administración elige la raíz; los profesionales trabajan desde las causas y espacios a los que tienen acceso.
@@ -89,6 +91,8 @@ La conexión compartida **no amplía los permisos de LexOpen**: el acceso al buz
 | **Configuración y Mi cuenta** | Distingue preferencias personales de ajustes compartidos; busca un ajuste sin desmontar formularios sin guardar. |
 
 La navegación respeta los permisos efectivos y las secciones habilitadas por el estudio. [Recorridos y criterios comparativos](docs/REVISION-UX-Y-COMPETENCIA-2026-11-09.md)
+
+Documentos, Clientes, Espacios, Mensajes, Flujos, Auditoría y Mi Fiscalía permiten recorrer páginas conservando sus filtros y permisos. Documentos busca por nombre y causa; Auditoría aplica los filtros sobre todo el historial, antes de limitar la página.
 
 ### OJV y Buscador Unificado de Jurisprudencia
 

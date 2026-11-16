@@ -6,6 +6,13 @@ import { parseTargetArgs } from "./release-resources.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const target = parseTargetArgs(process.argv.slice(2));
+// Signing secrets belong only to protected tagged releases. Fail before any
+// expensive build when the published macOS package cannot pass Gatekeeper.
+if (process.env.GITHUB_REF_TYPE === "tag" && target.platform === "darwin") {
+  for (const name of ["CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"]) {
+    if (!process.env[name]?.trim()) throw new Error(`Missing protected macOS release credential: ${name}`);
+  }
+}
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 // Windows .cmd wrappers require cmd.exe. All arguments below are fixed, never user input.
 function run(command, args, options = {}) {
