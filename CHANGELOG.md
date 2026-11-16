@@ -2,6 +2,8 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Plazos con paginación completa, búsqueda de causas, responsables internos y cumplimiento respaldado por documento versionado y SHA-256 o justificación manual. Historial de cierre y reapertura, control de cambios y reintentos sin duplicados compartidos con minutas, offline y Altazor.
+
 - Evaluadores reproducibles de recuperación jurídica y modelos locales ya instalados, con corpus versionado, informes JSON/Markdown y mediciones ausentes explícitas; sin descargas ni llamadas a proveedores remotos.
 
 - Manuscritos académicos y notas privadas de lectura en el espacio offline cifrado: versiones, revisión invalidada al editar, marcadores comprobados y sincronización que revalida permisos.

@@ -134,7 +134,7 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
               )}
             </dl>
           </div>
-          <MinutaDetailActions
+          <MinutaDetailActions causaId={id}
             minutaId={minuta.id}
             version={minuta.version}
             canEdit={minuta.canEdit}

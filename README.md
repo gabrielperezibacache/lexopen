@@ -82,7 +82,7 @@ La conexión compartida **no amplía los permisos de LexOpen**: el acceso al buz
 | --- | --- |
 | **Inicio y jornada** | Consulta vencidos pendientes de todos los meses, próximos siete días y eventos de hoy asignados a ti. En móvil, despliega el resumen cuando lo necesites y mantén el editor de Altazor a mano. |
 | **Clientes y Mis Causas** | Organiza expedientes manuales o conectados, documentos, equipo y actividad; aplica acceso del estudio o muro ético por causa. |
-| **Plazos, calendario y tareas** | Asigna responsables, registra vencimientos y sigue pendientes. Los avisos y acuses críticos tienen su propio seguimiento. |
+| **Plazos, calendario y tareas** | Asigna responsables, recorre todos los vencimientos y registra cumplimientos con documento versionado o justificación, historial y reapertura. Los avisos y acuses críticos tienen su propio seguimiento. |
 | **Documentos, audiencias y escritos** | Conserva originales y versiones, reúne antecedentes, prepara pautas y revisa borradores con sus pasajes de respaldo. |
 | **Fuentes y jurisprudencia** | Reúne material jurídico y recupera fuentes oficiales compatibles, con texto, procedencia y hashes. |
 | **Biblioteca y Académico** | Organiza lecturas privadas, bibliografía, pasajes, matrices y manuscritos; revisa el respaldo antes de exportar. |
@@ -107,6 +107,8 @@ Los escritos permiten asignar una versión a un segundo profesional con acceso v
 ### Altazor AI e Ícaros
 
 Al abrir una causa, **Estado de la causa** muestra automáticamente sus plazos abiertos y vencidos, escritos pendientes de resolución, tareas en espera y gestiones actuales. Altazor genera una lectura con referencias a esos registros usando la IA configurada. El panel comprueba cambios cada minuto mientras está visible y, durante la visita, evita repetir consultas iguales al modelo mientras no cambien los datos o el día en Chile. Si el proveedor falla o está en demostración, conserva los hechos registrados sin presentar una respuesta ficticia como análisis real. Las referencias de la lectura enlazan solo registros del contexto visible; las desconocidas se señalan y las respuestas tardías no sustituyen una comprobación más reciente. [Fuentes, actualización y límites del estado automático](docs/ESTADO-CAUSA.md).
+
+[Cumplimiento e historial de plazos](docs/PLAZOS-CUMPLIMIENTO.md): el mismo respaldo se exige en Plazos, minutas, offline y Altazor. Los cumplimientos anteriores conservan su condición histórica.
 
 **Mi Fiscalía** reúne la preparación de solicitudes por causa, RUC, folio de presentación, respuesta e historial. Abre el portal oficial para ingresar con la misma ClaveÚnica del Registro Civil, sin pedir otra contraseña en LexOpen. La presentación se completa en el portal; su folio y respuesta se registran manualmente y alimentan el estado automático de la causa. [Flujo, permisos y alcance](docs/MI-FISCALIA.md). Los plazos abiertos desde una causa conservan su filtro al cambiar de mes o de vista.
 

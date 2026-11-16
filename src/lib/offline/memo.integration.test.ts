@@ -53,7 +53,7 @@ async function main() {
     await syncOfflineEntity(a, { ...edit, requestId: randomUUID(), expectedVersion: fresh.version, fields: { ...fresh.fields, acuerdos: "Cambio sólo en el texto" } });
     assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: row.acciones[0].taskId! } })).instructions, "Cambio posterior de otra sesión");
     const closeBase = await readOfflineEntity(a, "minuta", id), closeFields = structuredClone(closeBase.fields) as typeof fields; closeFields.acciones[0].estado = "hecha";
-    const close = { ...edit, requestId: randomUUID(), expectedVersion: closeBase.version, fields: closeFields };
+    const close = { ...edit, requestId: randomUUID(), expectedVersion: closeBase.version, completions:{[closeFields.acciones[0].id]:{kind:"manual",justification:"Acción realizada en expediente ficticio"}},fields: closeFields };
     await prisma.user.update({ where: { id: a.id }, data: { capabilityRevokes: "plazo.close" } }); await assert.rejects(syncOfflineEntity(a, close), status(403));
     await prisma.user.update({ where: { id: a.id }, data: { capabilityRevokes: "" } }); await assert.rejects(syncOfflineEntity(a, close), status(403));
     const completed = { ...close, requestId: randomUUID() }; await Promise.all([syncOfflineEntity(a, completed), syncOfflineEntity(a, completed)]);

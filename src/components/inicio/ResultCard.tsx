@@ -39,6 +39,8 @@ function primaryLink(card: Record<string, unknown> | null | undefined): {
       return { href: `/inicio?altazor=computer${id ? `&escritorio=${encodeURIComponent(id)}` : ""}${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`, label: "Abrir escritorio" };
     case "evento":
       return { href: "/calendario", label: "Ver en calendario" };
+    case "plazos":
+      return {href:"/plazos",label:"Ver plazos"};
     case "plazo":
       return { href: causaId ? `/causas/${causaId}` : "/plazos", label: "Ver plazo" };
     case "causa":
@@ -84,7 +86,7 @@ function CardBody({ card }: { card: Record<string, unknown> | null | undefined }
       </p>
     );
   }
-  if (type === "causa-lista" || type === "documento-lista") {
+  if (type === "causa-lista" || type === "documento-lista" || type === "plazos") {
     const items = Array.isArray(card.items) ? (card.items as Array<Record<string, unknown>>) : [];
     if (items.length === 0) return null;
     return (

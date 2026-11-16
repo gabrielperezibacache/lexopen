@@ -1,3 +1,4 @@
+import { deadlineVersion } from "@/lib/deadlines/completion";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "./db";
@@ -44,8 +45,9 @@ async function main() {
     assert.equal(await prisma.notification.count({ where: { userId: outside.id } }), 0);
     assert.equal(await prisma.notification.count({ where: { userId: owner.id, entityType: "plazo", entityId: first.id } }), 1);
     const closeKey = randomUUID();
-    await updatePlazoCommand(owner, { id: first.id, estado: "cumplido" }, closeKey);
-    await updatePlazoCommand(owner, { id: first.id, estado: "cumplido" }, closeKey);
+    const closeInput = {id:first.id,estado:"cumplido" as const,expectedVersion:deadlineVersion(await prisma.plazo.findUniqueOrThrow({where:{id:first.id}})),completion:{kind:"manual" as const,justification:"Presentación ficticia revisada por el estudio"}};
+    await updatePlazoCommand(owner, closeInput, closeKey);
+    await updatePlazoCommand(owner, closeInput, closeKey);
     assert.equal(await prisma.auditEvent.count({ where: { actorId: owner.id, action: "plazo.update" } }), 1);
     await prisma.user.update({ where: { id: outside.id }, data: { role: "cliente" } });
     const orphan = await prisma.plazo.create({ data: { titulo: "Sin causa, cuenta retirada del equipo", fechaLimite, responsableId: outside.id } });

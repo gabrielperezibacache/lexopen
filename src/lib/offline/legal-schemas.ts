@@ -1,3 +1,4 @@
+import { completionSupportSchema } from "@/lib/deadlines/schemas";
 import { z } from "zod";
 import { causaCreateSchema } from "@/lib/schemas";
 const id = z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
@@ -17,7 +18,7 @@ const reference = z.object({ id, expectedVersion: version }).strict();
 const identity = { requestId: z.string().uuid(), entityId: id.optional(), expectedVersion: version.optional(), action: z.enum(["create", "update"]) };
 export const legalSyncSchema = z.discriminatedUnion("kind", [
   z.object({ ...identity, kind: z.literal("causa"), fields: legalCauseFields }).strict(),
-  z.object({ ...identity, kind: z.literal("plazo"), fields: legalDeadlineFields, dateReviewed: z.boolean().optional(), relations: z.object({
+  z.object({ ...identity, kind: z.literal("plazo"), fields: legalDeadlineFields, completion: completionSupportSchema.optional(), dateReviewed: z.boolean().optional(), relations: z.object({
     cause: z.object({ id: id.nullable(), expectedVersion: version.optional(), previous: reference.optional() }).strict().optional(),
     responsible: z.object({ id: id.nullable(), expectedVersion: version.optional() }).strict().optional(),
   }).strict().optional() }).strict(),

@@ -1,19 +1,19 @@
 # Próximas etapas de LexOpen
 
-5 de noviembre de 2026
+Actualizado el 16 de noviembre de 2026
 
 La prioridad es que un estudio pueda recibir una novedad, ubicarla en su causa, preparar la audiencia y entregar un escrito revisado con las fuentes a mano. Altazor acompaña ese recorrido desde el mismo hilo y devuelve cada resultado a su expediente. Académico conserva un recorrido propio para investigar, escribir y enseñar.
 
 ## Punto de partida
 
-El [PR #246](https://github.com/gabrielperezibacache/lexopen/pull/246) se integró en `main` en `ae0a2d8`. Pasaron la comprobación general, las pruebas del escritorio de Altazor en Linux x64 y ARM64 y el empaquetado de Windows x64, macOS Intel y Apple Silicon, y Linux x64. La última descarga pública comprobada es `1.1.0-preview.5`. [Ejecución de empaquetado](https://github.com/gabrielperezibacache/lexopen/actions/workflows/desktop-release.yml) · [Descargas públicas](https://github.com/gabrielperezibacache/lexopen/releases).
+La versión del código es `1.1.0-preview.11`, en preparación; la última descarga publicada es preview 10. La fiabilidad de respaldos, historias paginadas, audio cifrado y las extensiones offline ya están integradas. Esta entrega completa el cumplimiento de plazos con respaldo, historial y control de versiones. Consulte [Fiabilidad diaria](FIABILIDAD-DIARIA.md) para distinguir implementación, pruebas y validaciones externas pendientes. El resto de este documento conserva objetivos del recorrido completo; no implica que cada subapartado esté terminado.
 
 La base ya ofrece Mis Causas, importación y versionado, páginas verificables, preparación de audiencias, transcripción revisable, escritos con historial, tareas con Excel, un hilo continuo de Altazor y una Mesa de revisión académica. Los siguientes hitos aprovechan esas piezas para cerrar recorridos completos. [Mapa de funciones](../README.md) · [Plan anterior](PLAN-DESARROLLO-2026-11-05.md).
 
 ## 0. Cerrar distribución y recuperación
 
-1. Preparar la publicación de `1.1.0-preview.6` desde el commit integrado. Verificar que la etiqueta, el manifiesto, las huellas y los instaladores descargables coincidan. Registrar arquitectura y estado de firma por paquete.
-2. Probar instalación gráfica limpia y actualización desde `preview.5` en Windows, macOS y Linux. Incluir la creación del primer administrador, un equipo cliente conectado al Host y el arranque después de reiniciar.
+1. Preparar la publicación de `1.1.0-preview.11` desde el commit integrado. Verificar que la etiqueta, el manifiesto, las huellas y los instaladores descargables coincidan. Registrar arquitectura y estado de firma por paquete.
+2. Probar instalación gráfica limpia y actualización desde `preview.10` en Windows, macOS y Linux. Incluir la creación del primer administrador, un equipo cliente conectado al Host y el arranque después de reiniciar.
 3. Completar un asistente de preparación que muestre qué está listo y cómo resolver lo pendiente. Comprobar almacenamiento, respaldo, escritorio, OCR, audio e IA local. Separar la descarga de herramientas de la activación del motor y del proveedor. Mostrar espacio requerido y avance de cada descarga.
 4. Ensayar una actualización fallida y restaurar el respaldo en una carpeta aparte. Para el canal estable, añadir las comprobaciones de firma y, en macOS, notarización y actualización con el paquete firmado.
 

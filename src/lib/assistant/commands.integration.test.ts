@@ -1,3 +1,4 @@
+import { deadlineVersion } from "@/lib/deadlines/completion";
 /** Real PostgreSQL checks: rollback, duplicate requests, current ACL and stale undo. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -236,7 +237,7 @@ async function main() {
     await assert.rejects(() => updatePlazoCommand(paymentActor, { id: deadlines[0].id, estado: "cumplido" }, `${prefix}:api-plazo-close`));
     assert.equal((await prisma.plazo.findUnique({ where: { id: deadlines[0].id } }))?.estado, "pendiente");
     failAudit = false;
-    await updatePlazoCommand(paymentActor, { id: deadlines[0].id, estado: "cumplido" }, `${prefix}:api-plazo-close`);
+    await updatePlazoCommand(paymentActor, { id: deadlines[0].id, estado: "cumplido", expectedVersion:deadlineVersion(await prisma.plazo.findUniqueOrThrow({where:{id:deadlines[0].id}})),completion:{kind:"manual",justification:"Cumplimiento ficticio revisado"} }, `${prefix}:api-plazo-close`);
     assert.equal((await prisma.plazo.findUnique({ where: { id: deadlines[0].id } }))?.estado, "cumplido");
     const { createInvoice } = await import("@/lib/billing-invoices");
     const invoiceTime = await prisma.timeEntry.create({ data: { userId: userA.id, causaId: causa.id, clienteId: cliente.id, hours: 1, amountClp: 30, rateClp: 30, description: "Invoice rollback fixture" } });

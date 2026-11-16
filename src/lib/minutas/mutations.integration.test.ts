@@ -30,7 +30,7 @@ async function main() {
     await prisma.task.update({ where: { id: action.taskId! }, data: { rrule: "FREQ=DAILY" } });
     const current = await getMinuteView(owner, first.id);
     const original = await prisma.documento.findUniqueOrThrow({ where: { id: first.documentoId! } });
-    const complete = { action: "accion-estado", accionId: action.id, estado: "hecha", expectedVersion: current.version };
+    const complete = { completion:{kind:"manual",justification:"Acción realizada y revisada en expediente ficticio"}, action: "accion-estado", accionId: action.id, estado: "hecha", expectedVersion: current.version };
     const completeKey = randomUUID();
     await Promise.all([updateNativeMinute(owner, first.id, complete, completeKey), updateNativeMinute(owner, first.id, complete, completeKey)]);
     assert.equal(await prisma.workflowInstance.count({ where: { workflowId: workflow.id } }), 1, "Completion from a minute must run the same workflow once");

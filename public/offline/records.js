@@ -1,3 +1,4 @@
+import { renderDeadlineSupport } from "/offline/deadline-support.js";
 import { operationConfigs, normalizeOperation, eventInputValue, setEventTime, toggleEventDay, renderOperation } from "/offline/operations.js";
 import { memoConfigs, setupMemoActions } from "/offline/memos.js";
 import { setupBindings } from "/offline/bindings.js";
@@ -74,7 +75,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
   const fileArea = setupFiles({ getData, auth, flush, write, run, message, markDirty, isCausePending: item => !same(normalize(item.kind, item.fields), item.baseFields) });
   const list = () => getData()?.records || [];
   const entry = () => list().find(item => item.localId === selected && item.kind === kind);
-  const memoActions = setupMemoActions({ getItem: entry, markDirty, message, dateReadback });
+  const memoActions = setupMemoActions({ getData, getItem: entry, markDirty, message, dateReadback });
   const bindings = setupBindings({ getData, getItem: entry, auth, flush, write, run, message, markDirty, getRemote, isCausePending: item => !same(normalize(item.kind, item.fields), item.baseFields) });
   const noun = () => config[kind]?.noun;
   const dirty = item => Boolean(item.pending || bindings.hasChanges(item) || !same(normalize(item.kind, item.fields), item.baseFields));
@@ -97,10 +98,12 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
         if (item.kind === "plazo" && key === "fechaLimite") $("deadline-date-readback").textContent = dateReadback(item.fields[key]);
         if (item.kind === "tramite" && key === "fechaLimite") item.dateReviewed = false;
         renderOperation(item); markDirty();
+        if(item.kind === "plazo" && key === "estado") { fields(item); document.getElementById(control.id)?.focus(); }
       });
       $("record-fields").append(label, control);
       if (item.kind === "plazo" && key === "fechaLimite") { const p = document.createElement("p"); p.id = "deadline-date-readback"; p.className = "help"; p.textContent = dateReadback(item.fields[key]); $("record-fields").append(p); }
     }
+    if(item.kind === "plazo" && item.fields.estado === "cumplido" && item.baseFields?.estado !== "cumplido") renderDeadlineSupport({item,data:getData(),parent:$("record-fields"),value:item.completion,id:"deadline-support",onChange:v=>{item.completion=v;markDirty();}});
     renderOperation(item);
     $("cause-parties").hidden = kind !== "causa"; $("deadline-review").hidden = kind !== "plazo";
     $("deadline-reviewed").checked = Boolean(item.dateReviewed); $("deadline-source-note").textContent = item.baseRelations?.sourceLocked ? "Los datos están fijados por tareas o minutas de origen. Puede actualizar su estado con los permisos correspondientes." : item.baseRelations?.calculationRegime ? "Esta fecha tiene un cálculo registrado. Cambiar las fechas o el tipo de cómputo lo sustituye por una fecha revisada manualmente." : "No se calcula un vencimiento sin conexión. Revise país, procedimiento y fecha antes de confirmar.";
@@ -167,7 +170,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
     if (!current[config[kind].title]) throw new Error("Complete el nombre o título del registro antes de sincronizar.");
     const relationChanges = item.pending ? undefined : bindings.changes(item);
     if (!item.pending && ["nota", "minuta", "tramite"].includes(kind) && !item.remoteId && !relationChanges?.cause?.id) throw new Error("Seleccione una causa preparada antes de sincronizar este registro.");
-    if (!item.pending) item.pending = { requestId: crypto.randomUUID(), kind, action: item.remoteId ? "update" : "create", ...(item.remoteId ? { entityId: item.remoteId, expectedVersion: item.version } : {}), fields: copy(current), ...(relationChanges ? { relations: relationChanges } : {}), ...(["plazo", "evento", "tramite"].includes(kind) ? { dateReviewed: Boolean(item.dateReviewed) } : {}), ...(kind === "minuta" ? { reviewedActions: copy(item.reviewedActions || []) } : {}) };
+    if (!item.pending) item.pending = { requestId: crypto.randomUUID(), kind, action: item.remoteId ? "update" : "create", ...(item.remoteId ? { entityId: item.remoteId, expectedVersion: item.version } : {}), fields: copy(current), ...(item.completion ? {completion:copy(item.completion)} : {}), ...(item.completions ? {completions:copy(item.completions)} : {}), ...(relationChanges ? { relations: relationChanges } : {}), ...(["plazo", "evento", "tramite"].includes(kind) ? { dateReviewed: Boolean(item.dateReviewed) } : {}), ...(kind === "minuta" ? { reviewedActions: copy(item.reviewedActions || []) } : {}) };
     await write();
     const csrf = document.cookie.split(";").map(s => s.trim()).find(s => s.startsWith("lexopen_csrf="))?.slice(13);
     if (!csrf) throw new Error("Abra LexOpen e inicie sesión para renovar la protección de la sesión. La copia local se conserva.");
@@ -187,7 +190,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
       item.conflict = true; await write(); throw new Error("El envío anterior está confirmado, pero el servidor conserva otra versión. Su texto local sigue protegido; descargue y compare las copias.");
     }
     item.version = remote.version; item.baseFields = normalize(kind, remote.fields);
-    if (same(normalize(kind, item.fields), sent.fields)) item.fields = copy(remote.fields);
+    if (same(normalize(kind, item.fields), sent.fields) && same(item.completion||null,sent.completion||null) && same(item.completions||null,sent.completions||null)) { item.fields = copy(remote.fields); delete item.completion; delete item.completions; }
     bindings.accept(item, remote, value.references);
     delete item.pending; await write(); render();
     message((dirty(item) ? "Envío anterior confirmado. Hay cambios locales posteriores: vuelva a sincronizar para enviarlos." : "Registro sincronizado. Los cambios ya están en LexOpen.") + (remote.relations?.warning ? " " + remote.relations.warning : ""));
@@ -201,7 +204,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
   });
   $("record-download").onclick = () => {
     const item = entry(); if (!item) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify({ kind, fields: item.fields, pending: item.pending, remoteId: item.remoteId, version: item.version, relations: item.relationChoices, baseRelations: item.baseRelations, lastRejectedRequest: item.lastRejectedRequest, reviewedActions: item.reviewedActions, dateReviewed: item.dateReviewed }, null, 2)], { type: "application/json;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ kind, fields: item.fields, completion:item.completion, completions:item.completions, pending: item.pending, remoteId: item.remoteId, version: item.version, relations: item.relationChoices, baseRelations: item.baseRelations, lastRejectedRequest: item.lastRejectedRequest, reviewedActions: item.reviewedActions, dateReviewed: item.dateReviewed }, null, 2)], { type: "application/json;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = noun() + "-local.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   $("record-remove").onclick = () => void run(async () => {

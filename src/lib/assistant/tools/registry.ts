@@ -17,7 +17,7 @@ import {
   documentoResumirTool,
   documentoClasificarTool,
 } from "./documento";
-import { plazoCrearTool, plazoEstimarTool } from "./plazo";
+import { plazoCrearTool, plazoEstimarTool, plazoActualizarTool, plazoListarTool } from "./plazo";
 import { eventoCrearTool, eventoEditarTool, eventoEliminarTool } from "./evento";
 import { buscarTool } from "./buscar";
 import { jurisprudenciaBuscarTool, jurisprudenciaBriefTool } from "./jurisprudencia";
@@ -45,6 +45,8 @@ export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "documento.descargar": documentoDescargarTool,
   "documento.resumir": documentoResumirTool,
   "documento.clasificar": documentoClasificarTool,
+  "plazo.actualizar": plazoActualizarTool,
+  "plazo.listar": plazoListarTool,
   "plazo.crear": plazoCrearTool,
   "plazo.estimar": plazoEstimarTool,
   "evento.crear": eventoCrearTool,
