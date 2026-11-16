@@ -1,6 +1,7 @@
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const { createReadStream } = require("node:fs");
 
 const BACKUP_FORMAT_VERSION = 1;
 const AUTO_BACKUP_PREFIX = "lexopen-backup-";
@@ -146,9 +147,43 @@ async function assertEmptyOrMissingDirectory(directory) {
   }
 }
 
+// Read actual paths, never paths supplied by the manifest. Links cannot escape
+// the backup or silently substitute another installation's files.
+async function backupInventory(root) {
+  const entries = [];
+  async function visit(directory) {
+    const children = await fs.readdir(directory, { withFileTypes: true });
+    children.sort((a, b) => a.name.localeCompare(b.name, "en"));
+    for (const child of children) {
+      const file = path.join(directory, child.name);
+      const relative = path.relative(root, file).split(path.sep).join("/");
+      if (relative === "manifest.json") continue;
+      if (child.isSymbolicLink()) throw new Error("El respaldo contiene enlaces; prepare una copia local independiente.");
+      if (child.isDirectory()) {
+        entries.push({ path: relative, type: "directory" });
+        await visit(file);
+      } else if (child.isFile()) {
+        const hash = crypto.createHash("sha256"); let size = 0;
+        for await (const chunk of createReadStream(file)) { hash.update(chunk); size += chunk.length; }
+        entries.push({ path: relative, type: "file", size, sha256: hash.digest("hex") });
+      } else throw new Error("El respaldo contiene un archivo especial no compatible.");
+    }
+  }
+  await visit(root);
+  return entries;
+}
+
+async function verifyBackupIntegrity(root, manifest) {
+  if (manifest.integrity === undefined) return false; // Historical format v1.
+  if (manifest.integrity?.algorithm !== "sha256" || !Array.isArray(manifest.integrity.entries)) throw new Error("Índice de integridad del respaldo inválido.");
+  if (JSON.stringify(await backupInventory(root)) !== JSON.stringify(manifest.integrity.entries)) throw new Error("Integridad del respaldo inválida: hay archivos alterados, ausentes o adicionales.");
+  return true;
+}
+
 async function validateBackupDirectory(backupDir) {
   const root = absolute(backupDir);
   const manifestPath = path.join(root, "manifest.json");
+  if ((await fs.lstat(root)).isSymbolicLink() || !(await fs.lstat(manifestPath)).isFile() || (await fs.lstat(manifestPath)).isSymbolicLink()) throw new Error("El respaldo y su manifiesto deben ser archivos locales independientes.");
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
   if (
     manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
@@ -171,7 +206,8 @@ async function validateBackupDirectory(backupDir) {
       throw new Error(`Respaldo incompleto: falta ${requiredPath}`);
     }
   }
-  return { root, manifest };
+  const integrityVerified = await verifyBackupIntegrity(root, manifest);
+  return { root, manifest, integrityVerified };
 }
 
 async function createDataBackup(dataDir, destination, metadata = {}) {
@@ -195,6 +231,8 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
 
   try {
     await fs.cp(source, temporary, { recursive: true, force: false });
+    const entries = await backupInventory(temporary);
+    await fs.chmod(temporary, 0o700);
     if (await exists(path.join(temporary, ".env"))) {
       await fs.chmod(path.join(temporary, ".env"), 0o600);
     }
@@ -216,6 +254,7 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
         "app-state.json",
       ],
       sensitive: true,
+      integrity: { algorithm: "sha256", entries },
     };
     await fs.writeFile(
       path.join(temporary, "manifest.json"),
@@ -275,6 +314,7 @@ async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = 
   await fs.rename(target, rollback);
   try {
     await fs.cp(root, target, { recursive: true, force: false });
+    await verifyBackupIntegrity(target, manifest);
     await fs.rm(path.join(target, "manifest.json"), { force: true });
     if (relocateManagedHost) await relocateRestoredHost(target, manifest);
     if (await exists(path.join(target, ".env"))) {
