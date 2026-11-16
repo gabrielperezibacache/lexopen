@@ -363,3 +363,7 @@ Siguen disponibles como respaldo (ver `docs/WEB-HOST.md`).
 ### Respuestas de sesión y corpus de fallos
 
 Los lectores rechazan los scripts de retorno al inicio por sesión no disponible antes de procesar el HTML. Esa respuesta no confirma una búsqueda vacía ni un historial sin cambios. El Buscador Unificado de Jurisprudencia es una fuente pública independiente: la investigación permite incorporar individualmente un fallo civil por ID, con sesión anónima propia y conservación del JSON y texto. No usa ClaveÚnica ni añade un canal HTTP de consulta de causas. Véase [alcance y pruebas](INTEGRACION-OJV-JURISPRUDENCIA-2026-11-09.md).
+
+## Límites de los módulos de navegador
+
+`public-browser.ts` contiene navegación y lectura públicas y utilidades de navegador compartidas. `ojv-authenticated.ts` contiene login de ClaveÚnica, Mis Causas y detalle autenticado. `public-scrape.ts` conserva las importaciones existentes como fachada. La extracción no modifica autorizaciones, políticas de descargas, ingreso manual ni horarios de consulta.

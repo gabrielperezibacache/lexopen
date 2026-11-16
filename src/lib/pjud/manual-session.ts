@@ -58,7 +58,7 @@ function safeReadDiagnostic(operation: SessionReadOperation, error: unknown): Ma
   } catch { /* A malformed error cannot expand the diagnostic payload. */ }
   const locations = new Set<string>();
   for (const line of stack.split("\n").slice(0, 100)) {
-    const frame = /^\s+at\s+(?:[^()\r\n]*\()?[^()\r\n]*?\bsrc[\\/]lib[\\/]pjud[\\/](public-scrape|manual-session|ojv-dom)\.ts:([1-9]\d{0,6}):([1-9]\d{0,6})\)?\s*$/.exec(line);
+    const frame = /^\s+at\s+(?:[^()\r\n]*\()?[^()\r\n]*?\bsrc[\\/]lib[\\/]pjud[\\/](public-scrape|public-browser|ojv-authenticated|manual-session|ojv-dom)\.ts:([1-9]\d{0,6}):([1-9]\d{0,6})\)?\s*$/.exec(line);
     if (frame) locations.add(`src/lib/pjud/${frame[1]}.ts:${frame[2]}:${frame[3]}`);
     if (locations.size === 4) break;
   }
