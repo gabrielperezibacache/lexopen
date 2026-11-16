@@ -2,6 +2,7 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Manuscritos académicos y notas privadas de lectura en el espacio offline cifrado: versiones, revisión invalidada al editar, marcadores comprobados y sincronización que revalida permisos.
 - Historias completas mediante paginación en Documentos, Clientes, Espacios, Mensajes, Flujos, Auditoría y Mi Fiscalía; filtros de auditoría sobre todos los eventos y búsqueda de documentos por nombre o causa.
 - Respaldo con inventario SHA-256, comprobación antes del reemplazo y tras copiar, rechazo de enlaces y compatibilidad explícita con copias antiguas sin índice.
 - Audio pendiente cifrado en el navegador, clave del Host ligada a usuario, causa y mesa, recuperación sin reenvío y memoria separada por cuenta.

@@ -1,12 +1,14 @@
 # Trabajo sin conexión
 
-El espacio local permite editar escritos preparados y preparar o crear Clientes, tareas, causas, plazos, notas, minutas, documentos, adjuntos, eventos de Agenda y trámites sin red. Se abre desde **Trabajo sin conexión** en la aplicación o desde `/offline.html`. Los cambios se envían al Host al pulsar **Sincronizar**, tras comprobar la cuenta, los permisos y la versión del registro.
+El espacio local permite editar escritos y manuscritos académicos preparados, conservar notas de lectura privadas y preparar o crear Clientes, tareas, causas, plazos, notas, minutas, documentos, adjuntos, eventos de Agenda y trámites sin red. Se abre desde **Trabajo sin conexión** en la aplicación o desde `/offline.html`. Los cambios se envían al Host al pulsar **Sincronizar**, tras comprobar la cuenta, los permisos y la versión del registro.
 
 ## Preparar este navegador
 
 Con conexión, cree el espacio con una clave local de al menos 12 caracteres. Es independiente de su contraseña de cuenta y no se envía al Host. Si ya tenía escritos preparados, use la misma clave: sus copias y sus peticiones pendientes se conservan.
 
 - **Escritos:** abra un escrito y pulse **Trabajar sin conexión**. Se guardan primero los cambios del editor. En el espacio local, pulse **Preparar este escrito**.
+- **Manuscritos:** guarde los cambios del editor académico y pulse **Trabajar sin conexión**; después, **Preparar manuscrito**. Sólo se copia el texto de un resultado editable existente.
+- **Biblioteca:** desde el lector, pulse **Mis notas y marcador sin conexión** y **Preparar nota de lectura**. Cada usuario conserva sus propias notas aunque el libro pertenezca a una colección compartida.
 - **Clientes:** abra la ficha del cliente y pulse **Trabajar sin conexión**. Si modificó el formulario, se guardará antes de abrir el espacio. Pulse **Preparar cliente** para conservar una copia cifrada.
 - **Causas:** en la ficha, pulse **Trabajar sin conexión** y después **Preparar causa**. Se comprueba que puede modificarla.
 - **Plazos:** en la lista de Plazos, pulse **Sin conexión** y después **Preparar plazo**.
@@ -18,7 +20,7 @@ Con conexión, cree el espacio con una clave local de al menos 12 caracteres. Es
 - **Trámites:** desde una causa o ficha de cliente, pulse **Preparar sin conexión** y después **Preparar trámite**.
 - **Tareas:** en la lista de Tareas, el enlace **Sin conexión** aparece para las tareas que puede editar. En el espacio local, pulse **Preparar tarea**.
 
-El espacio tiene las áreas Escritos, Clientes, Tareas, Causas, Plazos, Notas, Minutas, Documentos, Adjuntos, Agenda y Trámites. Al cambiar de área o registro, guarda los cambios pendientes en la copia local. Para cerrar o recargar, espere el estado **Copia local guardada**. Si el navegador aún no los guardó, la página advierte al salir.
+El espacio tiene las áreas Escritos, Manuscritos, Notas de lectura, Clientes, Tareas, Causas, Plazos, Notas, Minutas, Documentos, Adjuntos, Agenda y Trámites. Al cambiar de área o registro, guarda los cambios pendientes en la copia local. Para cerrar o recargar, espere el estado **Copia local guardada**. Si el navegador aún no los guardó, la página advierte al salir.
 
 ## Crear y editar sin red
 
@@ -37,6 +39,8 @@ Con el espacio desbloqueado, los botones para crear un cliente, tarea, causa, pl
 | Agenda | Título, tipo, inicio y fin, días completos, lugar, modalidad, enlace, notas, audiencia, tribunal, estado, responsable y causa preparada. |
 | Trámites | Título, detalle, estado, fecha límite revisada, orden y responsable. Las altas necesitan causa preparada. |
 | Escritos | Título y texto del escrito preparado. |
+| Manuscritos | Texto del resultado académico existente; el título y las fuentes se conservan. |
+| Notas de lectura | Título personal, notas privadas y un marcador por página física PDF o número de fragmento existente. |
 
 Las causas nuevas son manuales, se crean a su nombre y registran su membresía, partes, etapa, actividad y auditoría en la misma transacción. El equipo, acceso, cliente, autorizaciones de conflictos y conexiones externas se gestionan con conexión. Los cambios de una ficha preparada conservan esos datos y el origen PJUD, si existe. Las referencias RIT/ROL y RUC con el mismo tribunal se comprueban también frente a altas concurrentes. Las coincidencias reservadas se comunican sin revelar su identidad.
 
@@ -168,3 +172,11 @@ Validación de documentos y adjuntos: suites unitarias e integración PostgreSQL
 Validación de Agenda y Trámites: suite unitaria, integraciones de todas las áreas offline y minutas, plazos/Agenda, tareas, Clientes y Flujos, TypeScript, lint global y compilación con Webpack aprobados en una copia aislada. Se comprobaron 179 casos distintos de navegador (102 de Chromium, 72 de WebKit y cinco de captura nativa), incluidos los 28 nuevos. Los 29 recorridos finales confirmaron los tres ajustes de fixture, el borrado de avisos al bloquear, los reintentos tras recargar y la conservación de milisegundos al editar detalles. Las vistas a 360 y 1.440 píxeles no presentaron desbordamientos.
 
 La integración general no se da por aprobada: se detuvo en el simulador de autorización de secretos del escritorio de Altazor, cuya respuesta de salud aún no anuncia el contrato exigido por el control nuevo. Las integraciones del alcance offline y operativo pasaron por separado. Este incremento no añade migraciones ni modifica datos reales. Véase el detalle en [Correcciones de auditoría](CORRECCIONES-AUDITORIA-2026-11-07.md#continuación-agenda-y-trámites-sin-conexión).
+
+## Manuscritos y notas de lectura
+
+La preparación es selectiva: no descarga la biblioteca, los originales ni las citas del manuscrito. Las copias elegidas usan el mismo espacio cifrado y clave local. No se crean proyectos académicos, fuentes, revisiones aprobadas ni contenido con IA sin conexión.
+
+Al sincronizar un manuscrito, el Host vuelve a comprobar titularidad, permisos, fuentes y versión. Si cambia el texto, conserva las dos versiones y retira la marca de revisión. Revise el resultado con conexión antes de aprobarlo o exportarlo.
+
+Las notas son personales y no se incluyen al compartir una colección. El marcador debe existir en la revisión actual del libro. Si cambia el libro o otra sesión edita las notas, compare las copias antes de sincronizar; la copia local se conserva. Retirar acceso al libro impide nuevas lecturas y envíos, incluso al recuperar un recibo anterior. Los cambios se registran junto con la auditoría en una transacción.

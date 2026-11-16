@@ -61,7 +61,7 @@ export function setupBindings({ getData, getItem, auth, flush, write, run, messa
       $("binding-responsible").replaceChildren(); $("binding-cause").replaceChildren(); $("reference-query").value = ""; $("binding-review-list").replaceChildren(); $("binding-review").hidden = true; return;
     }
     if (lastItem !== item.localId) { invalidate(); lastItem = item.localId; }
-    $("binding-panel").hidden = item.kind === "causa";
+    $("binding-panel").hidden = ["causa", "academic", "booknote"].includes(item.kind);
     const b = base(item), c = choices(item), stale = Boolean(item.remoteId && !item.baseRelations);
     $("binding-notice").textContent = item.referenceFailure ? "La petición anterior fue rechazada sin aplicar cambios. Revise las referencias o deshaga sus elecciones; sus campos locales se conservan."
       : stale ? "Esta copia anterior aún no tiene referencias. Use Preparar opciones con conexión para añadirlas sin reemplazar sus campos."

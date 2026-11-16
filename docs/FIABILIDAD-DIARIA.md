@@ -15,6 +15,7 @@ La preparación `1.1.0-preview.11` no es un instalador publicado. Preview 10 sig
 | Operación | Fallo al consultar la cola judicial identificado como indisponible; el estado de respaldo no se presenta como verificación completa ni cifrado. |
 | Google | Calendar y Drive corporativo separados de la sesión OAuth; fachada compatible con importaciones actuales y un solo mecanismo de autenticación y renovación de tokens. No cambia la cuenta compartida ni los alcances. |
 | OJV | Módulos separados de navegación pública y lectura autenticada. Las credenciales sólo se pasan al flujo autenticado; se conservan la fachada, autorizaciones, ingreso manual y diagnósticos acotados. |
+| Trabajo sin conexión | Edición de manuscritos existentes con invalidación de revisión y notas privadas de Biblioteca con marcador validado. Copias selectivas cifradas, control de versiones, auditoría atómica y revalidación del acceso al sincronizar. |
 | Desarrollo | Dev Container opcional con Node 22, PostgreSQL 16 desechable, inicialización protegida contra bases remotas y CI que comprueba los comandos documentados. |
 
 ## Comprobaciones y alcance
@@ -32,6 +33,6 @@ Las pruebas de firma y artefactos con transportes simulados comprueban los contr
 
 ## Desarrollo posterior que no se declara completado
 
-El perfil procesal civil chileno (#267), corpus jurídico evaluado (#260), medición comparativa de modelos locales (#264), manuscritos académicos sin conexión (#259), anotaciones offline (#268), resumen incremental de conversaciones, cumplimiento de plazos con evidencia y auditoría visual exhaustiva mantienen su alcance propio. No se cierran por los cambios de paginación, refactorización ni por una suite de pruebas aprobada. La firma real (#266) necesita además sus credenciales y ejecución verificadas.
+El perfil procesal civil chileno (#267), corpus jurídico evaluado (#260), medición comparativa de modelos locales (#264), resumen incremental de conversaciones, cumplimiento de plazos con evidencia y auditoría visual exhaustiva mantienen su alcance propio. No se cierran por los cambios de paginación, refactorización ni por una suite de pruebas aprobada. La firma real (#266) necesita además sus credenciales y ejecución verificadas.
 
 Se mantienen el escritorio persistente, las actualizaciones judiciales automáticas a las 08:00 y 22:00 de Chile, las manuales libres, los muros éticos y la cuenta Google compartida.

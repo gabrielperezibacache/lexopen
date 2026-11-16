@@ -390,7 +390,10 @@ export async function cancelAcademicArtifact(workspaceId: string, id: string, us
 }
 export async function saveAcademicArtifact(workspaceId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicArtifactSaveSchema.parse(raw);
-  return bookTransaction(client, async tx => {
+  return bookTransaction(client, tx => saveAcademicArtifactInTransaction(workspaceId, id, input, user, tx));
+}
+/** Shared atomic mutation for the connected editor and offline receipt transaction. */
+export async function saveAcademicArtifactInTransaction(workspaceId: string, id: string, input: z.infer<typeof academicArtifactSaveSchema>, user: CausaAccessUser, tx: Prisma.TransactionClient) {
     const current = await readAcademicArtifact(workspaceId, id, user, tx);
     if (current.revision !== input.expectedRevision || !["proposed", "reviewed"].includes(current.status)) throw httpError("El resultado cambió. Recargue antes de guardar su revisión", 409);
     if (current.body === input.body && (current.status === "reviewed") === input.reviewed) return { revision: current.revision };
@@ -399,8 +402,8 @@ export async function saveAcademicArtifact(workspaceId: string, id: string, raw:
     if (!changed.count) throw httpError("El resultado cambió. Recargue antes de guardar su revisión", 409);
     await retainAcademicVersion(id, input.expectedRevision + 1, input.body, input.reviewed, tx);
     return { revision: input.expectedRevision + 1 };
-  });
 }
+
 
 async function retainAcademicVersion(artifactId: string, revision: number, body: string, reviewed: boolean, client: AcademicClient) {
   const bodySha256 = sha256(body), previous = await client.altazorAcademicArtifactVersion.findUnique({ where: { artifactId_revision: { artifactId, revision } } });

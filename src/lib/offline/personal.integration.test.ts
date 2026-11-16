@@ -1,0 +1,92 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { prisma } from "@/lib/db";
+import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
+import { withRejectedAudit } from "@/lib/testing/audit-failure";
+import { importBook, readBook } from "@/lib/books/service";
+import { bookMetadataSchema } from "@/lib/books/ingest";
+import { resolveAltazorSources } from "@/lib/altazor/resources";
+import { sha256 } from "@/lib/evidence/fragments";
+import { readOfflineEntity, syncOfflineEntity } from "./service";
+const code = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
+async function main() {
+  assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
+  const storage = await mkdtemp(path.join(os.tmpdir(), "lexopen-personal-offline-")), previous = process.env.STORAGE_PATH;
+  process.env.STORAGE_PATH = storage;
+  const tag = randomUUID(), actors: string[] = [];
+  try {
+    const owner = await prisma.user.create({ data: { name: "Personal fixture", email: `${tag}@personal.invalid`, role: "abogado", password: "fixture" } }); actors.push(owner.id);
+    const member = await prisma.user.create({ data: { name: "Shared reader", email: `${tag}-member@personal.invalid`, role: "abogado", password: "fixture" } }); actors.push(member.id);
+    const text = "FULL_BOOK_NOT_TO_COPY. Este texto ficticio distingue el material del libro de sus notas personales.";
+    const imported = await importBook({ ...bookMetadataSchema.parse({ title: "Libro ficticio compartido" }), requestId: randomUUID(), name: "personal.txt", bytes: Buffer.from(text) }, owner);
+    const bookId = imported.book.id, detail = await readBook(bookId, owner);
+    await assert.rejects(readOfflineEntity(member, "booknote", bookId), code(404));
+    const collection = await prisma.bookShelfCollection.create({ data: { ownerId: owner.id, name: "Shared fixture", items: { create: { bookId } }, members: { create: { userId: member.id } } } });
+    const empty = await readOfflineEntity(owner, "booknote", bookId);
+    assert(!JSON.stringify(empty).includes(text), "Preparing annotations never copies the book");
+    const note = { kind: "booknote", action: "update", requestId: randomUUID(), entityId: bookId, expectedVersion: empty.version, fields: { title: "Notas personales", notes: "Nota privada del titular", bookmarkKind: "fragment", bookmarkNumber: "1" } };
+    await assert.rejects(syncOfflineEntity(owner, { ...note, action: "create" }));
+    await assert.rejects(syncOfflineEntity(owner, { ...note, fields: { ...note.fields, ownerId: member.id } }));
+    const saved = await syncOfflineEntity(owner, note);
+    assert.equal((await syncOfflineEntity(owner, note)).receipt.version, saved.receipt.version);
+    assert.equal((await prisma.libraryReadingNote.findUniqueOrThrow({ where: { ownerId_bookId: { ownerId: owner.id, bookId } } })).revision, 1);
+    const memberCopy = await readOfflineEntity(member, "booknote", bookId);
+    assert.equal(memberCopy.kind, "booknote");
+    if (memberCopy.kind !== "booknote") throw Error("Unexpected kind");
+    assert.equal(memberCopy.fields.notes, "", "A shared book does not share annotations");
+    const memberInput = { ...note, requestId: randomUUID(), expectedVersion: memberCopy.version, fields: { ...note.fields, notes: "Nota privada del lector" } };
+    await syncOfflineEntity(member, memberInput);
+    assert.equal(await prisma.libraryReadingNote.count({ where: { bookId } }), 2);
+    const ownerCurrent = await readOfflineEntity(owner, "booknote", bookId);
+    await assert.rejects(syncOfflineEntity(owner, { ...note, requestId: randomUUID(), expectedVersion: ownerCurrent.version, fields: { ...note.fields, bookmarkNumber: "99999" } }), code(422));
+    await withRejectedAudit(owner.id, "offline.booknote.update", async () => {
+      await assert.rejects(syncOfflineEntity(owner, { ...note, requestId: randomUUID(), expectedVersion: ownerCurrent.version, fields: { ...note.fields, notes: "Must roll back" } }));
+    });
+    assert.equal((await readOfflineEntity(owner, "booknote", bookId)).version, ownerCurrent.version);
+    const changed = await syncOfflineEntity(owner, { ...note, requestId: randomUUID(), expectedVersion: ownerCurrent.version, fields: { ...note.fields, notes: "Edición posterior" } });
+    const replay = await syncOfflineEntity(owner, note);
+    assert.notEqual(replay.receipt.version, replay.entity.version, "A lost older receipt does not overwrite later notes");
+    assert.equal(replay.entity.version, changed.entity.version);
+
+    const workspace = await prisma.altazorAcademicWorkspace.create({ data: { ownerId: owner.id, requestId: randomUUID(), title: "Manuscrito ficticio", kind: "research" } });
+    const refs = await resolveAltazorSources(owner, [{ kind: "book", bookId, fragmentId: detail.fragments[0].id, quote: detail.fragments[0].text }]);
+    const original = "Texto inicial para revisión humana.";
+    const artifact = await prisma.altazorAcademicArtifact.create({ data: { workspaceId: workspace.id, requestId: randomUUID(), inputSha256: sha256(original), mode: "academic_writing", title: "Artículo ficticio", status: "reviewed", body: original, bodySha256: sha256(original), sourceSnapshotsJson: JSON.stringify(refs.refs) } });
+    const manuscript = await readOfflineEntity(owner, "academic", artifact.id);
+    assert.equal(manuscript.kind, "academic");
+    if (manuscript.kind !== "academic") throw Error("Unexpected manuscript kind");
+    assert.equal(manuscript.relations.sourceReferences[0].identity.bookId, bookId);
+    assert(!JSON.stringify(manuscript).includes(text), "Prepared sources retain identities, never copied passages");
+    await assert.rejects(readOfflineEntity(member, "academic", artifact.id), code(404));
+    const edit = { kind: "academic", action: "update", requestId: randomUUID(), entityId: artifact.id, expectedVersion: manuscript.version, fields: { title: artifact.title, body: "Texto modificado sin conexión." } };
+    const synchronized = await syncOfflineEntity(owner, edit);
+    assert.equal((await syncOfflineEntity(owner, edit)).receipt.version, synchronized.receipt.version);
+    const updated = await prisma.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: artifact.id } });
+    assert.equal(updated.revision, 2); assert.equal(updated.status, "proposed");
+    assert.equal(await prisma.altazorAcademicArtifactVersion.count({ where: { artifactId: artifact.id } }), 2);
+    assert.equal(updated.sourceSnapshotsJson, artifact.sourceSnapshotsJson);
+    await assert.rejects(syncOfflineEntity(owner, { ...edit, requestId: randomUUID(), fields: { ...edit.fields, body: "Stale overwrite" } }), code(409));
+    await withRejectedAudit(owner.id, "offline.academic.update", async () => {
+      await assert.rejects(syncOfflineEntity(owner, { ...edit, requestId: randomUUID(), expectedVersion: synchronized.entity.version, fields: { ...edit.fields, body: "Must roll back" } }));
+    });
+    assert.equal((await prisma.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: artifact.id } })).revision, 2);
+    await prisma.libraryBook.update({ where: { id: bookId }, data: { title: "Fuente modificada", revision: { increment: 1 } } });
+    await assert.rejects(syncOfflineEntity(owner, { ...note, requestId: randomUUID(), expectedVersion: changed.entity.version }), code(409));
+    await prisma.libraryBookFragment.update({ where: { id: detail.fragments[0].id }, data: { text: "Pasaje cambiado" } });
+    await assert.rejects(readOfflineEntity(owner, "academic", artifact.id));
+    await prisma.bookShelfMember.deleteMany({ where: { collectionId: collection.id, userId: member.id } });
+    await assert.rejects(syncOfflineEntity(member, memberInput), code(404), "Committed receipts recheck current book access");
+    assert.equal((await prisma.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: artifact.id } })).body, edit.fields.body);
+    console.log("Offline personal: private notes, valid bookmarks, immutable sources, review invalidation, concurrent versions, receipt replay, audit rollback and revoked access passed.");
+  } finally {
+    await prisma.commandExecution.deleteMany({ where: { ownerId: { in: actors } } });
+    await prisma.auditEvent.deleteMany({ where: { actorId: { in: actors } } });
+    await prisma.user.deleteMany({ where: { id: { in: actors } } });
+    if (previous === undefined) delete process.env.STORAGE_PATH; else process.env.STORAGE_PATH = previous;
+    await rm(storage, { recursive: true, force: true });
+  }
+}
+main().finally(() => prisma.$disconnect()).catch(error => { console.error(error); process.exitCode = 1; });

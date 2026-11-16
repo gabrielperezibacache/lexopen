@@ -1,10 +1,11 @@
+import { personalSyncSchema } from "./personal-schemas";
 import { memoSyncSchema } from "./memo-schemas";
 import { operationsSyncSchema } from "./operations-schemas";
 import { legalSyncSchema } from "./legal-schemas";
 import { z } from "zod";
 import { clienteCreateSchema } from "@/lib/schemas";
 import { taskChangesSchema } from "@/lib/tasks/service";
-export const offlineKind = z.enum(["cliente", "task", "causa", "plazo", "nota", "minuta", "evento", "tramite"]);
+export const offlineKind = z.enum(["cliente", "task", "causa", "plazo", "nota", "minuta", "evento", "tramite", "academic", "booknote"]);
 export const offlineVersion = z.string().regex(/^[a-f0-9]{64}$/);
 const id = z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
 const reference = z.object({ id, expectedVersion: offlineVersion }).strict();
@@ -22,5 +23,5 @@ const recordSyncSchema = z.discriminatedUnion("kind", [
   if (value.action === "update" && (!value.entityId || !value.expectedVersion)) ctx.addIssue({ code: "custom", message: "La actualización requiere identidad y versión de partida" });
   if (value.action === "create" && (value.entityId || value.expectedVersion)) ctx.addIssue({ code: "custom", message: "La creación no acepta una identidad del servidor" });
 });
-export const offlineSyncSchema = z.union([recordSyncSchema, legalSyncSchema, memoSyncSchema, operationsSyncSchema]);
+export const offlineSyncSchema = z.union([recordSyncSchema, legalSyncSchema, memoSyncSchema, operationsSyncSchema, personalSyncSchema]);
 export type OfflineSyncInput = z.input<typeof recordSyncSchema>;

@@ -159,6 +159,7 @@ model User {
   createdCaseConflicts CaseConflict[] @relation("ConflictCreator")
   caseConflictReviews CaseConflictReview[]
   knowledgeCollections KnowledgeCollection[]
+  libraryReadingNotes LibraryReadingNote[]
   libraryBooks LibraryBook[]
   bookShelfCollections BookShelfCollection[]
   bookShelfMemberships BookShelfMember[]
@@ -2048,6 +2049,7 @@ model KnowledgeCollectionItem {
 
 // Personal library: ownership remains independent from case documents.
 model LibraryBook {
+  personalNotes LibraryReadingNote[]
   id String @id @default(cuid())
   ownerId String
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -3244,4 +3246,23 @@ model TrustedDevice {
   expiresAt DateTime
   revokedAt DateTime?
   @@index([userId,revokedAt,expiresAt])
+}
+
+// Personal annotations never inherit the sharing of a book's collection.
+model LibraryReadingNote {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookId String
+  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  title String
+  notes String @db.Text
+  bookmarkKind String @default("")
+  bookmarkNumber String @default("")
+  bookRevision Int
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId, bookId])
+  @@index([bookId])
 }
