@@ -88,3 +88,7 @@ La detección automática se comprobó de forma nativa en macOS con Apple M4 Max
 OCR, transcripción, búsqueda, navegador y Obsidian conservan su preparación independiente del catálogo. Tesseract/Poppler, whisper.cpp/FFmpeg, PostgreSQL, Chromium/Playwright y la bóveda local no se instalan al elegir un modelo. [Tesseract](https://tesseract-ocr.github.io/tessdoc/Data-Files.html) · [whisper.cpp](https://github.com/ggml-org/whisper.cpp#memory-usage) · [Playwright](https://playwright.dev/docs/library) · [Obsidian](https://help.obsidian.md/Files+and+folders/How+Obsidian+stores+data)
 
 El espacio del motor se contabiliza aparte de los pesos. El instalador de cada herramienta debe conservar lo ya preparado, verificar procedencia y permitir retomar la preparación. [Ollama para Windows](https://docs.ollama.com/windows)
+
+## Medir con tareas ficticias
+
+El [evaluador local](EVALUACION-JURIDICA-IA.md) compara exclusivamente modelos ya instalados en Ollama y conserva respuestas, edición, cuantización, hardware y telemetría disponible. No descarga modelos ni llama a proveedores remotos. Las cifras anteriores siguen siendo estimaciones del catálogo: no se han convertido en mediciones ni en un ganador universal.

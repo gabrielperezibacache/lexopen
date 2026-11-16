@@ -1,0 +1,21 @@
+{
+  "version": "chile-public-excerpts-1",
+  "capturedOn": "2026-11-16",
+  "review": {"status":"provisional", "professionalReviewer":null, "reviewedOn":null},
+  "notice": "Extractos públicos para evaluar recuperación y referencias, no un corpus jurídico validado ni reglas de cómputo. La versión histórica de Ley 19.880 no acredita vigencia actual.",
+  "sources": [
+    {"id":"cc-1545","jurisdiction":"CL","authority":"Ministerio de Justicia","publishedOn":"2000-05-30","versionDate":null,"title":"Código Civil · efectos del contrato","locator":"artículo 1545","url":"https://www.bcn.cl/leychile/navegar?idNorma=172986","excerpt":"Todo contrato legalmente celebrado es una ley para los contratantes, y no puede ser invalidado sino por su consentimiento mutuo o por causas legales."},
+    {"id":"cpc-38","jurisdiction":"CL","authority":"Ministerio de Justicia","publishedOn":"1902-08-30","versionDate":null,"title":"Código de Procedimiento Civil · notificaciones","locator":"artículo 38","url":"https://www.bcn.cl/leychile/navegar?idNorma=22740","excerpt":"Las resoluciones judiciales sólo producen efecto en virtud de notificación hecha con arreglo a la ley, salvo los casos expresamente exceptuados por ella."},
+    {"id":"admin-25","jurisdiction":"CL","authority":"Ministerio Secretaría General de la Presidencia","publishedOn":"2003-05-29","versionDate":"2025-09-29","title":"Ley 19.880 · plazos del procedimiento administrativo","locator":"artículo 25, extracto del inciso primero","url":"https://www.bcn.cl/leychile/navegar?idNorma=210676&idVersion=2025-09-29","excerpt":"son de días hábiles, entendiéndose que son inhábiles los días sábados, los domingos y los festivos."}
+  ],
+  "queries": [
+    {"id":"contrato","query":"contrato consentimiento mutuo","relevant":["cc-1545"]},
+    {"id":"invalidacion","query":"contrato invalidado causas legales","relevant":["cc-1545"]},
+    {"id":"notificacion","query":"resoluciones judiciales notificación efecto","relevant":["cpc-38"]},
+    {"id":"efectos","query":"notificación hecha arreglo ley","relevant":["cpc-38"]},
+    {"id":"inhabiles","query":"inhábiles sábados domingos festivos","relevant":["admin-25"]},
+    {"id":"administrativo","query":"plazos procedimiento administrativo días hábiles","relevant":["admin-25"]},
+    {"id":"sin-fuente","query":"nanotecnología orbital cuántica","relevant":[]},
+    {"id":"negativo-con-solapamiento","query":"plazo apelación interplanetaria","relevant":[]}
+  ]
+}
