@@ -65,7 +65,7 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     await loginAs(page, user.email);
     await authenticateApiRequests(page);
     await page.goto(`/plazos?mes=2088-11&causaId=${cause.id}`);
-    await expect(page.getByText("105 plazos en esta vista")).toBeVisible();
+    await expect(page.getByText("105 plazos en esta vista",{exact:true})).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
     ).toHaveCount(100);
@@ -89,11 +89,9 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     expect(second).toHaveLength(5);
     expect(new Set([...first, ...second].map((p) => p.id)).size).toBe(105);
     const target = second[0];
-    const card = page
-      .locator("div.panel")
-      .filter({
-        has: page.getByRole("heading", { name: target.titulo, exact: true }),
-      });
+    const card = page.locator("div.panel").filter({
+      has: page.getByRole("heading", { name: target.titulo, exact: true }),
+    });
     await card
       .getByRole("button", { name: "Registrar cumplimiento", exact: true })
       .click();
@@ -109,7 +107,9 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await card.getByRole("group",{name:"Respaldo del cumplimiento"}).scrollIntoViewIfNeeded();
+    await card
+      .getByRole("group", { name: "Respaldo del cumplimiento" })
+      .scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath("plazo-respaldo-360.png") });
     await card
       .getByRole("button", { name: "Confirmar cumplimiento", exact: true })
@@ -178,5 +178,133 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
       where: { actorId: { in: [userId, otherId] } },
     });
     await prisma.user.deleteMany({ where: { id: { in: [userId, otherId] } } });
+  }
+});
+
+test("plazos: causas fuera de las primeras 100, roles internos y páginas de vencidos", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const tag = randomUUID(),
+    users: string[] = [];
+  try {
+    const owner = await prisma.user.create({
+      data: {
+        name: `Autor ${tag}`,
+        email: `${tag}@deadline-picker.invalid`,
+        password: await hash("lexopen", 10),
+        role: "abogado",
+      },
+    });
+    users.push(owner.id);
+    const outside = await prisma.user.create({
+      data: {
+        name: `Ajeno ${tag}`,
+        email: `outside-${tag}@deadline-picker.invalid`,
+        password: "no-login",
+        role: "abogado",
+      },
+    });
+    users.push(outside.id);
+    const old = await prisma.causa.create({
+      data: {
+        titulo: `Expediente antiguo ${tag}`,
+        rit: `ANT-${tag}`,
+        tribunal: "Ficticio",
+        materia: "civil",
+        acceso: "equipo",
+        abogadoId: owner.id,
+        updatedAt: new Date("2000-01-01T00:00:00Z"),
+      },
+    });
+    await prisma.causa.createMany({
+      data: Array.from({ length: 101 }, (_, i) => ({
+        titulo: `Reciente ${i} ${tag}`,
+        tribunal: "Ficticio",
+        materia: "civil",
+        acceso: "equipo",
+        abogadoId: owner.id,
+      })),
+    });
+    await prisma.causa.create({
+      data: {
+        titulo: `Ajena ${tag}`,
+        rit: `HIDDEN-${tag}`,
+        tribunal: "Ficticio",
+        materia: "civil",
+        acceso: "equipo",
+        abogadoId: outside.id,
+      },
+    });
+    for (const role of ["socio", "procurador", "contabilidad"]) {
+      const u = await prisma.user.create({
+        data: {
+          name: `${role} ${tag}`,
+          email: `${role}-${tag}@deadline-picker.invalid`,
+          password: "no-login",
+          role,
+        },
+      });
+      users.push(u.id);
+    }
+    await loginAs(page, owner.email);
+    await page.goto("/plazos?mes=2088-11");
+    const select = page.getByLabel("Causa", { exact: true });
+    await expect(select.locator(`option[value="${old.id}"]`)).toHaveCount(0);
+    const query = page.getByLabel("Buscar causa", { exact: true });
+    await query.fill(old.rit!);
+    await query
+      .locator("..")
+      .getByRole("button", { name: "Buscar", exact: true })
+      .click();
+    await select.selectOption(old.id);
+    for (const role of ["socio", "procurador", "contabilidad"])
+      await expect(
+        page
+          .getByLabel("Responsable", { exact: true })
+          .getByRole("option", { name: `${role} ${tag}`, exact: true }),
+      ).toHaveCount(1);
+    await page
+      .getByLabel("Título", { exact: true })
+      .fill(`Creado por búsqueda ${tag}`);
+    await page
+      .getByLabel("Fecha límite directa", { exact: true })
+      .fill("2088-11-24");
+    await page
+      .getByRole("button", { name: "Crear plazo", exact: true })
+      .click();
+    await expect
+      .poll(() => prisma.plazo.count({ where: { causaId: old.id } }))
+      .toBe(1);
+    const blocked = await (
+      await page.request.get(`/api/plazos/options?kind=cause&q=HIDDEN-${tag}`)
+    ).json();
+    expect(blocked.items).toEqual([]);
+    await prisma.plazo.createMany({
+      data: Array.from({ length: 105 }, (_, i) => ({
+        titulo: `Vencido ${i} ${tag}`,
+        causaId: old.id,
+        responsableId: owner.id,
+        fechaLimite: new Date("2020-01-01T00:00:00Z"),
+      })),
+    });
+    await page.goto(`/plazos?vista=mis-vencidos&causaId=${old.id}`);
+    await expect(page.getByText("105 plazos en esta vista",{exact:true})).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
+    ).toHaveCount(100);
+    await page
+      .getByRole("link", { name: "Ver siguientes", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
+    ).toHaveCount(5);
+  } finally {
+    await prisma.causa.deleteMany({ where: { abogadoId: { in: users } } });
+    await prisma.commandExecution.deleteMany({
+      where: { ownerId: { in: users } },
+    });
+    await prisma.auditEvent.deleteMany({ where: { actorId: { in: users } } });
+    await prisma.user.deleteMany({ where: { id: { in: users } } });
   }
 });
