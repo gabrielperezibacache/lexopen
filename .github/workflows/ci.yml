@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
+          - runner: ubuntu-24.04
             architecture: amd64
             check: altazor-computer-runtime
             evidence: altazor-computer-runtime-evidence
