@@ -1,3 +1,4 @@
+import { documentBodyForDownload } from "@/lib/security/download";
 import type { Plazo, PlazoStateEvent, Prisma } from "@prisma/client";
 import { currentStaffActor, type StaffActor } from "@/lib/auth/staff-actor";
 import {
@@ -196,9 +197,10 @@ export async function recordDeadlineTransition(
       const { doc } = await supportDocument(after, support, actor, tx);
       if (!doc.storageKey && doc.contenido === null)
         throw httpError("El original del respaldo no está disponible", 409);
-      const bytes = doc.storageKey
-        ? await getObjectBounded(doc.storageKey)
-        : Buffer.from(doc.contenido || "", "utf8");
+      const bytes = documentBodyForDownload(
+        doc,
+        doc.storageKey ? await getObjectBounded(doc.storageKey) : null,
+      );
       if (!bytes)
         throw httpError("El original del respaldo no está disponible", 409);
       const retained = await tx.offlineDocumentRevision.findUnique({
@@ -207,11 +209,12 @@ export async function recordDeadlineTransition(
         },
       });
       if (retained) {
-        const retainedBytes = retained.storageKey
-          ? await getObjectBounded(retained.storageKey)
-          : retained.contenido !== null
-            ? Buffer.from(retained.contenido, "utf8")
-            : null;
+        const retainedBytes = documentBodyForDownload(
+          retained,
+          retained.storageKey
+            ? await getObjectBounded(retained.storageKey)
+            : null,
+        );
         if (!retainedBytes || sha256(retainedBytes) !== sha256(bytes))
           throw httpError(
             "La versión retenida del documento no coincide con el original",

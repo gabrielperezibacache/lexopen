@@ -54,6 +54,16 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
         mimeType: "text/plain",
       },
     });
+    const missingOriginal = await prisma.documento.create({
+      data: {
+        nombre: `Texto sin original ${tag}.pdf`,
+        tipo: "otro",
+        causaId: cause.id,
+        autorId: user.id,
+        contenido: "Sólo texto extraído, sin original PDF",
+        mimeType: "application/pdf",
+      },
+    });
     await prisma.plazo.createMany({
       data: Array.from({ length: 105 }, (_, i) => ({
         titulo: `Plazo ${String(i).padStart(3, "0")}`,
@@ -66,7 +76,11 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     await authenticateApiRequests(page);
     await page.goto(`/plazos?mes=2088-11&causaId=${cause.id}`);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("105 plazos en esta vista",{exact:true}).filter({visible:true})).toBeVisible();
+    await expect(
+      page
+        .getByText("105 plazos en esta vista", { exact: true })
+        .filter({ visible: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
     ).toHaveCount(100);
@@ -99,6 +113,18 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     await card.getByLabel("Tipo de respaldo").selectOption("document");
     await card.getByLabel("Buscar documento de la causa").fill(tag);
     await card.getByRole("button", { name: "Buscar", exact: true }).click();
+    await card
+      .getByLabel("Documento de la causa", { exact: true })
+      .selectOption(missingOriginal.id);
+    await card
+      .getByRole("button", { name: "Confirmar cumplimiento", exact: true })
+      .click();
+    await expect(card.getByRole("alert")).toContainText(
+      "El original del respaldo no está disponible",
+    );
+    expect(
+      await prisma.plazoStateEvent.count({ where: { plazoId: target.id } }),
+    ).toBe(0);
     await card
       .getByLabel("Documento de la causa", { exact: true })
       .selectOption(doc.id);
@@ -292,7 +318,11 @@ test("plazos: causas fuera de las primeras 100, roles internos y páginas de ven
     });
     await page.goto(`/plazos?vista=mis-vencidos&causaId=${old.id}`);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("105 plazos en esta vista",{exact:true}).filter({visible:true})).toBeVisible();
+    await expect(
+      page
+        .getByText("105 plazos en esta vista", { exact: true })
+        .filter({ visible: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
     ).toHaveCount(100);

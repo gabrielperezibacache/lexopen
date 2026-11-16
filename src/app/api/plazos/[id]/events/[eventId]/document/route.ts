@@ -5,7 +5,10 @@ import { deadlineFor, eventDocument } from "@/lib/deadlines/completion";
 import { httpError } from "@/lib/auth/access";
 import { getObjectBounded } from "@/lib/storage";
 import { sha256 } from "@/lib/evidence/fragments";
-import { downloadResponseHeaders } from "@/lib/security/download";
+import {
+  documentBodyForDownload,
+  downloadResponseHeaders,
+} from "@/lib/security/download";
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string; eventId: string }> },
@@ -20,9 +23,12 @@ export async function GET(
       });
       if (!event) throw httpError("Comprobante no disponible", 404);
       const { revision } = await eventDocument(row, event, user, tx);
-      const bytes = revision.storageKey
-        ? await getObjectBounded(revision.storageKey)
-        : Buffer.from(revision.contenido || "", "utf8");
+      const bytes = documentBodyForDownload(
+        revision,
+        revision.storageKey
+          ? await getObjectBounded(revision.storageKey)
+          : null,
+      );
       if (!bytes || sha256(bytes) !== event.documentSha256)
         throw httpError(
           "El original conservado no coincide con el comprobante",

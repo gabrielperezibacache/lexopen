@@ -2,6 +2,8 @@
 
 En **Plazos**, «Registrar cumplimiento» permite seleccionar un documento o comprobante de la misma causa, o escribir una justificación manual. Es un registro interno del estudio: no afirma que el tribunal haya recibido o aceptado una presentación.
 
+Un PDF sin original recuperable no se sustituye por su texto extraído: el cierre se rechaza y permite seleccionar otro documento o escribir una justificación.
+
 El respaldo documental conserva la versión seleccionada y la huella SHA-256 de sus bytes. «Ver historial del plazo» permite descargar esa versión aunque el documento haya tenido ediciones posteriores. Cada consulta y descarga comprueba de nuevo los permisos del plazo, la causa y el documento, incluidas sus restricciones históricas. Si el documento se retira o se mueve a otra causa, el historial indica que el respaldo no está disponible.
 
 Reabrir un plazo añade otro evento y reactiva sus avisos pendientes; conserva el cumplimiento y su respaldo anteriores. Los cierres anteriores a esta función aparecen como históricos sin inventar autor, fecha ni comprobante.

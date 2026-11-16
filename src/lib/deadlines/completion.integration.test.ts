@@ -196,6 +196,42 @@ async function main() {
       ),
       status(404),
     );
+    const extractedPdf = await prisma.documento.create({
+      data: {
+        nombre: "Original ausente.pdf",
+        tipo: "otro",
+        contenido: "Texto extraído; no son bytes PDF",
+        mimeType: "application/pdf",
+        causaId: cause.id,
+        autorId: owner.id,
+      },
+    });
+    await assert.rejects(
+      updatePlazoCommand(
+        owner,
+        {
+          ...body,
+          expectedVersion: deadlineVersion(current),
+          completion: {
+            kind: "document",
+            documentoId: extractedPdf.id,
+            version: 1,
+          },
+        },
+        randomUUID(),
+      ),
+      status(409),
+    );
+    assert.equal(
+      (await prisma.plazo.findUniqueOrThrow({ where: { id: p.id } })).estado,
+      "pendiente",
+    );
+    assert.equal(
+      await prisma.offlineDocumentRevision.count({
+        where: { documentoId: extractedPdf.id },
+      }),
+      0,
+    );
     const documentary = {
         ...body,
         expectedVersion: deadlineVersion(current),
