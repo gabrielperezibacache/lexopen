@@ -65,7 +65,8 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     await loginAs(page, user.email);
     await authenticateApiRequests(page);
     await page.goto(`/plazos?mes=2088-11&causaId=${cause.id}`);
-    await expect(page.getByText("105 plazos en esta vista",{exact:true})).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("105 plazos en esta vista",{exact:true}).filter({visible:true})).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
     ).toHaveCount(100);
@@ -249,6 +250,7 @@ test("plazos: causas fuera de las primeras 100, roles internos y páginas de ven
     }
     await loginAs(page, owner.email);
     await page.goto("/plazos?mes=2088-11");
+    await page.waitForLoadState("networkidle");
     const select = page.getByLabel("Causa", { exact: true });
     await expect(select.locator(`option[value="${old.id}"]`)).toHaveCount(0);
     const query = page.getByLabel("Buscar causa", { exact: true });
@@ -289,7 +291,8 @@ test("plazos: causas fuera de las primeras 100, roles internos y páginas de ven
       })),
     });
     await page.goto(`/plazos?vista=mis-vencidos&causaId=${old.id}`);
-    await expect(page.getByText("105 plazos en esta vista",{exact:true})).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("105 plazos en esta vista",{exact:true}).filter({visible:true})).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Registrar cumplimiento", exact: true }),
     ).toHaveCount(100);
