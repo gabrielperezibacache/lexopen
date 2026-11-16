@@ -50,10 +50,11 @@ export async function getHostStatus() {
     prisma.pjudSyncJob.count({ where: { status: "failed" } }),
     getDigestStatus().catch(() => ({
       lastAt: null,
-      lastStatus: null,
-      lastNote: null,
+      lastStatus: "unavailable",
+      lastNote: "No se pudo comprobar el estado del resumen judicial.",
     })),
-    getPjudQueueStatus().catch(() => ({
+    getPjudQueueStatus().then(value => ({ ...value, available: true })).catch(() => ({
+      available: false,
       waiting: 0,
       active: 0,
       completed: 0,

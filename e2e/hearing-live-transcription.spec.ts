@@ -283,6 +283,16 @@ test("protege enlaces y Atrás detiene la captura con recuperación del tramo si
     await expect(audio.getByRole("button", { name: "Descargar audio pendiente", exact: true })).toBeVisible();
     expect(providerCalls).toBe(calls);
     expect(await db.hearingLiveAudioClip.count({ where: { session: { workspaceId: desk.id } } })).toBe(0);
+    const protectedRows = await page.evaluate(async () => new Promise<{ encrypted: boolean; plainBlob: boolean; storedKey: boolean }[]>((resolve, reject) => {
+      const request = indexedDB.open("lexopen-pending-capture", 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => { const database = request.result, read = database.transaction("clips").objectStore("clips").getAll();
+        read.onsuccess = () => { resolve(read.result.map(row => ({ encrypted: row.encrypted instanceof ArrayBuffer, plainBlob: row.clip.blob instanceof Blob, storedKey: "key" in row || "localRecoveryKey" in row }))); database.close(); };
+        read.onerror = () => { reject(read.error); database.close(); };
+      };
+    }));
+    expect(protectedRows.length).toBeGreaterThan(0);
+    expect(protectedRows.every(row => row.encrypted && !row.plainBlob && !row.storedKey)).toBe(true);
     // A real reload discards module memory; recovery must come from IndexedDB.
     page.once("dialog", dialog => void dialog.accept());
     await page.reload();

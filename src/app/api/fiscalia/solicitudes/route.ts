@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await requireStaff(), status = req.nextUrl.searchParams.get("status") || "open";
     if (!["open", "all", ...Object.keys(FISCALIA_STATUSES)].includes(status)) return NextResponse.json({ error: "Estado de solicitud no válido" }, { status: 400, headers });
-    return NextResponse.json(await fiscaliaWorkspace(user, { causaId: req.nextUrl.searchParams.get("causaId") || undefined, status }), { headers });
+    return NextResponse.json(await fiscaliaWorkspace(user, { causaId: req.nextUrl.searchParams.get("causaId") || undefined, status, after: req.nextUrl.searchParams.get("after") || undefined }), { headers });
   } catch (e) { const response = handleRouteError(e); response.headers.set("Cache-Control", headers["Cache-Control"]); return response; }
 }
 async function save(req: NextRequest, update: boolean) {

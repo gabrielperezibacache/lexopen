@@ -1,3 +1,6 @@
+import { STAFF_ROLES } from "@/lib/auth/roles";
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
@@ -15,24 +18,25 @@ async function clientHasPortalSite(userId: string) {
   );
 }
 
-export default async function MessagesPage() {
+export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ after?: string }> }) {
+  const sp = await searchParams;
   const user = await requireUser();
 
-  const [messages, directory] = await Promise.all([
+  const [messageRows, directory] = await Promise.all([
     prisma.message.findMany({
-      where: { OR: [{ receiverId: user.id }, { senderId: user.id }] },
+      where: { AND: [{ OR: [{ receiverId: user.id }, { senderId: user.id }] }, listCursorWhere(sp.after, "createdAt")] },
       include: {
         sender: { select: publicUserSelect },
         receiver: { select: publicUserSelect },
       },
-      orderBy: { createdAt: "desc" },
-      take: 50,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 51,
     }),
     (async () => {
       if (isCliente(user.role)) {
         if (!(await clientHasPortalSite(user.id))) return [];
         return prisma.user.findMany({
-          where: { role: { in: ["admin", "abogado", "asistente"] } },
+          where: { role: { in: [...STAFF_ROLES] } },
           select: publicUserSelect,
           orderBy: { name: "asc" },
         });
@@ -51,7 +55,7 @@ export default async function MessagesPage() {
         }),
         prisma.user.findMany({
           where: {
-            role: { in: ["admin", "abogado", "asistente"] },
+            role: { in: [...STAFF_ROLES] },
             id: { not: user.id },
           },
           select: publicUserSelect,
@@ -62,8 +66,9 @@ export default async function MessagesPage() {
     })(),
   ]);
 
+  const { items: messages, next } = listWindow(messageRows, 50, "createdAt");
   return (
-    <MessagesClient
+    <div><MessagesClient pagination={<ListPagination path="/mensajes" after={sp.after} next={next} count={messages.length} />}
       initialMessages={messages.map((m) => ({
         id: m.id,
         subject: m.subject,
@@ -78,6 +83,6 @@ export default async function MessagesPage() {
         email: u.email,
         role: u.role,
       }))}
-    />
+    /></div>
   );
 }

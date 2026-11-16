@@ -1,3 +1,5 @@
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireStaffPage } from "@/lib/auth/access";
@@ -10,7 +12,7 @@ import { PageHeader } from "@/components/sites/SiteNav";
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; estado?: string }>;
+  searchParams: Promise<{ q?: string; estado?: string; after?: string }>;
 }) {
   const user = await requireStaffPage();
   const { t } = await getI18n();
@@ -19,10 +21,10 @@ export default async function ClientesPage({
   const estado = sp.estado;
 
   const LIST_TAKE = 100;
-  const [clientes, abogados] = await Promise.all([
+  const [clientRows, abogados] = await Promise.all([
     prisma.cliente.findMany({
       where: {
-        AND: [
+        AND: [listCursorWhere(sp.after, "updatedAt"),
           estado ? { estado } : {},
           q
             ? {
@@ -36,8 +38,8 @@ export default async function ClientesPage({
         ],
       },
       include: clienteListInclude(user),
-      orderBy: { updatedAt: "desc" },
-      take: LIST_TAKE,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: LIST_TAKE + 1,
     }),
     prisma.user.findMany({
       where: { role: { in: ["admin", "abogado", "asistente"] } },
@@ -46,6 +48,7 @@ export default async function ClientesPage({
     }),
   ]);
 
+  const { items: clientes, next } = listWindow(clientRows, LIST_TAKE, "updatedAt");
   return (
     <div className="space-y-6">
       <PageHeader
@@ -79,6 +82,7 @@ export default async function ClientesPage({
         </button>
       </form>
 
+      <ListPagination path="/clientes" filters={{ q, estado }} after={sp.after} next={next} count={clientes.length} />
       {clientes.length > 0 ? (
         <p className="text-xs text-[var(--muted)]">
           Mostrando hasta {LIST_TAKE} clientes más recientes.

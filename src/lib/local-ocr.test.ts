@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  missingOcrLanguages,
   extraOcrPathDirs,
   ocrCommandTimeout,
   ocrInstallHint,
@@ -9,6 +10,11 @@ import {
   prependOcrPath,
   tesseractBinCandidates,
 } from "@/lib/local-ocr";
+
+assert.deepEqual(missingOcrLanguages("spa+eng", 'List of available languages in "/fixture" (2):\neng\nosd\n'), ["spa"]);
+assert.deepEqual(missingOcrLanguages("spa+eng", "eng\nspa\nosd\n"), []);
+assert.deepEqual(missingOcrLanguages("script/Latin", "script/Latin\neng"), []);
+assert.throws(() => missingOcrLanguages("eng+--help", "eng"), /inválida/);
 
 // The native binding supports macOS/Linux only. Requiring it on every platform
 // prevents npm ci from reaching the existing Windows CLI fallback.

@@ -1,3 +1,6 @@
+import type { Prisma } from "@prisma/client";
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -15,7 +18,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { getI18n } from "@/lib/i18n/server";
 
 type Props = {
-  searchParams: Promise<{ action?: string; actor?: string; q?: string }>;
+  searchParams: Promise<{ action?: string; actor?: string; q?: string; after?: string }>;
 };
 
 export default async function AuditoriaPage({ searchParams }: Props) {
@@ -28,47 +31,32 @@ export default async function AuditoriaPage({ searchParams }: Props) {
   const actorFilter = (sp.actor || "").trim();
   const q = (sp.q || "").trim().toLowerCase();
 
-  const [events, actors] = await Promise.all([
+  const [eventRows, actors, actions] = await Promise.all([
     prisma.auditEvent.findMany({
+      where: { AND: [listCursorWhere(sp.after, "createdAt"),
+        ...(actionFilter ? [{ action: actionFilter }] : []), ...(actorFilter ? [{ actorId: actorFilter }] : []),
+        ...(q ? [{ OR: ([...(["action", "entityType", "entityId", "afterJson", "beforeJson"] as const).map(field => ({ [field]: { contains: q, mode: "insensitive" as const } })), { actor: { name: { contains: q, mode: "insensitive" as const } } }, { actor: { email: { contains: q, mode: "insensitive" as const } } }] satisfies Prisma.AuditEventWhereInput[]) }] : [])] },
       include: { actor: { select: { id: true, name: true, email: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 300,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 101,
     }),
     prisma.user.findMany({
       where: { role: { not: "cliente" } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.auditEvent.groupBy({ by: ["action"], orderBy: { action: "asc" } }),
   ]);
 
-  const actionOptions = Array.from(new Set(events.map((e) => e.action))).sort();
-
-  const filtered = events.filter((event) => {
-    if (actionFilter && event.action !== actionFilter) return false;
-    if (actorFilter && event.actorId !== actorFilter) return false;
-    if (q) {
-      const hay = [
-        event.action,
-        event.entityType,
-        event.entityId || "",
-        event.actor?.name || "",
-        event.actor?.email || "",
-        event.afterJson || "",
-        event.beforeJson || "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
+  const { items: filtered, next } = listWindow(eventRows, 100, "createdAt");
+  const actionOptions = actions.map(row => row.action);
 
   return (
     <div className={`${styles.area} space-y-6`}>
       <ModuleHeader artwork="research" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
       <p className="text-sm text-[var(--ink-soft)]">
-        Mostrando hasta 300 eventos más recientes (luego filtros en pantalla).
+        Los filtros consultan todo el historial autorizado.
       </p>
       <form className="panel grid grid-cols-1 items-end gap-3 rounded-3xl p-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_2fr_auto_auto]" method="get">
         <label className="min-w-0 text-sm">
@@ -110,6 +98,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
         </Link>
       </form>
 
+      <ListPagination path="/auditoria" filters={{ action: actionFilter, actor: actorFilter, q }} after={sp.after} next={next} count={filtered.length} />
       {filtered.length === 0 ? (
         <EmptyState
           title="Sin eventos"

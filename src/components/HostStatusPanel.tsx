@@ -96,7 +96,7 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
               : ""}
             {" · "}
             Fallidos {pjud.failedJobs ?? 0}
-            {pjud.queue
+            {pjud.queue && pjud.queue.available !== false
               ? ` · Cola ${pjud.queue.pending}p/${pjud.queue.running}r`
               : ""}
             {pjud.digest?.lastStatus
@@ -155,7 +155,8 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
                 : ""}
             </p>
           )}
-          {pjud.queue && (
+          {pjud.queue?.available === false && <p role="alert" className="mt-2 text-[var(--danger)]">No se pudo consultar la cola judicial. Su estado no está confirmado.</p>}
+          {pjud.queue && pjud.queue.available !== false && (
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
               Cola PJUD (estilo CausaMonitor): {pjud.queue.waiting ?? pjud.queue.pending}{" "}
               waiting · {pjud.queue.active ?? pjud.queue.running} active ·{" "}
@@ -179,6 +180,7 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
               : `Sin backup válido · directorio ${backups.directoryState}`}
           </span>
         )}
+        <p className="mt-2 text-[var(--ink-soft)]">El estado indica antigüedad y disponibilidad. La integridad completa se comprueba al restaurar; conserve una copia en un destino cifrado.</p>
       </div>
 
       <SelfUpdatePanel />
