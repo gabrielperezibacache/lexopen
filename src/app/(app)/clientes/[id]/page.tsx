@@ -1,7 +1,15 @@
+import { clienteDocumentsWhere } from "@/lib/clientes/documents";
+import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { ListPagination } from "@/components/ui/ListPagination";
 import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
 import { clienteVersion } from "@/lib/offline/version";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { causaAccessWhere, documentReadWhere, siteAccessWhere } from "@/lib/auth/causa-access";
+import {
+  causaAccessWhere,
+  documentReadWhere,
+  plazoAccessWhere,
+  siteAccessWhere,
+} from "@/lib/auth/causa-access";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -14,13 +22,12 @@ import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ClienteAiChat } from "@/components/clientes/ClienteAiChat";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
-import { confidentialWhere } from "@/lib/api";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 import { getI18n } from "@/lib/i18n/server";
 import { siteTipoLabel } from "@/lib/sites/labels";
 
 type Params = { params: Promise<{ id: string }> };
-type Search = { searchParams: Promise<{ causa?: string }> };
+type Search = { searchParams: Promise<{ causa?: string; after?: string }> };
 
 export default async function ClienteDetailPage({
   params,
@@ -32,42 +39,39 @@ export default async function ClienteDetailPage({
   const sp = await searchParams;
   const focusCausaId = sp.causa || null;
 
-  const [cliente, abogados] = await Promise.all([
+  const [cliente, abogados, documentRows, documentCount] = await Promise.all([
     prisma.cliente.findUnique({
       where: { id },
       include: {
         abogado: { select: { id: true, name: true } },
-        documentos: {
-          where: { AND: [documentReadWhere(user), confidentialWhere(user)] },
-          orderBy: { updatedAt: "desc" },
-          select: {
-            id: true,
-            nombre: true,
-            tipo: true,
-            ruta: true,
-            extractionStatus: true,
-            updatedAt: true,
-            causaId: true,
-            autor: { select: { name: true } },
-            causa: { select: { id: true, rit: true, titulo: true } },
-          },
-        },
         causas: {
-          where: causaAccessWhere(user),          orderBy: { updatedAt: "desc" },
+          where: causaAccessWhere(user),
+          orderBy: { updatedAt: "desc" },
           include: {
             abogado: { select: { id: true, name: true } },
             tramites: {
-              where: { OR: [{ task: null }, { task: { is: taskWorkspaceAccessWhere(user) } }] },
+              where: {
+                OR: [
+                  { task: null },
+                  { task: { is: taskWorkspaceAccessWhere(user) } },
+                ],
+              },
               orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
               include: {
                 responsable: { select: { id: true, name: true } },
               },
             },
-            _count: { select: { documentos: true, plazos: true } },
+            _count: {
+              select: {
+                documentos: { where: documentReadWhere(user) },
+                plazos: { where: plazoAccessWhere(user) },
+              },
+            },
           },
         },
         sites: {
-          where: siteAccessWhere(user),          orderBy: { updatedAt: "desc" },
+          where: siteAccessWhere(user),
+          orderBy: { updatedAt: "desc" },
           select: {
             id: true,
             name: true,
@@ -84,9 +88,36 @@ export default async function ClienteDetailPage({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.documento.findMany({
+      where: {
+        AND: [
+          clienteDocumentsWhere(id, user),
+          listCursorWhere(sp.after, "updatedAt"),
+        ],
+      },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: 51,
+      select: {
+        id: true,
+        nombre: true,
+        tipo: true,
+        ruta: true,
+        extractionStatus: true,
+        updatedAt: true,
+        causaId: true,
+        autor: { select: { name: true } },
+        causa: { select: { id: true, rit: true, titulo: true } },
+      },
+    }),
+    prisma.documento.count({ where: clienteDocumentsWhere(id, user) }),
   ]);
 
   if (!cliente) notFound();
+  const { items: documentos, next: documentsNext } = listWindow(
+    documentRows,
+    50,
+    "updatedAt",
+  );
 
   // ⚡ Bolt: Calculate multiple counts in a single O(N) pass to avoid redundant iteration and memory overhead.
   let tramitesPendientes = 0;
@@ -95,7 +126,9 @@ export default async function ClienteDetailPage({
     for (const t of c.tramites) {
       if (t.estado === "hecho") {
         tramitesHechos++;
-      } else if (TRAMITES_ABIERTOS.includes(t.estado as "pendiente" | "en_curso")) {
+      } else if (
+        TRAMITES_ABIERTOS.includes(t.estado as "pendiente" | "en_curso")
+      ) {
         tramitesPendientes++;
       }
     }
@@ -103,36 +136,49 @@ export default async function ClienteDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/clientes" className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
+      <Link
+        href="/clientes"
+        className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline"
+      >
         ← Clientes
       </Link>
       <PageHeader
         title={cliente.razonSocial}
-        subtitle={<>{cliente.rut || "Sin RUT"} · {cliente.tipo} · {cliente.abogado?.name || "Sin abogado asignado"}</>}
+        subtitle={
+          <>
+            {cliente.rut || "Sin RUT"} · {cliente.tipo} ·{" "}
+            {cliente.abogado?.name || "Sin abogado asignado"}
+          </>
+        }
       />
       <div className="flex flex-wrap gap-2">
-          <StatusBadge
-            estado={cliente.estado === "activo" ? "activa" : "suspendida"}
-          />
-          <span className="badge badge-ink">{cliente.causas.length} causas</span>
-          <span className="badge badge-pendiente">
-            {tramitesPendientes} trámites pend.
-          </span>
-          <span className="badge badge-activa">{tramitesHechos} hechos</span>
-          <span className="badge badge-sea">
-            {cliente.documentos.length} docs
-          </span>
+        <StatusBadge
+          estado={cliente.estado === "activo" ? "activa" : "suspendida"}
+        />
+        <span className="badge badge-ink">{cliente.causas.length} causas</span>
+        <span className="badge badge-pendiente">
+          {tramitesPendientes} trámites pend.
+        </span>
+        <span className="badge badge-activa">{tramitesHechos} hechos</span>
+        <span className="badge badge-sea">{documentCount} docs</span>
       </div>
 
       <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="mb-4 text-lg font-semibold">Datos del cliente</h2>
-        <ClienteEditForm cliente={{ ...cliente, version: clienteVersion(cliente) }} abogados={abogados} />
+        <ClienteEditForm
+          cliente={{ ...cliente, version: clienteVersion(cliente) }}
+          abogados={abogados}
+        />
       </section>
 
       <section className="panel rounded-[var(--radius-lg)] p-5">
-        <h2 className="mb-4 text-lg font-semibold">{t("sites.clientSection.title")}</h2>
+        <h2 className="mb-4 text-lg font-semibold">
+          {t("sites.clientSection.title")}
+        </h2>
         {cliente.sites.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">{t("sites.clientSection.empty")}</p>
+          <p className="text-sm text-[var(--muted)]">
+            {t("sites.clientSection.empty")}
+          </p>
         ) : (
           <div className="space-y-3">
             {cliente.sites.map((site) => (
@@ -143,18 +189,28 @@ export default async function ClienteDetailPage({
                 <div>
                   <div className="font-medium">{site.name}</div>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                    <span className="badge badge-ink">{siteTipoLabel(dict, site.tipo)}</span>
+                    <span className="badge badge-ink">
+                      {siteTipoLabel(dict, site.tipo)}
+                    </span>
                     {site.isClientVisible && (
-                      <span className="badge badge-sea">{t("siteTabs.portalVisible")}</span>
+                      <span className="badge badge-sea">
+                        {t("siteTabs.portalVisible")}
+                      </span>
                     )}
                     {site.causa && (
-                      <Link href={`/causas/${site.causa.id}`} className="text-[var(--sea)]">
+                      <Link
+                        href={`/causas/${site.causa.id}`}
+                        className="text-[var(--sea)]"
+                      >
                         {site.causa.rit || site.causa.titulo}
                       </Link>
                     )}
                   </div>
                 </div>
-                <Link href={`/sites/${site.id}`} className="btn btn-secondary text-sm">
+                <Link
+                  href={`/sites/${site.id}`}
+                  className="btn btn-secondary text-sm"
+                >
                   {t("sites.clientSection.open")}
                 </Link>
               </div>
@@ -184,9 +240,7 @@ export default async function ClienteDetailPage({
             key={causa.id}
             id={`causa-${causa.id}`}
             className="panel group scroll-mt-24 rounded-[var(--radius-lg)] p-5"
-            open={
-              cliente.causas.length === 1 || focusCausaId === causa.id
-            }
+            open={cliente.causas.length === 1 || focusCausaId === causa.id}
           >
             <summary className="cursor-pointer list-none">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -212,8 +266,8 @@ export default async function ClienteDetailPage({
                       {
                         causa.tramites.filter((t) =>
                           TRAMITES_ABIERTOS.includes(
-                            t.estado as "pendiente" | "en_curso"
-                          )
+                            t.estado as "pendiente" | "en_curso",
+                          ),
                         ).length
                       }{" "}
                       pend.
@@ -251,7 +305,7 @@ export default async function ClienteDetailPage({
         <div>
           <h2 className="text-lg font-semibold">Carpeta de documentos</h2>
           <p className="text-sm text-[var(--muted)]">
-            Archivos del cliente (también puede asociarlos a una causa).
+            Archivos del cliente y de sus causas accesibles.
           </p>
         </div>
         <DocumentoIngestForm
@@ -262,7 +316,7 @@ export default async function ClienteDetailPage({
           }))}
         />
         <div className="space-y-2">
-          {cliente.documentos.map((d) => (
+          {documentos.map((d) => (
             <div
               key={d.id}
               className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm"
@@ -272,7 +326,9 @@ export default async function ClienteDetailPage({
                   <div className="font-medium">{d.nombre}</div>
                   <div className="text-xs text-[var(--muted)]">
                     {d.tipo}
-                    {d.causa ? ` · ${d.causa.rit || d.causa.titulo}` : " · carpeta cliente"}
+                    {d.causa
+                      ? ` · ${d.causa.rit || d.causa.titulo}`
+                      : " · carpeta cliente"}
                     {" · "}
                     {formatDate(d.updatedAt)}
                     {d.autor ? ` · ${d.autor.name}` : ""}
@@ -285,18 +341,22 @@ export default async function ClienteDetailPage({
                   Descargar
                 </Link>
               </div>
-              <DocumentoAiActions
-                documentoId={d.id}
-                causaId={d.causa?.id}
-              />
+              <DocumentoAiActions documentoId={d.id} causaId={d.causa?.id} />
             </div>
           ))}
-          {cliente.documentos.length === 0 && (
+          {documentCount === 0 && (
             <p className="text-sm text-[var(--muted)]">
-              Carpeta vacía. Suba el primer documento.
+              No hay documentos accesibles del cliente ni de sus causas.
             </p>
           )}
         </div>
+        <ListPagination
+          path={`/clientes/${id}`}
+          filters={{ causa: sp.causa }}
+          after={sp.after}
+          next={documentsNext}
+          count={documentos.length}
+        />
       </section>
 
       <ClienteAiChat

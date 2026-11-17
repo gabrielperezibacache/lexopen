@@ -185,6 +185,10 @@ export async function ingestManualCaseDocument(input: ManualInput, original: Buf
     });
     if (!actor || !isStaff(actor.role)) throw httpError("No tiene permiso para incorporar documentos", 403);
     await assertCausaCapability(input.causaId, actor, "causa.write", tx);
+    if (input.clienteId) {
+      const cause = await tx.causa.findUniqueOrThrow({ where: { id: input.causaId }, select: { clienteId: true } });
+      if (cause.clienteId !== input.clienteId) throw httpError("El cliente no corresponde al expediente", 400);
+    }
     if (input.confidencial && !canSeeConfidential(actor) || input.privilegio && !canSeePrivileged(actor)) {
       throw httpError("Su rol no puede crear contenido confidencial o privilegiado", 403);
     }

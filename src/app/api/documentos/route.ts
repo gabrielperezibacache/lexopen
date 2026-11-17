@@ -164,6 +164,8 @@ export async function POST(req: NextRequest) {
       tipo = inferDocumentoTipo(ruta ? `${ruta}/${nombre}` : nombre);
     }
 
+    if (clienteId && !causaId && !await prisma.cliente.findUnique({ where: { id: clienteId }, select: { id: true } })) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+
     if (!nombre) {
       return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
     }

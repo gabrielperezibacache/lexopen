@@ -90,6 +90,16 @@ export async function processDocumentBytes(
   }
 
   const extension = path.extname(name).toLowerCase();
+  if ([".txt", ".text", ".md", ".markdown"].includes(extension)) {
+    const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le" : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : "utf-8";
+    try {
+      const text = new TextDecoder(encoding, { fatal: true }).decode(bytes).trim();
+      if (/[\x00-\x08\x0b\x0e-\x1f\x7f]/.test(text)) return { format: extension.slice(1), status: "unsupported", markdown: null, metadata: { errorCode: "binary_text" } };
+      return { format: extension.slice(1), status: text ? "completed" : "unsupported", markdown: text || null, metadata: { encoding } };
+    } catch {
+      return { format: extension.slice(1), status: "unsupported", markdown: null, metadata: { errorCode: "invalid_text_encoding" } };
+    }
+  }
   const format = formatFromExtension(extension);
   try {
     const markdown = await toMarkdownBytes(bytes, format);

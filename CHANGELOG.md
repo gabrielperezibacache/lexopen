@@ -2,6 +2,10 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Continuidad jurídica: selector de cliente con búsqueda y preselección; creación de causas recuperable tras respuestas perdidas, con recibos idempotentes, permisos vigentes y auditoría atómica. Las coincidencias judiciales reservadas no revelan identidades.
+- La ficha y el contador de documentos del cliente reúnen archivos directos y de sus causas accesibles, sin duplicados y con paginación. Se rechazan asociaciones explícitas incompatibles entre cliente y causa.
+- Extracción local de TXT y Markdown UTF-8 o UTF-16 con BOM, con rechazo de contenido binario y codificaciones inválidas. Prueba funcional de cliente a escrito aprobado, preservando la privacidad de la audiencia y el cierre explícito de tareas y plazos.
+
 - Jerarquía visual más compacta: jornada siempre visible en móvil, estado de causa antes de preparación, descarga directa de documentos y formularios plegables que conservan borradores y abren su destino desde enlaces.
 - Vista de próximos plazos compartida con Inicio y la API, con intervalo civil explícito, permisos, responsables y paginación consistentes entre meses. Configuración identifica el ámbito de cada ajuste; el visor del escritorio prioriza el trabajo y sus autorizaciones sobre la preparación de otra sesión.
 

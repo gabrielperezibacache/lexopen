@@ -1,3 +1,4 @@
+import { clienteDocumentCounts } from "@/lib/clientes/documents";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
 
+    const documentCounts = await clienteDocumentCounts(clientes.map(c => c.id), user);
     const items = clientes.map((c) => ({
       id: c.id,
       razonSocial: c.razonSocial,
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
       notas: c.notas,
       abogado: c.abogado,
       causasCount: c._count.causas,
-      documentosCount: c._count.documentos,
+      documentosCount: documentCounts.get(c.id) || 0,
       tramitesPendientes: c.causas.reduce(
         (n, causa) => n + causa._count.tramites,
         0
