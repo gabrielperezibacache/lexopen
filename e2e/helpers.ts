@@ -80,3 +80,10 @@ export async function loginAs(page: Page, email: string) {
     return;
   }
 }
+
+/** Open the secondary preparation tools through the visible case summary. */
+export async function openCasePreparation(page: Page) {
+  const summary = page.getByText("Preparación de la causa", { exact: true }).filter({ visible: true });
+  await summary.waitFor({ state: "visible" });
+  if (!(await page.getByTestId("case-preparation").isVisible())) await summary.click();
+}

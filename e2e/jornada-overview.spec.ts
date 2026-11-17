@@ -18,7 +18,7 @@ test("jornada: vencidos de otros meses, navegación por términos y adaptación 
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 1050 });
   await loginAs(page, "abogado@estudio.cl");
-  const summary = page.getByTestId("day-overview");
+  const summary = page.getByRole("region", { name: "Tu jornada", exact: true });
   await expect(summary).toBeVisible();
   await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeVisible();
   await page.screenshot({ path: info.outputPath("jornada-desktop.png"), fullPage: false });
@@ -32,16 +32,13 @@ test("jornada: vencidos de otros meses, navegación por términos y adaptación 
   await expect(dialog.getByRole("button", { name: /Mis Causas/i })).toBeVisible();
   await dialog.getByRole("textbox", { name: "Ir a un apartado", exact: true }).press("Enter");
   await expect(page).toHaveURL(/\/mis-causas$/, { timeout: 30_000 });
-  await page.goto("/inicio");
+  await page.goto("/inicio", { waitUntil: "networkidle" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(summary).toBeVisible();
-  const toggle = summary.getByRole("button", { name: /Tu jornada/ });
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeHidden();
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeVisible();
-  await toggle.click();
+  await expect(summary.getByRole("link", { name: /Próximos plazos/ })).toBeVisible();
+  await expect(summary.getByRole("link", { name: /Eventos de hoy/ })).toBeVisible();
+  await expect(page.getByTestId("inicio-composer")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("jornada-mobile.png"), fullPage: false });
 });
@@ -50,7 +47,7 @@ test("jornada disponible sin permiso de asistente", async ({ page }) => {
   await loginAs(page, restrictedEmail);
   await expect(page.getByRole("heading", { name: "Tu jornada", exact: true })).toBeVisible();
   await expect(page.getByTestId("inicio-composer")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /Abrir Mis Causas/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Mis Causas/ })).toBeVisible();
 });
 
 test("buscar ajustes conserva los formularios sin guardar", async ({ page }) => {

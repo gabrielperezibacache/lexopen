@@ -1,3 +1,8 @@
+import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
+import {
+  personalDeadlineWhere,
+  upcomingDeadlinePeriod,
+} from "@/lib/deadlines/views";
 import { DeadlineActions } from "@/components/DeadlineActions";
 import { DeadlineOptions } from "@/components/DeadlineOptions";
 import { ListPagination } from "@/components/ui/ListPagination";
@@ -5,7 +10,6 @@ import { deadlineVersion } from "@/lib/deadlines/completion";
 import {
   deadlineCursorWhere,
   deadlineWindow,
-  deadlineBefore,
   deadlineMonth,
 } from "@/lib/deadlines/pagination";
 import { STAFF_ROLES } from "@/lib/auth/roles";
@@ -50,9 +54,8 @@ type Props = {
   }>;
 };
 
-function monthView(value?: string) {
-  const today = santiagoDateKey(new Date());
-  const [todayYear, todayMonth] = today.split("-").map(Number);
+function monthView(value: string | undefined, now: Date) {
+  const [todayYear, todayMonth] = santiagoDateKey(now).split("-").map(Number);
   const match = value?.match(/^(\d{4})-(\d{2})$/);
   const year = match ? Number(match[1]) : todayYear;
   const month = match ? Number(match[2]) : todayMonth;
@@ -97,18 +100,24 @@ export default async function PlazosPage({ searchParams }: Props) {
       if (value) params.set(key, value);
     return `/plazos${params.size ? `?${params}` : ""}`;
   };
-  const { year, monthIndex } = monthView(sp.mes);
+  const now = new Date();
+  const { year, monthIndex } = monthView(sp.mes, now);
   const overdue = sp.vista === "mis-vencidos";
-  const today = santiagoDateKey(new Date());
+  const upcoming = sp.vista === "proximos";
+  const personalView = overdue || upcoming;
+  const period = upcomingDeadlinePeriod(now);
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
   const where = {
     AND: [
       plazoAccessWhere(user),
       ...(selectedCause ? [{ causaId: selectedCause.id }] : []),
-      ...(overdue
+      ...(personalView
         ? [
-            { estado: "pendiente", responsableId: user.id },
-            deadlineBefore(today),
+            personalDeadlineWhere(
+              user,
+              overdue ? "mis-vencidos" : "proximos",
+              now,
+            ),
           ]
         : [deadlineMonth(monthKey)]),
     ],
@@ -175,11 +184,15 @@ export default async function PlazosPage({ searchParams }: Props) {
         artwork="deadlines"
         eyebrow={h.eyebrow}
         title={h.title}
-        subtitle={h.subtitle}
         actions={
-          <Link className="btn btn-secondary" href="/agente?utility=plazos">
-            {h.analyze}
-          </Link>
+          <>
+            <a className="btn btn-primary" href="#registrar-plazo">
+              {locale === "en" ? "Register a deadline" : "Registrar un plazo"}
+            </a>
+            <Link className="btn btn-ghost" href="/agente?utility=plazos">
+              {locale === "en" ? "Review with Altazor" : "Revisar con Altazor"}
+            </Link>
+          </>
         }
       />
 
@@ -189,8 +202,8 @@ export default async function PlazosPage({ searchParams }: Props) {
       >
         <Link
           href={scopeHref({ mes: sp.mes })}
-          className={`btn ${overdue ? "btn-secondary" : "btn-primary"}`}
-          aria-current={!overdue ? "page" : undefined}
+          className={`btn ${personalView ? "btn-secondary" : "btn-primary"}`}
+          aria-current={!personalView ? "page" : undefined}
         >
           {locale === "en" ? "By month" : "Por mes"}
         </Link>
@@ -201,40 +214,67 @@ export default async function PlazosPage({ searchParams }: Props) {
         >
           {locale === "en" ? "My overdue deadlines" : "Mis vencidos pendientes"}
         </Link>
+        <Link
+          href={scopeHref({ vista: "proximos" })}
+          className={`btn ${upcoming ? "btn-primary" : "btn-secondary"}`}
+          aria-current={upcoming ? "page" : undefined}
+        >
+          {locale === "en" ? "Upcoming deadlines" : "Próximos plazos"}
+        </Link>
       </nav>
-      <form
-        method="GET"
-        className="panel flex flex-wrap items-end gap-3 rounded-[var(--radius-lg)] p-4"
-        aria-label={locale === "en" ? "Deadline filters" : "Filtros de plazos"}
+      <ContextDisclosure
+        id="filtrar-plazos"
+        title={
+          selectedCause
+            ? "Filtrar por causa · Filtro activo"
+            : "Filtrar por causa"
+        }
+        defaultOpen={Boolean(selectedCause)}
       >
-        {sp.mes && <input type="hidden" name="mes" value={sp.mes} />}
-        {overdue && <input type="hidden" name="vista" value="mis-vencidos" />}
-        <DeadlineOptions
-          key={selectedCause?.id || "all"}
-          label="Filtrar por causa"
-          name="causaId"
-          initial={causeOptions.map((c) => ({
-            id: c.id,
-            label: `${c.rit || ""} ${c.titulo}`,
-          }))}
-          empty="Todas las causas accesibles"
-          initialValue={selectedCause?.id}
-        />
+        <form
+          method="GET"
+          className="panel flex flex-wrap items-end gap-3 rounded-[var(--radius-lg)] p-4"
+          aria-label={
+            locale === "en" ? "Deadline filters" : "Filtros de plazos"
+          }
+        >
+          {sp.mes && <input type="hidden" name="mes" value={sp.mes} />}
+          {personalView && (
+            <input
+              type="hidden"
+              name="vista"
+              value={overdue ? "mis-vencidos" : "proximos"}
+            />
+          )}
+          <DeadlineOptions
+            key={selectedCause?.id || "all"}
+            label="Filtrar por causa"
+            name="causaId"
+            initial={causeOptions.map((c) => ({
+              id: c.id,
+              label: `${c.rit || ""} ${c.titulo}`,
+            }))}
+            empty="Todas las causas accesibles"
+            initialValue={selectedCause?.id}
+          />
 
-        <button className="btn btn-secondary">
-          {locale === "en" ? "Apply filters" : "Aplicar filtros"}
-        </button>
-        {selectedCause && (
-          <Link
-            className="btn btn-ghost"
-            href={
-              overdue ? "/plazos?vista=mis-vencidos" : `/plazos?mes=${monthKey}`
-            }
-          >
-            {locale === "en" ? "Clear case filter" : "Quitar filtro de causa"}
-          </Link>
-        )}
-      </form>
+          <button className="btn btn-secondary">
+            {locale === "en" ? "Apply filters" : "Aplicar filtros"}
+          </button>
+          {selectedCause && (
+            <Link
+              className="btn btn-ghost"
+              href={
+                personalView
+                  ? `/plazos?vista=${overdue ? "mis-vencidos" : "proximos"}`
+                  : `/plazos?mes=${monthKey}`
+              }
+            >
+              {locale === "en" ? "Clear case filter" : "Quitar filtro de causa"}
+            </Link>
+          )}
+        </form>
+      </ContextDisclosure>
       {selectedCause && (
         <p className="text-sm text-[var(--muted)]">
           {locale === "en" ? "Deadlines for" : "Plazos de"}{" "}
@@ -247,6 +287,12 @@ export default async function PlazosPage({ searchParams }: Props) {
           .
         </p>
       )}
+      {upcoming && (
+        <p className="text-sm text-[var(--muted)]">
+          {locale === "en" ? "Assigned to you" : "Asignados a ti"} ·{" "}
+          {formatCivilDate(period.first)}–{formatCivilDate(period.through)}
+        </p>
+      )}
       {overdue && (
         <p role="status" className="text-sm">
           {locale === "en"
@@ -254,10 +300,14 @@ export default async function PlazosPage({ searchParams }: Props) {
             : "Plazos pendientes asignados a ti anteriores a hoy, de todos los meses."}
         </p>
       )}
-      <details open={!overdue} className="space-y-3">
-        <summary className="cursor-pointer py-3 font-medium">
-          {locale === "en" ? "Register a deadline" : "Registrar un plazo"}
-        </summary>
+      <ContextDisclosure
+        id="registrar-plazo"
+        title={locale === "en" ? "Register a deadline" : "Registrar un plazo"}
+        defaultOpen={Boolean(
+          sp.titulo || sp.fechaLimite || sp.desde || sp.dias || sp.computo,
+        )}
+        className="space-y-3"
+      >
         <PlazoForm
           causas={causeOptions.map((c) => ({
             id: c.id,
@@ -273,12 +323,12 @@ export default async function PlazosPage({ searchParams }: Props) {
             titulo: sp.titulo || "",
           }}
         />
-      </details>
+      </ContextDisclosure>
 
-      {!overdue && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      {!personalView && (
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 sm:flex sm:flex-wrap sm:justify-between">
           <Link
-            className="btn btn-ghost order-2 flex-1 sm:order-1 sm:flex-none"
+            className="btn btn-ghost order-1 sm:flex-none"
             href={scopeHref({ mes: prev })}
             aria-label={t("common.previousMonth")}
           >
@@ -287,11 +337,11 @@ export default async function PlazosPage({ searchParams }: Props) {
               {t("common.previousMonth")}
             </span>
           </Link>
-          <h2 className="order-1 text-center text-lg font-semibold capitalize sm:order-2">
+          <h2 className="order-2 text-center text-base font-semibold capitalize sm:text-lg">
             {h.calendarHeading.replace("{month}", monthLabel)}
           </h2>
           <Link
-            className="btn btn-ghost order-3 flex-1 sm:flex-none"
+            className="btn btn-ghost order-3 sm:flex-none"
             href={scopeHref({ mes: next })}
             aria-label={t("common.nextMonth")}
           >
@@ -309,10 +359,10 @@ export default async function PlazosPage({ searchParams }: Props) {
           <EmptyState
             title={h.title}
             description={
-              overdue
+              personalView
                 ? locale === "en"
-                  ? "No overdue pending deadlines assigned to you were found in the accessible records."
-                  : "No se encontraron plazos vencidos pendientes asignados a ti en los registros accesibles."
+                  ? "No pending deadlines assigned to you in this period."
+                  : "No tienes plazos pendientes en esta vista."
                 : h.empty
             }
             actionLabel={h.openCalendar}
@@ -328,17 +378,14 @@ export default async function PlazosPage({ searchParams }: Props) {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="break-words font-semibold">{p.titulo}</h2>
                 <StatusBadge estado={p.estado} />
-                <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />
-                <span className="badge badge-ink">{p.tipo}</span>
-                <span className="badge badge-ink">
-                  {labelTipoComputo(p.tipoComputo)}
-                </span>
+                {(p.estado !== "vencido" || diasRestantes(p.fechaLimite) >= 0) && <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />}
                 {p.esFatal && (
                   <span className="badge badge-vencido">{h.fatal}</span>
                 )}
               </div>
               <p className="mt-1 break-words text-sm text-[var(--muted)]">
-                {formatCivilDate(p.fechaLimite)}
+                {formatCivilDate(p.fechaLimite)} ·{" "}
+                {labelTipoComputo(p.tipoComputo)}
                 {p.estado === "pendiente"
                   ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
                   : ""}{" "}
@@ -421,7 +468,7 @@ export default async function PlazosPage({ searchParams }: Props) {
         path="/plazos"
         filters={{
           mes: monthKey,
-          vista: overdue ? "mis-vencidos" : undefined,
+          vista: overdue ? "mis-vencidos" : upcoming ? "proximos" : undefined,
           causaId: selectedCause?.id,
         }}
         after={sp.after}

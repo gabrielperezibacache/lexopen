@@ -11,11 +11,17 @@
 
 LexOpen es una aplicación de código abierto para profesionales y estudios jurídicos, con herramientas de investigación y docencia. Conserva los documentos y la base de datos en un **Host** que administras. Tu equipo accede a ese servidor con cuentas y permisos propios.
 
-**Versión del código: 1.1.0-preview.11, en preparación.** La última descarga publicada es la preview 10; no contiene todas las mejoras actuales de `main`. Esta preparación añade historiales paginados, búsqueda completa de documentos y auditoría, verificación de integridad de respaldos y protección del audio pendiente. La publicación de Mac requiere firma, notarización y aceptación de Gatekeeper. [Historial de cambios](CHANGELOG.md) · [Fiabilidad y validaciones pendientes](docs/FIABILIDAD-DIARIA.md)
+**Versión del código: 1.1.0-preview.11, en preparación.** La última descarga publicada es la preview 10; no contiene todas las mejoras actuales de `main`. Esta preparación simplifica la información en pantalla y añade historiales paginados, búsqueda completa de documentos y auditoría, verificación de integridad de respaldos y protección del audio pendiente. La publicación de Mac requiere firma, notarización y aceptación de Gatekeeper. [Historial de cambios](CHANGELOG.md) · [Fiabilidad y validaciones pendientes](docs/FIABILIDAD-DIARIA.md)
 
 ![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
 
 *Las imágenes de la galería son ilustrativas y utilizan expedientes ficticios; algunos controles han evolucionado desde su captura.*
+
+## Información y acciones a mano
+
+Las pantallas priorizan el estado y los registros. Los formularios de incorporación, la preparación de causas y las ayudas se despliegan cuando los necesitas; plegarlos conserva el borrador. En Documentos, **Descargar** aparece directamente en cada registro. En Configuración, cada apartado indica si afecta a tu usuario, al navegador o a todo el estudio.
+
+**Próximos plazos** abre los pendientes asignados a ti desde hoy hasta la fecha indicada, inclusive (hoy + 7 días), aunque cambien de mes. Los avisos de acceso, datos desactualizados y autorizaciones siguen visibles. [Criterios y comparación visual](docs/JERARQUIA-INFORMACION.md).
 
 ## Descargar e instalar
 
@@ -40,7 +46,7 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 2. **Configura tu estudio y su equipo.** Revisa el país de trabajo, los roles y las secciones habilitadas. En **Mi cuenta → Mi rol y permisos**, cada persona puede consultar su acceso efectivo.
 3. **Conecta Google una vez.** La administración autoriza la cuenta compartida del estudio y selecciona una carpeta de **Organización** en Drive. La misma conexión se utiliza para Drive, Calendar y Gmail; las cuentas antiguas pueden necesitar ampliar su autorización.
 4. **Organiza un cliente y su causa.** Crea la causa en **Mis Causas** y prepara su carpeta. Añade documentos, registra plazos y revisa las fuentes antes de preparar una audiencia o un escrito.
-5. **Empieza tu jornada.** Inicio muestra tus pendientes y eventos. Altazor aparece cuando tienes permiso para utilizarlo. **Ctrl+K / ⌘K** permite ir a un apartado; **Buscar un ajuste** te lleva a la configuración correspondiente.
+5. **Empieza tu jornada.** Inicio conserva Altazor como espacio central y muestra tres indicadores compactos, también en móvil: vencidos pendientes, próximos plazos y eventos propios. Pulsa un indicador para abrir sus registros. **Ctrl+K / ⌘K** permite ir a un apartado; **Buscar un ajuste** te lleva a la configuración correspondiente.
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 

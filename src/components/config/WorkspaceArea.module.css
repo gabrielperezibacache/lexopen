@@ -241,3 +241,5 @@
 .settingsResults a { display:flex; align-items:center; gap:.6rem; white-space:normal; }
 .settingsResults small { color:var(--muted); font-weight:400; }
 @media(max-width:600px) { .settingsSearch { align-items:stretch; flex-direction:column; gap:.3rem; } .settingsResults { max-height:10rem; } }
+
+.scopeLabel {font-size:var(--text-xs);font-weight:600;color:var(--muted);margin-block:0 .4rem;}

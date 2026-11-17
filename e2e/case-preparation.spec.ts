@@ -69,7 +69,7 @@ test("preparación integrada: índice, hoja con citas, incertidumbre y permisos 
   expect(analyzed.ok(), await analyzed.text()).toBeTruthy();
   expect((await analyzed.json()).newFacts).toBeGreaterThan(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(`/causas/${causaId}`);
+  await page.goto(`/causas/${causaId}#preparacion`);
   const preparation = page.getByTestId("case-preparation");
   await expect(preparation.getByRole("heading", { name: "Preparar la causa", exact: true })).toBeVisible();
   await expect(preparation.locator(".case-preparation-steps > li")).toHaveCount(5);

@@ -177,7 +177,7 @@ body {
 /* Midnight editorial: tall titles, readable controls, book serif for reading. */
 .workspace-title {
   font-family: var(--font-editorial), var(--font-sora), sans-serif;
-  font-size: clamp(2.25rem, 3.2vw, 3rem);
+  font-size: clamp(2rem, 2.8vw, 2.5rem);
   line-height: 1.08;
   font-weight: 500;
   letter-spacing: -.025em;
@@ -615,3 +615,7 @@ a:hover .folio-brand img { transform: translateY(-1px); }
   .folio-brand img { transition: none; }
   a:hover .folio-brand img { transform: none; }
 }
+
+/* Secondary actions expand inline without moving or unmounting their controls. */
+.document-row-actions {display:flex;flex-wrap:wrap;align-items:baseline;column-gap:1rem;}
+.document-row-actions>details[open] {flex-basis:100%;}

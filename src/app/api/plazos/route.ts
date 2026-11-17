@@ -1,13 +1,12 @@
+import { personalDeadlineWhere } from "@/lib/deadlines/views";
 import {
   deadlineCursorWhere,
   deadlineWindow,
   deadlineMonth,
-  deadlineBefore,
 } from "@/lib/deadlines/pagination";
 import { deadlineVersion } from "@/lib/deadlines/completion";
 import { currentStaffActor } from "@/lib/auth/staff-actor";
 import { serializable } from "@/lib/command-execution";
-import { santiagoDateKey } from "@/lib/chile-time";
 import { httpError } from "@/lib/auth/access";
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -54,11 +53,20 @@ export async function GET(req: NextRequest) {
             ? [{ titulo: { contains: q, mode: "insensitive" as const } }]
             : []),
           ...(state ? [{ estado: state }] : []),
-          ...(month ? [deadlineMonth(month)] : []),
-          ...(url.searchParams.get("vista") === "mis-vencidos"
+          ...(month &&
+          !["mis-vencidos", "proximos"].includes(
+            url.searchParams.get("vista") || "",
+          )
+            ? [deadlineMonth(month)]
+            : []),
+          ...(["mis-vencidos", "proximos"].includes(
+            url.searchParams.get("vista") || "",
+          )
             ? [
-                { estado: "pendiente", responsableId: actor.id },
-                deadlineBefore(santiagoDateKey(new Date())),
+                personalDeadlineWhere(
+                  actor,
+                  url.searchParams.get("vista") as "mis-vencidos" | "proximos",
+                ),
               ]
             : []),
         ],

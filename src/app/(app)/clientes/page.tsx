@@ -55,7 +55,6 @@ export default async function ClientesPage({
         eyebrow={t("crm.eyebrow")}
         title={t("crm.title")}
         artwork="clients"
-        subtitle={t("crm.subtitle")}
         actions={<NewClienteForm abogados={abogados} userId={user.id} />}
       />
 

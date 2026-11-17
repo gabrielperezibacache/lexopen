@@ -99,10 +99,11 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
       } });
     });
     await archive.getByRole("link", { name: "Google Drive", exact: true }).click();
-    await archive.getByText("Archivos de Google Drive", { exact: true }).click();
+    await expect(archive.getByRole("button", { name: "Elegir archivos de Drive", exact: true })).toBeVisible();
     await archive.getByRole("button", { name: "Elegir archivos de Drive", exact: true }).click();
     await expect(archive.getByRole("radio", { name: "Seleccionar Original remoto de demostración.pdf" })).toBeVisible();
     expect(driveWrites).toBe(0);
+    await archive.getByRole("link", { name: "Añadir archivos", exact: true }).click();
     await expect(archive.getByText("Carpeta de destino · Prueba documental")).toBeVisible();
     await archive.locator('input[type="file"]').first().setInputFiles({
       name: "Nuevo anexo.txt",

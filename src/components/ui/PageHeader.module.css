@@ -4,9 +4,9 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: var(--space-5) var(--space-8);
-  margin-block-end: var(--space-6);
-  padding-block: var(--space-2) var(--space-6);
+  gap: var(--space-3) var(--space-5);
+  margin-block-end: var(--space-4);
+  padding-block: 0 var(--space-3);
   border-block-end: 3px double var(--line-strong);
 }
 
@@ -24,10 +24,10 @@
 
 .subtitle {
   max-inline-size: 65ch;
-  margin-block-start: var(--space-3);
+  margin-block-start: var(--space-2);
   color: var(--muted);
-  font-size: var(--text-base);
-  line-height: 1.7;
+  font-size: var(--text-sm);
+  line-height: 1.5;
   text-wrap: pretty;
 }
 
@@ -43,7 +43,7 @@
 
 @media (max-width: 639px) {
   .header { gap: var(--space-4); padding-block-start: 0; }
-  .header h1 { font-size: 2rem; }
+  .header h1 { font-size: 1.75rem; }
   .subtitle { font-size: var(--text-sm); }
   .actions { inline-size: 100%; justify-content: flex-start; }
 }

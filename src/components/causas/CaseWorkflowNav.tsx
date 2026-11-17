@@ -30,7 +30,7 @@ export function CaseWorkflowNav({ causaId, title, current, workspaceId, mode = "
   if (selectedWorkspace) writingContext.set("mesa", selectedWorkspace);
   const active = current === "hearing" || current === "writing" ? current : current !== "case" ? "prepare" : ["#documentos", "#tramites", "#actividad"].includes(hash) ? "file" : ["#preparacion", "#conocimiento", "#audios", "#minutas"].includes(hash) ? "prepare" : "overview";
   const steps = [
-    { stage: "overview", label: "Resumen", href: `${overview}${suffix}#ficha`, icon: PanelsTopLeft },
+    { stage: "overview", label: "Resumen", href: `${overview}${suffix}#estado-causa`, icon: PanelsTopLeft },
     { stage: "file", label: "Expediente", href: `${overview}${suffix}#documentos`, icon: FolderOpen },
     { stage: "prepare", label: "Preparación", href: `${overview}${suffix}#preparacion`, icon: ListChecks },
     { stage: "hearing", label: "Audiencias", href: selectedWorkspace ? `/audiencias/${encodeURIComponent(selectedWorkspace)}${hearingSuffix}` : `${base}/audiencias${suffix}`, icon: MessagesSquare },

@@ -1,3 +1,4 @@
+import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import { listCursorWhere, listWindow } from "@/lib/api/list-window";
 import { ListPagination } from "@/components/ui/ListPagination";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
@@ -70,30 +71,22 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
         eyebrow={h.eyebrow}
         title={h.title}
         artwork="casefiles"
-        actions={
-          <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
-            Consultar con ALTAZOR
-          </Link>
-        }
+        actions={<><a className="btn btn-primary" href="#document-upload">Añadir archivos</a><Link className="btn btn-ghost" href="/agente?utility=doc_qa">Consultar con Altazor</Link></>}
       />
 
       <form role="search" className="panel flex flex-wrap items-end gap-3 p-4">
         <label className="min-w-0 flex-1">Buscar documentos o causas<input className="input" name="q" defaultValue={q} maxLength={200} /></label>
         <button className="btn btn-secondary" type="submit">Buscar</button>
       </form>
-      <ListPagination path="/documentos" filters={{ q }} after={query.after} next={next} count={rawDocumentos.length} />
-      <details className="group">
-        <summary className="btn btn-primary w-fit cursor-pointer">Añadir archivos</summary>
-        <div className="mt-4"><DocumentoIngestForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} /></div>
-      </details>
+      <ContextDisclosure id="document-upload" title="Añadir archivos"><DocumentoIngestForm causas={causas.map(c=>({id:c.id,label:c.rit||c.titulo}))}/></ContextDisclosure>
       {documentos.some(documento => documento.extractionStatus === "needs_ocr") && <DocumentOcrStatus />}
 
       {documentos.length === 0 ? (
         <EmptyState
-          title="Sin documentos por causa"
-          description="Añade archivos a una causa o reúne los documentos compartidos del equipo en Espacios."
-          actionLabel="Ver espacios"
-          actionHref="/sites"
+          title={q?"Sin resultados":"Sin documentos disponibles"}
+          description={q?"Prueba con otro nombre o quita el filtro.":"Añade un archivo a una causa para empezar."}
+          actionLabel={q?"Quitar filtros":"Añadir archivos"}
+          actionHref={q?"/documentos":"#document-upload"}
         />
       ) : (
         <div className="panel overflow-hidden rounded-[var(--radius-lg)]">
@@ -113,19 +106,20 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
                     <Link href={`/documentos/${d.id}/fuentes`} className="font-medium text-[var(--sea)]">{d.nombre}</Link>
                     {["pending", "processing"].includes(d.extractionStatus || "") && <p className="mt-1 text-xs text-[var(--ink-soft)]">Preparando texto…</p>}
                     {["needs_ocr", "failed", "unsupported"].includes(d.extractionStatus || "") && <p className="mt-1 text-xs text-[var(--danger)]">{d.extractionStatus === "needs_ocr" ? "Texto pendiente de reconocer" : d.extractionStatus === "unsupported" ? "Formato pendiente de preparación" : "No se pudo preparar el texto"}</p>}
-                    <details className="mt-2 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Detalles y descargas</summary>
+                    <div className="document-row-actions">                      <a
+                        href={`/api/documentos/${d.id}/content`}
+                        className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
+                      >
+                        Descargar
+                      </a>
+
+                    <details className="mt-1 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Detalles y descargas</summary>
                     <p className="text-xs text-[var(--ink-soft)]">{d.tipo} · {d.autor?.name || "Sin autor indicado"}</p>
                     {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Procedencia: Google Drive</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Esta copia conserva la revisión {d.driveImport.driveVersion} del archivo.</p><Link className="underline" href="/sincronizacion">Revisar actualizaciones de mis archivos</Link><details className="mt-2"><summary className="cursor-pointer">Identidad del archivo conservado</summary><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details></details>}
                     {d.ruta && (
                       <div className="text-xs text-[var(--muted)]">{d.ruta}/</div>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                      <a
-                        href={`/api/documentos/${d.id}/content`}
-                        className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
-                      >
-                        Descargar
-                      </a>
                       {d.causaId && (
                         <Link
                           href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}
@@ -145,7 +139,7 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
                     {(d.obsidianPath || d.googleDriveId) && <details className="mt-2 text-xs text-[var(--muted)]"><summary className="cursor-pointer">Ubicaciones vinculadas</summary>{d.obsidianPath && <p className="break-all">Obsidian: {d.obsidianPath}</p>}{d.googleDriveId && <p className="break-all">{isRealDriveFolderId(d.googleDriveId) ? `Google Drive: ${d.googleDriveId}` : "La ubicación de Google Drive todavía necesita configurarse."}</p>}</details>}
                     {d.extractionStatus === "completed" && d.hasMarkdown && <a className="inline-flex min-h-11 items-center text-[var(--sea)]" href={`/api/documentos/${d.id}/markdown`}>Descargar texto preparado</a>}
                     {["needs_ocr", "unsupported", "failed"].includes(d.extractionStatus || "") && <DocumentProcessingAction documentId={d.id} />}
-                    </details>
+                    </details></div>
                   </td>
                   <td role="cell" data-label="Causa" className="px-4 py-3">
                     {d.causa ? (
@@ -164,6 +158,7 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
           </div>
         </div>
       )}
+      {documentos.length>0&&<ListPagination path="/documentos" filters={{q}} after={query.after} next={next} count={rawDocumentos.length}/>}
     </div>
   );
 }

@@ -46,8 +46,17 @@ export function deadlineMonth(month: string): Prisma.PlazoWhereInput {
     throw httpError("Mes inválido", 400);
   const first = month + "-01",
     [year, m] = month.split("-").map(Number);
-  const last = `${month}-${new Date(Date.UTC(year, m, 0)).getUTCDate()}`,
-    next = addCivilDays(last, 1);
+  const last = `${month}-${new Date(Date.UTC(year, m, 0)).getUTCDate()}`;
+  return deadlineSpan(first, last);
+}
+/** Inclusive civil dates, including date-only UTC records and legacy instants. */
+export function deadlineSpan(
+  first: string,
+  through: string,
+): Prisma.PlazoWhereInput {
+  if (!isValidYmd(first) || !isValidYmd(through) || first > through)
+    throw httpError("Intervalo inválido", 400);
+  const next = addCivilDays(through, 1);
   return {
     OR: [
       { fechaLimite: new Date(first + "T00:00:00.000Z") },

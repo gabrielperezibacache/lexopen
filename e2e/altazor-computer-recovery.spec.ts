@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route, type Locator } from "@playwright/test";
 import { CONNECTOR_CATALOG } from "../src/lib/altazor/connectors/catalog";
 import type { ConnectorInventory } from "../src/lib/altazor/connectors/types";
 import type { ComputerSessionSummary, ComputerStatus } from "../src/lib/altazor/computer/types";
@@ -16,6 +16,12 @@ function session(id: string, state = "ready"): ComputerSessionSummary {
 function computer(sessions: ComputerSessionSummary[]): ComputerStatus {
   return { enabled: true, configured: true, policyAllowed: true, canConfigure: true, state: "configured", workspaceId,
     provider: "synthetic-fixture", version: "synthetic-fixture", lastVerifiedAt: null, reason: null, runtime: "container", sessions };
+}
+async function revealStart(panel: Locator, start: Locator) {
+  const summary = panel.getByText(/Preparar (otro )?escritorio/, { exact: true });
+  await expect(summary).toBeVisible();
+  if (await summary.locator("..").getAttribute("open") === null) await summary.click();
+  await expect(start).toBeVisible();
 }
 async function idleActivity(page: Page) {
   await page.route("**/api/altazor/computer/activity", route => route.fulfill({ json: { state: "idle", sessionId: null, monitor: false } }));
@@ -113,6 +119,7 @@ test("una sesión pasa de iniciándose a disponible también en el selector y co
     await page.goto("/inicio?altazor=computer");
     const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true });
     const start = panel.getByRole("button", { name: "Iniciar escritorio privado", exact: true });
+    await revealStart(panel, start);
     await expect(start).toBeEnabled();
     await start.click();
     const picker = panel.getByLabel("Sesión de este espacio", { exact: true });
@@ -124,9 +131,11 @@ test("una sesión pasa de iniciándose a disponible también en el selector y co
     await expect(picker.locator("option:checked")).toContainText("Escritorio disponible");
     await expect(panel.getByRole("button", { name: "Conservar escritorio persistente", exact: true })).toBeVisible();
     await expect(panel.getByRole("button", { name: "Devolver control", exact: true })).toBeEnabled();
+    await revealStart(panel, start);
     await expect(start).toBeDisabled();
     await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
     await expect(picker.locator(`option[value="${starting.id}"]`)).toContainText("Escritorio detenido");
+    await revealStart(panel, start);
     await expect(start).toBeEnabled();
     expect(starts).toBe(1);
   } finally { if (firstRead) await firstRead.abort().catch(() => {}); }
@@ -156,17 +165,20 @@ test("una apertura sin confirmar recupera la sesión pendiente y permite detener
   await page.goto("/inicio?altazor=computer");
   const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true });
   const start = panel.getByRole("button", { name: "Iniciar escritorio privado", exact: true });
+  await revealStart(panel, start);
   await expect(start).toBeEnabled();
   const readsBeforeStart = statusReads;
   await start.click();
   await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(uncertain.id);
   await expect(panel.getByLabel("Sesión de este espacio", { exact: true }).locator("option:checked")).toContainText("Creación sin confirmar");
   await expect(panel.getByRole("button", { name: "Detener escritorio", exact: true })).toBeEnabled();
+  await revealStart(panel, start);
   await expect(start).toBeDisabled();
   expect(statusReads).toBeGreaterThan(readsBeforeStart);
   expect(starts).toBe(1);
   await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
   await expect(panel.getByRole("status")).toContainText("confirmó que detuvo este escritorio");
+  await revealStart(panel, start);
   await expect(start).toBeEnabled();
   expect(starts).toBe(1);
   expect(stops).toBe(1);
@@ -278,7 +290,7 @@ test("escritorio persistente: conserva la sesión tras recargar y reanuda la mis
   await loginAs(page, "abogado@estudio.cl");
   await page.goto("/inicio?altazor=computer");
   const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true }).filter({ has: page.getByLabel("Sesión de este espacio", { exact: true }) });
-  await expect(panel.getByText(/Escritorio persistente · sin vencimiento automático/)).toBeVisible();
+  await expect(panel.getByText(/Escritorio persistente · Los archivos se conservan al detenerlo/)).toBeVisible();
   await expect(panel.getByRole("button", { name: "Conservar escritorio persistente", exact: true })).toHaveCount(0);
   await page.reload();
   await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(desktop.id);

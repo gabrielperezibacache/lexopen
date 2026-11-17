@@ -89,3 +89,11 @@
 .readingResult > pre { font: inherit; font-size: var(--text-sm); line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 350px; overflow: auto; padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--mist); }
 .controls { margin-top: 1rem; font-size: var(--text-sm); }.controls summary { cursor: pointer; color: var(--sea); }.controls ul { padding-left: 1.3rem; margin-top: .7rem; }.controls li { line-height: 1.7; padding-block: .25rem; overflow-wrap: anywhere; }.controls li > span { color: var(--muted); font-size: var(--text-xs); }.controls small { display: block; color: var(--muted); }
 @media (max-width: 600px) { .viewer { padding: .75rem; }.viewerHeader button { width: 100%; }.viewerTools { gap: .4rem; }.viewerTools .check { width: 100%; margin-block: .3rem; }.chat article { padding: .8rem; }.chat article[data-author="user"] { margin-left: .5rem; }.reading { padding: .8rem; } }
+
+.setupPanel {margin-block:.5rem 1rem;border-bottom:1px solid var(--line);}
+.setupPanel>summary {min-height:44px;padding:.7rem 0;cursor:pointer;font-size:var(--text-sm);color:var(--sea);}
+.viewerTools>label:first-child {display:inline-flex;align-items:center;gap:.4rem;margin:0;font-weight:400;}
+.viewerTools>label:first-child select {width:auto;min-height:44px;padding:.35rem .6rem;}
+.work {padding-top:.75rem;}
+.sessions {margin-block:.5rem;}
+.expiry {margin-block:.5rem;}

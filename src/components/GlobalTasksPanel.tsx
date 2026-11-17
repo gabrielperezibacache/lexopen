@@ -272,24 +272,17 @@ export function GlobalTasksPanel({ tasks, filters, causes, sites, users, current
           {currentCase ? `Primero las tareas de ${caseLabel(currentCase)}. Luego, por prioridad y fecha límite.` : "Ordenadas por prioridad y fecha límite."}
         </p>
         <div className="flex flex-wrap gap-2">
-          <a className="btn btn-secondary" href={`/api/tasks/export?${exportParams}`} download><Download size={16} aria-hidden="true" /> Excel de pendientes</a>
           <button className="btn btn-primary" type="button" onClick={() => setEditor("new")}><Plus size={16} aria-hidden="true" /> Nueva tarea</button>
+          <a className="btn btn-secondary" href={`/api/tasks/export?${exportParams}`} download><Download size={16} aria-hidden="true" /> Excel de pendientes</a>
         </div>
       </div>
 
       <fieldset disabled={filtering} className="panel space-y-4 rounded-[var(--radius-lg)] p-4" aria-label="Filtros de tareas">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <label className="min-w-0 space-y-2 text-sm">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <label className="col-span-2 min-w-0 space-y-2 text-sm lg:col-span-1">
             <span className="block font-medium">Causa</span>
             <select className="select" value={filters.causaId || ""} onChange={event => changeFilter("causaId", event.target.value)}>
               <option value="">Todas las causas</option>
-              {causes.map(cause => <option key={cause.id} value={cause.id}>{caseLabel(cause)}</option>)}
-            </select>
-          </label>
-          <label className="min-w-0 space-y-2 text-sm">
-            <span className="block font-medium">Priorizar causa</span>
-            <select className="select" value={filters.prioritizedCausaId || ""} onChange={event => changeFilter("prioritizedCausaId", event.target.value)}>
-              <option value="">Sin preferencia</option>
               {causes.map(cause => <option key={cause.id} value={cause.id}>{caseLabel(cause)}</option>)}
             </select>
           </label>
@@ -309,9 +302,17 @@ export function GlobalTasksPanel({ tasks, filters, causes, sites, users, current
             </select>
           </label>
         </div>
-        <details open={Boolean(filters.bucket || filters.priority || filters.siteId || filters.origen) || undefined} className="border-t border-[var(--line)] pt-2">
+        <details open={Boolean(filters.bucket || filters.priority || filters.siteId || filters.origen || filters.prioritizedCausaId) || undefined} className="border-t border-[var(--line)] pt-2">
           <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Más filtros</summary>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <label className="min-w-0 space-y-2 text-sm">
+              <span className="block font-medium">Priorizar causa</span>
+              <select className="select" value={filters.prioritizedCausaId || ""} onChange={event => changeFilter("prioritizedCausaId", event.target.value)}>
+                <option value="">Sin preferencia</option>
+                {causes.map(cause => <option key={cause.id} value={cause.id}>{caseLabel(cause)}</option>)}
+              </select>
+            </label>
+
             <label className="min-w-0 space-y-2 text-sm">
               <span className="block font-medium">Vencimiento</span>
               <select className="select" value={filters.bucket || ""} onChange={event => changeFilter("bucket", event.target.value)}>

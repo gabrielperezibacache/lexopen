@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loginAs } from "./helpers";
 
+// This fixture intercepts desktop responses; a service worker would bypass page.route.
+test.use({ serviceWorkers: "block" });
+
 const api = "/api/altazor/computer", sessionId = "viewer-fixture-session";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64");
 
@@ -31,6 +34,8 @@ async function fixture(page: Page, working = false) {
     return route.fulfill({ json: { reading: { version: "v1", source: data.source, title: data.source === "browser" ? "Página interna ficticia" : "Documento ficticio", ...(data.source === "browser" ? { url: "https://example.test/reporte" } : {}), text: offset ? "Segundo bloque de texto semántico." : "Texto semántico seleccionado sin imagen.", totalChars: 12000, offset, nextOffset: offset ? null : 6000, items: [{ ref: 1, role: "link", label: "Informe de prueba" }], elementOffset: 0, nextElementOffset: null, method: data.source === "browser" ? "dom" : "pdf-text", redacted: true } } });
   });
   await loginAs(page, "abogado@estudio.cl");
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("region", { name: "Escritorio de Altazor", exact: true }).getByRole("status")).toHaveText("Escritorio abierto");
   await page.getByRole("region", { name: "Escritorio de Altazor", exact: true }).getByRole("button", { name: "Abrir escritorio", exact: false }).click();
   const panel = page.getByTestId("altazor-computer-panel");
   const viewer = panel.getByRole("region", { name: "Visor del escritorio", exact: true });
@@ -56,9 +61,9 @@ test("visor accesible, lectura semántica paginada y recuperación de captura si
   await view.panel.getByRole("button", { name: "Leer contenido", exact: true }).click();
   await expect(view.panel.getByRole("region", { name: "Contenido leído como texto" })).toContainText("Texto del PDF");
   expect(view.reads[2]).toMatchObject({ source: "document", path: "informes/contrato.pdf" });
-  await viewer.getByRole("button", { name: "150 %", exact: true }).click();
-  await expect(viewer.getByRole("button", { name: "150 %", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await viewer.getByRole("button", { name: "Vista completa", exact: true }).click();
+  await viewer.getByRole("combobox", { name: "Escala de la pantalla", exact: true }).selectOption("1.5");
+  await expect(viewer.getByRole("combobox", { name: "Escala de la pantalla", exact: true })).toHaveValue("1.5");
+  await viewer.getByRole("combobox", { name: "Escala de la pantalla", exact: true }).selectOption("0");
   if (await page.evaluate(() => document.fullscreenEnabled)) {
     await viewer.getByRole("button", { name: "Pantalla completa", exact: true }).click();
     await expect(viewer.getByRole("button", { name: "Salir de pantalla completa" })).toBeVisible();

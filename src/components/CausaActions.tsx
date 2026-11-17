@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CausaManageActions } from "@/components/CausaManageActions";
 import { apiMutation } from "@/lib/api-mutation";
@@ -11,11 +11,13 @@ export function CausaActions({
   titulo,
   estado,
   isAdmin,
+  extraActions,
 }: {
   causaId: string;
   titulo: string;
   estado: string;
   isAdmin: boolean;
+  extraActions?: ReactNode;
 }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,6 +63,7 @@ export function CausaActions({
       <details className="case-more-actions">
         <summary>Más acciones</summary>
         <div className="case-actions-directory">
+          {extraActions}
           <CausaManageActions causaId={causaId} titulo={titulo} estado={estado} isAdmin={isAdmin} compact />
           <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">{busy ? "Sincronizando…" : "Sincronizar notas"}</button>
           <Link href={`/agente?causaId=${causaId}&utility=copilot`} className="btn btn-ghost">Hablar con ALTAZOR</Link>
