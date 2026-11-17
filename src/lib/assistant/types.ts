@@ -24,6 +24,8 @@ export const ASSISTANT_TOOL_IDS = [
   "documento.descargar",
   "documento.resumir",
   "documento.clasificar",
+  "plazo.listar",
+  "plazo.actualizar",
   "plazo.crear",
   "plazo.estimar",
   "evento.crear",

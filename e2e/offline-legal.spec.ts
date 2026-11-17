@@ -88,7 +88,7 @@ test("la ficha en línea no sobrescribe un cambio sincronizado después de abrir
 test("retirar permiso de cierre conserva el plazo y rechaza la identidad anterior aun al restaurarlo", async ({ page }) => {
   test.setTimeout(120000); const f = await fixture(page);
   try {
-    await prepare(page, f.url("plazo"), "plazo"); await page.getByLabel("Estado del plazo", { exact: true }).selectOption("cumplido"); await prisma.user.update({ where: { id: f.a.id }, data: { capabilityRevokes: "plazo.close" } });
+    await prepare(page, f.url("plazo"), "plazo"); await page.getByLabel("Estado del plazo", { exact: true }).selectOption("cumplido"); await page.getByLabel("Justificación del cumplimiento",{exact:true}).fill("Cumplimiento ficticio revisado por el estudio"); await prisma.user.update({ where: { id: f.a.id }, data: { capabilityRevokes: "plazo.close" } });
     await sync(page); await expect(page.locator("#message")).toHaveAttribute("data-error", "true"); expect((await prisma.plazo.findUniqueOrThrow({ where: { id: f.deadline.id } })).estado).toBe("pendiente");
     await prisma.user.update({ where: { id: f.a.id }, data: { capabilityRevokes: "" } }); await page.reload(); await unlock(page); await sync(page); await expect(page.locator("#message")).toHaveAttribute("data-error", "true");
     await page.locator("#binding-panel > summary").click(); await page.getByRole("button", { name: "Revisar referencias rechazadas", exact: true }).click(); await page.getByRole("button", { name: "Confirmar referencias revisadas", exact: true }).click(); await sync(page); await expect(page.locator("#message")).toContainText("Registro sincronizado");

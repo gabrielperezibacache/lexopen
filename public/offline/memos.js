@@ -1,3 +1,4 @@
+import { renderDeadlineSupport } from "/offline/deadline-support.js";
 const $ = id => document.getElementById(id);
 export const memoConfigs = {
   nota: { noun: "nota", plural: "Notas", title: "titulo", fields: [["titulo", "Título de la nota", "text", 200], ["contenido", "Contenido de la nota", "textarea", 20000], ["tags", "Etiquetas de la nota", "text", 300]], defaults: { titulo: "", contenido: "", tags: "" } },
@@ -9,7 +10,7 @@ export const memoConfigs = {
   ], defaults: () => ({ tipo: "reunion", titulo: "", fecha: new Date().toISOString(), modalidad: "presencial", lugar: null, participantes: "", resumenEjecutivo: "", hechosRelevantes: null, acuerdos: null, proximosPasos: null, riesgosAlertas: null, estadoCausaNota: null, etapaSugerida: null, confidencial: false, acciones: [] }) },
 };
 function civil(value) { if (!value) return ""; if (value.length === 10 || value.endsWith("T00:00:00.000Z")) return value.slice(0, 10); const parts = new Intl.DateTimeFormat("en", { timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value)); const get = t => parts.find(p => p.type === t).value; return `${get("year")}-${get("month")}-${get("day")}`; }
-export function setupMemoActions({ getItem, markDirty, message, dateReadback }) {
+export function setupMemoActions({ getData, getItem, markDirty, message, dateReadback }) {
   function resetReview(item, id) { item.reviewedActions = (item.reviewedActions || []).filter(value => value !== id); }
   function persisted(item, id) { return item.baseFields?.acciones?.find(a => a.id === id) || (!item.referenceFailure && item.pending?.fields.acciones?.find(a => a.id === id)); }
   function render(item) {
@@ -32,12 +33,13 @@ export function setupMemoActions({ getItem, markDirty, message, dateReadback }) 
         if (Array.isArray(type)) for (const [value, title] of type) { const option = document.createElement("option"); option.value = value; option.textContent = title; if (["crearTask", "crearPlazo"].includes(key) && (item.baseFields?.acciones?.find(a => a.id === action.id)?.[key] || !item.referenceFailure && item.pending?.fields.acciones?.find(a => a.id === action.id)?.[key]) && value === "false") option.disabled = true; control.append(option); }
         else if (type === "textarea") { control.rows = 3; control.maxLength = max; } else { control.type = type; if (max) control.maxLength = max; }
         control.dataset.actionField = key; control.value = key === "fechaLimite" ? civil(action[key]) : String(action[key] ?? "");
-        control.addEventListener(Array.isArray(type) ? "change" : "input", () => { action[key] = ["crearTask", "crearPlazo", "esFatal"].includes(key) ? control.value === "true" : control.value || null; if (["fechaLimite", "tipoComputo", "crearTask", "crearPlazo"].includes(key)) resetReview(item, action.id); reviewState(); markDirty(); });
+        control.addEventListener(Array.isArray(type) ? "change" : "input", () => { action[key] = ["crearTask", "crearPlazo", "esFatal"].includes(key) ? control.value === "true" : control.value || null; if (["fechaLimite", "tipoComputo", "crearTask", "crearPlazo"].includes(key)) resetReview(item, action.id); reviewState(); markDirty(); if(["estado","crearPlazo"].includes(key)) { render(item); document.getElementById(control.id)?.focus(); } });
         group.append(label, control);
       }
       readback.className = "help"; reviewState(); check.onchange = () => { resetReview(item, action.id); if (check.checked) (item.reviewedActions ||= []).push(action.id); markDirty(); };
       const remove = document.createElement("button"); remove.type = "button"; remove.className = "text-button"; remove.textContent = "Quitar acción sin enviar"; remove.disabled = Boolean(persisted(item, action.id)); remove.dataset.persistedAction = String(remove.disabled);
       remove.onclick = () => { if (persisted(item, action.id)) { message("La acción ya se envió. Confirme la sincronización antes de cambiar su seguimiento.", true); return; } item.fields.acciones = item.fields.acciones.filter(a => a.id !== action.id); resetReview(item, action.id); markDirty(); render(item); };
+      if(action.crearPlazo && action.estado === "hecha" && item.baseFields?.acciones?.find(a=>a.id===action.id)?.estado !== "hecha") renderDeadlineSupport({item,data:getData(),parent:group,value:item.completions?.[action.id],id:`memo-support-${index}`,onChange:v=>{(item.completions||={})[action.id]=v;markDirty();}});
       group.append(readback, reviewLabel, remove); $("memo-action-list").append(group);
     }
   }

@@ -1,3 +1,4 @@
+import { resolveDeadlineToolInput } from "./tools/plazo";
 import { getWorkCountry } from "@/lib/config/work-country";
 /**
  * Orquestación del turno del asistente: normalize → classify → resolve
@@ -163,6 +164,10 @@ function buildToolInput(
     case "documento.resumir":
     case "documento.clasificar":
       return { documentoId: slots.documentoId };
+    case "plazo.actualizar":
+      return {plazoId:slots.plazoId,plazo:slots.plazo||slots.titulo,estado:slots.estado,expectedVersion:slots.expectedVersion,completion:slots.completion};
+    case "plazo.listar":
+      return {causaId,q:slots.q,after:slots.after};
     case "plazo.crear":
       return {
         titulo: slots.titulo ?? texto.slice(0, 120) ?? "Plazo",
@@ -318,6 +323,7 @@ export async function runAssistantTurn(
     if (intent.toolId === "escritorio.encargar") toolInput = await resolveDesktopTaskInput(toolInput, ctx);
     const academic = intent.toolId.startsWith("academia."), workflow = intent.toolId.startsWith("audiencia.") || intent.toolId.startsWith("escrito.");
     try {
+      if (intent.toolId === "plazo.actualizar") toolInput = await resolveDeadlineToolInput(toolInput,ctx,input.text);
       if (intent.toolId === "icaro.delegar") toolInput = await resolveIcaroToolInput(toolInput, ctx, input.text);
       if (intent.toolId.startsWith("drive.")) toolInput = await resolveDriveToolInput(intent.toolId, toolInput, ctx);
       if (academic) toolInput = await resolveAcademicToolInput(intent.toolId, toolInput, ctx);

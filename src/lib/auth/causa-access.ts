@@ -264,5 +264,5 @@ export function siteFileReadWhere(user: CausaAccessUser): Prisma.SiteFileWhereIn
 
 /** A deadline derived from a confidential minute inherits that restriction. */
 export function plazoAccessWhere(user: CausaAccessUser): Prisma.PlazoWhereInput {
-  return { AND: [relatedCausaWhere(user), can(user, "doc.confidential.read") ? {} : { minutaAcciones: { none: { minuta: { confidencial: true } } } }] };
+  return { AND: [relatedCausaWhere(user), {minutaAcciones:{every:{minuta:{causa:causaAccessWhere(user)}}}}, can(user, "doc.confidential.read") ? {} : { minutaAcciones: { none: { minuta: { confidencial: true } } } }] };
 }

@@ -3,10 +3,17 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { civilDateKey } from "@/lib/chile-time";
-import { driveFileUrl, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import {
+  driveFileUrl,
+  isRealDriveFolderId,
+} from "@/lib/integrations/drive-folder";
 import { apiMutation } from "@/lib/api-mutation";
 
+import { CompletionSupportFields } from "@/components/CompletionSupportFields";
+import type { CompletionSupport } from "@/lib/deadlines/schemas";
+
 type Accion = {
+  plazoId?: string | null;
   id: string;
   descripcion: string;
   estado: string;
@@ -17,6 +24,7 @@ type Accion = {
 
 export function MinutaDetailActions({
   minutaId,
+  causaId,
   version,
   canEdit = true,
   acciones,
@@ -25,6 +33,7 @@ export function MinutaDetailActions({
   aviso,
 }: {
   minutaId: string;
+  causaId?: string;
   version?: string;
   canEdit?: boolean;
   acciones: Accion[];
@@ -32,6 +41,11 @@ export function MinutaDetailActions({
   googleDriveFileId?: string | null;
   aviso?: string | null;
 }) {
+  const [closing, setClosing] = useState<string | null>(null);
+  const [support, setSupport] = useState<CompletionSupport>({
+    kind: "manual",
+    justification: "",
+  });
   const router = useRouter();
   const requests = useRef<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
@@ -39,26 +53,39 @@ export function MinutaDetailActions({
   const [error, setError] = useState("");
   const hasRealFolder = isRealDriveFolderId(folderId);
 
-  function setEstado(accionId: string, estado: string) {
+  function setEstado(
+    accionId: string,
+    estado: string,
+    completion?: CompletionSupport,
+  ) {
     setError("");
-    if (!version) { setError("Actualice la minuta antes de modificar sus acciones."); return; }
-    const identity = `${version}:${accionId}:${estado}`;
-    const commandKey = requests.current[identity] ||= crypto.randomUUID();
+    if (!version) {
+      setError("Actualice la minuta antes de modificar sus acciones.");
+      return;
+    }
+    const identity = JSON.stringify({ version, accionId, estado, completion });
+    const commandKey = (requests.current[identity] ||= crypto.randomUUID());
     startTransition(async () => {
       const result = await apiMutation(`/api/minutas/${minutaId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": commandKey },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": commandKey,
+        },
         body: JSON.stringify({
           action: "accion-estado",
           expectedVersion: version,
           accionId,
           estado,
+          ...(completion ? { completion } : {}),
         }),
       });
       if (!result.ok) {
         setError(result.error || "No se pudo actualizar la acción");
         return;
       }
+      setClosing(null);
+      setSupport({ kind: "manual", justification: "" });
       router.refresh();
     });
   }
@@ -86,7 +113,7 @@ export function MinutaDetailActions({
             ? "Minuta subida a la carpeta Drive de la causa"
             : data.status === "stub"
               ? "Modo stub: conecte Google OAuth para subir"
-              : String(data.status))
+              : String(data.status)),
       );
       router.refresh();
     });
@@ -145,7 +172,14 @@ export function MinutaDetailActions({
                 <div className="text-sm font-medium">{a.descripcion}</div>
                 <div className="text-xs text-[var(--ink-soft)]/65">
                   {a.responsable || "Sin asignar"} · {a.prioridad} · plazo{" "}
-                  {a.fechaLimite ? civilDateKey(typeof a.fechaLimite === "string" ? new Date(a.fechaLimite) : a.fechaLimite) : "—"} · {a.estado}
+                  {a.fechaLimite
+                    ? civilDateKey(
+                        typeof a.fechaLimite === "string"
+                          ? new Date(a.fechaLimite)
+                          : a.fechaLimite,
+                      )
+                    : "—"}{" "}
+                  · {a.estado}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -155,7 +189,9 @@ export function MinutaDetailActions({
                       type="button"
                       className="btn btn-ghost"
                       disabled={pending || !canEdit}
-                      onClick={() => setEstado(a.id, "hecha")}
+                      onClick={() =>
+                        a.plazoId ? setClosing(a.id) : setEstado(a.id, "hecha")
+                      }
                     >
                       Hecha
                     </button>
@@ -194,6 +230,31 @@ export function MinutaDetailActions({
                   </>
                 )}
               </div>
+              {closing === a.id && (
+                <form
+                  className="w-full space-y-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setEstado(a.id, "hecha", support);
+                  }}
+                >
+                  <CompletionSupportFields
+                    value={support}
+                    onChange={setSupport}
+                    causaId={causaId}
+                  />
+                  <button className="btn btn-primary" disabled={pending}>
+                    Confirmar acción y cumplimiento
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setClosing(null)}
+                  >
+                    Volver
+                  </button>
+                </form>
+              )}
             </div>
           ))}
           {acciones.length === 0 && (

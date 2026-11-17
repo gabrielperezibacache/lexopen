@@ -6,6 +6,8 @@ import { apiMutation } from "@/lib/api-mutation";
 import { labelDiasRestantes, labelUrgencia, MAX_DIAS_PLAZO } from "@/lib/plazos";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 
+import { DeadlineOptions } from "./DeadlineOptions";
+
 type Option = { id: string; label: string };
 
 export type PlazoFormDefaults = {
@@ -138,20 +140,7 @@ export function PlazoForm({
         />
       </div>
       <div>
-        <label htmlFor={`${fieldId}-causaId`} className="mb-2 block text-sm font-medium">Causa</label>
-        <select id={`${fieldId}-causaId`}
-          className="select"
-          name="causaId"
-          value={causaId}
-          onChange={(e) => setCausaId(e.target.value)}
-        >
-          <option value="">Sin causa</option>
-          {causas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        <DeadlineOptions label="Causa" name="causaId" initial={causas} value={causaId} onChange={setCausaId}/>
       </div>
       <div>
         <label htmlFor={`${fieldId}-responsableId`} className="mb-2 block text-sm font-medium">Responsable</label>

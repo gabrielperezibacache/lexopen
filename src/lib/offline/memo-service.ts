@@ -58,7 +58,7 @@ export async function syncMemoEntity(user: StaffActor, input: MemoInput) {
           if (ref.version !== input.relations.cause.expectedVersion) throw referenceConflict();
         }
         if (causeId) await memoCause(causeId, actor, tx);
-        if (input.kind === "minuta") prepared = await prepareMinute(input.fields, causeId!, actor, tx, minute, { reviewedActions: input.reviewedActions });
+        if (input.kind === "minuta") prepared = await prepareMinute(input.fields, causeId!, actor, tx, minute, { reviewedActions: input.reviewedActions, completions: input.completions });
       } catch (e) {
         if ((e as { code?: string }).code === "offline_reference_conflict" || [403, 404].includes((e as { status?: number }).status || 0)) return { rejected: true, error: (e as Error).message, status: (e as { status?: number }).status || 409 };
         throw e;

@@ -10,6 +10,7 @@ La preparación `1.1.0-preview.11` no es un instalador publicado. Preview 10 sig
 | --- | --- |
 | Mac y distribución | Credenciales sólo en etiquetas con Environment protegido; fallo temprano sin credenciales; recibos independientes de integridad de firma, identidad, notarización y Gatekeeper. Se verifica el DMG, se monta en modo de sólo lectura y se comprueba una copia temporal con cuarentena. Mac público exige superar todas esas comprobaciones, incluso en preview. |
 | Respaldo | Inventario SHA-256 de archivos y carpetas, detección de modificaciones, ausencias, archivos adicionales y enlaces; validación antes de sustituir y después de copiar, con recuperación del destino previo ante fallo. Compatibilidad v1 sin índice identificada como no verificada. |
+| Plazos | Páginas mensuales y de vencidos, causas buscables y responsables internos. Cumplimiento con respaldo, historial, reapertura y versión optimista; aplicación común desde minutas, offline y Altazor. [Contrato y límites](PLAZOS-CUMPLIMIENTO.md). |
 | Historias y búsqueda | Páginas acotadas en Documentos, Clientes, Espacios, Mensajes, Flujos, Auditoría y Mi Fiscalía. Documentos busca nombre y causa. Auditoría filtra en PostgreSQL antes de paginar. Mi Fiscalía conserva orden de seguimiento, incluidas fechas vacías. Los permisos se consultan de nuevo en cada página. |
 | Audio | Tramos pendientes cifrados AES-GCM, con clave dependiente de Host, usuario, causa y mesa que no se almacena en IndexedDB. Identidad y metadatos autenticados, migración de copias anteriores sin extender su vigencia y memoria separada por cuenta. Recuperar no reanuda la captura ni envía audio. |
 | Operación | Fallo al consultar la cola judicial identificado como indisponible; el estado de respaldo no se presenta como verificación completa ni cifrado. |
@@ -34,7 +35,7 @@ Las pruebas de firma y artefactos con transportes simulados comprueban los contr
 
 ## Desarrollo posterior que no se declara completado
 
-El perfil procesal civil chileno (#267), revisión profesional y ampliación del corpus jurídico (#260), mediciones reales de modelos locales en el equipo del estudio (#264), resumen incremental de conversaciones, cumplimiento de plazos con evidencia y auditoría visual exhaustiva mantienen su alcance propio. No se cierran por los cambios de paginación, refactorización ni por una suite de pruebas aprobada. La firma real (#266) necesita además sus credenciales y ejecución verificadas.
+El perfil procesal civil chileno (#267), revisión profesional y ampliación del corpus jurídico (#260), mediciones reales de modelos locales en el equipo del estudio (#264), resumen incremental de conversaciones y auditoría visual exhaustiva mantienen su alcance propio. No se cierran por los cambios de paginación, refactorización ni por una suite de pruebas aprobada. La firma real (#266) necesita además sus credenciales y ejecución verificadas.
 
 Se mantienen el escritorio persistente, las actualizaciones judiciales automáticas a las 08:00 y 22:00 de Chile, las manuales libres, los muros éticos y la cuenta Google compartida.
 

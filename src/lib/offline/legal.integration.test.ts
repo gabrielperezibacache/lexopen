@@ -1,3 +1,4 @@
+import { deadlineVersion } from "@/lib/deadlines/completion";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
@@ -43,9 +44,9 @@ async function main() {
     await prisma.causa.update({ where: { id }, data: { procedimiento: "Procedimiento revisado" } });
     await assert.rejects(syncOfflineEntity(a, { kind: "plazo", action: "update", requestId: randomUUID(), entityId: pid, expectedVersion: beforeState.version, dateReviewed: true, fields: { ...beforeState.fields, fechaLimite: "2026-11-24T00:00:00.000Z" } }), status(409), "a case change invalidates the previous review context");
     assert.equal((await prisma.plazo.findUniqueOrThrow({ where: { id: pid } })).fechaLimite.toISOString(), "2026-11-20T00:00:00.000Z");
-    await updatePlazoCommand(a, { id: pid, estado: "suspendido" }, randomUUID());
+    await updatePlazoCommand(a, { id: pid, estado: "suspendido",expectedVersion:deadlineVersion(await prisma.plazo.findUniqueOrThrow({where:{id:pid}})) }, randomUUID());
     await assert.rejects(syncOfflineEntity(a, { kind: "plazo", action: "update", requestId: randomUUID(), entityId: pid, expectedVersion: beforeState.version, fields: { ...beforeState.fields, descripcion: "Cambio que no sobrescribe" } }), status(409));
-    const fresh = await readOfflineEntity(a, "plazo", pid), close = { kind: "plazo", action: "update", requestId: randomUUID(), entityId: pid, expectedVersion: fresh.version, fields: { ...fresh.fields, estado: "cumplido" } };
+    const fresh = await readOfflineEntity(a, "plazo", pid), close = { kind: "plazo", action: "update", requestId: randomUUID(), entityId: pid, expectedVersion: fresh.version,completion:{kind:"manual",justification:"Cumplimiento ficticio revisado"}, fields: { ...fresh.fields, estado: "cumplido" } };
     await withRejectedAudit(a.id, "plazo.update", async () => { await assert.rejects(syncOfflineEntity(a, close), status(500)); assert.equal((await prisma.plazo.findUniqueOrThrow({ where: { id: pid } })).estado, "suspendido"); });
     await Promise.all([syncOfflineEntity(a, close), syncOfflineEntity(a, close)]);
     await prisma.user.update({ where: { id: a.id }, data: { capabilityRevokes: "plazo.close" } }); await assert.rejects(syncOfflineEntity(a, close), status(403)); await prisma.user.update({ where: { id: a.id }, data: { capabilityRevokes: "" } });
@@ -72,7 +73,7 @@ async function main() {
     await assert.rejects(syncOfflineEntity(a, blocked), e => { assert.equal((e as { status?: number }).status, 409); assert.doesNotMatch((e as Error).message, new RegExp(hidden.id + "|Reservada|Identidad")); return true; });
     assert.equal(await prisma.causa.count({ where: { rit: blocked.fields.rit } }), 0);
     await assert.rejects(syncOfflineEntity(a, { ...deadline, requestId: randomUUID(), fields: { ...deadlineFields, fechaLimite: "2026-02-31T12:00:00.000Z" } }), /fecha válida/);
-    const standalone = { kind: "plazo", action: "create", requestId: randomUUID(), dateReviewed: true, fields: { ...deadlineFields, titulo: `Sin causa ${tag}`, estado: "cumplido" } };
+    const standalone = { completion:{kind:"manual",justification:"Cumplimiento ficticio revisado"}, kind: "plazo", action: "create", requestId: randomUUID(), dateReviewed: true, fields: { ...deadlineFields, titulo: `Sin causa ${tag}`, estado: "cumplido" } };
     const own = await syncOfflineEntity(a, standalone); deadlines.push(own.receipt.entityId);
     await prisma.user.update({ where: { id: a.id }, data: { capabilityRevokes: "plazo.close" } });
     await assert.rejects(syncOfflineEntity(a, standalone), status(403), "standalone receipt recovery requires the original close permission");

@@ -1,6 +1,6 @@
 /* Only this public shell is cached. Authenticated pages, APIs and attachments never enter CacheStorage. */
-const SHELL_CACHE = "lexopen-offline-shell-v9";
-const SHELL_FILES = ["/offline.html", "/offline/workspace.css", "/offline/workspace.js", "/offline/vault.js", "/offline/records.js", "/offline/bindings.js", "/offline/memos.js", "/offline/files.js", "/offline/operations.js"];
+const SHELL_CACHE = "lexopen-offline-shell-v10";
+const SHELL_FILES = ["/offline.html", "/offline/workspace.css", "/offline/workspace.js", "/offline/vault.js", "/offline/records.js", "/offline/bindings.js", "/offline/memos.js", "/offline/deadline-support.js", "/offline/files.js", "/offline/operations.js"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
 });

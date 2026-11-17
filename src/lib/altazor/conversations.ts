@@ -107,6 +107,7 @@ async function verifiedContext(row: AltazorTurn, user: CausaAccessUser, client: 
     if (!card) continue;
     const targets: Array<{ key: string; id: string }> = [];
     if (card.type === "documento-lista" && Array.isArray(card.items)) for (const item of card.items) { if (item && typeof item.id === "string") targets.push({ key: "documentoId", id: item.id }); }
+    if (card.type === "plazos" && Array.isArray(card.items)) for (const item of card.items) { if (item && typeof item.id === "string") targets.push({key:"plazoId",id:item.id}); }
     const keys: Record<string, string> = { "documento-descarga": "documentoId", nota: "notaId", tarea: "taskId", evento: "eventoId", plazo: "plazoId", minuta: "minutaId" };
     if (typeof card.type === "string" && keys[card.type] && typeof card.id === "string") targets.push({ key: keys[card.type], id: card.id });
     for (const target of targets) await assertToolInputAccess("altazor.history", { [target.key]: target.id }, toolContext, false, client);

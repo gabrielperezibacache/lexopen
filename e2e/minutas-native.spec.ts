@@ -79,6 +79,8 @@ for (const mode of ["respuesta perdida", "confirmación incompleta"] as const) {
       expect(await db.task.count({ where: { causaId: f.cause.id } })).toBe(1);
       expect(await db.plazo.count({ where: { causaId: f.cause.id } })).toBe(1);
       await page.getByRole("button", { name: "Hecha", exact: true }).click();
+      await page.getByLabel("Justificación",{exact:true}).fill("Acción ficticia revisada por el estudio");
+      await page.getByRole("button",{name:"Confirmar acción y cumplimiento"}).click();
       await expect.poll(() => db.task.count({ where: { causaId: f.cause.id, status: "done" } })).toBe(1);
       await expect.poll(() => db.workflowInstance.count({ where: { workflowId: f.workflow.id } })).toBe(1);
       const minute = await db.minuta.findUniqueOrThrow({ where: { id }, include: { documento: true } });

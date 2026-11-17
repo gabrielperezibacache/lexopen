@@ -55,6 +55,7 @@ model FirmSettings {
 }
 
 model User {
+  deadlineStateEvents PlazoStateEvent[]
   trustedDevices TrustedDevice[]
   trustedDeviceVersion Int @default(0)
   fiscaliaRequests FiscaliaRequest[]
@@ -895,6 +896,8 @@ model CaseDocumentIntake {
 }
 
 model Plazo {
+  stateRevision Int @default(1)
+  stateEvents PlazoStateEvent[]
   id            String   @id @default(cuid())
   titulo        String
   descripcion   String?
@@ -3265,4 +3268,28 @@ model LibraryReadingNote {
   updatedAt DateTime @updatedAt
   @@unique([ownerId, bookId])
   @@index([bookId])
+}
+
+/// Append-only state transitions; legacy closures are deliberately not backfilled.
+model PlazoStateEvent {
+  id String @id @default(cuid())
+  plazoId String
+  plazo Plazo @relation(fields: [plazoId], references: [id], onDelete: Cascade)
+  revision Int
+  fromEstado String?
+  toEstado String
+  actorId String?
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName String
+  createdAt DateTime @default(now())
+  origin String
+  scopeCausaId String?
+  confidential Boolean @default(false)
+  supportKind String?
+  justification String? @db.Text
+  documentoId String?
+  documentVersion Int?
+  documentSha256 String?
+  @@unique([plazoId, revision])
+  @@index([plazoId, createdAt, id])
 }

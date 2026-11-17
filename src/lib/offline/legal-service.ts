@@ -1,3 +1,4 @@
+import { recordDeadlineTransition, authorizeDeadlineEvent } from "@/lib/deadlines/completion";
 import type { Prisma, Causa, Plazo } from "@prisma/client";
 import { executeCommand, serializable, canonicalJson } from "@/lib/command-execution";
 import { currentStaffActor, type StaffActor } from "@/lib/auth/staff-actor";
@@ -56,10 +57,11 @@ export async function readLegalEntity(kind: Kind, id: string, actor: Actor, tx: 
     causeLocked: locked, sourceLocked: locked, canAssignOthers: true,
     calculationCountry: row.calculationCountry, calculationRegime: row.calculationRegime, diasPlazo: row.diasPlazo } };
 }
-type Authority = { destinationCaseId: string | null; cases: string[]; responsibleId?: string | null; close: boolean };
+type Authority = { destinationCaseId: string | null; cases: string[]; responsibleId?: string | null; close: boolean; closure?: { id: string; revision: number } };
 type Receipt = { kind: Kind; entityId: string; version: string; authority: Authority; referenceVersions: { type: string; id: string; version: string }[] };
 type Rejected = { rejected: true; error: string; status: number };
 async function authorize(authority: Authority, actor: Actor, tx: Tx) {
+  if(authority.closure)await authorizeDeadlineEvent(authority.closure.id,authority.closure.revision,actor,tx);
   const destination = { causaId: authority.destinationCaseId, responsableId: authority.responsibleId || null };
   await deadlinePermission(destination, actor, "plazo.edit", tx);
   if (authority.close) await deadlinePermission(destination, actor, "plazo.close", tx);
@@ -154,7 +156,10 @@ export async function syncLegalEntity(user: StaffActor, input: LegalInput) {
         const { before, date, dateChanged, causeId, responsibleId } = prepared; authority = prepared.authority;
         const data = { ...input.fields, fechaLimite: date, fechaNotificacion: dateValue(input.fields.fechaNotificacion), causaId: causeId, responsableId: responsibleId,
           ...(dateChanged ? { diasPlazo: null, calculationCountry: null, calculationRegime: null, alertaEnviada: false } : {}) };
-        const row = before ? await tx.plazo.update({ where: { id: before.id, updatedAt: before.updatedAt }, data }) : await tx.plazo.create({ data }); id = row.id;
+        let row = before ? await tx.plazo.update({ where: { id: before.id, updatedAt: before.updatedAt }, data }) : await tx.plazo.create({ data });
+        row=await recordDeadlineTransition(before,row,actor,input.completion,tx,"offline");
+        if(row.estado==="cumplido"&&before?.estado!==row.estado)authority.closure={id:row.id,revision:row.stateRevision};
+        id = row.id;
         if (!before && causeId) await tx.activity.create({ data: { tipo: "plazo", mensaje: `Plazo: ${row.titulo}`, causaId: causeId, userId: actor.id } });
         await writeAuditStrict({ actorId: actor.id, action: before ? "plazo.update" : "plazo.create", entityType: "Plazo", entityId: id, before: before ? { estado: before.estado, fechaLimite: before.fechaLimite } : undefined, after: data }, tx);
       }
