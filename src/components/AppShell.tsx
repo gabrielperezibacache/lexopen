@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Search } from "lucide-react";
+import { Menu, Search, CloudOff } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { OfflineStatus } from "@/components/OfflineStatus";
@@ -166,6 +166,7 @@ export function AppShell({
           <div className="flex shrink-0 items-center gap-2">
             <Link href="/buscar" className="shell-icon-button" aria-label={t("common.searchGlobal")}><Search size={19} aria-hidden="true" /></Link>
             <NotificationBell key={user?.id} />
+            {navigation.mode !== "portal" && <a href="/offline.html" className="shell-icon-button" aria-label="Trabajo sin conexión" title="Trabajo sin conexión"><CloudOff size={18} aria-hidden="true"/></a>}
           </div>
         </header>
         {navigation.mode !== "portal" && <OfflineStatus />}
@@ -178,7 +179,7 @@ export function AppShell({
         <main
           id="main-content"
           tabIndex={-1}
-          className="app-content min-w-0 w-full flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8"
+          className="app-content min-w-0 w-full flex-1 px-4 py-4 sm:px-6 md:px-8 md:py-5"
           style={{
             paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
           }}

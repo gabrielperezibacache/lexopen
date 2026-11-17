@@ -72,10 +72,6 @@ export default async function MinutasPage({ searchParams }: { searchParams: Prom
       <PageHeader
         artwork="writing"
         title={dict.hubs.minutas.title}
-        subtitle={tr(
-          "Registra lo que ocurrió en una audiencia, reunión o llamada y deja los próximos pasos en el expediente.",
-          "Record what happened at a hearing, meeting, or call and keep the next steps in its case file.",
-        )}
         actions={canCreate && !choosingCase ? (
           <Link className="btn btn-primary" href="/minutas?nueva=1#nueva-minuta">
             <Plus size={16} aria-hidden="true" /> {tr("Nueva minuta", "New minute")}

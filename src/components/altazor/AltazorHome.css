@@ -30,8 +30,8 @@
 .altazor-home input[type=checkbox],.altazor-home input[type=radio] { width:18px; height:18px; accent-color:var(--sea); flex-shrink:0; margin-top:.2rem; }
 .altazor-home button:disabled { opacity:.55; cursor:not-allowed; }
 .altazor-context-label { width:100%; max-width:520px; margin:0; }
-.altazor-welcome { padding:1.5rem 0 .75rem; }
-.altazor-welcome>p { font-family:var(--font-fraunces),Georgia,serif; font-size:clamp(1.6rem,2.4vw,2.3rem); margin-bottom:.5rem; }
+.altazor-welcome { padding:.75rem 0 .5rem; }
+.altazor-welcome>p { font-family:var(--font-fraunces),Georgia,serif; font-size:clamp(1.35rem,2vw,1.85rem); margin-bottom:.5rem; }
 .altazor-prompts { display:flex; flex-wrap:wrap; gap:.65rem; }
 .altazor-prompts button { padding:.65rem .95rem; min-height:44px; border:1px solid var(--line); border-radius:999px; font-size:1rem; text-align:left; }
 .altazor-prompts button:hover { border-color:var(--sea); color:var(--sea); }
@@ -203,3 +203,6 @@
 .altazor-urgent { max-width:880px; margin:1.25rem auto 0; color:var(--danger); }
 .altazor-urgent a { text-decoration:underline; text-underline-offset:3px; }
 @media(max-width:600px) { .altazor-identity-row { gap:.25rem; padding-bottom:.5rem; } .altazor-identity-row .altazor-header { padding-bottom:0; } .altazor-identity-row .altazor-toolbar-actions { gap:0; } }
+
+.altazor-composer-help {margin:.2rem .5rem 0;font-size:.75rem;color:var(--muted);}
+.altazor-composer-help>summary {min-height:44px;display:list-item;padding:.7rem 0;cursor:pointer;}

@@ -42,3 +42,8 @@
   .header button { grid-column: 2; justify-self: start; }
 }
 .consultation { padding: .75rem 0; margin: 0; color: var(--ink); line-height: 1.7; font-size: var(--text-sm); overflow-wrap: anywhere; }
+
+.compact {padding:.55rem .75rem;}
+.compact .header {gap:.5rem;flex-wrap:wrap;}
+.compact .heading h2 {font-size:.85rem;}
+.compact .heading p {font-size:.75rem;}

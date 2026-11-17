@@ -107,7 +107,7 @@ export function AltazorDesktopActivity({ causaId, refreshKey, onOpen }: { causaI
   const needsPreparation = activity?.state === "unconfigured" || activity?.state === "disabled";
   const review = activity?.state === "help" || activity?.state === "approval" ? activity.state : undefined;
   const visibleFrame = frame && activity && frame.sessionId === activity.sessionId && frameStates.has(activity.state) ? frame : null;
-  return <section className={styles.activity} aria-labelledby={heading} ref={container}>
+  return <section className={`${styles.activity} ${needsPreparation?styles.compact:""}`} aria-labelledby={heading} ref={container}>
     <header className={styles.header}>
       <Monitor aria-hidden="true" size={20} />
       <div className={styles.heading}><h2 id={heading}>Escritorio de Altazor</h2><p role="status">{label}</p></div>

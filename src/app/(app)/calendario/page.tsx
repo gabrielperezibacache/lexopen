@@ -361,12 +361,12 @@ export default async function CalendarioPage({ searchParams }: Props) {
       <PageHeader
         title="Calendario"
         artwork="calendar"
-        subtitle="Plazos procesales, tareas, eventos y audiencias. Arrastre eventos (verde) entre días en mes o semana."
         actions={<>
           <GoogleCalendarPullButton />
           <Link href={qs({ nuevo: "1" })} className="btn btn-primary">Nuevo evento</Link>
         </>}
       />
+      <details className="text-sm text-[var(--muted)]"><summary className="min-h-11 cursor-pointer py-3">Cómo usar el calendario</summary><p>Arrastra los eventos verdes entre días en las vistas de mes o semana. Los plazos y tareas se modifican desde su apartado.</p></details>
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
         <nav aria-label="Vista del calendario" className="flex w-fit max-w-full flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface)] p-1">
           {([["mes", "Mes"], ["semana", "Semana"], ["agenda", "Agenda"]] as const).map(([value, label]) => (

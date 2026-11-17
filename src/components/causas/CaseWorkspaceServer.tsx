@@ -1,3 +1,4 @@
+import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
 import { CaseStatusPanel } from "./CaseStatusPanel";
 import { readCaseStatus } from "@/lib/causas/status-service";
@@ -37,7 +38,6 @@ import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import {
   isPlaceholderDriveFolderId,
-  isRealDriveFolderId,
 } from "@/lib/integrations/drive-folder";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { labelCausaOrigen } from "@/lib/pjud/causa-origin";
@@ -186,9 +186,6 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
   const semaforo = semaforoPorDiasSinMovimiento(diasSinMovimiento);
 
   const accionesAbiertas = totalAccionesAbiertas;
-  const proximosPlazos = causa.plazos.filter(
-    (p) => p.estado === "pendiente" || p.estado === "vencido"
-  );
   const tribunalEnCatalogo = TRIBUNALES_CHILE.includes(
     causa.tribunal as (typeof TRIBUNALES_CHILE)[number]
   );
@@ -200,76 +197,24 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
       </Link>
       <PageHeader
         title={causa.titulo}
-        subtitle={<>{causa.caratula || h.noCaratula}{causa.rit ? ` · ${causa.rit}` : ""}</>}
+        subtitle={[causa.rit,causa.caratula].filter(Boolean).join(" · ")}
+        actions={<CausaActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={user.role === "admin"} extraActions={<>
+          {can(user,"causa.write",{causaRol:access.causaRol})&&<Link href={`/offline.html?kind=causa&record=${causa.id}`} className="btn btn-ghost">Trabajar sin conexión</Link>}
+          <Link href={`/plazos?causaId=${causa.id}#registrar-plazo`} className="btn btn-ghost">Registrar plazo</Link>
+          <Link href={`/mi-fiscalia?causaId=${causa.id}`} className="btn btn-ghost">Solicitudes a Mi Fiscalía</Link>
+        </>}/>}
+
       />
       {canUseKnowledge && <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" mode={mode} />}
-      {can(user, "causa.write", { causaRol: access.causaRol }) && <Link href={`/offline.html?kind=causa&record=${causa.id}`} className="btn btn-secondary">Trabajar sin conexión</Link>}
-      <CausaActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={user.role === "admin"} />
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge estado={causa.estado} />
-            <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
-            <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
-            {connected && origen && (
-              <span className="badge badge-ink">
-                {h.origin.replace("{label}", origen)}
-              </span>
-            )}
-            <span
-              className={
-                causa.conflictStatus === "blocked"
-                  ? "badge badge-vencido"
-                  : causa.conflictStatus === "warning"
-                    ? "badge badge-pendiente"
-                    : "badge badge-activa"
-              }
-            >
-              {h.conflicts.replace("{status}", labelConflictStatus(causa.conflictStatus))}
-            </span>
-            {isRealDriveFolderId(causa.googleDriveFolderId) && (
-              <span className="badge badge-activa">{h.driveLinked}</span>
-            )}
-            {isPlaceholderDriveFolderId(causa.googleDriveFolderId) &&
-              causa.googleDriveFolderId && (
-                <span className="badge badge-pendiente">{h.driveStub}</span>
-              )}
-          </div>
-
-
+      <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
+        <span>{labelMateria(causa.materia)}</span>
+        {connected&&origen&&<span>· {h.origin.replace("{label}",origen)}</span>}
+        {isPlaceholderDriveFolderId(causa.googleDriveFolderId)&&causa.googleDriveFolderId&&<Link className="text-[var(--sea)] underline" href={`/causas/${causa.id}/expediente#drive-del-expediente`}>Drive por vincular</Link>}
+      </div>
       {["warning", "blocked"].includes(causa.conflictStatus) && <ConflictReviewPanel causaId={causa.id} status={causa.conflictStatus} notes={causa.conflictNotes} />}
-      <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
       <CaseStatusPanel key={caseStatus.fingerprint} initial={caseStatus} canUseAi={canUseKnowledge} />
-      <Link href={`/mi-fiscalia?causaId=${causa.id}`} className="btn btn-secondary">Solicitudes a Mi Fiscalía</Link>
-      {proximosPlazos.length > 0 && (
-        <section className="panel rounded-[var(--radius-lg)] px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Próximos plazos</h2>
-            <Link href={`/plazos?causaId=${causa.id}`} className="text-sm text-[var(--sea)]">
-              Registrar plazo
-            </Link>
-          </div>
-          <div className="mt-3 grid gap-2">
-            {proximosPlazos.slice(0, 4).map((p) => (
-              <div
-                key={p.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm"
-              >
-                <div className="min-w-0">
-                  <div className="font-medium break-words">
-                    {p.esFatal ? "Fatal · " : ""}
-                    {p.titulo}
-                  </div>
-                  <div className="text-xs text-[var(--muted)]">
-                    {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo)} ·{" "}
-                    {labelDiasRestantes(diasRestantes(p.fechaLimite))}
-                  </div>
-                </div>
-                <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
+      <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
+      <ContextDisclosure id="preparacion-resumen" title="Preparación de la causa">
       <CasePreparation
         causaId={id}
         documentCount={documentos.length}
@@ -283,6 +228,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
         transcriptCount={visibleAudios.filter(audio => Boolean(audio.transcriptSha256)).length}
         audioLimited={preparation.audios.length > 200}
       />
+      </ContextDisclosure>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div id="ficha" className="panel case-destination rounded-[var(--radius-lg)] p-5 lg:col-span-2">

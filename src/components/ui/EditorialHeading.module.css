@@ -1,5 +1,5 @@
 .heading {
-  --editorial-media-width: clamp(8.5rem, 13vw, 10.5rem);
+  --editorial-media-width: clamp(5rem, 8vw, 6.5rem);
   --editorial-media-height: calc(var(--editorial-media-width) * .5625);
   position: relative;
   display: grid;
@@ -34,7 +34,7 @@
 
 @media (max-width: 767px) {
   .heading {
-    --editorial-media-width: clamp(5.25rem, 24vw, 6.25rem);
+    --editorial-media-width: clamp(3rem, 14vw, 4rem);
     display: block;
     flex-basis: 100%;
   }

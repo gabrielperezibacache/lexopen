@@ -2,6 +2,9 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Jerarquía visual más compacta: jornada siempre visible en móvil, estado de causa antes de preparación, descarga directa de documentos y formularios plegables que conservan borradores y abren su destino desde enlaces.
+- Vista de próximos plazos compartida con Inicio y la API, con intervalo civil explícito, permisos, responsables y paginación consistentes entre meses. Configuración identifica el ámbito de cada ajuste; el visor del escritorio prioriza el trabajo y sus autorizaciones sobre la preparación de otra sesión.
+
 - Plazos con paginación completa, búsqueda de causas, responsables internos y cumplimiento respaldado por documento versionado y SHA-256 o justificación manual. Historial de cierre y reapertura, control de cambios y reintentos sin duplicados compartidos con minutas, offline y Altazor.
 
 - Evaluadores reproducibles de recuperación jurídica y modelos locales ya instalados, con corpus versionado, informes JSON/Markdown y mediciones ausentes explícitas; sin descargas ni llamadas a proveedores remotos.

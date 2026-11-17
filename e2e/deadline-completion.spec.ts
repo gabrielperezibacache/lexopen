@@ -277,6 +277,7 @@ test("plazos: causas fuera de las primeras 100, roles internos y páginas de ven
     await loginAs(page, owner.email);
     await page.goto("/plazos?mes=2088-11");
     await page.waitForLoadState("networkidle");
+    await page.getByRole("link", { name: "Registrar un plazo", exact: true }).click();
     const select = page.getByLabel("Causa", { exact: true });
     await expect(select.locator(`option[value="${old.id}"]`)).toHaveCount(0);
     const query = page.getByLabel("Buscar causa", { exact: true });

@@ -1,3 +1,4 @@
+import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Cloud, FileSearch, Folder, Search } from "lucide-react";
@@ -194,7 +195,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="archive-title" className="break-all text-lg font-semibold">{folder?.name || "Carpetas y documentos"}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          {canWrite && <a className="btn btn-secondary" href="#incorporar-documentos">Añadir archivos</a>}
+          {canWrite && <a className="btn btn-primary" href="#incorporar-documentos">Añadir archivos</a>}
           <a className="btn btn-ghost" href="#drive-del-expediente" aria-label="Google Drive"><Cloud size={17} aria-hidden="true" />
             <span><span className="hidden sm:inline">Google </span>Drive</span>
           </a>
@@ -239,13 +240,12 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
         {page * pageSize < total && <Link className="btn btn-ghost" href={href({ page: page + 1, preserve: true })}>Siguiente</Link>}
       </nav>}
     </section>
-    {canWrite && <section id="incorporar-documentos" aria-label="Incorporar archivos" className="space-y-3 scroll-mt-24">
+    {canWrite && <section aria-label="Incorporar archivos" className="space-y-3"><ContextDisclosure id="incorporar-documentos" title="Añadir archivos" className="panel rounded-[var(--radius-lg)] px-4">
       <DocumentoIngestForm key={folderId || "root"} lockedCausaId={id} compact allowDriveCopy={false} destinationFolder={folder || undefined} />
       {managementMode === "pjud_cl" && causa.rit && validarRit(causa.rit) && <CausaDocumentImportButton causaId={id} />}
-    </section>}
-    <details id="drive-del-expediente" className="panel scroll-mt-24 rounded-[var(--radius-lg)] px-4">
-      <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Archivos de Google Drive</summary>
+    </ContextDisclosure></section>}
+    <ContextDisclosure id="drive-del-expediente" title="Archivos de Google Drive" className="panel rounded-[var(--radius-lg)] px-4">
       <DriveFolderPanel canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
-    </details>
+    </ContextDisclosure>
   </div>;
 }

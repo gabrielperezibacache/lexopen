@@ -190,17 +190,9 @@ export default async function ConfiguracionPage() {
         artwork="settings"
         eyebrow={h.eyebrow}
         title={canManage ? h.title : dict.nav.settings}
-        subtitle={canManage ? h.subtitle : tr("Ajusta tu cuenta, tus avisos y las herramientas que usas.", "Adjust your account, notifications and tools.")}
       />
-      <section className="panel space-y-3 p-5" aria-labelledby="settings-scope-title">
-        <h2 id="settings-scope-title" className="text-lg font-semibold">{tr("A quién afectan los ajustes", "Who these settings affect")}</h2>
-        <dl className="grid gap-4 text-sm md:grid-cols-3">
-          <div><dt className="font-semibold">{tr("Tu usuario", "Your account")}</dt><dd className="mt-1 text-[var(--ink-soft)]">{tr("Tu cuenta, notificaciones, recuerdos y conexiones personales de Altazor y Codex. Cada persona administra los suyos.", "Your account, notifications, memories and personal Altazor and Codex connections. Each person manages their own.")}</dd></div>
-          <div><dt className="font-semibold">{tr("Todo el estudio", "The whole firm")}</dt><dd className="mt-1 text-[var(--ink-soft)]">{canManage ? tr("Puedes administrar los datos, usuarios, integraciones y políticas compartidas del Host. Los cambios se aplican a todo el equipo.", "You can administer the Host's shared details, users, integrations and policies. Changes apply to the whole team.") : tr("La administración del Host gestiona los datos, usuarios, integraciones y políticas compartidas. Tus preferencias personales respetan esas políticas.", "Host administrators manage shared details, users, integrations and policies. Your personal preferences follow those policies.")}</dd></div>
-          <div><dt className="font-semibold">{tr("Este navegador", "This browser")}</dt><dd className="mt-1 text-[var(--ink-soft)]">{tr("El idioma y la apariencia se conservan en este navegador y pueden mantenerse al cambiar de usuario.", "Language and appearance are saved in this browser and may remain when switching accounts.")}</dd></div>
-        </dl>
-      </section>
       <ConfigSectionNav categories={categories} />
+      <details className="text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--sea)]">{tr("A quién afectan los ajustes","Who these settings affect")}</summary><p className="py-2 text-[var(--muted)]">{tr("Tu usuario: cuenta y preferencias personales. Todo el estudio: configuración compartida del Host. Este navegador: idioma y apariencia.","Your account: personal settings. Whole firm: shared Host configuration. This browser: language and appearance.")}</p></details>
       <div className={styles.groups}>
         {categories.map(category => (
           <section key={category.id} className={styles.group} aria-labelledby={`settings-${category.id}-title`}>
@@ -209,7 +201,9 @@ export default async function ConfiguracionPage() {
               <p>{locale === "en" ? category.descriptionEn : category.description}</p>
             </header>
             <div className={styles.groupContent}>
-              {category.sections.map(section => <div key={section.id} data-config-section={section.id}>{sections[section.id]}</div>)}
+              {category.sections.map(section => <div key={section.id} data-config-section={section.id}>
+                <p className={styles.scopeLabel}>{["idioma","apariencia"].includes(section.id)?tr("Este navegador","This browser"):["cuenta-personal","preferencias-altazor","autorizaciones-escritorio","comunicaciones"].includes(section.id)?tr("Tu usuario","Your account"):section.id==="cuentas-conectadas"?tr("Ámbito indicado en cada cuenta","Scope shown on each account"):tr("Todo el estudio","Whole firm")}</p>
+                {sections[section.id]}</div>)}
             </div>
           </section>
         ))}
