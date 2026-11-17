@@ -2,6 +2,8 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Espacio sin conexión: crear y desbloquear permanecen deshabilitados hasta que termina de abrirse el almacenamiento local, evitando un error falso durante la carga.
+
 - Altazor: encargos persistentes de revisión por causa desde el chat, con confirmación del equipo/modelos y una confirmación posterior de tareas y borradores. Lectura por bloques, Ícaros con su modelo independiente, consolidación con citas literales, cobertura y limitaciones visibles.
 - Continuidad del encargo al cerrar la ventana o reiniciar el Host, recuperación de recibos de delegación y guardado parcial sin duplicados. Preguntas vinculadas al encargo mediante la ayuda existente; las respuestas no autorizan escrituras. Cambios de fuentes o destino requieren revisar el plan.
 - Los resultados utilizados por mensajes posteriores conservan dependencias verificables mediante contexto v2. Los mensajes anteriores mantienen contexto v1; una versión antigua no puede tratar esas dependencias nuevas como texto validado.

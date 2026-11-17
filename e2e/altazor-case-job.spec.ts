@@ -353,11 +353,10 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
   for (const width of [1366, 360]) {
     await fresh.setViewportSize({ width, height: 900 });
     await card.scrollIntoViewIfNeeded();
-    expect(
-      await fresh.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+    // Resizing can finish before Firefox has applied its responsive layout.
+    await expect.poll(() => fresh.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    )).toBe(true);
     await fresh.screenshot({ path: info.outputPath(`case-job-${width}.png`) });
   }
 });

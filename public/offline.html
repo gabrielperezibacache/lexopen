@@ -7,8 +7,8 @@
 <h1>Trabajo sin conexión</h1><p class="intro">Prepare manuscritos, notas de lectura, escritos, clientes, tareas, causas, plazos, notas, minutas, documentos, adjuntos, eventos y trámites. Puede editar sus copias y crear registros locales cuando se interrumpa la conexión. Su copia se cifra en este navegador con una clave local.</p>
 <p id="message" role="status" aria-live="polite"></p>
 <section id="gate" aria-label="Abrir espacio local">
-<form id="unlock-form"><label for="password">Clave del espacio local</label><input id="password" type="password" minlength="12" required autocomplete="current-password" aria-describedby="key-help"><p id="key-help">Al crear el espacio, elija al menos 12 caracteres. Esta clave es independiente de su cuenta. Si la pierde, deberá recuperar el trabajo desde sus descargas o desde el servidor.</p><button id="unlock" type="submit">Desbloquear</button></form>
-<button id="create" class="secondary" type="button" hidden>Crear espacio cifrado</button>
+<form id="unlock-form"><label for="password">Clave del espacio local</label><input id="password" type="password" minlength="12" required autocomplete="current-password" aria-describedby="key-help"><p id="key-help">Al crear el espacio, elija al menos 12 caracteres. Esta clave es independiente de su cuenta. Si la pierde, deberá recuperar el trabajo desde sus descargas o desde el servidor.</p><button id="unlock" type="submit" disabled>Desbloquear</button></form>
+<button id="create" class="secondary" type="button" hidden disabled>Crear espacio cifrado</button>
 </section>
 <section id="workspace" hidden>
 <div class="toolbar"><button id="lock" class="secondary" type="button">Bloquear espacio</button></div>
