@@ -2,6 +2,14 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Chat de Altazor: los nombres de causas largos se ajustan al ancho disponible y conservan visible el botón para quitar contexto en pantallas pequeñas.
+
+- Espacio sin conexión: crear y desbloquear permanecen deshabilitados hasta que termina de abrirse el almacenamiento local, evitando un error falso durante la carga.
+
+- Altazor: encargos persistentes de revisión por causa desde el chat, con confirmación del equipo/modelos y una confirmación posterior de tareas y borradores. Lectura por bloques, Ícaros con su modelo independiente, consolidación con citas literales, cobertura y limitaciones visibles.
+- Continuidad del encargo al cerrar la ventana o reiniciar el Host, recuperación de recibos de delegación y guardado parcial sin duplicados. Preguntas vinculadas al encargo mediante la ayuda existente; las respuestas no autorizan escrituras. Cambios de fuentes o destino requieren revisar el plan.
+- Los resultados utilizados por mensajes posteriores conservan dependencias verificables mediante contexto v2. Los mensajes anteriores mantienen contexto v1; una versión antigua no puede tratar esas dependencias nuevas como texto validado.
+
 - Continuidad jurídica: selector de cliente con búsqueda y preselección; creación de causas recuperable tras respuestas perdidas, con recibos idempotentes, permisos vigentes y auditoría atómica. Las coincidencias judiciales reservadas no revelan identidades.
 - La ficha y el contador de documentos del cliente reúnen archivos directos y de sus causas accesibles, sin duplicados y con paginación. Se rechazan asociaciones explícitas incompatibles entre cliente y causa.
 - Extracción local de TXT y Markdown UTF-8 o UTF-16 con BOM, con rechazo de contenido binario y codificaciones inválidas. Prueba funcional de cliente a escrito aprobado, preservando la privacidad de la audiencia y el cierre explícito de tareas y plazos.

@@ -222,6 +222,8 @@ export function ruleClassify(
   normalized: NormalizedAssistantInput
 ): RuleClassifyResult {
   const flat = normalizeSearch(normalized.text);
+  const caseJob = explicitCaseJobIntent(normalized);
+  if (caseJob) return {intents:[caseJob]};
   const icaro = explicitIcaroIntent(normalized);
   if (icaro) return { intents: [icaro] };
   const connectorTask = connectorDesktopIntent(normalized.text);
@@ -279,4 +281,12 @@ export function ruleClassify(
   }
 
   return { intents: matched };
+}
+
+/** Explicit affirmative case work only; quotations/examples/negations remain ordinary chat. */
+export function explicitCaseJobIntent(input: NormalizedAssistantInput): AssistantIntent | undefined {
+  const flat=input.text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  if (!/^(?:(?:por favor[,\s]+|puedes\s+|podrias\s+))*(?:revisa|revisar|analiza|analizar|encargate de|organiza)\b/.test(flat) || !/\b(?:esta causa|este expediente|la causa actual)\b/.test(flat)) return;
+  if (/[«»“”"`]/.test(input.text) || /\b(?:no|nunca|ejemplo|traduce|copia|cita|explica como|supongamos)\b/.test(flat)) return;
+  return {toolId:"causa.encargar",confidence:1,slots:{}};
 }

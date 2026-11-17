@@ -15,7 +15,7 @@ import { getHelpChannelConfig, getWhatsAppMetaConfig } from "./config";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type HelpRequestView = ReturnType<typeof publicHelpRequest>;
-const createSchema = z.object({ requestKey: z.string().min(1).max(500), question: z.string().trim().min(1).max(4000), conversationId: z.string().max(200).nullable().optional(), computerSessionId: z.string().max(200).nullable().optional(), computerTurnId: z.string().max(200).nullable().optional(), scopeKind: z.enum(["causa", "workspace", "personal", "general"]).nullable().optional(), scopeId: z.string().max(200).nullable().optional(), expiresInMinutes: z.number().int().min(5).max(1440).optional() }).strict();
+const createSchema = z.object({ caseJobId:z.string().max(200).nullable().optional(), requestKey: z.string().min(1).max(500), question: z.string().trim().min(1).max(4000), conversationId: z.string().max(200).nullable().optional(), computerSessionId: z.string().max(200).nullable().optional(), computerTurnId: z.string().max(200).nullable().optional(), scopeKind: z.enum(["causa", "workspace", "personal", "general"]).nullable().optional(), scopeId: z.string().max(200).nullable().optional(), expiresInMinutes: z.number().int().min(5).max(1440).optional() }).strict();
 type CreateInput = z.input<typeof createSchema>;
 type Delivery = { codeEnc?: string; ntfy?: { status: string; messageId?: string; topic?: string; replyTopic?: string; baseUrl?: string; error?: string }; whatsapp?: { status: string; messageId?: string; channelId?: string; error?: string } };
 function delivery(row: AltazorHelpRequest): Delivery { try { return JSON.parse(row.deliveryJson); } catch { return {}; } }
@@ -35,11 +35,15 @@ async function helpView(row: AltazorHelpRequest, client: Client) {
 }
 
 /** Recheck both ownership and current matter permission at every answer and resumption. */
-async function helpAccess(row: Pick<AltazorHelpRequest, "ownerId" | "conversationId" | "computerSessionId" | "scopeKind" | "scopeId">, user: { id: string }, client: Client) {
+async function helpAccess(row: Pick<AltazorHelpRequest, "ownerId" | "conversationId" | "computerSessionId" | "scopeKind" | "scopeId" | "caseJobId"> & {id?:string;status?:string}, user: { id: string }, client: Client) {
   if (row.ownerId !== user.id) throw httpError("Solicitud de ayuda no encontrada.", 404);
   const found = await client.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, sessionVersion: true, capabilityGrants: true, capabilityRevokes: true } });
   if (!found) throw httpError("No tiene permiso para esta ayuda.", 403);
   const actor = await altazorActor(found, client);
+  if (row.caseJobId) {
+    const {job} = await (await import("../case-jobs/service")).caseJobAccess(row.caseJobId, actor, client);
+    if (job.conversationId !== row.conversationId || job.causaId !== row.scopeId || job.cancelledAt || row.id && ["pending","answered"].includes(row.status||"") && job.helpRequestId !== row.id) throw httpError("La pregunta ya no corresponde al encargo actual",409);
+  }
   let causaId: string | null = null;
   if (row.conversationId) causaId = (await conversationFor(row.conversationId, actor, client, true)).conversation.causaId;
   if (row.computerSessionId) {
@@ -64,22 +68,23 @@ async function ownRequest(id: string, user: { id: string }, client: Client) {
   return row;
 }
 
-export async function createHelpRequest(user: { id: string }, raw: CreateInput, client: PrismaClient = prisma): Promise<HelpRequestView> {
+export async function createHelpRequest(user: { id: string }, raw: CreateInput, client: Client = prisma): Promise<HelpRequestView> {
   const input = createSchema.parse(raw);
   const requestKey = sha256Hex(`${user.id}:${input.requestKey}`);
-  return altazorTransaction(client, async tx => {
-    const scope = { ownerId: user.id, conversationId: input.conversationId ?? null, computerSessionId: input.computerSessionId ?? null, scopeKind: input.scopeKind ?? "personal", scopeId: input.scopeId ?? null };
+  const run = async (tx: Prisma.TransactionClient) => {
+    const scope = { caseJobId:input.caseJobId??null, ownerId: user.id, conversationId: input.conversationId ?? null, computerSessionId: input.computerSessionId ?? null, scopeKind: input.scopeKind ?? "personal", scopeId: input.scopeId ?? null };
     const actor = await helpAccess(scope, user, tx);
     const prior = await tx.altazorHelpRequest.findUnique({ where: { requestKey } });
     if (prior) {
-      if (prior.ownerId !== actor.id || prior.computerSessionId !== scope.computerSessionId || prior.conversationId !== scope.conversationId || prior.computerTurnId !== (input.computerTurnId ?? null) || prior.scopeKind !== scope.scopeKind || prior.scopeId !== scope.scopeId) throw httpError("La solicitud de ayuda ya existe con otro alcance.", 409);
+      if (prior.caseJobId !== scope.caseJobId || prior.ownerId !== actor.id || prior.computerSessionId !== scope.computerSessionId || prior.conversationId !== scope.conversationId || prior.computerTurnId !== (input.computerTurnId ?? null) || prior.scopeKind !== scope.scopeKind || prior.scopeId !== scope.scopeId) throw httpError("La solicitud de ayuda ya existe con otro alcance.", 409);
       return publicHelpRequest(prior);
     }
     const code = randomBytes(24).toString("base64url");
     const row = await tx.altazorHelpRequest.create({ data: { ...scope, computerTurnId: input.computerTurnId ?? null, requestKey, question: input.question, correlationHash: sha256Hex(code), expiresAt: new Date(Date.now() + (input.expiresInMinutes ?? 60) * 60_000), deliveryJson: JSON.stringify({ codeEnc: encryptSecret(code) }) } });
     await writeAuditStrict({ actorId: actor.id, action: "altazor.help.wait", entityType: "AltazorHelpRequest", entityId: row.id, after: { computerSessionId: row.computerSessionId, conversationId: row.conversationId, expiresAt: row.expiresAt.toISOString() } }, tx);
     return publicHelpRequest(row);
-  });
+  };
+  return "$transaction" in client ? altazorTransaction(client,run) : run(client);
 }
 
 export async function getHelpRequest(user: { id: string }, id: string, client: PrismaClient = prisma) { return helpView(await ownRequest(id, user, client), client); }

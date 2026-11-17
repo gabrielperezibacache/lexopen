@@ -142,6 +142,7 @@ window.addEventListener("online", network); window.addEventListener("offline", n
 try {
   vault = await openVaultStore();
   const exists = await vault.exists(); $("create").hidden = exists; $("unlock").hidden = !exists;
+  $("create").disabled = false; $("unlock").disabled = false;
   if (!exists) message("Cree el espacio con conexión y prepare las copias que necesite. Después puede continuar sin conexión.");
   if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/sw.js");
 } catch (error) { message(error.message, true); $("create").disabled = true; $("unlock").disabled = true; }

@@ -12,6 +12,20 @@ const test = baseTest.extend<{ network: Awaited<ReturnType<typeof networkGateway
   network: async ({}, provide, info) => { const gateway = await networkGateway(String(info.project.use.baseURL)); try { await provide(gateway); } finally { await gateway.close(); } },
   baseURL: async ({ network }, provide) => provide(network.origin),
 });
+test("no ofrece desbloquear antes de inicializar el almacenamiento local", async ({ page }) => {
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/offline/vault.js", async route => { await ready; await route.continue(); });
+  try {
+    await page.goto("/offline.html", { waitUntil: "commit" });
+    await expect(page.getByRole("button", { name: "Desbloquear", exact: true })).toBeDisabled();
+    release();
+    await expect(page.getByRole("button", { name: "Crear espacio cifrado", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Crear espacio cifrado", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Desbloquear", exact: true })).toBeHidden();
+    await expect(page.locator("#message")).not.toHaveAttribute("data-error", "true");
+  } finally { release(); }
+});
 type Kind = "cliente" | "task";
 const key = "fictitious-local-records-key";
 const names = { cliente: "Razón social / nombre", task: "Título de la tarea" };

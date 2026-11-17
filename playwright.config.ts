@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3100";
 
-const compiledBrowserSpecs = ["legal-workflow-continuity.spec.ts", "information-hierarchy.spec.ts", "jornada-overview.spec.ts", "altazor-computer-viewer.spec.ts", "deadline-completion.spec.ts", "browser-smoke.spec.ts", "app-updates.spec.ts", "writing-review.spec.ts", "offline-*.spec.ts", "whatsapp-link.spec.ts"];
+const compiledBrowserSpecs = ["altazor-case-job.spec.ts", "legal-workflow-continuity.spec.ts", "information-hierarchy.spec.ts", "jornada-overview.spec.ts", "altazor-computer-viewer.spec.ts", "deadline-completion.spec.ts", "browser-smoke.spec.ts", "app-updates.spec.ts", "writing-review.spec.ts", "offline-*.spec.ts", "whatsapp-link.spec.ts"];
 const compiled = process.env.E2E_SERVER_MODE === "production";
 
 export default defineConfig({
@@ -38,12 +38,12 @@ export default defineConfig({
     },
     {
       name: "firefox",
-      testMatch: ["legal-workflow-continuity.spec.ts", "information-hierarchy.spec.ts", "jornada-overview.spec.ts", "altazor-computer-viewer.spec.ts", "deadline-completion.spec.ts", "browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "offline-personal.spec.ts", "whatsapp-link.spec.ts"],
+      testMatch: ["altazor-case-job.spec.ts", "legal-workflow-continuity.spec.ts", "information-hierarchy.spec.ts", "jornada-overview.spec.ts", "altazor-computer-viewer.spec.ts", "deadline-completion.spec.ts", "browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "offline-personal.spec.ts", "whatsapp-link.spec.ts"],
       use: { ...devices["Desktop Firefox"], launchOptions: { timeout: 30_000 } },
     },
     {
       name: "webkit",
-      testMatch: ["legal-workflow-continuity.spec.ts", "information-hierarchy.spec.ts", "jornada-overview.spec.ts", "altazor-computer-viewer.spec.ts", "deadline-completion.spec.ts", "browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "offline-personal.spec.ts", "whatsapp-link.spec.ts"],
+      testMatch: ["altazor-case-job.spec.ts", "legal-workflow-continuity.spec.ts", "information-hierarchy.spec.ts", "jornada-overview.spec.ts", "altazor-computer-viewer.spec.ts", "deadline-completion.spec.ts", "browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "offline-personal.spec.ts", "whatsapp-link.spec.ts"],
       use: { ...devices["Desktop Safari"] },
     },
   ],

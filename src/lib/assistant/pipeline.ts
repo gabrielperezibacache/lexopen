@@ -18,6 +18,7 @@ import { resolveDesktopTaskInput } from "./tools/escritorio";
 import { resolveAcademicToolInput } from "./tools/academic";
 import { resolveWorkflowToolInput } from "./tools/workflow";
 import { resolveLibrarySyncInput } from "./tools/library-sync";
+import { resolveCaseJobInput } from "./tools/case-job";
 import { resolveIcaroToolInput } from "./tools/icaro";
 import { resolveDriveToolInput } from "./tools/drive";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
@@ -100,6 +101,7 @@ function buildToolInput(
   const causaId = (slots.causaId as string | undefined) || resolved.causaId;
 
   switch (toolId) {
+    case "causa.encargar": return {};
     case "icaro.listar": return {};
     case "icaro.delegar": return { icaroId: slots.icaroId, icaroName: slots.icaroName, instruction: slots.instruction || texto, useMemory: slots.useMemory === true };
     case "drive.estado": return {};
@@ -324,6 +326,7 @@ export async function runAssistantTurn(
     const academic = intent.toolId.startsWith("academia."), workflow = intent.toolId.startsWith("audiencia.") || intent.toolId.startsWith("escrito.");
     try {
       if (intent.toolId === "plazo.actualizar") toolInput = await resolveDeadlineToolInput(toolInput,ctx,input.text);
+      if (intent.toolId === "causa.encargar") toolInput = await resolveCaseJobInput(ctx,input.text);
       if (intent.toolId === "icaro.delegar") toolInput = await resolveIcaroToolInput(toolInput, ctx, input.text);
       if (intent.toolId.startsWith("drive.")) toolInput = await resolveDriveToolInput(intent.toolId, toolInput, ctx);
       if (academic) toolInput = await resolveAcademicToolInput(intent.toolId, toolInput, ctx);

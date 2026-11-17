@@ -132,6 +132,14 @@ En **Ícaros** puedes crear especialistas privados para el ámbito actual y eleg
 
 Puedes pedir «Delega al Ícaro Revisor: compara estas fuentes». Altazor prepara un plan con el modelo, destino y fuentes seleccionadas antes de delegar. Los encargos se conservan en una cola, sus resultados se reúnen en la conversación y puedes continuar escribiendo mientras trabajan. No se copia automáticamente el historial, la memoria ni los adjuntos del padre. La cancelación y los cambios de acceso se comprueban también durante el trabajo. Hay límites de dos trabajos simultáneos por usuario, diez en cola y un nivel de subdelegación.
 
+## Encargos persistentes de una causa
+
+Pide «Revisa esta causa, organiza los pendientes y prepara un borrador» desde una conversación vinculada al expediente. **Confirmar equipo e iniciar encargo** autoriza el alcance y los modelos indicados. Altazor utiliza hasta dos Ícaros habilitados de esa causa, o realiza el análisis solo cuando no hay perfiles disponibles. En esta modalidad no se incorpora memoria de los Ícaros ni se guardan recuerdos automáticamente; los encargos manuales de Ícaros conservan sus opciones de memoria propias.
+
+El encargo tiene etapas y recibos persistentes, distintos de un turno ordinario del chat: no caduca al superar las 24 horas de cola de mensajes. Cada llamada mantiene sus límites de recursos y controles de acceso. El Host y su worker de jornada deben continuar activos para trabajar con la ventana cerrada. Cancelar detiene las etapas y delegaciones pendientes; no deshace registros ya guardados.
+
+El resultado es una propuesta revisable, con fuentes y limitaciones. **Confirmar registros seleccionados** guarda únicamente las tareas y el borrador elegidos. No presenta escritos, envía comunicaciones del estudio, crea nuevos vencimientos ni cumple plazos. Un cambio relevante del expediente o del destino del modelo bloquea la reutilización hasta revisar el alcance; los recibos de registros ya guardados se conservan. [Guía completa](ALTAZOR-ENCARGOS-DE-CAUSA.md).
+
 ## Ayuda a distancia
 
 **Ayuda a distancia** configura ntfy por usuario mediante un servidor HTTPS, un token y temas separados para los avisos y las respuestas. WhatsApp requiere que la administración prepare Meta Cloud API y su plantilla aprobada, y que cada persona verifique su propio número. El webhook configurado es `/api/altazor/help/whatsapp`. Los secretos sólo se guardan cifrados en el Host.

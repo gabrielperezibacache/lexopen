@@ -2,6 +2,7 @@ import type { ToolResult } from "@/lib/assistant/types";
 
 export type AltazorProgress = { summary: string; planned: number; completed: number; failed: number };
 const activities: Record<string, string> = {
+  "causa.encargar":"coordinar la revisión de la causa y preparar propuestas",
   "respuesta.libre": "analizar las fuentes y preparar una respuesta",
   "icaro.listar": "consultar tus Ícaros disponibles",
   "icaro.delegar": "delegar el análisis a tus Ícaros",
