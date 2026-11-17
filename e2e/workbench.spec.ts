@@ -91,7 +91,15 @@ test("Mesa: recorrido visual con proveedor y eventos ficticios, escritorio y mó
   await page.setViewportSize({ width: 360, height: 800 });
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+    overflowing: [...document.querySelectorAll("main *")]
+      .filter(element => element.getBoundingClientRect().right > document.documentElement.clientWidth + .5)
+      .map(element => ({ tag: element.tagName, className: element.className, width: element.getBoundingClientRect().width, text: element.textContent?.slice(0, 60) }))
+      .slice(-20),
+  }));
+  expect(layout.scroll, JSON.stringify(layout)).toBeLessThanOrEqual(layout.width);
   const sourceTrigger = page.getByRole("button", { name: "Fuentes del trabajo", exact: true });
   await sourceTrigger.click();
   const panel = page.locator("#workbench-tools");

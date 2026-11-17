@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { loginAs } from "./helpers";
 
 test("Tareas permite delegar, editar instrucciones y priorizar una causa", async ({ page }) => {
@@ -11,8 +12,9 @@ test("Tareas permite delegar, editar instrucciones y priorizar una causa", async
     options.map(option => (option as HTMLOptionElement).value).filter(Boolean)
   );
   expect(causes.length).toBeGreaterThanOrEqual(2);
-  const first = "Preparar evidencia priorizable";
-  const second = "Revisar escrito urgente";
+  const tag = randomUUID();
+  const first = `Preparar evidencia priorizable ${tag}`;
+  const second = `Revisar escrito urgente ${tag}`;
 
   async function create(title: string, causeId: string, priority: string) {
     await page.getByRole("button", { name: "Nueva tarea", exact: true }).click();
@@ -34,6 +36,7 @@ test("Tareas permite delegar, editar instrucciones y priorizar una causa", async
   const rows = page.getByRole("list", { name: "Tareas por prioridad" });
   const relevant = () => rows.getByRole("heading", { name: new RegExp(`${first}|${second}`) });
   await expect(relevant()).toHaveText([second, first]);
+  await filters.getByText("Más filtros", { exact: true }).click();
   await filters.getByRole("combobox", { name: "Priorizar causa" }).selectOption(causes[0]);
   await expect(relevant()).toHaveText([first, second]);
   await page.screenshot({ path: test.info().outputPath("tareas-priorizadas.png") });
