@@ -42,4 +42,6 @@ Capturas de la misma instalación de prueba con expedientes ficticios, a 1366 ×
 - `information-hierarchy.spec.ts`: equivalencia Inicio/lista/API, 106 plazos y paginación, apertura por enlace, teclado, borrador conservado, búsqueda vacía y ausencia de desbordamiento. Captura 14 apartados en ambos tamaños.
 - `jornada-overview.spec.ts`, `deadline-completion.spec.ts` y `altazor-computer-viewer.spec.ts`: recorrido de jornada, permisos, borradores de configuración, respaldo de cumplimiento, lectura semántica y recuperación del visor. Interacciones en Chromium, Firefox y WebKit; capturas generales en Chromium.
 
+Los recorridos de escritos y audiencias abren explícitamente Preparación antes de utilizar sus herramientas. Las regresiones de la mesa y de audiencia comprueban el ancho móvil; las de escritorio conservan las comprobaciones de inicio incierto, detención, permisos y reanudación. La captura de audio mantiene las pruebas de recuperación al volver atrás y al reabrir el navegador.
+
 La revisión de interfaz no acredita un piloto con datos reales, una conexión judicial activa ni la publicación o firma de instaladores.

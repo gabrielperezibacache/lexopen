@@ -6,7 +6,7 @@ import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { putObject } from "../src/lib/storage";
 import type { WritingDraftView, WritingHistory, WritingMutationResult } from "../src/lib/writings/types";
-import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest, openCasePreparation } from "./helpers";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Writing fixtures require local storage");
@@ -342,6 +342,7 @@ test("volver en el navegador antes de la pausa de guardado conserva la última e
   test.setTimeout(90_000); await loginAs(page, email); await authenticateApiRequests(page);
   const draft = await createDraft(page, "Continuidad al volver", "Texto inicial de navegación.");
   await page.goto(`/causas/${causaId}`);
+  await openCasePreparation(page);
   await page.getByRole("link", { name: "Escribir con fuentes", exact: true }).click();
   await expect(page.getByLabel("Título del escrito", { exact: true })).toHaveValue(draft.title);
   const latest = "Última edición antes de volver a la carpeta de la causa.";
@@ -349,6 +350,7 @@ test("volver en el navegador antes de la pausa de guardado conserva la última e
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`/causas/${causaId}$`));
   await expect.poll(async () => (await current(page, draft.id)).body).toBe(latest);
+  await openCasePreparation(page);
   await page.getByRole("link", { name: "Escribir con fuentes", exact: true }).click();
   await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveValue(latest);
 });

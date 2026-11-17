@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { loginAs } from "./helpers";
+import { loginAs, openCasePreparation } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import type { HearingLiveMutation, HearingLiveView } from "../src/lib/hearings/live-types";
 import type { HearingNoteView } from "../src/lib/hearings/types";
@@ -210,6 +210,7 @@ test("anotación pendiente al volver y contador sin conexión: recuperación sin
   const other = await json<{ id: string }>(await page.request.post(hearings(), { data: { title: "Otra mesa ficticia de navegación" } }), 201);
   const first = await json<{ id: string }>(await page.request.post(hearings(), { data: { title: "Borrador ficticio aún sin confirmar" } }), 201);
   await page.goto(`/causas/${causaId}`);
+  await openCasePreparation(page);
   await page.getByRole("link", { name: "Abrir mesa de audiencia", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Mesa privada", exact: true })).toHaveValue(first.id);
   await page.getByRole("button", { name: "En vivo", exact: true }).click();
@@ -219,6 +220,7 @@ test("anotación pendiente al volver y contador sin conexión: recuperación sin
   await panel.getByRole("textbox", { name: "Registro de audiencia", exact: true }).fill(pending);
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`/causas/${causaId}$`));
+  await openCasePreparation(page);
   await page.getByRole("link", { name: "Abrir mesa de audiencia", exact: true }).click();
   await page.getByRole("button", { name: "En vivo", exact: true }).click();
   await expect(panel.getByRole("textbox", { name: "Registro de audiencia", exact: true })).toHaveValue(pending);

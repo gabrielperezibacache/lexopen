@@ -119,7 +119,7 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   const beforeAttachment=modelRequests.length;await send(page,"Analiza el comprobante adjunto ficticio");expect(modelRequests.slice(beforeAttachment).some(messages=>JSON.stringify(messages).includes(bytes.toString()))).toBe(true);
   const archive=page.locator(".altazor-attachment-archive");if(await archive.getAttribute("open")===null)await archive.locator(":scope > summary").click();
   const fileOptions=page.locator(".altazor-attachment-options");await fileOptions.locator(":scope > summary").click();
-  await page.getByRole("button",{name:"Guardar en biblioteca",exact:true}).click();await expect(page.getByRole("status").filter({hasText:"Guardado en tu biblioteca"})).toBeVisible();
+  await page.getByRole("button",{name:"Guardar en biblioteca",exact:true}).click();await expect(page.getByRole("status").filter({hasText:"Guardado en Biblioteca:"})).toBeVisible();
   const book=await db.libraryBook.findFirstOrThrow({where:{ownerId:user.id,requestId:`altazor-attachment-${attached.id}`}});expect(book.originalRetained).toBe(false);expect(book.convertedToText).toBe(true);expect(book.sourceSha256).toBe(sha(bytes));
   await page.getByRole("button",{name:"Guardar en biblioteca",exact:true}).click();await expect(page.getByRole("button",{name:"Guardar en biblioteca",exact:true})).toBeEnabled();expect(await db.libraryBook.count({where:{ownerId:user.id,requestId:`altazor-attachment-${attached.id}`}})).toBe(1);
   const fragment=await db.libraryBookFragment.findFirstOrThrow({where:{bookId:book.id},orderBy:{ordinal:"asc"}}),callsBeforeForgery=modelRequests.length,current=await readChat(page,id);

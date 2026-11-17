@@ -5,7 +5,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest, openCasePreparation } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import type { HearingLiveAudioView } from "../src/lib/audio/live-types";
 import type { HearingLiveMutation } from "../src/lib/hearings/live-types";
@@ -263,6 +263,7 @@ test("protege enlaces y Atrás detiene la captura con recuperación del tramo si
   try {
     await loginAs(page, email); await authenticateApiRequests(page); const desk = await createDesk(page, "Retorno ficticio a captura pendiente");
     await page.goto(`/causas/${causaId}`);
+    await openCasePreparation(page);
     await page.getByRole("link", { name: "Abrir mesa de audiencia", exact: true }).click();
     await page.getByRole("button", { name: "En vivo", exact: true }).click();
     let audio = page.getByTestId("hearing-live-audio");
@@ -276,6 +277,7 @@ test("protege enlaces y Atrás detiene la captura con recuperación del tramo si
     await page.goBack();
     await expect(page).toHaveURL(new RegExp(`/causas/${causaId}$`));
     await microphoneEnded(page);
+    await openCasePreparation(page);
     await page.getByRole("link", { name: "Abrir mesa de audiencia", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/causas/${causaId}/audiencias`));
     await page.getByRole("button", { name: "En vivo", exact: true }).click();
