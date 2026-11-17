@@ -8,11 +8,12 @@ export type { AltazorProgress } from "./progress";
 export type AltazorClient = PrismaClient | Prisma.TransactionClient;
 export type AltazorDestination = { provider: string; model: string; endpoint: string; endpointHash: string; remote: boolean; permitted: boolean; key: string };
 export type AltazorContext = {
-  version: 1;
+  version: 1 | 2;
   attachmentIds: string[];
   refs: AltazorSourceSnapshot[];
   historyTurnIds: string[];
   memoryDependencies: unknown[];
+  caseJobResults?: {id:string;hash:string}[];
   recalledTurns?: { id: string; conversationId: string; fingerprint: string }[];
 };
 export type AltazorExecutionContext = { context: string; history: LlmHistoryMessage[]; snapshot: AltazorContext };

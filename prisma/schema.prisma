@@ -55,6 +55,7 @@ model FirmSettings {
 }
 
 model User {
+  altazorCaseJobs AltazorCaseJob[]
   deadlineStateEvents PlazoStateEvent[]
   trustedDevices TrustedDevice[]
   trustedDeviceVersion Int @default(0)
@@ -319,6 +320,7 @@ model Cliente {
 }
 
 model Causa {
+  altazorCaseJobs AltazorCaseJob[]
   fiscaliaRequests FiscaliaRequest[]
   altazorIcaros AltazorIcaro[]
   pjudDocumentDownloadsEnabled Boolean @default(false)
@@ -513,6 +515,7 @@ model AltazorIcaroMemory {
 
 /// Human assistance stays bound to its owner and originating work; delivery does not authorize execution.
 model AltazorHelpRequest {
+  caseJobId String?
   id String @id @default(cuid())
   ownerId String
   owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
@@ -2563,6 +2566,7 @@ model WorkbenchImportReceipt {
 }
 
 model AltazorConversation {
+  altazorCaseJobs AltazorCaseJob[]
   companionSelections AltazorCompanion[]
   id String @id @default(cuid())
   ownerId String
@@ -3292,4 +3296,54 @@ model PlazoStateEvent {
   documentSha256 String?
   @@unique([plazoId, revision])
   @@index([plazoId, createdAt, id])
+}
+
+/// Explicit case work survives browser/Host restarts; leases limit calls, never retention.
+model AltazorCaseJob {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  causaId String
+  causa Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation AltazorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  originTurnId String @unique
+  requestId String
+  inputSha256 String
+  actorSessionVersion Int
+  objective String @db.Text
+  planJson String @db.Text
+  status String @default("queued")
+  revision Int @default(1)
+  reportJson String @default("{}") @db.Text
+  selectionJson String @default("null") @db.Text
+  helpRequestId String?
+  errorCode String?
+  cancelledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  steps AltazorCaseJobStep[]
+  @@unique([ownerId, requestId])
+  @@index([ownerId, status, updatedAt])
+  @@index([status, updatedAt])
+}
+model AltazorCaseJobStep {
+  id String @id @default(cuid())
+  jobId String
+  job AltazorCaseJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  ordinal Int
+  kind String
+  label String
+  status String @default("queued")
+  attempts Int @default(0)
+  dataJson String @default("{}") @db.Text
+  resultJson String @default("{}") @db.Text
+  icaroJobId String?
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  errorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([jobId, ordinal])
+  @@index([jobId, status, ordinal])
 }

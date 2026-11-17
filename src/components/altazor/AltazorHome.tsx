@@ -1,4 +1,5 @@
 "use client";
+import { AltazorCaseJob } from "./AltazorCaseJob";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowUp, BellRing, BrainCircuit, CircleStop, Ellipsis, Feather, Link2, MessageSquare, Monitor, Paperclip, Settings2, X } from "lucide-react";
@@ -119,7 +120,7 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
 type TurnAction = "confirm" | "reject" | "execute" | "cancel";
 
 function AltazorTurnMessage({ turn, busy, onAction }: { turn: TimelineTurn; busy: boolean; onAction: (action: TurnAction) => void }) {
-  if (turn.available === false) return <p className="altazor-muted">Contenido no disponible. Cambió el acceso a una fuente.</p>;
+  if (turn.available === false) return <><p className="altazor-muted">Contenido no disponible. Cambió el acceso a una fuente.</p>{turn.results.filter(r=>r.result.card?.type==="case-job"&&typeof r.result.card.id==="string").map(r=><AltazorCaseJob key={String(r.result.card!.id)} id={String(r.result.card!.id)}/>)}</>;
   const canAct = turn.conversationStatus === "active";
   const inProgress = ["queued", "running", "delegating"].includes(turn.status);
   const cards = turn.results.filter(item => item.result.card && !(item.result.card.type === "respuesta-libre" && item.result.message === turn.assistantText));
@@ -144,10 +145,11 @@ function AltazorTurnMessage({ turn, busy, onAction }: { turn: TimelineTurn; busy
         <h4>Revisa el encargo completo</h4>
         {!turn.progress && turn.assistantText && <AltazorMessageContent text={turn.assistantText} />}
         <details><summary>{turn.plan.steps.length === 1 ? "Ver la acción propuesta" : `Ver las ${turn.plan.steps.length} acciones propuestas`}</summary><ol>{turn.plan.steps.map((step, index) => <li key={index}>{step.preview}</li>)}</ol></details>
-        <button type="button" className="btn btn-primary" data-testid="plan-confirm" disabled={busy} onClick={() => onAction("confirm")}>Confirmar estos cambios</button>
+        <button type="button" className="btn btn-primary" data-testid="plan-confirm" disabled={busy} onClick={() => onAction("confirm")}>{turn.plan.steps.some(s=>s.toolId==="causa.encargar")?"Confirmar equipo e iniciar encargo":"Confirmar estos cambios"}</button>
         <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => onAction("reject")}>Descartar plan</button>
       </div>}
       {!inProgress && cards.length > 0 && <details className="altazor-result-details"><summary>Ver resultados y detalles · {cards.length}</summary>{cards.map((item, index) => <ResultCard key={index} item={{ toolId: item.toolId, ...item.result } as AssistantResultItem} />)}</details>}
+      {turn.results.filter(item=>item.result.card?.type==="case-job"&&typeof item.result.card.id==="string").map(item=><AltazorCaseJob key={String(item.result.card!.id)} id={String(item.result.card!.id)}/>)}
       {Boolean(turn.delegations?.length) && <details className="altazor-result-details"><summary>Ver encargos a Ícaros · {turn.delegations!.length}</summary><ul className="altazor-delegation-list">{turn.delegations!.map(job => <li key={job.id}><strong>{job.icaroName || "Ícaro no disponible"}</strong><span>{({ queued: "En cola", running: "Trabajando", completed: "Completado", failed: "No completado", cancelled: "Detenido", blocked: "Acceso no disponible", interrupted: "Interrumpido" } as Record<string, string>)[job.status] || "Estado por consultar"}</span>{job.available && job.result && <AltazorMessageContent text={job.result} />}</li>)}</ul><Link href={`/inicio?${new URLSearchParams({ altazor: "icaros", ...(turn.causaId ? { causaId: turn.causaId } : {}) })}`}>Abrir mis Ícaros</Link></details>}
       {canAct && inProgress && <div className="altazor-running">
         {!turn.progress && <span role="status">{turn.status === "queued" ? "Encargo en cola" : "Trabajando…"}</span>}

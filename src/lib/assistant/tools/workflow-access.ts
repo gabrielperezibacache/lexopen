@@ -18,6 +18,13 @@ export async function savedAnswer(input: Record<string,unknown>, ctx: ToolContex
   const turn = typeof input.sourceTurnId === "string" ? await db.altazorTurn.findFirst({where:{id:input.sourceTurnId,conversationId:scope.conversationId,ownerId:scope.actor.id,status:"completed"},select:{assistantText:true,contextJson:true}}) : null;
   if (!turn || !turn.assistantText.trim()) throw httpError("Prepara primero una respuesta con tus fuentes y después pide guardarla como escrito.",409);
   let snapshot: AltazorContext; try { snapshot = JSON.parse(turn.contextJson); } catch { throw httpError("La respuesta necesita revisar sus fuentes.",409); }
+  if(snapshot.caseJobResults?.length) {
+    for(const ref of snapshot.caseJobResults) {
+      const result=await (await import("@/lib/altazor/case-jobs/conversation")).caseJobConversationResult(ref.id,scope.conversationId,scope.actor);
+      if(!result||result.hash!==ref.hash)throw httpError("El resultado del encargo cambió; prepara una respuesta nueva",409);
+    }
+    if(!snapshot.refs.length)throw httpError("Guarda el borrador desde el encargo o selecciona pasajes documentales antes de guardar esta respuesta como escrito",409);
+  }
   await verifyAltazorSources(scope.actor,snapshot.refs,{causaId:scope.causaId,client:db});
   return { ...scope,turn,snapshot };
 }

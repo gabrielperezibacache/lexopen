@@ -29,6 +29,8 @@ import { bibliotecaListarTool, sincronizacionEstadoTool } from "./library-sync";
 import { icaroListarTool, icaroDelegarTool } from "./icaro";
 import { driveEstadoTool, driveCrearCarpetaTool, driveGuardarDocumentoTool } from "./drive";
 
+import { causaEncargarTool } from "./case-job";
+
 export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "nota.crear": notaCrearTool,
   "nota.editar": notaEditarTool,
@@ -39,6 +41,7 @@ export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "causa.resumen": causaResumenTool,
   "causa.movimientos": causaMovimientosTool,
   "causa.estado": causaEstadoTool,
+  "causa.encargar": causaEncargarTool,
   "minuta.borrador": minutaBorradorTool,
   "minuta.crear": minutaCrearTool,
   "documento.buscar": documentoBuscarTool,

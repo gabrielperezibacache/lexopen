@@ -1,3 +1,4 @@
+import { processCaseJobs } from "@/lib/altazor/case-jobs/worker";
 import { runQueuedAltazorTurns } from "@/lib/altazor/worker";
 import { runScheduledAcademicCallRefresh } from "@/lib/altazor/academic-calls";
 import { runDueTeachingReminders } from "@/lib/altazor/teaching-reminders";
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   }
   const tasks = [
     ["altazor", () => runQueuedAltazorTurns()],
+    ["caseJobs", () => processCaseJobs({ limit: 4 })],
     ["icaros", () => processQueuedIcaroJobs({ limit: 4 })],
     ["humanHelp", () => reconcileComputerHelp({ limit: 10 })],
     ["dailyBrief", () => processDueDailyBriefs()],

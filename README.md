@@ -29,6 +29,12 @@ Si se pierde la respuesta al crear una causa, **Reintentar creación** recupera 
 
 Los documentos del cliente incluyen los de sus causas accesibles, con contador y paginación coherentes. Los originales se conservan; TXT y Markdown válidos se extraen localmente, incluidos textos UTF-16 con BOM. Puedes preparar una audiencia, promover una observación revisada a hecho del expediente y citar su documento en un escrito con segundo revisor. La mesa privada conserva su acceso propio. Exportar el escrito no completa tareas ni plazos: cada cierre requiere su acción explícita. [Recorrido y comprobaciones](docs/CONTINUIDAD-TRABAJO-JURIDICO.md).
 
+## Encargos de Altazor por causa
+
+En una conversación de una causa puedes pedir: **«Revisa esta causa, organiza los pendientes y prepara un borrador»**. Altazor propone el equipo, los modelos y el alcance; al confirmar, conserva el encargo y sus etapas en el Host. Si hay Ícaros habilitados en ese ámbito, delega el análisis por bloques y consolida sus resultados. Si no los hay, trabaja solo.
+
+El informe muestra fuentes cotejadas y limitaciones de lectura. Las tareas y el borrador se pueden editar y seleccionar antes de una **segunda confirmación para guardarlos**. Los reintentos recuperan los recibos de cada registro. Cerrar la ventana o reiniciar el Host conserva el encargo; para continuar sin navegador debe estar activo el worker de jornada. Una pregunta pendiente puede avisarse por los canales de ayuda configurados y su respuesta no aprueba escrituras. [Funcionamiento, actualización y pruebas](docs/ALTAZOR-ENCARGOS-DE-CAUSA.md).
+
 ## Descargar e instalar
 
 [**Publicaciones y descargas verificadas**](https://github.com/gabrielperezibacache/lexopen/releases) · [Versión 1.1.0-preview.10](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.10)

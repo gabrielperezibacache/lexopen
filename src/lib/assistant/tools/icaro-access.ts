@@ -24,7 +24,7 @@ export async function icaroSelectedSources(ctx: ToolContext, db: Prisma.Transact
   const turn = await db.altazorTurn.findFirst({ where: { id: ctx.nativeTurnId, conversationId: scope.conversationId, ownerId: scope.actor.id, cancelRequestedAt: null } });
   let snapshot: { version: number; refs: AltazorSourceSnapshot[] } | undefined;
   try { snapshot = turn ? JSON.parse(turn.contextJson) : undefined; } catch { /* Fail closed. */ }
-  if (!turn || !snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.refs) || snapshot.refs.length > 8) throw httpError("No se pudieron verificar las fuentes seleccionadas del encargo.", 409);
+  if (!turn || !snapshot || ![1,2].includes(snapshot.version) || !Array.isArray(snapshot.refs) || snapshot.refs.length > 8) throw httpError("No se pudieron verificar las fuentes seleccionadas del encargo.", 409);
   await verifyAltazorSources(scope.actor, snapshot.refs, { causaId: scope.causaId, client: db });
   return { ...scope, turn, refs: snapshot.refs, sourceKey: sha256(canonicalJson(snapshot.refs)) };
 }

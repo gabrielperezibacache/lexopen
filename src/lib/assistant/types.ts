@@ -18,6 +18,7 @@ export const ASSISTANT_TOOL_IDS = [
   "causa.resumen",
   "causa.movimientos",
   "causa.estado",
+  "causa.encargar",
   "minuta.borrador",
   "minuta.crear",
   "documento.buscar",

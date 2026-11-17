@@ -100,7 +100,7 @@ function expected(row: DraftRow, revision: number) {
   if (row.revision !== revision) throw Object.assign(writingChanged(), { code: "writing_conflict" });
 }
 
-export async function createCaseWriting(causaId: string, raw: z.input<typeof writingCreateSchema>, user: CausaAccessUser, client: PrismaClient = prisma): Promise<WritingMutationResult> {
+export async function createCaseWriting(causaId: string, raw: z.input<typeof writingCreateSchema>, user: CausaAccessUser, client: WritingClient = prisma): Promise<WritingMutationResult> {
   const input = writingCreateSchema.parse(raw), hash = inputHash("created", input);
   return writingTransaction(client, async tx => {
     const { actor, canWrite } = await writingActor(causaId, user, tx, true);

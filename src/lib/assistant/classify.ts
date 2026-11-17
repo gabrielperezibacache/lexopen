@@ -9,7 +9,7 @@ import { z } from "zod";
 import { askLlm as defaultAskLlm } from "@/lib/integrations/llm";
 import { ASSISTANT_TOOL_IDS, isAssistantToolId } from "./types";
 import type { AssistantIntent } from "./types";
-import { explicitDesktopListing, explicitWorkflowListing, explicitIcaroIntent, ruleClassify } from "./classify-rules";
+import { explicitCaseJobIntent, explicitDesktopListing, explicitWorkflowListing, explicitIcaroIntent, ruleClassify } from "./classify-rules";
 import { connectorDesktopIntent } from "./connector-desktop-intent";
 import { explicitDriveIntent } from "./drive-intent";
 import type { NormalizedAssistantInput } from "./normalize";
@@ -115,6 +115,8 @@ export async function classifyIntents(
 ): Promise<ClassifyResult> {
   opts?.signal?.throwIfAborted();
   const prompt = classifyPrompt(input, opts?.attachments, opts?.altazorContext);
+  const caseJob=opts?.altazorContext?explicitCaseJobIntent(input):undefined;
+  if(caseJob)return {intents:[caseJob],source:"rule",prompt};
   const icaro = opts?.altazorContext ? explicitIcaroIntent(input) : undefined;
   if (icaro) return { intents: [icaro], source: "rule", prompt };
   const driveTask = opts?.altazorContext ? explicitDriveIntent(input.text) : undefined;
@@ -153,7 +155,7 @@ export async function classifyIntents(
       );
       const intents = parsed.intents
         .filter((i) => isAssistantToolId(i.toolId))
-        .filter((i) => !i.toolId.startsWith("icaro."))
+        .filter((i) => !i.toolId.startsWith("icaro.") && i.toolId !== "causa.encargar")
         .map((i) => ({
           toolId: i.toolId as AssistantIntent["toolId"],
           confidence: i.confidence,

@@ -17,7 +17,7 @@ type Db = Prisma.TransactionClient;
 type MemoryRef = { id: string; revision: number };
 type Sources = { version: 1; refs: AltazorSourceSnapshot[]; memory: MemoryRef[]; sourceResultHash?: string };
 type ValidationBudget = { remaining: number };
-type JobOrigin = { conversationId: string; turnId: string };
+type JobOrigin = { conversationId: string; turnId: string; caseJobId?: string; caseStepId?: string };
 type JobContext = Sources & { useMemory: boolean; allowRemote: boolean; profileInstructions: string; origin?: JobOrigin };
 export type IcaroServiceOptions = { signal?: AbortSignal; authorizeContext?: () => Promise<void>; ask?: typeof askLlm };
 const missing = () => httpError("Ícaro o trabajo no disponible con sus permisos actuales", 404);
@@ -55,11 +55,18 @@ function contextFor(job: AltazorIcaroJob): JobContext {
   if (value.origin && (!icaroId.safeParse(value.origin.conversationId).success || !icaroId.safeParse(value.origin.turnId).success)) throw changed();
   return value;
 }
-async function assertOrigin(origin: JobOrigin | undefined, profile: AltazorIcaro, actor: CausaAccessUser, db: Db) {
+async function assertOrigin(origin: JobOrigin | undefined, profile: AltazorIcaro, actor: CausaAccessUser, db: Db, active=false) {
   if (!origin) return;
+  if (origin.caseJobId || origin.caseStepId) {
+    if (!origin.caseJobId || !origin.caseStepId) throw changed();
+    const { job, plan } = await (await import("../case-jobs/service")).caseJobAccess(origin.caseJobId, actor, db);
+    const step = await db.altazorCaseJobStep.findFirst({where:{id:origin.caseStepId,jobId:job.id,kind:"analyze"}});
+    if (!step || job.conversationId !== origin.conversationId || job.originTurnId !== origin.turnId || job.cancelledAt || ["cancelled","blocked","interrupted","awaiting_plan"].includes(job.status) || !plan.team.some(m=>m.id===profile.id && m.revision===profile.revision)) throw changed();
+    if(active&&(job.status!=="running"||!["running","waiting"].includes(step.status)))throw changed();
+  }
   const turn = await db.altazorTurn.findFirst({ where: { id: origin.turnId, conversationId: origin.conversationId, ownerId: actor.id, conversation: { ownerId: actor.id, scopeKey: profile.scopeKey, causaId: profile.causaId } } });
   const current = await altazorActor(actor, db);
-  if (!turn || turn.cancelRequestedAt || !["running", "queued", "awaiting_confirmation", "partial", "completed"].includes(turn.status) || turn.actorSessionVersion !== null && turn.actorSessionVersion !== current.sessionVersion) throw changed();
+  if (!turn || turn.cancelRequestedAt || !["running", "queued", "awaiting_confirmation", "partial", "completed"].includes(turn.status) || !origin.caseJobId && turn.actorSessionVersion !== null && turn.actorSessionVersion !== current.sessionVersion) throw changed();
 }
 function destinationFor(job: AltazorIcaroJob): IcaroDestination {
   let value: IcaroDestination;
@@ -103,7 +110,14 @@ async function validateJobContext(job: AltazorIcaroJob, profile: AltazorIcaro, a
     await validateJobContext(parent, parent.icaro, actor, db, budget);
   }
   const snapshot = contextFor(job);
-  await assertOrigin(snapshot.origin, profile, actor, db);
+  await assertOrigin(snapshot.origin, profile, actor, db, job.status!=="completed");
+  if(snapshot.origin?.caseJobId){
+    const step=await db.altazorCaseJobStep.findUniqueOrThrow({where:{id:snapshot.origin.caseStepId!}});
+    const data=JSON.parse(step.dataJson) as {operationKey?:string;refs?:{id:string;source:AltazorSourceSnapshot}[];text?:string};
+    const refs=data.refs||[];
+    const expectedText=(data.text||"")+"\nCorrespondencias de fuentes: "+refs.map((r,i)=>`[R${i+1}] = [${r.id}]`).join("; ");
+    if(!data.operationKey||job.requestId!==`case-job:${step.id}:${data.operationKey}`||job.explicitText!==expectedText||canonicalJson(snapshot.refs.map(r=>r.fingerprint))!==canonicalJson(refs.map(r=>r.source.fingerprint)))throw changed();
+  }
   const verified = await verifyAltazorSources(actor, snapshot.refs, { causaId: profile.causaId, client: db });
   const memory = await memoryForContext(profile, actor, snapshot.memory, db, budget);
   return { snapshot, context: verified.context, memory };
@@ -177,7 +191,7 @@ export async function createIcaroJob(id: string, raw: unknown, user: CausaAccess
   const result = await altazorTransaction(prisma, async db => {
     const { actor, profile } = await profileFor(id, user, db); await lockOwner(actor.id, db);
     if (profile.revision !== initial.profile.revision || !profile.enabled) throw changed();
-    await assertOrigin(options.origin, profile, actor, db);
+    await assertOrigin(options.origin, profile, actor, db, true);
     await verifyAltazorSources(actor, refs, { causaId: profile.causaId, client: db }); await memoryForContext(profile, actor, memories, db);
     const prior = await db.altazorIcaroJob.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
     if (prior) { if (prior.inputSha256 !== hash || prior.icaroId !== id) throw changed(); return { job: prior, profile, reused: true }; }

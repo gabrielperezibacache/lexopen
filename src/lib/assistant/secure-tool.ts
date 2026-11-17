@@ -1,3 +1,4 @@
+import { assertCaseJobToolAccess, authorizeCaseJobResult } from "./tools/case-job";
 import {
   deadlineFor,
   authorizeCompletion,
@@ -96,6 +97,7 @@ export async function assertToolInputAccess(
   db: Prisma.TransactionClient = prisma,
 ) {
   ctx.signal?.throwIfAborted();
+  if (id === "causa.encargar") return assertCaseJobToolAccess(ctx);
   if (id === "icaro.listar" || id === "icaro.delegar")
     return assertIcaroToolInputAccess(id, input, ctx, write, db);
   if (id === "escritorio.listar" || id === "escritorio.encargar")
@@ -337,6 +339,7 @@ export async function authorizeCommittedResult(
       );
     return;
   }
+  if (id === "causa.encargar" && result) return authorizeCaseJobResult(result, actor);
   if (id === "icaro.delegar" && result)
     return authorizeIcaroResult(input, result, actor, tx);
   if (id === "escritorio.encargar")
