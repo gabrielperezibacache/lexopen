@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
@@ -32,6 +32,10 @@ export async function serializable<T>(run: (tx: Prisma.TransactionClient) => Pro
       });
     } catch (error) {
       if ((error as { code?: string }).code !== "P2034" || attempt >= 4) throw error;
+      // PostgreSQL rolled this attempt back. Yield before starting a fresh
+      // snapshot so competing writes can finish instead of exhausting retries
+      // in the same burst. Other errors may have an unknown outcome: never retry.
+      await new Promise(resolve => setTimeout(resolve, 50 * 2 ** attempt + randomInt(0, 51)));
     }
   }
 }

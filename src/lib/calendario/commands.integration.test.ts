@@ -25,7 +25,13 @@ async function main() {
       assert.equal(await prisma.evento.count({ where: { causaId: cause.id } }), 0);
       assert.equal(await prisma.activity.count({ where: { causaId: cause.id } }), 0);
     });
-    const key = randomUUID(), [first, replay] = await Promise.all([createEventCommand(owner, input, key), createEventCommand(owner, input, key)]);
+    const key = randomUUID(), concurrent = await Promise.allSettled([createEventCommand(owner, input, key), createEventCommand(owner, input, key)]);
+    // Await both writers before cleanup, including when one rejects. Otherwise
+    // a late commit can race fixture deletion and hide the original failure.
+    const [first, replay] = concurrent.map(result => {
+      if (result.status === "rejected") throw result.reason;
+      return result.value;
+    });
     assert.equal(first.id, replay.id);
     assert.equal(await prisma.evento.count({ where: { causaId: cause.id } }), 1);
     const neighbor = await prisma.evento.create({ data: { titulo: "Conflicto real", inicio: new Date("2092-11-24T11:00:00Z"), fin: new Date("2092-11-24T13:00:00Z"), causaId: cause.id, responsableId: owner.id } });

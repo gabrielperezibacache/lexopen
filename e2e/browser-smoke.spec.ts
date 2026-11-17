@@ -1,5 +1,19 @@
 import { expect, test } from "@playwright/test";
-import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest, openCasePreparation } from "./helpers";
+
+test("preparación actúa sobre la causa visible y conserva las copias ocultas de navegación", async ({ page }) => {
+  await page.setContent(`
+    <div hidden><details open><summary>Preparación de la causa</summary><section data-testid="case-preparation">Causa anterior oculta</section></details></div>
+    <main><details><summary>Preparación de la causa</summary><section data-testid="case-preparation">Causa actual</section></details></main>
+  `);
+  await openCasePreparation(page);
+  await expect(page.getByTestId("case-preparation").filter({ visible: true })).toHaveText("Causa actual");
+  await expect(page.getByTestId("case-preparation")).toHaveCount(2);
+  await expect(page.locator("div[hidden] details")).toHaveAttribute("open", "");
+  // Calling again must not collapse the current panel or activate the cached one.
+  await openCasePreparation(page);
+  await expect(page.getByTestId("case-preparation").filter({ visible: true })).toHaveText("Causa actual");
+});
 
 test("formularios accesibles y menú móvil en el motor del navegador", async ({ page }) => {
   test.setTimeout(90_000);
