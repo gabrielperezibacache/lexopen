@@ -6,6 +6,7 @@ import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { withRejectedAudit } from "@/lib/testing/audit-failure";
 import { createClienteCommand } from "./commands";
 import { clienteListInclude } from "./list";
+import { clienteDocumentCounts } from "./documents";
 
 const status = (code: number) => (error: unknown) => (error as { status?: number }).status === code;
 
@@ -35,7 +36,7 @@ async function main() {
     ] });
     async function counts(actor: typeof owner) {
       const row = await prisma.cliente.findUniqueOrThrow({ where: { id: client.id }, include: clienteListInclude(actor) });
-      return { causas: row._count.causas, documentos: row._count.documentos, pendientes: row.causas.reduce((sum, cause) => sum + cause._count.tramites, 0) };
+      return { causas: row._count.causas, documentos: (await clienteDocumentCounts([client.id], actor)).get(client.id), pendientes: row.causas.reduce((sum, cause) => sum + cause._count.tramites, 0) };
     }
     assert.equal(await prisma.causa.count({ where: { id: hidden.id, ...causaAccessWhere(outsider) } }), 0);
     assert.deepEqual(await counts(owner), { causas: 2, documentos: 4, pendientes: 2 });

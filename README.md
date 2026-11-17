@@ -23,6 +23,12 @@ Las pantallas priorizan el estado y los registros. Los formularios de incorporac
 
 **Próximos plazos** abre los pendientes asignados a ti desde hoy hasta la fecha indicada, inclusive (hoy + 7 días), aunque cambien de mes. Los avisos de acceso, datos desactualizados y autorizaciones siguen visibles. [Criterios y comparación visual](docs/JERARQUIA-INFORMACION.md).
 
+## Continuidad del expediente
+
+Si se pierde la respuesta al crear una causa, **Reintentar creación** recupera esa misma operación; conserva los datos hasta confirmar el resultado. El servidor vuelve a comprobar los permisos y conflictos. La referencia judicial mantiene su control de duplicados; dos asuntos manuales distintos pueden tener el mismo título.
+
+Los documentos del cliente incluyen los de sus causas accesibles, con contador y paginación coherentes. Los originales se conservan; TXT y Markdown válidos se extraen localmente, incluidos textos UTF-16 con BOM. Puedes preparar una audiencia, promover una observación revisada a hecho del expediente y citar su documento en un escrito con segundo revisor. La mesa privada conserva su acceso propio. Exportar el escrito no completa tareas ni plazos: cada cierre requiere su acción explícita. [Recorrido y comprobaciones](docs/CONTINUIDAD-TRABAJO-JURIDICO.md).
+
 ## Descargar e instalar
 
 [**Publicaciones y descargas verificadas**](https://github.com/gabrielperezibacache/lexopen/releases) · [Versión 1.1.0-preview.10](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.10)
@@ -45,7 +51,7 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 1. **Elige el equipo principal.** Abre LexOpen, selecciona **Este PC es el servidor** y crea la primera cuenta de administración. En los demás equipos, selecciona **Conectar a un servidor** e introduce la dirección del Host.
 2. **Configura tu estudio y su equipo.** Revisa el país de trabajo, los roles y las secciones habilitadas. En **Mi cuenta → Mi rol y permisos**, cada persona puede consultar su acceso efectivo.
 3. **Conecta Google una vez.** La administración autoriza la cuenta compartida del estudio y selecciona una carpeta de **Organización** en Drive. La misma conexión se utiliza para Drive, Calendar y Gmail; las cuentas antiguas pueden necesitar ampliar su autorización.
-4. **Organiza un cliente y su causa.** Crea la causa en **Mis Causas** y prepara su carpeta. Añade documentos, registra plazos y revisa las fuentes antes de preparar una audiencia o un escrito.
+4. **Organiza un cliente y su causa.** Abre **Nueva causa** desde el cliente para conservar su selección, o búscalo en el formulario. Prepara su carpeta y añade documentos: la ficha del cliente reúne sus archivos directos y los de sus causas accesibles, sin duplicarlos. Registra plazos y revisa las fuentes antes de preparar una audiencia o un escrito.
 5. **Empieza tu jornada.** Inicio conserva Altazor como espacio central y muestra tres indicadores compactos, también en móvil: vencidos pendientes, próximos plazos y eventos propios. Pulsa un indicador para abrir sus registros. **Ctrl+K / ⌘K** permite ir a un apartado; **Buscar un ajuste** te lleva a la configuración correspondiente.
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)

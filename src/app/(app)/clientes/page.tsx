@@ -1,3 +1,4 @@
+import { clienteDocumentCounts } from "@/lib/clientes/documents";
 import { listCursorWhere, listWindow } from "@/lib/api/list-window";
 import { ListPagination } from "@/components/ui/ListPagination";
 import Link from "next/link";
@@ -49,6 +50,7 @@ export default async function ClientesPage({
   ]);
 
   const { items: clientes, next } = listWindow(clientRows, LIST_TAKE, "updatedAt");
+  const documentCounts = await clienteDocumentCounts(clientes.map(c => c.id), user);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -123,7 +125,7 @@ export default async function ClientesPage({
                     <td role="cell" data-label={t("crm.colRut")} className="px-4 py-3">{c.rut || "—"}</td>
                     <td role="cell" data-label={t("crm.colCases")} className="px-4 py-3">{c._count.causas}</td>
                     <td role="cell" data-label={t("crm.colPending")} className="px-4 py-3">{pend}</td>
-                    <td role="cell" data-label={t("crm.colDocs")} className="px-4 py-3">{c._count.documentos}</td>
+                    <td role="cell" data-label={t("crm.colDocs")} className="px-4 py-3">{(documentCounts.get(c.id) || 0)}</td>
                     <td role="cell" data-label={t("crm.colLawyer")} className="px-4 py-3">{c.abogado?.name || "—"}</td>
                     <td role="cell" data-label={t("crm.colStatus")} className="px-4 py-3">
                       <StatusBadge

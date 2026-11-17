@@ -7,6 +7,17 @@ import {
 import { getOcrCapability } from "@/lib/local-ocr";
 
 async function main() {
+  for (const name of ["comprobante.txt", "notas.md"]) {
+    const text = "Declaración ficticia: revisión y año 2026.";
+    const result = await processDocumentBytes(name, Buffer.from(text));
+    assert.equal(result.status, "completed"); assert.equal(result.markdown, text);
+  }
+  const utf16 = await processDocumentBytes("archivo.txt", Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("Texto jurídico ficticio", "utf16le")]));
+  assert.equal(utf16.markdown, "Texto jurídico ficticio");
+  const binary = await processDocumentBytes("archivo.txt", Buffer.from([0x41, 0, 0x42]));
+  assert.equal(binary.status, "unsupported"); assert.equal(binary.markdown, null);
+  const invalid = await processDocumentBytes("archivo.txt", Buffer.from([0xff, 0x41]));
+  assert.equal(invalid.status, "unsupported"); assert.equal(invalid.markdown, null);
   const csv = await processDocumentBytes(
     "clientes.csv",
     Buffer.from("nombre,rol\nLexOpen,cliente\n", "utf8")
