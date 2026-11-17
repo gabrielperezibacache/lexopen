@@ -191,7 +191,8 @@
 .altazor-identity-row .altazor-toolbar-actions { margin-left:auto; }
 .altazor-identity-row:has(.altazor-tools[open]) .altazor-toolbar-actions { flex-basis:100%; margin-left:0; }
 .altazor-tools>summary { min-width:44px; justify-content:center; }
-.altazor-context-line { display:flex; align-items:center; gap:.35rem; margin:.25rem 0; }
+.altazor-context-line { display:flex; align-items:center; gap:.35rem; margin:.25rem 0; min-width:0; }
+.altazor-context-line .altazor-case-context { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
 .altazor-context-line .btn { min-width:44px; min-height:44px; padding:.4rem; }
 .altazor-history-controls { display:flex; flex-wrap:wrap; gap:.25rem; }
 .altazor-turn-context { color:var(--ink-soft); font-weight:400; margin-inline-start:.65rem; overflow-wrap:anywhere; }

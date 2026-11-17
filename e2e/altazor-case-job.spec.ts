@@ -53,7 +53,7 @@ test.beforeAll(async () => {
   causeId = (
     await db.causa.create({
       data: {
-        titulo: `Expediente ficticio ${tag}`,
+        titulo: `Expediente ficticio ${tag.replaceAll("-", "").repeat(3)}`,
         tribunal: "Tribunal de prueba",
         materia: "civil",
         abogadoId: ownerId,
@@ -353,10 +353,20 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
   for (const width of [1366, 360]) {
     await fresh.setViewportSize({ width, height: 900 });
     await card.scrollIntoViewIfNeeded();
-    // Resizing can finish before Firefox has applied its responsive layout.
-    await expect.poll(() => fresh.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    )).toBe(true);
+    // Keep the strict width check and identify overflowing nodes on failure.
+    await expect.poll(() => fresh.evaluate(() => {
+      if (document.documentElement.scrollWidth <= innerWidth) return [];
+      const overflow = [...document.querySelectorAll<HTMLElement>("body *")]
+        .filter(element => element.getBoundingClientRect().right > innerWidth + 1)
+        .slice(0, 12).map(element => ({
+          tag: element.tagName, className: element.className,
+          width: element.getBoundingClientRect().width,
+          right: element.getBoundingClientRect().right,
+          text: element.textContent?.slice(0, 80),
+        }));
+      return [{ tag: "DOCUMENT", className: "", width: document.documentElement.scrollWidth, right: innerWidth, text: "" }, ...overflow];
+    })).toEqual([]);
+    await expect(fresh.getByRole("button", { name: "Quitar el contexto de la causa", exact: true })).toBeInViewport({ ratio: 1 });
     await fresh.screenshot({ path: info.outputPath(`case-job-${width}.png`) });
   }
 });
