@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page, Response } from "@playwright/test";
+import { expect, type APIRequestContext, type Page, type Response } from "@playwright/test";
 import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
 
 /** Explicit opt-in for HTTP fixtures that exercise the compiled production server. */
@@ -85,5 +85,9 @@ export async function loginAs(page: Page, email: string) {
 export async function openCasePreparation(page: Page) {
   const summary = page.getByText("Preparación de la causa", { exact: true }).filter({ visible: true });
   await summary.waitFor({ state: "visible" });
-  if (!(await page.getByTestId("case-preparation").isVisible())) await summary.click();
+  // Cached routes can retain a hidden copy of the same panel. Keep strict
+  // matching for the visible route; two visible copies still indicate a bug.
+  const panel = page.getByTestId("case-preparation").filter({ visible: true });
+  if (!(await panel.isVisible())) await summary.click();
+  await expect(panel).toBeVisible();
 }

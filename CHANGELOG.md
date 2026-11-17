@@ -2,6 +2,9 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Guardados concurrentes: los conflictos de serialización confirmados por PostgreSQL esperan de forma progresiva antes de reintentar, conservando el límite de intentos, los permisos vigentes y el recibo atómico. Los errores de resultado incierto y de auditoría no se reintentan automáticamente.
+- Regresiones de navegación: las comprobaciones de preparación de causas y del compositor de Inicio distinguen la pantalla visible de las copias ocultas conservadas por el navegador, sin elegir arbitrariamente entre dos controles visibles.
+
 - Chat de Altazor: los nombres de causas largos se ajustan al ancho disponible y conservan visible el botón para quitar contexto en pantallas pequeñas.
 
 - Espacio sin conexión: crear y desbloquear permanecen deshabilitados hasta que termina de abrirse el almacenamiento local, evitando un error falso durante la carga.

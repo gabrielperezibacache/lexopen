@@ -38,7 +38,7 @@ test("jornada: vencidos de otros meses, navegación por términos y adaptación 
   await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeVisible();
   await expect(summary.getByRole("link", { name: /Próximos plazos/ })).toBeVisible();
   await expect(summary.getByRole("link", { name: /Eventos de hoy/ })).toBeVisible();
-  await expect(page.getByTestId("inicio-composer")).toBeVisible();
+  await expect(page.getByTestId("inicio-composer").filter({ visible: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("jornada-mobile.png"), fullPage: false });
 });
