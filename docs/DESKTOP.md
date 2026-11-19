@@ -143,6 +143,9 @@ versiones antiguas que no incluyan los informes de esta distribución.
   El respaldo contiene secretos (`.env`): guárdelo en un disco cifrado.
 - Restauración: use **LexOpen → Restaurar respaldo…**. La aplicación conserva el
   estado anterior temporalmente y lo revierte si el Host restaurado no puede arrancar.
+  Al recuperar un Host embebido en otro equipo del mismo sistema y arquitectura,
+  las rutas locales de documentos y del vault pasan a la carpeta de datos elegida
+  en ese equipo. Las bases o almacenes externos requieren su propia recuperación.
 - Recuperación: use **LexOpen → Recuperar contraseña admin…** solo con acceso físico
   al Host. El token local no debe compartirse; al restablecer se invalidan las sesiones.
 

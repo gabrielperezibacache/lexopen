@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { createDataBackup, validateBackupDirectory, restoreDataDirectory } = require("./backup.cjs");
+const { createDataBackup, createRotatingDataBackup, validateBackupDirectory, restoreDataDirectory } = require("./backup.cjs");
 (async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "lexopen-integrity-"));
   try {
@@ -37,6 +37,19 @@ const { createDataBackup, validateBackupDirectory, restoreDataDirectory } = requ
     fs.cp = async (...args) => { await cp(...args); await fs.writeFile(path.join(args[1], "storage", "document.txt"), "bad copy"); };
     try { await assert.rejects(restoreDataDirectory(target, backup), /Integridad/); } finally { fs.cp = cp; }
     assert.equal(await fs.readFile(path.join(target, "keep"), "utf8"), "prior installation");
+    const rotating = path.join(root, "rotation");
+    const first = await createRotatingDataBackup(source, rotating, { keep: 1 });
+    // An incorrect copy must not become its own reference inventory or displace the last valid backup.
+    const failed = path.join(root, "failed-backup");
+    fs.cp = async (...args) => { await cp(...args); await fs.writeFile(path.join(args[1], "storage", "document.txt"), "damaged in transit!"); };
+    try {
+      await assert.rejects(createDataBackup(source, failed), /Integridad/);
+      await assert.rejects(createRotatingDataBackup(source, rotating, { keep: 1 }), /Integridad/);
+    } finally { fs.cp = cp; }
+    assert.equal(await fs.stat(failed).catch(() => null), null);
+    assert.deepEqual(await fs.readdir(rotating), [path.basename(first.destination)]);
+    assert.equal((await validateBackupDirectory(first.destination)).integrityVerified, true);
+    assert.equal(await fs.readFile(path.join(first.destination, "storage", "document.txt"), "utf8"), "fictitious original");
     const manifestPath = path.join(backup, "manifest.json"), manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
     delete manifest.integrity; await fs.writeFile(manifestPath, JSON.stringify(manifest));
     await assert.rejects(validateBackupDirectory(backup), /Índice/);
