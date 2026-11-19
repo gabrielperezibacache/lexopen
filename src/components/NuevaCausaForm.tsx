@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/sites/SiteNav";
 import { ETAPAS } from "@/lib/chile";
 import { apiMutation } from "@/lib/api-mutation";
 import { CausaExtraerAi } from "@/components/ai/CausaExtraerAi";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 import { ClientePicker } from "@/components/clientes/ClientePicker";
 import {
@@ -33,7 +34,9 @@ export function NuevaCausaForm({
 }) {
   const fieldId = useId();
   const router = useRouter();
+  const { t } = useI18n();
   const [clienteId, setClienteId] = useState(initialClienteId);
+  const [acceso, setAcceso] = useState<"estudio" | "equipo">("estudio");
   const submission = useRef(
     createSubmissionKeys(operationKey, `lexopen:causa-create:${userId}`),
   );
@@ -122,6 +125,7 @@ export function NuevaCausaForm({
       caratula: String(fd.get("caratula") || ""),
       resumen: String(fd.get("resumen") || ""),
       clienteId: clienteId || null,
+      ...(fd.get("acceso") === "equipo" ? { acceso: "equipo" } : {}),
       conflictOverride: fd.get("conflictOverride") === "on",
       conflictNotes: String(fd.get("conflictNotes") || ""),
       partes,
@@ -208,6 +212,28 @@ export function NuevaCausaForm({
             value={clienteId}
             onChange={setClienteId}
           />
+          <div>
+            <label
+              htmlFor={`${fieldId}-acceso`}
+              className="mb-2 block text-sm font-medium"
+            >
+              {t("caseCreation.visibility")}
+            </label>
+            <select
+              id={`${fieldId}-acceso`}
+              className="select"
+              name="acceso"
+              value={acceso}
+              onChange={(event) => setAcceso(event.target.value as "estudio" | "equipo")}
+              aria-describedby={`${fieldId}-acceso-help`}
+            >
+              <option value="estudio">{t("caseCreation.study")}</option>
+              <option value="equipo">{t("caseCreation.team")}</option>
+            </select>
+            <p id={`${fieldId}-acceso-help`} className="mt-2 text-sm text-[var(--ink-soft)]">
+              {t(acceso === "equipo" ? "caseCreation.teamHelp" : "caseCreation.studyHelp")}
+            </p>
+          </div>
           <details>
             <summary className="min-h-11 cursor-pointer py-3 text-sm text-[var(--ink-soft)]">
               Completar desde un texto

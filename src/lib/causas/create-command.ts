@@ -40,11 +40,15 @@ export async function createCausaCommand(
   key: string,
 ) {
   const body = causaCreateSchema.parse(raw);
+  // Older clients omitted the historical default. An explicit default must
+  // still replay that receipt, while a team wall remains part of its identity.
+  const { acceso, ...legacyInput } = body;
+  const input = acceso === "equipo" ? body : legacyInput;
   // Receipts retain only the identity. A replay reads current data and permissions.
   const receipt = await executeCommand<{ id: string }>({
     key,
     ownerId: user.id,
-    input: body,
+    input,
     authorize: async (tx, result) => {
       const actor = await currentStaffActor(user, tx);
       authorize(actor, body);
@@ -61,16 +65,13 @@ export async function createCausaCommand(
       const actor = await currentStaffActor(user, tx);
       authorize(actor, body);
       const abogadoId = body.abogadoId || actor.id;
-      if (
-        !isStaff(
-          (
-            await tx.user.findUnique({
-              where: { id: abogadoId },
-              select: { role: true },
-            })
-          )?.role || "",
-        )
-      )
+      const responsable = await tx.user.findUnique({
+        where: { id: abogadoId },
+        select: { role: true, capabilityGrants: true, capabilityRevokes: true },
+      });
+      if (!responsable || !isStaff(responsable.role) ||
+        !can(responsable, "causa.read", { causaRol: "responsable" }) ||
+        !can(responsable, "causa.write", { causaRol: "responsable" }))
         throw httpError("El responsable ya no está disponible", 403);
       if (
         body.clienteId &&
@@ -136,6 +137,7 @@ export async function createCausaCommand(
           materia: body.materia,
           procedimiento: body.procedimiento || null,
           estado: body.estado || "activa",
+          acceso: body.acceso ?? "estudio",
           etapa: body.etapa || "ingreso",
           caratula: body.caratula || null,
           resumen: body.resumen || null,
@@ -149,6 +151,9 @@ export async function createCausaCommand(
           pjudOrigin: "manual",
           clienteId: body.clienteId || null,
           abogadoId,
+          miembros: body.acceso === "equipo" && abogadoId !== actor.id
+            ? { create: { userId: actor.id, rol: "colaborador", agregadoPorId: actor.id } }
+            : undefined,
           conflictCheckedAt: new Date(),
           conflictStatus: currentRisk.status,
           conflictNotes: body.conflictNotes || null,
@@ -201,6 +206,8 @@ export async function createCausaCommand(
           entityId: causa.id,
           after: {
             titulo: causa.titulo,
+            acceso: causa.acceso,
+            abogadoId,
             rit: causa.rit,
             conflicts: currentRisk.conflicts,
             conflictOverride: Boolean(

@@ -72,8 +72,8 @@ export async function CaseListServer({ mode, searchParams, organizer = false }: 
         <td role="cell" data-label={t("causas.colCase")} className="data-table-primary max-w-xl px-4 py-4"><Link className="font-medium hover:text-[var(--sea)]" href={organizer ? `/causas/${encodeURIComponent(causa.id)}/expediente` : `${base}/${encodeURIComponent(causa.id)}`}>{causa.titulo}</Link><p className="mt-1 text-xs text-[var(--muted)]">{causa.rit || tr("Sin referencia", "No reference")}{causa.tribunal ? ` · ${causa.tribunal}` : ""}</p></td>
         <td role="cell" data-label={situation} className="px-4 py-4"><StatusBadge estado={causa.estado} /><p className="mt-1 text-xs text-[var(--muted)]">{labelEtapa(causa.etapa)}</p></td>
         <td role="cell" data-label={update} className="px-4 py-4">{connected ? <>
-          <span>{!causa.pjudMonitoreoActivo ? tr("Sin seguimiento", "Not tracked") : !causa.pjudLastSyncStatus || causa.pjudLastSyncStatus === "never" ? tr("Pendiente de primera consulta", "Awaiting first check") : causa.pjudLastSyncStatus === "ok" ? tr("Consulta actualizada", "Query updated") : labelPjudSyncStatus(causa.pjudLastSyncStatus)}</span>
-          {causa.pjudLastSyncAt && <p className="mt-1 text-xs text-[var(--muted)]">{tr("Revisada", "Checked")} {formatDate(causa.pjudLastSyncAt)}</p>}
+          <span>{!causa.pjudMonitoreoActivo ? tr("Sin seguimiento", "Not tracked") : !causa.pjudLastSyncStatus || causa.pjudLastSyncStatus === "never" ? tr("Pendiente de primera consulta", "Awaiting first check") : causa.pjudLastSyncStatus === "ok" ? tr("Consulta registrada", "Query recorded") : labelPjudSyncStatus(causa.pjudLastSyncStatus)}</span>
+          {causa.pjudLastSyncAt && <p className="mt-1 text-xs text-[var(--muted)]">{tr("Último intento", "Last attempt")} {formatDate(causa.pjudLastSyncAt)}</p>}
         </> : formatDate(causa.updatedAt)}</td>
         <td role="cell" data-label={options} className="data-table-actions px-4 py-4">
           <div className="flex flex-wrap items-baseline gap-x-4">

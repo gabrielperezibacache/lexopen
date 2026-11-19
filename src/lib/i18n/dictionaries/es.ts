@@ -1,4 +1,11 @@
 export const es = {
+  caseCreation: {
+    visibility: "Quién puede ver la causa",
+    study: "Todo el estudio",
+    team: "Equipo asignado",
+    studyHelp: "El personal del estudio podrá verla según sus permisos.",
+    teamHelp: "Al restringir al equipo, tú conservarás acceso desde el alta. Puedes gestionar integrantes en la causa según tus permisos. Se mantienen los permisos especiales de acceso del estudio.",
+  },
   computerPersistence: {
     stoppedNotice: "El gateway confirmó que detuvo este escritorio. Puedes reanudarlo conservando sus archivos y conversación.",
     notice: "Escritorio persistente. Se conservan sus archivos, aplicaciones y conversación sin vencimiento automático.",

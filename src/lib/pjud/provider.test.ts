@@ -64,6 +64,14 @@ async function coverageFromPartner() {
     assert.equal(unsafe.cuadernos?.status, "unknown");
     assert.doesNotMatch(JSON.stringify(unsafe.cuadernos), /PRIVATE_SESSION/);
     assert.equal(requests, 3);
+    for (const failure of [{}, { status: "error", movimientos: [] }, { ok: false, movimientos: [] }, { error: "PRIVATE_SESSION", movimientos: [] }]) {
+      response = failure;
+      await assert.rejects(fetchPjudMovimientos(causa), { message: "El proveedor PJUD no confirmó una lectura del historial de movimientos." });
+    }
+    response = { movimientos: [], status: "partial" };
+    assert.equal((await fetchPjudMovimientos(causa)).cuadernos?.status, "partial");
+    response = { movimientos: [] };
+    assert.deepEqual((await fetchPjudMovimientos(causa)).movimientos, [], "an explicitly empty legacy history remains supported");
   } finally {
     globalThis.fetch = originalFetch;
     for (const name of names) {

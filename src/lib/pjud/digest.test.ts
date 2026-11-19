@@ -77,6 +77,7 @@ assert.equal(
 
 const text = formatDigestText(items, "https://app.example");
 assert.match(text, /C-1-2024/);
+assert.match(text, /Sin movimientos nuevos registrados en el estudio/);
 assert.match(text, /semáforo rojo/);
 
 const sectioned = formatDigestText(

@@ -1,8 +1,8 @@
-# Fiabilidad diaria — preparación de preview 11
+# Fiabilidad diaria de LexOpen
 
 ## Código y descargas
 
-La preparación `1.1.0-preview.11` no es un instalador publicado. Preview 10 sigue siendo la última publicación hasta completar las credenciales, comprobaciones y publicación de la siguiente etiqueta. Las funciones integradas después de preview 10 —estado automático de causas, Mi Fiscalía, horarios de consulta, recibos históricos, segundo revisor y equipos recordados— necesitan esa nueva distribución para llegar a los usuarios del instalador.
+La preparación posterior a preview 10 se incorporó a la versión 1.1.0. El registro de aceptación reúne la evidencia de las cinco condiciones de producción, los responsables del piloto y la identidad del paquete que deben verificar. [Aceptación de 1.1.0](ACEPTACION-1.1.0.md)
 
 ## Implementación de esta entrega
 
@@ -40,7 +40,7 @@ Las pruebas de firma y artefactos con transportes simulados comprueban los contr
 
 ## Desarrollo posterior que no se declara completado
 
-El perfil procesal civil chileno (#267), revisión profesional y ampliación del corpus jurídico (#260), mediciones reales de modelos locales en el equipo del estudio (#264), resumen incremental de conversaciones y auditoría visual exhaustiva mantienen su alcance propio. No se cierran por los cambios de paginación, refactorización ni por una suite de pruebas aprobada. La firma real (#266) necesita además sus credenciales y ejecución verificadas.
+La edición candidata del perfil civil chileno (#267) está implementada. Su activación requiere validación profesional documentada. Siguen pendientes la revisión y ampliación del corpus jurídico (#260), las mediciones de modelos locales en el equipo del estudio (#264), el resumen incremental de conversaciones y la auditoría visual exhaustiva. La firma real (#266) requiere las credenciales del editor y su comprobación en el instalador descargado.
 
 Se mantienen el escritorio persistente, las actualizaciones judiciales automáticas a las 08:00 y 22:00 de Chile, las manuales libres, los muros éticos y la cuenta Google compartida.
 

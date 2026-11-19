@@ -84,7 +84,8 @@ export async function configureDriveSync(causaId: string, user: CausaAccessUser,
 }
 /** Manual lists/imports use the selected account and never borrow another professional's connection. */
 export async function driveImportDependenciesForActor(causaId: string, user: CausaAccessUser, client = prisma): Promise<DriveImportDependencies> {
-  await assertCausaAccess(causaId, user, { auditOverride: false }, client);
+  const actor = await client.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+  await assertCausaAccess(causaId, actor, { auditOverride: false }, client);
   const selected = await client.driveSyncSubscription.findUnique({ where: { causaId } });
   if (selected?.account === "altazor") {
     if (selected.ownerId !== user.id || !selected.connectionId) throw error("Esta carpeta utiliza la conexión de otro profesional. Consulta las copias guardadas en la causa.", 403);
@@ -93,7 +94,26 @@ export async function driveImportDependenciesForActor(causaId: string, user: Cau
     if (!account || !binding || account.connectionId !== selected.connectionId) throw error("La cuenta cambió. Vuelve a elegir la carpeta con Altazor.");
     return { client, openTransport: account.openTransport, assertActive: db => assertAltazorDriveFolderBinding(causaId, user, binding, account, db) };
   }
-  if (selected?.account !== "personal") return { client };
+  if (selected?.account !== "personal") {
+    if (selected && selected.account !== "study") throw error("La cuenta elegida no está disponible. Abra nuevamente los archivos de Drive.");
+    const account = await resolveStudyDriveAccount(user, client);
+    const cause = await client.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } });
+    if (selected?.connectionId && selected.connectionId !== account.connectionId) throw error("La conexión de Google del estudio cambió. Vuelva a elegir la carpeta.");
+    const assertActive: NonNullable<DriveImportDependencies["assertActive"]> = async db => {
+      const actor = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+      await assertCausaAccess(causaId, actor, { auditOverride: false }, db);
+      const [current, currentCause] = await Promise.all([
+        db.driveSyncSubscription.findUnique({ where: { causaId } }),
+        db.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } }),
+      ]);
+      if (currentCause.googleDriveFolderId !== cause.googleDriveFolderId ||
+        selected && (!current || current.id !== selected.id || current.account !== "study" || current.ownerId !== selected.ownerId || current.connectionId !== selected.connectionId || current.generation !== selected.generation || current.folderId !== selected.folderId || current.folderId !== currentCause.googleDriveFolderId) ||
+        !selected && current) throw error("La cuenta o la carpeta de la causa cambió. Abra nuevamente los archivos de Drive.");
+      await account.assertActive(db);
+    };
+    await assertActive(client);
+    return { client, assertActive };
+  }
   if (selected.ownerId !== user.id || !selected.connectionId) throw error("La carpeta usa una conexión personal de otro profesional. Sus copias guardadas están disponibles en el expediente.", 403);
   const expected = selected.connectionId;
   const { requirePersonalDriveSession, assertPersonalDriveConnection } = await import("@/lib/personal-connectors/google-drive/service");

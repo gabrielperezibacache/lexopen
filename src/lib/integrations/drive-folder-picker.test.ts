@@ -23,7 +23,13 @@ async function main() {
   await assert.rejects(listDriveFoldersWithSession(session, { query: "x".repeat(121) }, deps));
   assert.equal(requests.length, beforeInvalid);
   count = 51; await assert.rejects(listDriveFoldersWithSession(session, {}, deps), /lista inválida/);
-  assert.equal(guards, 4, "every provider request must revalidate its owner-bound connection");
+  assert.equal(guards, 8, "every provider request must revalidate its owner-bound connection before and after the response");
+  let active = true;
+  count = 2;
+  await assert.rejects(listDriveFoldersWithSession(session, {}, {
+    fetch: async (input, init) => { const result = await fakeFetch(input, init); active = false; return result; },
+    assertActive: async () => { if (!active) throw Object.assign(new Error("Connection revoked during response"), { status: 409 }); },
+  }), /revoked during response/, "folder names must not escape after their connection is revoked");
   console.log("Drive folder picker: metadata-only root/breadcrumb/search/page requests, fixed host, query escaping, live guard and 50-folder bound passed (no network).");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

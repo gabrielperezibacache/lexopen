@@ -53,6 +53,10 @@ assert.equal(
 
 const parsed = parsePjudWebhookPayload(JSON.parse(raw));
 assert.equal(parsed.operationId, "op-1");
+assert.equal(parsed.status, "partial", "a signed delivery alone cannot clear a failed judicial query");
+for (const status of ["error", "partial", "ok"]) {
+  assert.equal(parsePjudWebhookPayload({ causaId: "fixture", status }).status, status);
+}
 assert.equal(parsed.movimientos[0].id, "movement-1");
 assert.throws(
   () => parsePjudWebhookPayload({ movimientos: [] }),

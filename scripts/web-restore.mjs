@@ -27,6 +27,7 @@ if (fs.existsSync(postmasterPid)) {
 }
 
 const replacement = await restoreDataDirectory(dataDir, path.resolve(source));
+if (replacement.relocated) console.log("Las rutas de almacenamiento del Host apuntan a la carpeta restaurada.");
 console.log(replacement.integrityVerified ? "Inventario de archivos verificado antes y después de copiar." : "Copia antigua sin índice de integridad: compruebe sus archivos y la recuperación completa.");
 console.log("Restauración aplicada.");
 console.log(`Rollback temporal conservado en: ${replacement.rollback}`);

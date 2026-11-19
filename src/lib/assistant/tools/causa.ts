@@ -1,3 +1,4 @@
+import { caseJudicialStatus } from "@/lib/causas/judicial-status";
 import { causaAccessWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
 import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
@@ -165,12 +166,14 @@ export const causaResumenTool: AssistantTool<CausaResumenInput> = secureTool({
       ? causa.movimientos.map((m) => m.titulo).join("; ")
       : "sin movimientos registrados";
 
-    const message = `Causa "${causa.titulo}" — ${labelEstado(causa.estado)} / ${labelEtapa(causa.etapa)}. Plazos pendientes: ${plazosLine}. Últimos movimientos: ${movLine}.`;
+    const judicialSync = caseJudicialStatus(causa);
+    const message = `Causa "${causa.titulo}" — ${labelEstado(causa.estado)} / ${labelEtapa(causa.etapa)}. Plazos pendientes: ${plazosLine}. Últimos movimientos registrados: ${movLine}.${judicialSync.notice ? ` ${judicialSync.notice}` : ""}`;
     return {
       ok: true,
       message,
       card: {
         type: "causa-resumen",
+        judicialSync,
         id: causa.id,
         titulo: causa.titulo,
         estado: causa.estado,

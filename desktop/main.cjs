@@ -499,12 +499,12 @@ async function stopHostIfRunning() {
   hostHandle = null;
 }
 
-async function startHostMode(cfg) {
+async function startHostMode(cfg, dataDir = hostDataDirectory()) {
   await stopHostIfRunning();
   sendStatus({ phase: "starting-host", message: "Arrancando servidor local…" });
   const { startHost } = await import("./host-runtime.mjs");
   hostHandle = await startHost({
-    dataDir: hostDataDirectory(),
+    dataDir,
     port: cfg.port,
     pgPort: cfg.pgPort,
     publicUrl: cfg.publicUrl,
@@ -544,8 +544,8 @@ async function stopHostForMaintenance() {
   }
 }
 
-async function restartHostAfterMaintenance(cfg) {
-  const url = await startHostMode(cfg);
+async function restartHostAfterMaintenance(cfg, dataDir) {
+  const url = await startHostMode(cfg, dataDir);
   loadAppUrl(url, hostHandle?.version);
   return url;
 }
@@ -631,11 +631,12 @@ async function restoreHostBackup() {
   maintenanceActive = true;
 
   const cfg = readConfig();
+  const dataDir = hostDataDirectory();
   let replacement = null;
   try {
     await stopHostForMaintenance();
-    replacement = await restoreDataDirectory(hostDataDirectory(), backupDir);
-    await restartHostAfterMaintenance(cfg);
+    replacement = await restoreDataDirectory(dataDir, backupDir);
+    await restartHostAfterMaintenance(cfg, dataDir);
     try {
       await finalizeRestore(replacement.rollback);
     } catch (cleanupError) {
@@ -648,15 +649,15 @@ async function restoreHostBackup() {
       type: "info",
       title: "Restauración completada",
       message: "El Host fue restaurado y reiniciado correctamente.",
-      detail: `Respaldo utilizado: ${backupDir}\n${replacement.integrityVerified ? "Inventario de archivos verificado antes y después de copiar." : "Copia antigua sin índice de integridad: el arranque correcto no acredita todos sus archivos."}`,
+      detail: `Respaldo utilizado: ${backupDir}\n${replacement.integrityVerified ? "Inventario de archivos verificado antes y después de copiar." : "Copia antigua sin índice de integridad: el arranque correcto no acredita todos sus archivos."}${replacement.relocated ? "\nLas rutas de almacenamiento del Host apuntan a la carpeta restaurada." : ""}`,
     });
   } catch (error) {
     try {
       if (hostHandle?.stop) await stopHostForMaintenance();
       if (replacement) {
-        await rollbackRestore(hostDataDirectory(), replacement.rollback);
+        await rollbackRestore(dataDir, replacement.rollback);
       }
-      await restartHostAfterMaintenance(cfg);
+      await restartHostAfterMaintenance(cfg, dataDir);
     } catch (rollbackError) {
       console.error("[lexopen-desktop] Falló la recuperación del estado anterior", rollbackError);
     }

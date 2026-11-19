@@ -109,9 +109,9 @@ export function semaforoPorDiasSinMovimiento(dias: number | null): Semaforo {
 }
 
 export function labelSemaforo(s: Semaforo) {
-  if (s === "verde") return "Al día";
-  if (s === "amarillo") return "Sin movimiento reciente";
-  if (s === "rojo") return "Atención: inactiva";
+  if (s === "verde") return "Movimiento reciente registrado";
+  if (s === "amarillo") return "Último registro hace más de 7 días";
+  if (s === "rojo") return "Último registro hace más de 21 días";
   return "Sin datos";
 }
 

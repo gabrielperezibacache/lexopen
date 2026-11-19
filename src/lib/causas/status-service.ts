@@ -12,7 +12,7 @@ export async function readCaseStatus(id: string, user: CausaAccessUser, db = pri
   const row = await db.causa.findFirst({
     where: { AND: [{ id }, causaAccessWhere(user)] },
     select: {
-      id: true, estado: true, etapa: true, fechaNotificacion: true, pjudLastSyncAt: true, pjudLastSyncStatus: true, pjudMonitoreoActivo: true,
+      id: true, estado: true, etapa: true, fechaNotificacion: true, pjudLastSyncAt: true, pjudLastSyncStatus: true, pjudMonitoreoActivo: true, pjudCuadernosCoverage: true,
       plazos: { where: plazos, orderBy: [{ fechaLimite: "asc" }, { id: "asc" }], take: 100, select: { id: true, titulo: true, estado: true, fechaLimite: true, esFatal: true } },
       tramites: { where: tramites, orderBy: [{ fechaLimite: { sort: "asc", nulls: "last" } }, { orden: "asc" }, { id: "asc" }], take: 40, select: { id: true, titulo: true, estado: true, fechaLimite: true, responsable: { select: { name: true } } } },
       movimientos: { orderBy: [{ fecha: "desc" }, { id: "asc" }], take: 1, select: { id: true, titulo: true, fecha: true, fuente: true } },

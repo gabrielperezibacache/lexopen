@@ -1,11 +1,12 @@
 import { civilDateKey, diffCivilDays, santiagoDateKey } from "@/lib/chile-time";
 
+import { caseJudicialStatus, type CaseJudicialRecord } from "./judicial-status";
+
 type Deadline = { id: string; titulo: string; estado: string; fechaLimite: Date; esFatal: boolean };
 type Step = { id: string; titulo: string; estado: string; fechaLimite: Date | null; responsable: { name: string } | null };
 type Movement = { id: string; titulo: string; fecha: Date; fuente: string };
-export type CaseStatusInput = {
+export type CaseStatusInput = CaseJudicialRecord & {
   id: string; estado: string; etapa: string; fechaNotificacion: Date | null;
-  pjudLastSyncAt: Date | null; pjudLastSyncStatus: string | null; pjudMonitoreoActivo: boolean;
   plazos: Deadline[]; tramites: Step[]; movimientos: Movement[]; pendientes: Movement[];
   _count: { plazos: number; tramites: number; movimientos: number };
   tasks?: { id: string; title: string; status: string; waitingOn: string | null; assignee: { name: string } | null }[];
@@ -32,12 +33,12 @@ export function buildCaseStatus(row: CaseStatusInput, now = new Date()) {
   const waitingTaskCount = Math.max(row.waitingTaskCount ?? 0, waitingTasks.length);
   const submittedCount = Math.max(row.submittedCount ?? 0, fiscaliaRequests.filter(r => r.status === "submitted").length);
   const latest = row.movimientos[0];
+  const judicialSync = caseJudicialStatus(row);
   const missing = [
     ...(!row.fechaNotificacion ? ["No consta fecha de notificación: comprobarla antes de computar nuevos plazos."] : []),
     ...(!row._count.plazos ? ["No hay plazos abiertos registrados; esto no confirma que no existan vencimientos legales."] : []),
     ...(!latest ? ["No hay movimientos registrados para confirmar el último avance."] : []),
-    ...(!row.pjudMonitoreoActivo ? ["Monitoreo judicial no activo: contrastar el expediente antes de concluir que no hubo novedades."] : []),
-    ...(row.pjudMonitoreoActivo && (row.pjudLastSyncStatus !== "ok" || !row.pjudLastSyncAt) ? ["La última sincronización judicial no está confirmada como completa."] : []),
+    ...(!row.pjudMonitoreoActivo && !judicialSync.notice ? ["Monitoreo judicial no activo: contrastar el expediente antes de concluir que no hubo novedades."] : []),
     ...(row._count.plazos > deadlines.length || row._count.tramites > steps.length || row._count.movimientos > waiting.length || waitingTaskCount > waitingTasks.length || (row.taskCount ?? 0) > (row.tasks?.length ?? 0) || (row.fiscaliaCount ?? 0) > fiscaliaRequests.length ? ["Se muestra una selección de pendientes; revisar las secciones completas de la causa."] : []),
   ];
   const urgent = deadlines.filter(p => p.days <= 7 || p.recordedState === "vencido");
@@ -55,7 +56,7 @@ export function buildCaseStatus(row: CaseStatusInput, now = new Date()) {
   return { causaId: row.id, today, state: row.estado, stage: row.etapa, deadlines, steps, waiting, waitingTasks, fiscaliaRequests, needs, missing,
     counts: row._count, waitingTaskCount, submittedCount, taskCount: row.taskCount ?? 0, fiscaliaCount: row.fiscaliaCount ?? 0,
     latest: latest ? { id: latest.id, title: latest.titulo, date: civilDateKey(latest.fecha), source: latest.fuente } : null,
-    judicialSync: { at: row.pjudLastSyncAt?.toISOString() ?? null, status: row.pjudLastSyncStatus, enabled: row.pjudMonitoreoActivo },
+    judicialSync,
   };
 }
 export type CaseStatus = ReturnType<typeof buildCaseStatus>;

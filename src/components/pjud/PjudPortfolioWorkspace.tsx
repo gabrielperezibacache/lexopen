@@ -353,7 +353,7 @@ export default function MonitoreoCausasPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <label className="grid gap-2 text-sm font-medium"><span>Mostrar causas</span><select className="input" value={filter} onChange={event => setFilter(event.target.value as typeof filter)}>{([
           ["todas", "Todas"], ["monitoreadas", "Monitoreadas"], ["fallidas", "Con avisos"],
-          ["verde", "Al día"], ["amarillo", "Atención"], ["rojo", "Prioritarias"], ["gris", "Sin datos"],
+          ["verde", labelSemaforo("verde")], ["amarillo", "Atención"], ["rojo", "Prioritarias"], ["gris", "Sin datos"],
         ] as const).map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></label>
         <label className="block w-full space-y-2 text-sm font-medium sm:ml-auto sm:max-w-sm">
           <span>Buscar causa</span>

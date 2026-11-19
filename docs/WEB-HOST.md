@@ -306,7 +306,9 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   ```
 
   El respaldo incluye PostgreSQL, documentos, vault y configuración. Contiene
-  `.env`, por lo que debe guardarse en un disco cifrado.
+  `.env`, por lo que debe guardarse en un disco cifrado. Antes de publicar la
+  copia, LexOpen compara su inventario y la huella SHA-256 de cada archivo con
+  el Host detenido. Si la comparación falla, conserva los respaldos anteriores.
 
 - Para restaurar, mantenga el Host detenido y ejecute:
 
@@ -315,7 +317,12 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   npm run web:host
   ```
 
-  La restauración conserva un rollback temporal hasta verificar el arranque.
+  Para restaurar en otra carpeta del mismo sistema y arquitectura, defina
+  `LEXOPEN_DATA_DIR` con la ruta del destino antes de ejecutar ambos comandos.
+  En un Host embebido con almacenamiento local, LexOpen ajusta las rutas de los
+  documentos y del vault al destino. Conserva la carpeta anterior como rollback
+  y muestra su ubicación. Si el origen utiliza PostgreSQL externo, archivos fuera
+  del directorio del Host o S3, prepare por separado la recuperación de esos datos.
 
 - Para desinstalar los datos del Host (destructivo; requiere `--yes`):
 

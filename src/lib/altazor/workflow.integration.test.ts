@@ -64,6 +64,15 @@ async function main() {
     await db.causa.update({where:{id:cause.id},data:{pjudMonitoreoActivo:true,pjudLastSyncStatus:"partial",pjudLastSyncNote:"PRIVATE_PORTAL_URL_AND_SESSION"}});
     await db.driveSyncSubscription.create({data:{causaId:cause.id,ownerId:owner.id,folderId:"PRIVATE_FOLDER",enabled:true,note:"PRIVATE_PROVIDER_DIAGNOSTIC"}});
     const sync=await getTool("sincronizacion.estado").execute({},caseCtx);assert.match(sync.message,/parcial/);assert.ok(!JSON.stringify(sync).includes("PRIVATE_"));
+    await db.causa.update({ where: { id: cause.id }, data: { pjudLastSyncAt: new Date(), pjudLastSyncStatus: "ok" } });
+    const incompleteSync = await getTool("sincronizacion.estado").execute({}, caseCtx);
+    assert.match(incompleteSync.message, /no acredita una lectura completa/);
+    assert.doesNotMatch(incompleteSync.message, /Actualizada|Última actualización|PRIVATE_/);
+    await db.causa.update({ where: { id: cause.id }, data: { pjudLastSyncStatus: "failed" } });
+    const failedSync = await getTool("sincronizacion.estado").execute({}, caseCtx);
+    assert.match(failedSync.message, /Falló la última consulta/);
+    assert.match(failedSync.message, /Último intento de consulta/);
+    assert.doesNotMatch(failedSync.message, /Última actualización|PRIVATE_/);
     const response=await queue("Prepara texto con mis fuentes",[{kind:"book",bookId:book.id,fragmentId:fragment.id,quote:fragment.text},{kind:"note",workspaceId:hearing.id,noteId:hearingNote.id,revision:hearingNote.revision}]);
     await executeAltazorTurn(chat,response,owner,db,{...base,execute:async input=>{assert.deepEqual(input.validatedReferences?.map(item=>item.marker),["R1"]);return{planId:null,previewSteps:[],autoResults:[{toolId:"respuesta.libre",result:{ok:true,message:"Borrador de prueba con respaldo [R1]. La observación permanece como nota personal."}}],streamEvents:[],classification:{source:"rule",toolIds:["respuesta.libre"],prompt:"fixture"}};}});
     const save=await prepare("Guarda la respuesta como escrito","escrito.guardar",{titulo:"Escrito ficticio con cita"});

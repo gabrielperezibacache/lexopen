@@ -223,3 +223,31 @@ test("Mis Causas inválido no reclama la sincronización y su metadata refleja p
   assertSafeStatus(credentialStatus);
   expect(await firmSyncState()).toEqual(before);
 });
+
+
+test("una importación CSV conserva el resultado judicial y el seguimiento elegido", async () => {
+  const ultimaConsulta = new Date("2026-11-18T12:00:00.000Z");
+  for (const activo of [true, false]) {
+    const cause = await db.causa.create({ data: {
+      titulo: `${prefix} CSV ${activo}`, tribunal, materia: "Civil", abogadoId: actors.linker.id, acceso: "equipo",
+      pjudMonitoreoActivo: activo, pjudLastSyncStatus: activo ? "failed" : "disabled", pjudLastSyncAt: ultimaConsulta,
+      pjudFailCount: activo ? 2 : 0, pjudLastSyncNote: "Sesión ficticia finalizada.",
+    } });
+    caseIds.push(cause.id);
+    for (const rows of [1, 0]) {
+      const response = await actors.linker.api.post(`/api/causas/${cause.id}/movimientos`, {
+        headers: { "x-csrf-token": actors.linker.csrf },
+        multipart: { csv: "titulo,detalle,fecha,referencia,id\nActuación local,,2026-11-19,,fixture-local" },
+      });
+      expect(response.status(), await response.text()).toBe(201);
+      expect(await response.json()).toEqual({ rows, skipped: 1 - rows });
+    }
+    const stored = await db.causa.findUniqueOrThrow({ where: { id: cause.id } });
+    expect(stored.pjudLastSyncStatus).toBe(cause.pjudLastSyncStatus);
+    expect(stored.pjudMonitoreoActivo).toBe(activo);
+    expect(stored.pjudLastSyncAt).toEqual(ultimaConsulta);
+    expect(stored.pjudFailCount).toBe(cause.pjudFailCount);
+    expect(stored.pjudLastSyncNote).toBe(cause.pjudLastSyncNote);
+    expect(await db.causaMovimiento.count({ where: { causaId: cause.id, fuente: "import" } })).toBe(1);
+  }
+});

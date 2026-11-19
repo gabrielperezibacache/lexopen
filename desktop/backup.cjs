@@ -249,7 +249,7 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
 
   try {
     await fs.cp(source, temporary, { recursive: true, force: false });
-    const entries = await backupInventory(temporary);
+    const entries = await backupInventory(source);
     await fs.chmod(temporary, 0o700);
     if (await exists(path.join(temporary, ".env"))) {
       await fs.chmod(path.join(temporary, ".env"), 0o600);
@@ -279,13 +279,32 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
       `${JSON.stringify(manifest, null, 2)}\n`,
       { encoding: "utf8", mode: 0o600 }
     );
-    await fs.rm(output, { recursive: true, force: true });
+    // Compare the finished copy against the stopped Host before publishing it.
+    await validateBackupDirectory(temporary);
+    await fs.rmdir(output).catch(error => { if (error.code !== "ENOENT") throw error; });
     await fs.rename(temporary, output);
     return manifest;
   } catch (error) {
     await fs.rm(temporary, { recursive: true, force: true });
     throw error;
   }
+}
+
+// Older, unmanaged backups can be restored as before. The normal desktop/CLI
+// path must rebase an embedded Host when its destination differs from its origin.
+async function needsManagedRelocation(root, target, manifest) {
+  const file = path.join(root, ".env");
+  const stat = await fs.lstat(file).catch(error => { if (error.code !== "ENOENT") throw error; });
+  if (!stat) return false;
+  if (!stat.isFile()) throw new Error("La configuración del respaldo debe ser un archivo local.");
+  const { parseEnvFile } = require("./config.cjs");
+  const { map } = parseEnvFile(await fs.readFile(file, "utf8"));
+  if (map.LEXOPEN_DESKTOP !== "1") return false;
+  const original = manifest.sourceDataDir || map.LEXOPEN_DATA_DIR;
+  if (!original || !path.isAbsolute(original) || map.LEXOPEN_DATA_DIR && path.relative(original, map.LEXOPEN_DATA_DIR) !== "") {
+    throw new Error("El origen del Host no coincide con su configuración o utiliza rutas de otra plataforma.");
+  }
+  return path.relative(original, target) !== "";
 }
 
 /** Relocate only a declared managed embedded Host, never external storage/databases. */
@@ -299,6 +318,7 @@ async function relocateRestoredHost(target, manifest) {
   if (isWithin(oldRoot,target) || isWithin(target,oldRoot)) throw new Error("La reubicación necesita un destino separado del origen.");
   const db = new URL(parsed.map.DATABASE_URL);
   if (!["postgres:","postgresql:"].includes(db.protocol) || !["127.0.0.1","localhost","[::1]"].includes(db.hostname) || db.search || db.hash) throw new Error("No se reubicó una base externa o con opciones no administradas.");
+  if (["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"].some(key => parsed.map[key])) throw new Error("El respaldo usa almacenamiento S3 externo; requiere una recuperación preparada.");
   for (const key of ["STORAGE_PATH", "OBSIDIAN_VAULT_PATH", "LEXOPEN_DATA_DIR", "CODEX_DATA_DIR"]) {
     if (!parsed.map[key]) continue;
     const previous = absolute(parsed.map[key]);
@@ -312,15 +332,26 @@ async function relocateRestoredHost(target, manifest) {
     if((await fs.lstat(item)).isSymbolicLink())throw new Error("La restauración incluye una carpeta enlazada.");
     await localTree(item);
   }
+  const configFile = path.join(target, "desktop-config.json");
+  if (await exists(configFile)) {
+    if (!(await fs.lstat(configFile)).isFile()) throw new Error("La configuración de escritorio restaurada no es un archivo local.");
+    const config = JSON.parse(await fs.readFile(configFile, "utf8"));
+    if (config.hostDataDir) {
+      if (path.relative(oldRoot, config.hostDataDir) !== "") throw new Error("La carpeta de datos seleccionada en el respaldo pertenece a otra instalación.");
+      config.hostDataDir = target;
+      await fs.writeFile(configFile, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+    }
+  }
   await fs.writeFile(file, serializeEnv(parsed.map, parsed.order), {mode:0o600});
 }
 
-async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = false } = {}) {
+async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost } = {}) {
   const target = absolute(dataDir);
   const { root, manifest, integrityVerified } = await validateBackupDirectory(backupDir);
   const realRoot = await fs.realpath(root), realTarget = await resolvedDestination(target);
   if (isWithin(realRoot, realTarget) || isWithin(realTarget, realRoot)) throw new Error("El respaldo y el destino deben permanecer separados, incluidos sus enlaces.");
-  if (relocateManagedHost && typeof manifest.sourceDataDir === "string") {
+  const relocate = relocateManagedHost ?? await needsManagedRelocation(root, target, manifest);
+  if (relocate && typeof manifest.sourceDataDir === "string") {
     const original = await fs.realpath(manifest.sourceDataDir).catch(() => null);
     if (original && (isWithin(original, realTarget) || isWithin(realTarget, original))) throw new Error("La reubicación necesita un destino separado del origen, incluidos sus enlaces.");
   }
@@ -340,11 +371,11 @@ async function restoreDataDirectory(dataDir, backupDir, { relocateManagedHost = 
     await fs.cp(root, target, { recursive: true, force: false });
     await verifyBackupIntegrity(target, manifest);
     await fs.rm(path.join(target, "manifest.json"), { force: true });
-    if (relocateManagedHost) await relocateRestoredHost(target, manifest);
+    if (relocate) await relocateRestoredHost(target, manifest);
     if (await exists(path.join(target, ".env"))) {
       await fs.chmod(path.join(target, ".env"), 0o600);
     }
-    return { rollback, manifest, integrityVerified };
+    return { rollback, manifest, integrityVerified, relocated: relocate };
   } catch (error) {
     await fs.rm(target, { recursive: true, force: true });
     await fs.rename(rollback, target);

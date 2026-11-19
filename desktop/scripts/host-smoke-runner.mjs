@@ -53,6 +53,43 @@ async function treeDigest(root) {
   await visit(root);return checksum.digest("hex");
 }
 
+async function createFixtureRecord(url, route, auth, body) {
+  const response = await fetch(url + route, {
+    method: "POST",
+    headers: { ...auth.headers(), "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify(body),
+  });
+  assert.equal(response.status, 201, `Could not create fixture at ${route}`);
+  const record = await response.json();
+  assert.ok(record.id);
+  return record;
+}
+
+async function verifyCaseRestore(url, member, outside, expected) {
+  const route = "/api/causas/" + encodeURIComponent(expected.caseId);
+  const response = await fetch(url + route, { headers: member.headers() });
+  assert.equal(response.status, 200);
+  const record = await response.json();
+  assert.equal(record.id, expected.caseId);
+  assert.equal(record.acceso, "equipo");
+  assert.equal(record.cliente?.id, expected.clientId);
+  assert.equal(record.abogado?.id, member.userId);
+  assert.ok(record.documentos.some(row => row.id === expected.documentId));
+  const deadline = record.plazos.find(row => row.id === expected.deadlineId);
+  assert.equal(deadline?.fechaLimite, expected.due);
+  assert.equal(deadline.responsableId, member.userId);
+  assert.equal(deadline.estado, "pendiente");
+
+  const file = "/api/documentos/" + encodeURIComponent(expected.documentId) + "/content";
+  const download = await fetch(url + file, { headers: member.headers() });
+  assert.equal(download.status, 200);
+  assert.ok(Buffer.from(await download.arrayBuffer()).equals(expected.bytes));
+  for (const resource of [route, file]) {
+    const denied = await fetch(url + resource, { headers: outside.headers() });
+    assert.equal(denied.status, 404, "A lawyer outside the case must not discover it or its documents");
+  }
+}
+
 try {
   active = await start();
   phase = "initial-health";
@@ -99,21 +136,41 @@ try {
   const sourceAuth=await smokeAuthenticate(active.url,password);
   phase = "fixture-factor-enrollment";
   const totpSecret=await smokeEnrollTotp(active.url,sourceAuth);
-  const credentials=sourceAuth.headers();
-  phase = "fixture-document-upload";
-  const documentBytes=Buffer.from("Fictitious legal document for native backup restoration. Información sintética.\n","utf8");
-  const form=new FormData();form.set("nombre","Restore fixture.txt");form.set("tipo","otro");form.set("file",new Blob([documentBytes],{type:"text/plain"}),"restore-fixture.txt");
-  const created=await fetch(`${active.url}/api/documentos`,{method:"POST",headers:credentials,body:form});assert.equal(created.status,201);const document=await created.json();assert(document.id);
-  phase = "verify-source-document";
-  const sourceDownload=await fetch(`${active.url}/api/documentos/${encodeURIComponent(document.id)}/content`,{headers:credentials});assert.equal(sourceDownload.status,200);assert(Buffer.from(await sourceDownload.arrayBuffer()).equals(documentBytes));
   phase = "fixture-settings";
-  const {PrismaClient}=requireBundled("@prisma/client");
-  const sourceClient=new PrismaClient({datasources:{db:{url:values.DATABASE_URL}}});
+  const { PrismaClient } = requireBundled("@prisma/client");
+  const sourceClient = new PrismaClient({ datasources: { db: { url: values.DATABASE_URL } } });
+  const memberEmail = "restore-member@example.test";
+  const outsideEmail = "restore-outside@example.test";
   let organizationId;
   try {
-    const organization=await sourceClient.organization.findFirst()||await sourceClient.organization.create({data:{name:"Fictitious restore firm"}});organizationId=organization.id;
-    await sourceClient.firmSettings.upsert({where:{organizationId},create:{organizationId,emisorRazonSocial:"Fictitious restore firm"},update:{emisorRazonSocial:"Fictitious restore firm"}});
-  }finally{await sourceClient.$disconnect();}
+    const organization = await sourceClient.organization.findFirst() || await sourceClient.organization.create({ data: { name: "Fictitious restore firm" } });
+    organizationId = organization.id;
+    await sourceClient.firmSettings.upsert({ where: { organizationId }, create: { organizationId, emisorRazonSocial: "Fictitious restore firm" }, update: { emisorRazonSocial: "Fictitious restore firm" } });
+    const admin = await sourceClient.user.findUniqueOrThrow({ where: { id: sourceAuth.userId }, select: { password: true } });
+    await sourceClient.user.createMany({ data: [memberEmail, outsideEmail].map(email => ({ email, name: email.split("@")[0], role: "abogado", password: admin.password })) });
+  } finally { await sourceClient.$disconnect(); }
+
+  phase = "fixture-team-case";
+  const member = await smokeAuthenticate(active.url, password, undefined, memberEmail);
+  const outside = await smokeAuthenticate(active.url, password, undefined, outsideEmail);
+  const client = await createFixtureRecord(active.url, "/api/clientes", sourceAuth, { razonSocial: "Cliente ficticio", abogadoId: member.userId });
+  const teamCase = await createFixtureRecord(active.url, "/api/causas", member, { titulo: "Expediente de restauración", tribunal: "Tribunal ficticio", materia: "Civil", clienteId: client.id, acceso: "equipo" });
+  const dueDate = "2035-04-12";
+  const deadline = await createFixtureRecord(active.url, "/api/plazos", member, { titulo: "Plazo de restauración", causaId: teamCase.id, calculationProfile: "manual", fechaLimite: dueDate });
+  phase = "fixture-document-upload";
+  const documentBytes = Buffer.from("Fictitious legal document for native backup restoration. Información sintética.\n", "utf8");
+  const form = new FormData();
+  form.set("nombre", "Restore fixture.txt");
+  form.set("tipo", "otro");
+  form.set("causaId", teamCase.id);
+  form.set("file", new Blob([documentBytes], { type: "text/plain" }), "restore-fixture.txt");
+  const created = await fetch(active.url + "/api/documentos", { method: "POST", headers: member.headers(), body: form });
+  assert.equal(created.status, 201);
+  const document = await created.json();
+  assert.ok(document.id);
+  const expected = { caseId: teamCase.id, clientId: client.id, documentId: document.id, bytes: documentBytes, deadlineId: deadline.id, due: dueDate + "T00:00:00.000Z" };
+  phase = "verify-source-case";
+  await verifyCaseRestore(active.url, member, outside, expected);
   const sentinel = path.join(dataDir, "storage", "fixture de instalación & revisión.txt");
   await fs.writeFile(sentinel, "LexOpen installer persistence fixture — información ficticia\n", { mode: 0o600 });
   const sentinelHash = digest(await fs.readFile(sentinel));
@@ -148,13 +205,17 @@ try {
   await fs.writeFile(path.join(badBackup,".env"),serializeEnv(badEnv.map,badEnv.order),{mode:0o600});
   await assert.rejects(restoreDataDirectory(oldTarget,badBackup,{relocateManagedHost:true}));assert.equal(await fs.readFile(path.join(oldTarget,"keep.txt"),"utf8"),"prior destination");
   phase="restore-empty-directory";
-  const replacement=await restoreDataDirectory(destination,backup,{relocateManagedHost:true});
+  const replacement=await restoreDataDirectory(destination,backup);
   phase="start-restored-host";
   process.env.CODEX_DATA_DIR=path.join(destination,"disabled-codex");process.env.CODEX_BIN=path.join(destination,"not-installed");
   active=await start(destination);assert.equal(active.needsSetup,false);
   const restoredAuth=await smokeAuthenticate(active.url,password,totpSecret);assert.equal(restoredAuth.userId,sourceAuth.userId);
-  const restoredCredentials=restoredAuth.headers();
-  const downloaded=await fetch(`${active.url}/api/documentos/${encodeURIComponent(document.id)}/content`,{headers:restoredCredentials});assert.equal(downloaded.status,200);assert(Buffer.from(await downloaded.arrayBuffer()).equals(documentBytes));
+  phase = "verify-restored-case";
+  const restoredMember = await smokeAuthenticate(active.url, password, undefined, memberEmail);
+  const restoredOutside = await smokeAuthenticate(active.url, password, undefined, outsideEmail);
+  assert.equal(restoredMember.userId, member.userId);
+  assert.equal(restoredOutside.userId, outside.userId);
+  await verifyCaseRestore(active.url, restoredMember, restoredOutside, expected);
   const restoredValues=await envValues(destination);
   assert.equal(digest(restoredValues.SESSION_SECRET),secretHashes.SESSION_SECRET);
   assert.equal(path.resolve(restoredValues.STORAGE_PATH),path.join(destination,"storage"));
@@ -167,7 +228,7 @@ try {
   phase="stop-restored-host";await stop();await finalizeRestore(replacement.rollback);
   phase="verify-original-intact";assert.equal(await treeDigest(dataDir),sourceDigest);
 
-  console.log(`LEXOPEN_DESKTOP_SMOKE ${JSON.stringify({ platform: process.platform, arch: process.arch, version: health.version, buildId: health.buildId, sourceRevision: health.sourceRevision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false })}`);
+  console.log(`LEXOPEN_DESKTOP_SMOKE ${JSON.stringify({ platform: process.platform, arch: process.arch, version: health.version, buildId: health.buildId, sourceRevision: health.sourceRevision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredCaseAccessAndDeadline: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false })}`);
 } catch (error) {
   const code = typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "UNCLASSIFIED";
   // Report fixed phase and bounded error code only, never raw server logs/tokens.

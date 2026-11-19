@@ -23,7 +23,7 @@ const movementSchema = z.object({
 export const pjudWebhookPayloadSchema = z
   .object({
     operationId: z.string().trim().min(1).max(200).optional(),
-    status: z.enum(["ok", "partial", "error"]).optional(),
+    status: z.enum(["ok", "partial", "error"]).default("partial"),
     causaId: z.string().trim().min(1).max(100).optional(),
     externalKey: z.string().trim().min(1).max(180).optional(),
     rit: z.string().trim().min(1).max(100).optional().nullable(),

@@ -133,6 +133,13 @@ async function main() {
     const wrongSender = webhook(`ALTAZOR ${waCode} Wrong sender`, "wamid.wrong", "56922222222");
     assert.equal((await processWhatsAppHelpWebhook(wrongSender, signed(wrongSender), client)).accepted, 0);
     const waReply = webhook("Continúa", "wamid.reply", "56911111111", "wamid.sent-fixture");
+    await client.firmSettings.update({ where: { organizationId }, data: { assistantLlmMode: "local_only" } });
+    assert.equal((await processWhatsAppHelpWebhook(waReply, signed(waReply), client)).accepted, 0, "a signed reply cannot bypass the Host's current local-only policy");
+    await client.firmSettings.update({ where: { organizationId }, data: { assistantLlmMode: "remote_allowed" } });
+    await saveHelpChannelConfig(owner, { whatsapp: { enabled: false, channelId: channel.id } }, client);
+    assert.equal((await processWhatsAppHelpWebhook(waReply, signed(waReply), client)).accepted, 0, "a previously sent notice cannot authorize a disabled channel");
+    assert.equal((await getHelpRequest(owner, waRequest.id, client)).status, "pending");
+    await saveHelpChannelConfig(owner, { whatsapp: { enabled: true, channelId: channel.id } }, client);
     assert.equal((await processWhatsAppHelpWebhook(waReply, signed(waReply), client)).accepted, 1);
     assert.equal((await processWhatsAppHelpWebhook(waReply, signed(waReply), client)).accepted, 0);
     assert.equal((await getHelpRequest(owner, waRequest.id, client)).status, "answered");

@@ -16,6 +16,7 @@ async function main() {
     const a = await person("author"), b = await person("outside"), reader = await person("reader"), assistant = await person("assistant", "asistente");
     const causeFields = { titulo: `Causa ${tag}`, tribunal: "Órgano ficticio", materia: "civil", rit: `R-${tag}`, partes: [{ nombre: `Parte ${tag}`, rut: null, domicilio: null, rol: "demandante" }], fechaNotificacion: null };
     const create = { kind: "causa", action: "create", requestId: randomUUID(), fields: causeFields };
+    for (const acceso of ["estudio", "equipo"]) await assert.rejects(syncOfflineEntity(a, { ...create, fields: { ...causeFields, acceso } }), (e: unknown) => e instanceof Error && e.name === "ZodError", "offline sync cannot inherit wall changes from the online creation schema");
     await withRejectedAudit(a.id, "causa.create", async () => { await assert.rejects(syncOfflineEntity(a, create), status(500)); assert.equal(await prisma.causa.count({ where: { rit: causeFields.rit } }), 0); assert.equal(await prisma.activity.count({ where: { userId: a.id } }), 0); });
     const pair = await Promise.all([syncOfflineEntity(a, create), syncOfflineEntity(a, create)]); const id = pair[0].receipt.entityId; cases.push(id); assert.equal(pair[1].receipt.entityId, id);
     assert.equal(await prisma.etapaHistorial.count({ where: { causaId: id } }), 1); assert.equal(await prisma.parte.count({ where: { causaId: id } }), 1);

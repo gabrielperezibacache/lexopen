@@ -20,9 +20,18 @@ type CreateInput = z.input<typeof createSchema>;
 type Delivery = { codeEnc?: string; ntfy?: { status: string; messageId?: string; topic?: string; replyTopic?: string; baseUrl?: string; error?: string }; whatsapp?: { status: string; messageId?: string; channelId?: string; error?: string } };
 function delivery(row: AltazorHelpRequest): Delivery { try { return JSON.parse(row.deliveryJson); } catch { return {}; } }
 
+export function helpStatus(row: AltazorHelpRequest) {
+  if (row.caseJobId) {
+    if (row.status === "pending" && row.expiresAt <= new Date()) return "expired";
+    // Older Hosts expired accepted answers during downtime. The stored receipt proves timely acceptance.
+    if (row.status === "expired" && row.response && row.respondedAt && row.respondedAt <= row.expiresAt) return "answered";
+  }
+  return row.status;
+}
+
 export function publicHelpRequest(row: AltazorHelpRequest) {
   const channels = delivery(row);
-  return { id: row.id, question: row.question, status: row.status, response: row.response, responseSource: row.responseSource, respondedAt: row.respondedAt?.toISOString() ?? null, expiresAt: row.expiresAt.toISOString(), createdAt: row.createdAt.toISOString(), conversationId: row.conversationId, computerSessionId: row.computerSessionId, computerTurnId: row.computerTurnId, scopeKind: row.scopeKind, scopeId: row.scopeId, causaId: row.scopeKind === "causa" ? row.scopeId : null, notificationStatus: row.notificationStatus, channels: { ntfy: channels.ntfy?.status ?? "not_configured", whatsapp: channels.whatsapp?.status ?? "not_configured" } };
+  return { id: row.id, question: row.question, status: helpStatus(row), response: row.response, responseSource: row.responseSource, respondedAt: row.respondedAt?.toISOString() ?? null, expiresAt: row.expiresAt.toISOString(), createdAt: row.createdAt.toISOString(), conversationId: row.conversationId, computerSessionId: row.computerSessionId, computerTurnId: row.computerTurnId, scopeKind: row.scopeKind, scopeId: row.scopeId, causaId: row.scopeKind === "causa" ? row.scopeId : null, notificationStatus: row.notificationStatus, channels: { ntfy: channels.ntfy?.status ?? "not_configured", whatsapp: channels.whatsapp?.status ?? "not_configured" } };
 }
 
 async function helpView(row: AltazorHelpRequest, client: Client) {
@@ -35,14 +44,15 @@ async function helpView(row: AltazorHelpRequest, client: Client) {
 }
 
 /** Recheck both ownership and current matter permission at every answer and resumption. */
-async function helpAccess(row: Pick<AltazorHelpRequest, "ownerId" | "conversationId" | "computerSessionId" | "scopeKind" | "scopeId" | "caseJobId"> & {id?:string;status?:string}, user: { id: string }, client: Client) {
+async function helpAccess(row: Pick<AltazorHelpRequest, "ownerId" | "conversationId" | "computerSessionId" | "scopeKind" | "scopeId" | "caseJobId"> & Partial<Pick<AltazorHelpRequest, "id" | "status" | "respondedAt">>, user: { id: string }, client: Client) {
   if (row.ownerId !== user.id) throw httpError("Solicitud de ayuda no encontrada.", 404);
   const found = await client.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, sessionVersion: true, capabilityGrants: true, capabilityRevokes: true } });
   if (!found) throw httpError("No tiene permiso para esta ayuda.", 403);
   const actor = await altazorActor(found, client);
   if (row.caseJobId) {
     const {job} = await (await import("../case-jobs/service")).caseJobAccess(row.caseJobId, actor, client);
-    if (job.conversationId !== row.conversationId || job.causaId !== row.scopeId || job.cancelledAt || row.id && ["pending","answered"].includes(row.status||"") && job.helpRequestId !== row.id) throw httpError("La pregunta ya no corresponde al encargo actual",409);
+    const needsCurrentQuestion = row.status === "pending" || row.status === "answered" || (row.status === "expired" && row.respondedAt);
+    if (job.conversationId !== row.conversationId || job.causaId !== row.scopeId || job.cancelledAt || row.id && needsCurrentQuestion && job.helpRequestId !== row.id) throw httpError("La pregunta ya no corresponde al encargo actual",409);
   }
   let causaId: string | null = null;
   if (row.conversationId) causaId = (await conversationFor(row.conversationId, actor, client, true)).conversation.causaId;
@@ -136,14 +146,34 @@ export async function notifyHelpRequest(ownerId: string, id: string, client: Pri
   return getHelpRequest({ id: ownerId }, id, client);
 }
 
+async function mobileReplyAllowed(row: AltazorHelpRequest, source: "ntfy" | "whatsapp", tx: Prisma.TransactionClient) {
+  if (!await remoteHelpAllowed(tx)) return false;
+  const config = await getHelpChannelConfig(row.ownerId, tx);
+  const sent = delivery(row);
+  if (source === "ntfy") {
+    return Boolean(config.ntfy?.enabled && sent.ntfy && config.ntfy.baseUrl === sent.ntfy.baseUrl && config.ntfy.replyTopic === sent.ntfy.replyTopic);
+  }
+  const channelId = sent.whatsapp?.channelId;
+  if (!channelId || !config.whatsapp.enabled || config.whatsapp.channelId !== channelId) return false;
+  return Boolean(await tx.canalUsuario.findFirst({
+    where: { id: channelId, userId: row.ownerId, canal: "whatsapp", estado: "activo", verificadoAt: { not: null } },
+    select: { id: true },
+  }));
+}
+
 async function answer(user: { id: string }, input: { requestId: string; response: string; source: "web" | "ntfy" | "whatsapp"; messageId?: string }, client: PrismaClient) {
   const response = z.string().trim().min(1).max(2000).parse(input.response);
   if (Buffer.byteLength(response, "utf8") > 2000) throw httpError("La respuesta admite hasta 2000 bytes de texto. Acórtala antes de continuar.", 400);
   return altazorTransaction(client, async tx => {
     const row = await ownRequest(input.requestId, user, tx);
-    if (row.expiresAt <= new Date()) { await tx.altazorHelpRequest.updateMany({ where: { id: row.id, status: "pending" }, data: { status: "expired" } }); return { accepted: false, request: publicHelpRequest({ ...row, status: "expired" }) }; }
     if (row.status !== "pending") return { accepted: false, request: publicHelpRequest(row) };
-    const changed = await tx.altazorHelpRequest.updateMany({ where: { id: row.id, ownerId: user.id, status: "pending", expiresAt: { gt: new Date() } }, data: { status: "answered", response, responseSource: input.source, responseMessageId: input.messageId ?? null, respondedAt: new Date() } });
+    if (input.source !== "web" && !await mobileReplyAllowed(row, input.source, tx)) return { accepted: false, request: publicHelpRequest(row) };
+    const respondedAt = new Date();
+    if (row.expiresAt <= respondedAt) {
+      await tx.altazorHelpRequest.updateMany({ where: { id: row.id, status: "pending" }, data: { status: "expired" } });
+      return { accepted: false, request: publicHelpRequest({ ...row, status: "expired" }) };
+    }
+    const changed = await tx.altazorHelpRequest.updateMany({ where: { id: row.id, ownerId: user.id, status: "pending", expiresAt: { gt: respondedAt } }, data: { status: "answered", response, responseSource: input.source, responseMessageId: input.messageId ?? null, respondedAt } });
     if (changed.count) await writeAuditStrict({ actorId: user.id, action: "altazor.help.answer", entityType: "AltazorHelpRequest", entityId: row.id, after: { source: input.source } }, tx);
     return { accepted: changed.count === 1, request: publicHelpRequest(await tx.altazorHelpRequest.findUniqueOrThrow({ where: { id: row.id } })) };
   });
@@ -182,8 +212,10 @@ export async function pollHelpReplies(user: { id: string }, client: PrismaClient
 }
 
 export async function cancelHelpRequest(user: { id: string }, id: string, client: PrismaClient = prisma) {
-  await ownRequest(id, user, client);
-  await client.altazorHelpRequest.updateMany({ where: { id, ownerId: user.id, status: { in: ["pending", "answered", "resume_failed"] } }, data: { status: "cancelled" } });
+  const row = await ownRequest(id, user, client);
+  const cancellable = ["pending", "answered", "resume_failed"];
+  if (row.status === "expired" && helpStatus(row) === "answered") cancellable.push("expired");
+  await client.altazorHelpRequest.updateMany({ where: { id, ownerId: user.id, status: { in: cancellable } }, data: { status: "cancelled" } });
   return getHelpRequest(user, id, client);
 }
 
@@ -191,7 +223,7 @@ export async function cancelHelpRequest(user: { id: string }, id: string, client
 export async function claimHelpResponse(user: { id: string }, id: string, client: PrismaClient = prisma) {
   return altazorTransaction(client, async tx => {
     const row = await ownRequest(id, user, tx);
-    if (!row.response || row.expiresAt <= new Date()) return null;
+    if (row.caseJobId || !row.response || row.expiresAt <= new Date()) return null;
     const changed = await tx.altazorHelpRequest.updateMany({ where: { id, ownerId: user.id, status: "answered", expiresAt: { gt: new Date() } }, data: { status: "resuming" } });
     return changed.count ? { ...publicHelpRequest(row), response: row.response, status: "resuming" } : null;
   });
@@ -204,7 +236,10 @@ export async function completeHelpResponse(user: { id: string }, id: string, suc
 
 export async function helpWorkerQueue(client: PrismaClient = prisma, limit = 30) {
   const now = new Date();
-  await client.altazorHelpRequest.updateMany({ where: { status: { in: ["pending", "answered"] }, expiresAt: { lte: now } }, data: { status: "expired" } });
+  await client.altazorHelpRequest.updateMany({
+    where: { expiresAt: { lte: now }, OR: [{ status: "pending" }, { status: "answered", caseJobId: null }] },
+    data: { status: "expired" },
+  });
   // A crash after provider acceptance is ambiguous. Never resend such an alert automatically.
   await client.altazorHelpRequest.updateMany({ where: { notificationStatus: "sending", notificationAttemptedAt: { lt: new Date(now.getTime() - 2 * 60_000) } }, data: { notificationStatus: "uncertain" } });
   await client.altazorHelpRequest.updateMany({ where: { status: "resuming", updatedAt: { lt: new Date(now.getTime() - 2 * 60_000) } }, data: { status: "resume_failed" } });

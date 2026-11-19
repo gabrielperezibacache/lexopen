@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { withRejectedAudit } from "@/lib/testing/audit-failure";
@@ -10,6 +10,9 @@ import {
 } from "@/lib/clientes/documents";
 import { ingestManualCaseDocument } from "./document-intake";
 import { listCursorWhere, listWindow } from "@/lib/api/list-window";
+import { assertCausaAccess, assertCausaCapability, assertCausaTeamManage } from "@/lib/auth/causa-access";
+import { canonicalJson } from "@/lib/command-execution";
+import { causaCreateSchema } from "@/lib/schemas";
 const status = (code: number) => (e: unknown) =>
   (e as { status?: number }).status === code;
 async function main() {
@@ -54,6 +57,11 @@ async function main() {
     );
     const cause = created[0];
     assert(created.every((row) => row.id === cause.id));
+    assert.equal(cause.acceso, "estudio", "omitting visibility preserves the historical default");
+    const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+    const receipt = await prisma.commandExecution.findUniqueOrThrow({ where: { key: hash(`${actor.id}:${key}`) } });
+    assert.equal(receipt.inputHash, hash(canonicalJson(input)), "old payloads retain their original receipt identity");
+    assert.equal((await createCausaCommand(actor, { ...input, acceso: "estudio" }, key)).id, cause.id, "explicit default visibility replays a legacy receipt without a hash conflict");
     assert.equal(
       await prisma.causa.count({ where: { titulo: input.titulo } }),
       1,
@@ -68,6 +76,45 @@ async function main() {
       await prisma.activity.count({ where: { causaId: cause.id } }),
       1,
     );
+    const restrictedInput = { ...input, titulo: `Equipo desde el alta ${tag}`, acceso: "equipo" };
+    const restrictedKey = randomUUID();
+    const privateResults = await Promise.all(Array.from({ length: 3 }, () => createCausaCommand(actor, restrictedInput, restrictedKey)));
+    const restricted = privateResults[0];
+    assert.equal(restricted.acceso, "equipo", "the requested wall must exist before the first document is uploaded");
+    assert(privateResults.every(row => row.id === restricted.id));
+    assert.equal(await prisma.documento.count({ where: { causaId: restricted.id } }), 0);
+    assert.equal(await prisma.causaMiembro.count({ where: { causaId: restricted.id, userId: actor.id, rol: "responsable" } }), 1);
+    await assertCausaAccess(restricted.id, actor);
+    await assert.rejects(assertCausaAccess(restricted.id, other), status(404));
+    await assert.rejects(createCausaCommand(actor, { ...restrictedInput, acceso: "estudio" }, restrictedKey), status(409));
+    assert.equal((await prisma.causa.findUniqueOrThrow({ where: { id: restricted.id } })).acceso, "equipo");
+    assert.equal(await prisma.auditEvent.count({ where: { entityId: restricted.id, action: "causa.create" } }), 1);
+    assert.equal(causaCreateSchema.safeParse({ ...input, acceso: "publico" }).success, false);
+
+    const delegated = await createCausaCommand(actor, { ...restrictedInput, titulo: `Asignada ${tag}`, abogadoId: other.id }, randomUUID());
+    await assertCausaCapability(delegated.id, actor, "causa.write");
+    await assertCausaCapability(delegated.id, other, "causa.write");
+    assert.equal((await prisma.causaMiembro.findUniqueOrThrow({ where: { causaId_userId: { causaId: delegated.id, userId: actor.id } } })).rol, "colaborador");
+    assert.equal((await prisma.causaMiembro.findUniqueOrThrow({ where: { causaId_userId: { causaId: delegated.id, userId: other.id } } })).rol, "responsable");
+    await assert.rejects(assertCausaTeamManage(delegated.id, actor), status(403));
+    await assertCausaTeamManage(delegated.id, other);
+    for (const change of [{ role: "cliente" }, { role: "contabilidad" }, { capabilityRevokes: "causa.read" }, { capabilityRevokes: "causa.write" }]) {
+      await prisma.user.update({ where: { id: other.id }, data: change });
+      const invalidTitle = `Responsable inválido ${randomUUID()}`;
+      await assert.rejects(createCausaCommand(actor, { ...restrictedInput, titulo: invalidTitle, abogadoId: other.id }, randomUUID()), status(403));
+      assert.equal(await prisma.causa.count({ where: { titulo: invalidTitle } }), 0);
+      await prisma.user.update({ where: { id: other.id }, data: { role: "abogado", capabilityRevokes: "" } });
+    }
+    await assert.rejects(createCausaCommand(actor, { ...restrictedInput, abogadoId: "missing-user" }, randomUUID()), status(403));
+    const rollbackTitle = `Rollback equipo ${tag}`, rollbackKey = randomUUID();
+    const membersBefore = await prisma.causaMiembro.count({ where: { userId: { in: users } } });
+    await withRejectedAudit(actor.id, "causa.create", async () => {
+      await assert.rejects(createCausaCommand(actor, { ...restrictedInput, titulo: rollbackTitle, abogadoId: other.id }, rollbackKey));
+      assert.equal(await prisma.causa.count({ where: { titulo: rollbackTitle } }), 0);
+      assert.equal(await prisma.causaMiembro.count({ where: { userId: { in: users } } }), membersBefore);
+      assert.equal(await prisma.commandExecution.count({ where: { key: hash(`${actor.id}:${rollbackKey}`) } }), 0);
+    });
+    assert.equal((await createCausaCommand(actor, { ...restrictedInput, titulo: rollbackTitle, abogadoId: other.id }, rollbackKey)).acceso, "equipo", "an audited rollback leaves the same key retryable");
     await assert.rejects(
       createCausaCommand(actor, { ...input, titulo: "Otro" }, key),
       status(409),

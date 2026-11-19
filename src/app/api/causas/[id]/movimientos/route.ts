@@ -18,7 +18,7 @@ import {
   parseReceptorFlag,
   serializeMovimientosCsv,
 } from "@/lib/pjud/import-csv";
-import { fingerprint } from "@/lib/pjud/provider";
+import { fingerprint } from "@/lib/pjud/types";
 import { downloadResponseHeaders } from "@/lib/security/download";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -193,16 +193,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           skipDuplicates: true,
         });
         const skipped = rows.length - createdRows.count;
-        await tx.causa.update({
-          where: { id },
-          data: {
-            pjudMonitoreoActivo: true,
-            pjudLastSyncAt: new Date(),
-            pjudLastSyncStatus: "ok",
-            pjudLastSyncNote: `Import CSV: ${createdRows.count} nuevos, ${skipped} repetidos.`,
-            pjudFailCount: 0,
-          },
-        });
+        // The imported rows have local provenance. Only a judicial query can update its outcome.
         await tx.pjudSyncJob.create({
           data: {
             causaId: id,

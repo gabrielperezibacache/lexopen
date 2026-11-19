@@ -26,7 +26,8 @@ export async function resolveStudyDriveAccount(user: CausaAccessUser, db = prism
     const actor = await client.user.findUnique({ where: { id: user.id }, select: { role: true } });
     if (!actor || !isStaff(actor.role)) throw httpError("Cuenta del equipo requerida", 403);
     const current = await client.integrationConfig.findUnique({ where: { provider: "google" } });
-    if (!current?.enabled || revision(await getGoogleConfig()) !== bindingRevision) throw httpError("La conexión de Google del estudio cambió", 409);
+    const config = await getGoogleConfig();
+    if (!current?.enabled || current.id !== row.id || config.syncDrive === false || revision(config) !== bindingRevision) throw httpError("La conexión de Google del estudio cambió", 409);
   }
   async function request(url: string, init: RequestInit = {}, max = 256 * 1024) {
     await assertActive(); const config = await requireDriveSession();

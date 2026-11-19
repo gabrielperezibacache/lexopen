@@ -22,6 +22,7 @@ export const causaCreateSchema = z.object({
   materia: z.string().min(2).max(120),
   procedimiento: z.string().max(200).optional().nullable(),
   estado: z.string().min(2).max(40).optional(),
+  acceso: z.enum(["estudio", "equipo"]).optional(),
   etapa: z.string().min(2).max(40).optional(),
   caratula: z.string().max(500).optional().nullable(),
   resumen: z.string().max(20000).optional().nullable(),

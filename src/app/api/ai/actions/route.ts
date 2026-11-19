@@ -15,7 +15,9 @@ import {
   isAiActionId,
   parseActionResult,
 } from "@/lib/ai/actions";
+import { readCaseStatus } from "@/lib/causas/status-service";
 import { buildActionContext } from "@/lib/ai/context";
+import { canSome } from "@/lib/auth/permissions";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import { writeAudit } from "@/lib/audit";
 
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     }
     const meta = AI_ACTION_META[action];
     const prompt = (body.prompt || "").trim();
-    const context = await buildActionContext({
+    const contextInput = {
       action,
       userRole: user.role,
       user,
@@ -87,7 +89,8 @@ export async function POST(req: NextRequest) {
         ...(body.extra || {}),
         ...(prompt ? { notes: prompt } : {}),
       },
-    });
+    };
+    const context = await buildActionContext(contextInput);
 
     const userContent = [
       buildActionInstructions(action),
@@ -133,6 +136,18 @@ export async function POST(req: NextRequest) {
       content = demoForAction(action, prompt || JSON.stringify(body.extra || {}));
     }
 
+    // A portal failure or access change while the model was responding invalidates this reading.
+    const summary = action === "causa.resumen" && Boolean(body.causaId);
+    const currentActor = action === "causa.estado" || summary ? await requireStaff() : user;
+    if ((action === "causa.estado" || summary) && !canSome(currentActor, "assistant.use")) {
+      return NextResponse.json({ error: "Su cuenta ya no tiene acceso al asistente.", code: "assistant_forbidden" }, { status: 403 });
+    }
+    const caseStatus = action === "causa.estado" ? await readCaseStatus(body.causaId!, currentActor) : null;
+    if (caseStatus && caseStatus.fingerprint !== JSON.parse(context).caseStatus.fingerprint ||
+        summary && context !== await buildActionContext({ ...contextInput, user: currentActor, userRole: currentActor.role })) {
+      return NextResponse.json({ error: "Los registros cambiaron mientras se generaba la lectura.", code: "case_status_changed" },
+        { status: 409, headers: { "Cache-Control": "private, no-store" } });
+    }
     const parsed = parseActionResult(action, content);
 
     await writeAudit({
@@ -159,8 +174,8 @@ export async function POST(req: NextRequest) {
       note: "note" in result ? result.note : undefined,
       provider: result.provider,
       model: result.model,
-      ...(action === "causa.estado" ? { caseStatus: JSON.parse(context).caseStatus } : {}),
-    });
+      ...(caseStatus ? { caseStatus } : {}),
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     return handleRouteError(e);
   }

@@ -1,6 +1,13 @@
 import type { Dictionary } from "./es";
 
 export const en: Dictionary = {
+  caseCreation: {
+    visibility: "Who can view the case",
+    study: "Whole firm",
+    team: "Assigned team",
+    studyHelp: "Firm staff can view it according to their permissions.",
+    teamHelp: "When restricting access to the team, you retain access from creation. Manage members from the case according to your permissions. Special firm access permissions still apply.",
+  },
   computerPersistence: {
     stoppedNotice: "The gateway confirmed this desktop stopped. Resume it to keep working with its files and conversation.",
     notice: "Persistent desktop. Files, applications and conversation are kept without automatic expiry.",

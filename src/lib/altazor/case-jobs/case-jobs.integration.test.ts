@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { createHmac, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { withRejectedAudit } from "@/lib/testing/audit-failure";
@@ -12,7 +13,11 @@ import {
   createAltazorConversation,
 } from "../conversations";
 import { createIcaro, saveIcaroMemory, forgetIcaroMemory } from "../icaros/service";
-import { answerHelpRequest } from "../help/service";
+import { encryptSecret, hashDestino, sha256Hex } from "@/lib/notify/secrets";
+import { createWhatsAppMetaProvider } from "@/lib/notify/providers/whatsapp";
+import { answerHelpRequest, helpWorkerQueue, notifyHelpRequest, pollHelpReplies } from "../help/service";
+import { saveHelpChannelConfig, saveWhatsAppMetaConfig } from "../help/config";
+import { processWhatsAppHelpWebhook } from "../help/whatsapp";
 import {
   prepareCasePlan,
   planPreview,
@@ -30,6 +35,28 @@ import { emptyReport } from "./types";
 
 const status = (code: number) => (e: unknown) =>
   (e as { status?: number }).status === code;
+
+// Boot a fresh worker process with the same database, racing two recovery passes while offline.
+async function restartedHelpWorker(jobId: string, ownerId: string) {
+  assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
+  const owner = { id: ownerId, role: "abogado" };
+  const offline = async () => { throw Error("Fixture transport unavailable"); };
+  globalThis.fetch = offline;
+  try {
+    await helpWorkerQueue();
+    let workers = 0;
+    const ready = Promise.withResolvers<void>();
+    const options = { ask: offline, help: { notify: async () => {
+      if (++workers === 2) ready.resolve();
+      await ready.promise;
+      return offline();
+    }, poll: offline } };
+    await Promise.all([advanceCaseJob(jobId, owner, options), advanceCaseJob(jobId, owner, options)]);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 async function main() {
   assert.equal(
     assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL),
@@ -42,9 +69,8 @@ async function main() {
     users: string[] = [],
     causes: string[] = [],
     clients: string[] = [];
-  const configs = await prisma.integrationConfig.findMany({
-    where: { provider: { in: ["llm", "llm-local", "hermes"] } },
-  });
+  const fixtureProviders = ["llm", "llm-local", "hermes", "whatsapp_meta"];
+  const configs = await prisma.integrationConfig.findMany({ where: { provider: { in: fixtureProviders } } });
   const priorFirm=await prisma.firmSettings.findFirst();
   let firm=priorFirm, ownedOrganization="";
   let askQuestion = false,
@@ -111,14 +137,14 @@ async function main() {
   };
   try {
     await prisma.integrationConfig.deleteMany({
-      where: { provider: { in: ["llm", "llm-local", "hermes"] } },
+      where: { provider: { in: fixtureProviders } },
     });
     if(!firm){const organization=await prisma.organization.create({data:{name:`Case jobs fictitious ${tag}`,settings:{create:{assistantLlmMode:"remote_allowed",hermesAllowDemo:false}}},include:{settings:true}});ownedOrganization=organization.id;firm=organization.settings!;}
     await prisma.firmSettings.update({
       where: { id: firm.id },
       data: { assistantLlmMode: "remote_allowed", hermesAllowDemo: false },
     });
-    for (const role of ["abogado", "abogado"])
+    for (const role of ["abogado", "abogado", "admin"])
       users.push(
         (
           await prisma.user.create({
@@ -756,26 +782,108 @@ async function main() {
     assert(waitingView.help);
     await prisma.altazorHelpRequest.update({where:{id:waitingView.help!.id},data:{expiresAt:new Date(0)}});
     const expiredHelp=await readCaseJob(waiting.id,owner);assert.equal(expiredHelp.help!.status,"expired");
+    assert.equal((await answerHelpRequest(owner, { requestId: waitingView.help.id, response: "Respuesta tardía" })).accepted, false);
     const renewedHelp=await resumeCaseJob(waiting.id,owner,expiredHelp.revision);assert.notEqual(renewedHelp.help!.id,waitingView.help!.id);
-    await answerHelpRequest(owner, {
-      requestId: renewedHelp.help!.id,
-      response: "Solicitar primero el comprobante original.",
+    const requestId = renewedHelp.help!.id;
+    await saveHelpChannelConfig(owner, { ntfy: {
+      enabled: true, baseUrl: "https://ntfy.fixture.invalid", topic: "case_help_notices",
+      replyTopic: "case_help_replies", token: "case-help-fictitious-token",
+    } });
+    let replyCode = "";
+    await notifyHelpRequest(owner.id, requestId, prisma, {
+      publishNtfy: async (_config, message) => {
+        replyCode = /ALTAZOR ([A-Za-z0-9_-]{32})/.exec(message.body)![1];
+        return { ok: true, providerMessageId: "fixture-notice" };
+      },
+      createWhatsAppMetaProvider: () => assert.fail("Only ntfy is connected"),
     });
-    await Promise.all([
-      advanceCaseJob(waiting.id, owner,{help:{notify:async()=>{throw Error("fictitious delivery unavailable");},poll:async()=>{throw Error("fictitious mobile network unavailable");}}}),
-      advanceCaseJob(waiting.id, owner,{help:{notify:async()=>{throw Error("fictitious delivery unavailable");},poll:async()=>{throw Error("fictitious mobile network unavailable");}}}),
+    const response = "Solicitar primero el comprobante original.";
+    const reply = { id: randomUUID(), time: Math.floor(Date.now() / 1000), message: `ALTAZOR ${replyCode} ${response}` };
+    assert.equal((await pollHelpReplies(owner, prisma, async () => [reply, reply])).accepted, 1);
+    const beforeRecovery = await prisma.altazorCaseJob.findUniqueOrThrow({ where: { id: waiting.id } });
+    assert.equal(beforeRecovery.status, "awaiting_help");
+    const userAccess = () => prisma.user.findUniqueOrThrow({
+      where: { id: owner.id }, select: { role: true, capabilityGrants: true, capabilityRevokes: true },
+    });
+    const beforeAccess = await userAccess();
+    const receipts = () => Promise.all([
+      prisma.task.count({ where: { causaId: cause.id } }), prisma.caseWritingDraft.count({ where: { causaId: cause.id } }),
     ]);
-    assert.equal(
-      await prisma.altazorCaseJobStep.count({
-        where: {
-          jobId: waiting.id,
-          label: "Integrar respuesta a la pregunta pendiente",
-        },
-      }),
-      1,
-    );
+    const beforeReceipts = await receipts();
+    const integrationStep = { jobId: waiting.id, label: "Integrar respuesta a la pregunta pendiente" };
+    await prisma.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } });
+    await assert.rejects(advanceCaseJob(waiting.id, owner), status(403));
+    assert.equal(await prisma.altazorCaseJobStep.count({ where: integrationStep }), 0);
+    await prisma.user.update({ where: { id: owner.id }, data: { capabilityRevokes: beforeAccess.capabilityRevokes } });
+    // The Host stopped after accepting the reply and boots after the response deadline.
+    const now = Date.now();
+    const pastWindow = {
+      createdAt: new Date(now - 26 * 3600_000), respondedAt: new Date(now - 3 * 3600_000), expiresAt: new Date(now - 2 * 3600_000),
+    };
+    await prisma.altazorHelpRequest.update({ where: { id: requestId }, data: pastWindow });
+    assert.equal((await readCaseJob(waiting.id, owner)).help?.status, "answered");
+    await assert.rejects(resumeCaseJob(waiting.id, owner, beforeRecovery.revision), status(409));
+    const duplicate = await answerHelpRequest(owner, { requestId, response: "Repetición" });
+    assert.equal(duplicate.accepted, false);
+    assert.equal(duplicate.request.status, "answered");
+    const restartWithPendingReply = (id: string) =>
+      execFileSync(process.execPath, ["--import", "tsx", process.argv[1], "--recover-help", id, owner.id]);
+    restartWithPendingReply(waiting.id);
+    const afterRecovery = await prisma.altazorCaseJob.findUniqueOrThrow({ where: { id: waiting.id } });
+    assert.equal(afterRecovery.revision, beforeRecovery.revision + 1);
+    assert.equal(afterRecovery.planJson, beforeRecovery.planJson);
+    assert.equal(afterRecovery.selectionJson, beforeRecovery.selectionJson);
+    const consumed = await prisma.altazorHelpRequest.findUniqueOrThrow({ where: { id: requestId } });
+    assert.equal(consumed.status, "resumed");
+    assert.equal(consumed.responseSource, "ntfy");
+    const integrations = await prisma.altazorCaseJobStep.findMany({ where: integrationStep });
+    assert.deepEqual(integrations.map(step => JSON.parse(step.dataJson).text), [response]);
+    assert.equal((await pollHelpReplies(owner, prisma, async () => [reply])).accepted, 0);
     askQuestion = false;
     assert.equal((await run(waiting.id)).status, "awaiting_review");
+    assert.deepEqual(await receipts(), beforeReceipts);
+    assert.deepEqual(await userAccess(), beforeAccess);
+
+    askQuestion = true;
+    const waJob = await make(false);
+    const waHelp = (await run(waJob.id)).help!;
+    const phone = "+56912000001", phoneNumberId = "12000000001", appSecret = "fictitious-case-app-secret";
+    const channel = await prisma.canalUsuario.create({ data: {
+      userId: owner.id, canal: "whatsapp", estado: "activo", verificadoAt: new Date(),
+      destinoEnc: encryptSecret(phone), destinoHash: hashDestino("whatsapp", phone),
+    } });
+    await saveWhatsAppMetaConfig({ id: users[2] }, { enabled: true, phoneNumberId, templateName: "fixture_help",
+      accessToken: "fixture-access", appSecret, verifyToken: "fictitious-verification-token" });
+    await saveHelpChannelConfig(owner, { whatsapp: { enabled: true, channelId: channel.id } });
+    const sentMessageId = "wamid.case-notice";
+    await notifyHelpRequest(owner.id, waHelp.id, prisma, {
+      publishNtfy: async () => ({ ok: true, providerMessageId: "fixture-ntfy-notice" }),
+      createWhatsAppMetaProvider: config => createWhatsAppMetaProvider(config, async () => Response.json({ messages: [{ id: sentMessageId }] })),
+    });
+    const waText = "Preparar una propuesta para revisar.";
+    const envelope = JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ value: {
+      metadata: { phone_number_id: phoneNumberId }, messages: [{
+        id: "wamid.case-reply", from: phone.slice(1), type: "text", timestamp: String(Math.floor(Date.now() / 1000)),
+        context: { id: sentMessageId }, text: { body: waText },
+      }],
+    } }] }] });
+    const signature = "sha256=" + createHmac("sha256", appSecret).update(envelope).digest("hex");
+    const deliverWhatsApp = () => processWhatsAppHelpWebhook(envelope, signature);
+    assert.equal((await deliverWhatsApp()).accepted, 1);
+    assert.equal((await deliverWhatsApp()).accepted, 0);
+    // A previous Host already swept this timely answer. Its persisted receipt still belongs to the live job.
+    await prisma.altazorHelpRequest.update({ where: { id: waHelp.id }, data: { ...pastWindow, status: "expired" } });
+    assert.equal((await readCaseJob(waJob.id, owner)).help?.status, "answered");
+    restartWithPendingReply(waJob.id);
+    const waConsumed = await prisma.altazorHelpRequest.findUniqueOrThrow({ where: { id: waHelp.id } });
+    assert.equal(waConsumed.status, "resumed");
+    assert.equal(waConsumed.responseSource, "whatsapp");
+    const waSteps = await prisma.altazorCaseJobStep.findMany({ where: { ...integrationStep, jobId: waJob.id } });
+    assert.deepEqual(waSteps.map(step => JSON.parse(step.dataJson).text), [waText]);
+    askQuestion = false;
+    assert.equal((await run(waJob.id)).status, "awaiting_review");
+    assert.deepEqual(await receipts(), beforeReceipts);
+    assert.deepEqual(await userAccess(), beforeAccess);
     const stopped = await make();
     await advanceCaseJob(stopped.id, owner);
     hold = true;
@@ -845,7 +953,7 @@ async function main() {
     await prisma.notification.deleteMany({ where: { userId: { in: users } } });
     await prisma.user.deleteMany({ where: { id: { in: users } } });
     await prisma.integrationConfig.deleteMany({
-      where: { provider: { in: ["llm", "llm-local", "hermes"] } },
+      where: { provider: { in: [...fixtureProviders, ...users.map(id => `altazor-help:${sha256Hex(id)}`)] } },
     });
     if (configs.length)
       await prisma.integrationConfig.createMany({ data: configs });
@@ -857,7 +965,8 @@ async function main() {
     await prisma.$disconnect();
   }
 }
-void main().catch((error) => {
+const suite = process.argv[2] === "--recover-help" ? restartedHelpWorker(process.argv[3], process.argv[4]) : main();
+void suite.catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

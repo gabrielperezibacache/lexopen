@@ -10,20 +10,20 @@ export function smokeTotpCode(secret, now=Date.now()) {
   return String((digest.readUInt32BE(offset)&0x7fffffff)%1_000_000).padStart(6,"0");
 }
 function expectHttp(response,status){if(response.status!==status)throw Object.assign(new Error("Native test HTTP request failed"),{code:`HTTP_${response.status}`});}
-export async function smokeAuthenticate(url,password,totpSecret){
+export async function smokeAuthenticate(url,password,totpSecret,email="installer-fixture@example.test"){
   const address=new URL(url);assert(["127.0.0.1","localhost","[::1]"].includes(address.hostname));
   const cookies=new Map();
   const accept=response=>{for(const line of response.headers.getSetCookie()){const pair=line.split(";",1)[0],at=pair.indexOf("=");cookies.set(pair.slice(0,at),pair.slice(at+1));}};
   const headers=()=>({Cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join("; "),Origin:url,"x-csrf-token":cookies.get("lexopen_csrf")});
   const page=await fetch(`${url}/login`);expectHttp(page,200);accept(page);assert(cookies.get("lexopen_csrf"));
-  const login=await fetch(`${url}/api/auth/login`,{method:"POST",headers:{...headers(),"Content-Type":"application/json"},body:JSON.stringify({email:"installer-fixture@example.test",password})});
+  const login=await fetch(`${url}/api/auth/login`,{method:"POST",headers:{...headers(),"Content-Type":"application/json"},body:JSON.stringify({email,password})});
   expectHttp(login,200);accept(login);let body=await login.json();
   if(totpSecret){
     assert.equal(body.needsTotp,true,"Restored account must still require its original second factor");
     const verified=await fetch(`${url}/api/auth/totp`,{method:"POST",headers:{...headers(),"Content-Type":"application/json"},body:JSON.stringify({action:"verify-login",code:smokeTotpCode(totpSecret),rememberDevice:false})});
     expectHttp(verified,200);accept(verified);body=await verified.json();
   }else assert.equal(body.needsTotp,undefined);
-  assert.equal(body.user.email,"installer-fixture@example.test");assert(body.user.id);
+  assert.equal(body.user.email,email);assert(body.user.id);
   return {headers,accept,userId:body.user.id};
 }
 export async function smokeEnrollTotp(url,auth){

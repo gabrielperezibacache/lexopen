@@ -151,3 +151,26 @@ test("el contexto antiguo del modelo no sustituye los registros actuales", async
   await expect(panel.getByText("Lectura contrastada", { exact: true })).toBeVisible();
   expect(calls).toBe(2);
 });
+
+test("una consulta judicial fallida invalida la lectura anterior y señala la procedencia local", async ({ page }) => {
+  await loginAs(page, "socio@estudio.cl");
+  const id = (await (await page.request.get("/api/causas?limit=1")).json())[0].id;
+  const previous = await (await page.request.get(`/api/causas/${id}/estado`)).json();
+  const notice = "Falló la última consulta al PJUD. Los movimientos registrados en el estudio no permiten saber si hubo novedades en el tribunal.";
+  const attemptedAt = "2026-11-19T01:00:00.000Z";
+  const failed = { ...previous, fingerprint: `${previous.fingerprint}-failed`, status: { ...previous.status,
+    judicialSync: { status: "failed", enabled: true, at: attemptedAt, attemptedAt, coverage: "unknown", notice } } };
+  let attempts = 0;
+  await page.route(`**/api/causas/${id}/estado`, route => route.fulfill({ json: failed }));
+  await page.route("**/api/ai/actions", route => {
+    if (route.request().postDataJSON().action !== "causa.estado") return route.continue();
+    if (++attempts === 1) return route.fulfill({ status: 409, json: { code: "case_status_changed", error: "Los registros cambiaron." } });
+    return route.fulfill({ json: { source: "llm", content: "Lectura de los registros locales", caseStatus: failed } });
+  });
+  await page.goto(`/causas/${id}`);
+  const panel = page.getByTestId("case-status");
+  await expect(panel.getByText(notice, { exact: true })).toBeVisible();
+  await expect(panel.locator("time")).toHaveAttribute("datetime", attemptedAt);
+  await expect(panel.getByText("Lectura de los registros locales", { exact: true })).toBeVisible();
+  expect(attempts).toBe(2);
+});

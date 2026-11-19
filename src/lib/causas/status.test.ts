@@ -17,11 +17,34 @@ assert.match(result.needs[0].title, /Revisar vencimiento/);
 assert.ok(result.needs.some(n => n.title.includes("Atender hoy")));
 assert.ok(result.needs.some(n => n.title.includes("asignar responsable")));
 assert.ok(result.missing.some(m => m.includes("notificación")));
-assert.ok(result.missing.some(m => m.includes("completa")));
+assert.match(result.judicialSync.notice!, /consulta al PJUD fue parcial/);
 const next = buildCaseStatus({ ...row, pendientes: [{ id: "writing", titulo: "Escrito", fecha: new Date("2026-11-01"), fuente: "pjud" }], _count: { ...row._count, movimientos: 22 } }, new Date("2026-11-10T12:00:00Z"));
 assert.equal(next.deadlines.find(p => p.id === "closed")?.days, -1);
 assert.equal(next.waiting[0].id, "writing");
 assert.ok(next.missing.some(m => m.includes("selección")));
 const empty = buildCaseStatus({ ...row, plazos: [], _count: { plazos: 0, tramites: 1, movimientos: 0 } });
 assert.ok(empty.missing.some(m => m.includes("no confirma")));
+const attemptedAt = new Date("2026-11-10T12:00:00Z");
+const complete = { status: "complete", read: 1, total: 1, items: [{ key: "cuaderno:1", label: "Cuaderno privado", status: "ok", count: 0, note: "sesión privada" }] };
+const sync = (status: string | null, coverage: unknown, enabled = true, at: Date | null = attemptedAt) =>
+  buildCaseStatus({ ...row, pjudMonitoreoActivo: enabled, pjudLastSyncStatus: status, pjudLastSyncAt: at, pjudCuadernosCoverage: coverage }).judicialSync;
+for (const failed of ["failed", "error"]) {
+  const record = sync(failed, complete, false);
+  assert.match(record.notice!, /Falló la última consulta/);
+  assert.equal(record.coverage, "unknown");
+  assert.equal(record.attemptedAt, attemptedAt.toISOString());
+  assert.doesNotMatch(JSON.stringify(record), /Cuaderno privado|sesión privada/);
+}
+assert.equal(sync("partial", complete).coverage, "partial");
+assert.match(sync("ok", null).notice!, /lectura completa/);
+assert.match(sync("ok", { ...complete, read: 0 }).notice!, /lectura completa/);
+assert.match(sync("ok", complete, true, null).notice!, /lectura completa/);
+assert.equal(sync("ok", complete, true, null).coverage, "unknown");
+assert.equal(sync("ok", complete).notice, null);
+assert.equal(sync("ok", complete).coverage, "complete");
+assert.match(sync("unverified", complete).notice!, /importados/);
+assert.equal(sync("unverified", complete).attemptedAt, null);
+assert.match(sync("demo", complete).notice!, /demostración/);
+assert.equal(sync(null, null, false, null).notice, null);
+assert.doesNotMatch(JSON.stringify(sync("token-privado", null)), /token-privado/);
 console.log("Case status: Santiago dates, priorities, explicit waits, missing evidence and bounded coverage passed.");
