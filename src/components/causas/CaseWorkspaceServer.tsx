@@ -207,7 +207,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
       <CasePreparation
         causaId={id}
         documentCount={documentos.length}
-        documentsWithText={documentos.filter(document => document.hasText).length}
+        documentsWithText={documentos.filter(document => document.downloads?.hasText).length}
         pendingDocuments={documentos.filter(document => ["pending", "processing", "queued"].includes(document.extractionStatus || "")).length}
         minutaCount={causa._count.minutas}
         pendingActions={accionesAbiertas}
