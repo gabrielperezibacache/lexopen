@@ -94,10 +94,11 @@ export default async function PortalPage() {
     <div className={`${styles.area} space-y-6`}>
       <PageHeader
         artwork="people"
+        actions={<Link href="/mensajes" className="btn btn-secondary">{t("nav.messages")}</Link>}
         eyebrow={t("portal.eyebrow")}
         title={t("portal.title")}
         subtitle={
-          isCliente(user.role) ? t("portal.subtitleClient") : t("portal.subtitleStaff")
+          isCliente(user.role) ? undefined : t("portal.subtitleStaff")
         }
       />
 
@@ -203,9 +204,6 @@ export default async function PortalPage() {
               {s.causa && (
                 <div className="mt-5">
                   <h3 className="text-sm font-semibold">Trámites de la causa</h3>
-                  <p className="mt-1 text-sm text-[var(--ink-soft)]">
-                    Vista informativa (solo lectura).
-                  </p>
                   <ul className="mt-2 space-y-1.5">
                     {s.causa.tramites.map((t) => (
                       <li
@@ -241,7 +239,7 @@ export default async function PortalPage() {
                   {s.qaThreads.map((q) => (
                     <li key={q.id} className="text-sm">
                       <Link
-                        href={`/sites/${s.id}/qa`}
+                        href={`/sites/${s.id}/qa?pregunta=${encodeURIComponent(q.id)}`}
                         className="text-[var(--sea)] hover:underline"
                       >
                         {q.subject}
@@ -255,17 +253,8 @@ export default async function PortalPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link href={`/sites/${s.id}/qa`} className="btn btn-primary">
-                  Abrir Q&A
-                </Link>
-                <Link href={`/sites/${s.id}/archivos`} className="btn btn-secondary">
-                  Documentos
-                </Link>
                 <Link href={`/sites/${s.id}/blog`} className="btn btn-ghost">
                   Blog
-                </Link>
-                <Link href="/mensajes" className="btn btn-ghost">
-                  Mensajes
                 </Link>
                 {isStaff(user.role) && (
                   <Link href={`/sites/${s.id}`} className="btn btn-ghost">

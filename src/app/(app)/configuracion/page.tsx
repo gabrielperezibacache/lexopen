@@ -191,23 +191,9 @@ export default async function ConfiguracionPage() {
         eyebrow={h.eyebrow}
         title={canManage ? h.title : dict.nav.settings}
       />
-      <ConfigSectionNav categories={categories} />
-      <details className="text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--sea)]">{tr("A quién afectan los ajustes","Who these settings affect")}</summary><p className="py-2 text-[var(--muted)]">{tr("Tu usuario: cuenta y preferencias personales. Todo el estudio: configuración compartida del Host. Este navegador: idioma y apariencia.","Your account: personal settings. Whole firm: shared Host configuration. This browser: language and appearance.")}</p></details>
-      <div className={styles.groups}>
-        {categories.map(category => (
-          <section key={category.id} className={styles.group} aria-labelledby={`settings-${category.id}-title`}>
-            <header className={styles.groupHeader}>
-              <h2 id={`settings-${category.id}-title`}>{locale === "en" ? category.labelEn : category.label}</h2>
-              <p>{locale === "en" ? category.descriptionEn : category.description}</p>
-            </header>
-            <div className={styles.groupContent}>
-              {category.sections.map(section => <div key={section.id} data-config-section={section.id}>
-                <p className={styles.scopeLabel}>{["idioma","apariencia"].includes(section.id)?tr("Este navegador","This browser"):["cuenta-personal","preferencias-altazor","autorizaciones-escritorio","comunicaciones"].includes(section.id)?tr("Tu usuario","Your account"):section.id==="cuentas-conectadas"?tr("Ámbito indicado en cada cuenta","Scope shown on each account"):tr("Todo el estudio","Whole firm")}</p>
-                {sections[section.id]}</div>)}
-            </div>
-          </section>
-        ))}
-      </div>
+      <ConfigSectionNav categories={categories} sections={Object.fromEntries(
+        categories.flatMap(category => category.sections.map(({ id }) => [id, sections[id]]))
+      )} />
     </div>
   );
 }

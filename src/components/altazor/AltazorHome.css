@@ -147,7 +147,6 @@
  .altazor-header .altazor-wordmark small { font-size:var(--text-xs); }
  .altazor-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.25rem; overflow:visible; margin-bottom:1rem; }
  .altazor-tabs>button { min-width:0; padding:.5rem .25rem; gap:.35rem; font-size:1rem; white-space:normal; }
- .altazor-tabs>button:last-child { grid-column:1/-1; }
  .altazor-tabs>button svg { flex-shrink:0; }
  .altazor-subtabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.25rem; overflow:visible; }
  .altazor-subtabs>button { min-width:0; white-space:normal; padding:.5rem; }

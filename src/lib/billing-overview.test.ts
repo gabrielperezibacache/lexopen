@@ -6,6 +6,8 @@ import { santiagoDateKey } from "./chile-time";
 import {
   billingMonthLabel,
   billingMonthRange,
+  indicatorHref,
+  indicatorMonth,
   receivableFromSums,
   summarizeProvision,
 } from "./billing-overview";
@@ -24,6 +26,12 @@ const october = billingMonthRange(oct1Morning);
 assert.equal(billingMonthLabel(oct1Morning), "octubre de 2026");
 assert.ok(oct1Morning.getTime() >= october.start.getTime());
 assert.ok(sep30Evening.getTime() < october.start.getTime());
+
+assert.deepEqual(indicatorMonth("2026-09"), september);
+assert.equal(indicatorMonth("9999-12").key, billingMonthRange().key);
+assert.equal(indicatorMonth("2026-13").key, billingMonthRange().key);
+assert.equal(indicatorHref("pagos", "2026-09", 2), "/facturacion?detalle=pagos&mes=2026-09&pagina=2");
+assert.equal(indicatorHref("por-cobrar", "2026-09"), "/facturacion?detalle=por-cobrar");
 
 assert.equal(receivableFromSums(160_000, 90_000), 70_000);
 assert.equal(receivableFromSums(100_000, 100_000), 0);

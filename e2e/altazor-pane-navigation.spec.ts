@@ -44,11 +44,22 @@ test("volver de Aplicaciones y del escritorio conserva el contexto y deja visibl
   for (const key of ["altazor", "connector", "oauthAttempt", "oauthProvider"]) expect(afterClose.searchParams.has(key)).toBe(false);
   expect(afterClose.searchParams.get("causaId")).toBe(causeId); expect(afterClose.searchParams.get("documentoId")).toBe(documentId); expect(afterClose.searchParams.get("keep")).toBe("pane-fixture");
   await composer.fill(message);
-  await page.getByLabel("Mi asistente", { exact: true }).click();
-  await page.getByRole("button", { name: "Computadora", exact: true }).click();
+  const tools = page.locator(".altazor-tools > summary");
+  await tools.focus(); await tools.press("Enter");
+  const toolNav = page.getByRole("navigation", { name: "Herramientas de Altazor", exact: true });
+  await expect(toolNav.getByRole("button", { name: "Aplicaciones", exact: true })).toBeVisible();
+  await toolNav.getByRole("button", { name: "Escritorio", exact: true }).press("Escape");
+  await expect(tools).toBeFocused();
+  await tools.press("Enter");
+  await toolNav.getByRole("button", { name: "Escritorio", exact: true }).press("Enter");
+  await expect(toolNav).toBeHidden();
   await expect(page.getByRole("region", { name: "Escritorio de Altazor", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Administrar aplicaciones", exact: true }).press("Enter");
+  await expect(page.getByRole("heading", { name: "Aplicaciones", exact: true })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("documentoId")).toBe(documentId);
   await page.getByRole("button", { name: "Volver a la conversación", exact: true }).click();
   await expect(composer).toHaveValue(message);
+  await expect(composer).toBeFocused();
   await page.getByTestId("inicio-send").click();
   await expect(page.getByRole("heading", { name: "Revisa el encargo completo", exact: true })).toBeVisible();
   await expect(page.getByText(preview, { exact: true })).toBeHidden();
@@ -122,4 +133,48 @@ test("Aplicaciones explícitas conserva Dropbox y el retorno OAuth al restaurar 
     await page.reload(); await expect(account.getByRole("heading", { name: "Dropbox conectado", exact: true })).toBeVisible(); await assertExplicit();
     expect(writes).toEqual([]);
   } finally { releaseBootstrap(); releaseResources(); releaseDetails(); }
+});
+
+test("herramientas e Ícaros en inglés conservan el borrador y muestran los encargos por demanda", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await loginAs(page, "abogado@estudio.cl");
+  await page.context().addCookies([{ name: "lexopen_locale", value: "en", url: new URL(page.url()).origin }]);
+  const destination = { key: "fixture-remote", provider: "study", model: "fixture", remote: true, permitted: true };
+  const profile = { id: "fixture-icaro", name: "Citation review", instructions: "", enabled: true, destination, memoryEnabled: true, revision: 1, causaId: null };
+  const jobs = Array.from({ length: 8 }, (_, index) => ({
+    id: `job-${index}`, instruction: `Assignment ${index + 1}`, result: `Reviewed result ${index + 1}`,
+    available: true, status: index === 7 ? "queued" : "completed", createdAt: "2030-05-05T12:00:00Z",
+  }));
+  const writes: string[] = [];
+  page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/altazor/icaros") && request.method() !== "GET") writes.push(request.url()); });
+  await page.route(/\/api\/altazor\/icaros(?:\?.*)?$/, route => route.fulfill({ json: { icaros: [profile], limits: { profiles: 20 } } }));
+  await page.route("**/api/altazor/icaros/fixture-icaro", route => route.fulfill({ json: { icaro: profile, jobs, memory: [] } }));
+  await page.goto("/inicio");
+  const composer = page.getByTestId("inicio-composer");
+  await composer.fill("Keep this draft for the next message");
+  const tools = page.locator(".altazor-tools > summary");
+  await expect(tools).toHaveText("Tools");
+  await tools.press("Enter");
+  const nav = page.getByRole("navigation", { name: "Altazor tools" });
+  await expect(nav.getByRole("button", { name: "Applications", exact: true })).toBeVisible();
+  await nav.getByRole("button", { name: "Ícaros", exact: true }).press("Enter");
+  await expect(nav).toBeHidden();
+  await page.getByRole("button", { name: /Citation review/ }).press("Enter");
+  const detail = page.getByTestId("altazor-icaro-detail");
+  const recent = detail.getByRole("region", { name: "Assignments for this Ícaro" });
+  await expect(recent.locator("summary")).toHaveCount(6);
+  await expect(recent.locator("summary").filter({ hasText: "Assignment 8" })).toBeVisible();
+  await recent.getByRole("button", { name: "Show more assignments" }).press("Enter");
+  await expect(recent.locator("summary")).toHaveCount(8);
+  await expect(recent.getByText("Reviewed result 6", { exact: true })).toBeHidden();
+  await recent.locator("summary").filter({ hasText: "Assignment 6" }).press("Enter");
+  await expect(recent.getByText("Reviewed result 6", { exact: true })).toBeVisible();
+  await detail.getByLabel("Assignment objective", { exact: true }).fill("Review this reference");
+  await expect(detail.getByRole("button", { name: "Assign to this Ícaro" })).toBeDisabled();
+  await expect(detail.getByRole("checkbox", { name: /Authorize sending/ })).not.toBeChecked();
+  await page.getByRole("button", { name: "Back to conversation" }).press("Enter");
+  await expect(composer).toHaveValue("Keep this draft for the next message");
+  await expect(composer).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(writes).toEqual([]);
 });

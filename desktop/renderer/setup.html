@@ -3,119 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
-    />
-    <title>LexOpen — Configuración</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
+    <title data-en="Set up LexOpen">Configurar LexOpen</title>
     <!--SETUP_CSS-->
   </head>
   <body>
     <main class="shell">
       <header>
-        <img class="brand-mark" src="<!--SETUP_BRAND-->" alt="LexOpen" width="104" height="104" />
-        <h1>Servidor del estudio o acceso remoto</h1>
-        <p class="lede">
-          Un PC principal guarda usuarios y datos. El resto se conecta por
-          Tailscale a esa misma instalación.
-        </p>
+        <img class="brand-mark" src="<!--SETUP_BRAND-->" alt="LexOpen" width="66" height="66" />
+        <h1 data-en="Set up this computer">Configurar este equipo</h1>
       </header>
-
       <p id="status" class="status" role="status"></p>
-      <p class="version-line"><span id="version"></span></p>
-
-      <section class="modes">
+      <fieldset class="modes" disabled>
+        <legend data-en="How will you use LexOpen?">¿Cómo usarás LexOpen?</legend>
         <label class="card">
           <input type="radio" name="mode" value="host" checked />
-          <div>
-            <strong>Este PC es el servidor</strong>
-            <span>Postgres embebido + LexOpen. Aquí crea usuarios del estudio.</span>
-          </div>
+          <span><strong data-en="Host the firm’s data">Guardar los datos del estudio</strong>
+            <span data-en="This computer runs the server and stores the firm’s files.">Este equipo ejecuta el servidor y guarda los expedientes.</span></span>
         </label>
         <label class="card">
           <input type="radio" name="mode" value="client" />
-          <div>
-            <strong>Conectar a un servidor</strong>
-            <span>URL Tailscale del PC principal (misma base de datos remota).</span>
-          </div>
+          <span><strong data-en="Connect to a server">Conectar a un servidor</strong>
+            <span data-en="Use the Host that your firm already has.">Accede al Host que ya usa tu estudio.</span></span>
         </label>
-      </section>
-
+      </fieldset>
       <section id="host-fields" class="fields">
         <div class="data-directory">
-          <strong>Carpeta de datos</strong>
-          <p class="hint">Elija una carpeta vacía existente o los datos de una instalación anterior. No se moverán ni copiarán archivos automáticamente.</p>
-          <button id="choose-data-directory" type="button" class="secondary">Elegir carpeta existente…</button>
-          <p class="meta"><code id="selectedDataDirectory"></code></p>
+          <strong data-en="Data folder">Carpeta de datos</strong>
+          <code id="selectedDataDirectory"></code>
+          <button id="choose-data-directory" type="button" class="secondary" data-en="Choose existing folder…">Elegir carpeta existente…</button>
+          <p class="hint" data-en="Choose an empty folder or your previous installation’s data folder. Files stay in the folder you choose.">Elige una carpeta vacía o la carpeta de tu instalación anterior. Los archivos permanecen en esa ubicación.</p>
         </div>
-        <label>
-          Puerto local
-          <input id="port" type="number" min="1024" max="65535" value="3000" />
+      </section>
+      <section id="client-fields" class="fields hidden">
+        <label><span data-en="Firm server URL">URL del servidor del estudio</span>
+          <input id="remoteUrl" type="url" required placeholder="https://estudio.tailXXXX.ts.net" aria-describedby="server-url-help" />
         </label>
-        <label>
-          URL Tailscale / pública (opcional)
-          <input
-            id="publicUrl"
-            type="url"
-            placeholder="http://pc-estudio.tailXXXX.ts.net:3000"
-          />
-        </label>
-        <label class="check">
-          <input id="seedDemo" type="checkbox" />
-          Cargar datos demo la primera vez
-        </label>
+        <p id="server-url-help" class="hint" data-en="Enter the address shared by the Host administrator.">Introduce la dirección que te compartió quien administra el Host.</p>
+      </section>
+      <div class="actions">
+        <button id="continue" type="button" disabled data-en="Continue">Continuar</button>
+        <button id="retry" type="button" class="secondary" hidden data-en="Retry">Reintentar</button>
+      </div>
+      <p id="error" class="error" role="alert" hidden></p>
+      <div id="host-options">
         <details class="desktop-preparation">
-          <summary>Escritorio de Altazor</summary>
-          <p class="hint">Al abrir el estudio, LexOpen prepara en segundo plano las herramientas de oficina, PDF, OCR y audio en Docker.</p>
+          <summary data-en="Host options">Opciones del Host</summary>
+          <div class="fields">
+            <label><span data-en="Local port">Puerto local</span><input id="port" type="number" min="1024" max="65535" value="3000" /></label>
+            <label><span data-en="Tailscale or public URL (optional)">URL Tailscale o pública (opcional)</span><input id="publicUrl" type="url" placeholder="http://estudio.tailXXXX.ts.net:3000" /></label>
+            <label class="check"><input id="seedDemo" type="checkbox" /><span data-en="Load sample data on first use">Cargar datos de demostración en el primer inicio</span></label>
+          </div>
+        </details>
+        <details class="desktop-preparation">
+          <summary data-en="Altazor desktop">Escritorio de Altazor</summary>
+          <p class="hint" data-en="LexOpen prepares the office, PDF, OCR and audio tools in the background using Docker.">LexOpen prepara en segundo plano las herramientas de oficina, PDF, OCR y audio en Docker.</p>
           <div class="actions">
-            <button id="prepare-altazor-desktop" type="button" class="secondary">Preparar ahora</button>
-            <button id="desktop-guide" type="button" class="secondary">Guía de preparación</button>
+            <button id="prepare-altazor-desktop" type="button" class="secondary" data-en="Prepare now">Preparar ahora</button>
+            <button id="desktop-guide" type="button" class="secondary" data-en="Setup guide">Guía de preparación</button>
           </div>
         </details>
         <p id="altazor-desktop-status" class="hint" role="status" hidden></p>
-      </section>
-
-      <section class="fields" aria-label="Actualizaciones">
-        <label class="check"><input id="updateChecks" type="checkbox" checked />Comprobar actualizaciones automáticamente cada seis horas</label>
-        <label>Canal de actualizaciones
-          <select id="updateChannel"><option value="stable">Estable</option><option value="preview">Vista previa</option></select>
-        </label>
-        <p class="hint">La descarga y la instalación se confirman por separado. Las versiones de prueba pueden tener funciones pendientes de verificar.</p>
-      </section>
-
-      <section id="client-fields" class="fields hidden">
-        <label>
-          URL del PC principal
-          <input
-            id="remoteUrl"
-            type="url"
-            placeholder="http://pc-estudio.tailXXXX.ts.net:3000"
-            required
-          />
-        </label>
-        <p class="hint">
-          En el Host: instale Tailscale y comparta el hostname MagicDNS, o ejecute
-          <code>tailscale serve --bg 3000</code>.
-        </p>
-      </section>
-
-      <footer>
-        <div class="actions">
-          <button id="continue" type="button">Continuar</button>
-          <button id="retry" type="button" class="secondary" hidden>
-            Reintentar
-          </button>
+      </div>
+      <details class="desktop-preparation">
+        <summary data-en="Updates">Actualizaciones</summary>
+        <div class="fields">
+          <label class="check"><input id="updateChecks" type="checkbox" checked /><span data-en="Check for updates every six hours">Comprobar actualizaciones cada seis horas</span></label>
+          <label><span data-en="Update channel">Canal de actualizaciones</span>
+            <select id="updateChannel"><option value="stable" data-en="Stable">Estable</option><option value="preview" data-en="Preview">Vista previa</option></select>
+          </label>
+          <p class="hint" data-en="Downloading and installing each require confirmation.">La descarga y la instalación se confirman por separado.</p>
         </div>
-        <p id="error" class="error" role="alert" hidden></p>
-        <p class="meta">
-          Datos del Host (se conservan al actualizar):
-          <code id="dataDir"></code>
-        </p>
-        <p class="hint meta">
-          El secreto de sesión se genera una vez en <code>.env</code> y no se
-          regenera en actualizaciones. Puede editarlo en la carpeta de datos.
-        </p>
-      </footer>
+      </details>
+      <p class="version-line"><span id="version"></span></p>
     </main>
     <!--SETUP_JS-->
   </body>

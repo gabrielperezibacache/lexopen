@@ -19,11 +19,14 @@ function computer(sessions: ComputerSessionSummary[]): ComputerStatus {
 }
 async function revealStart(panel: Locator, start: Locator) {
   const summary = panel.getByText(/Preparar (otro )?escritorio/, { exact: true });
-  await expect(summary).toBeVisible();
+  await expect(summary).toBeVisible({ timeout: 20_000 });
   if (await summary.locator("..").getAttribute("open") === null) await summary.click();
   await expect(start).toBeVisible();
 }
 async function idleActivity(page: Page) {
+  await page.route(`**/api/altazor/connectors/oauth?workspaceId=${workspaceId}`, route => route.fulfill({ json: {
+    workspaceId, causaId: null, canAdmin: false, requiresStop: false, providers: [],
+  } }));
   await page.route("**/api/altazor/computer/activity", route => route.fulfill({ json: { state: "idle", sessionId: null, monitor: false } }));
 }
 
@@ -70,8 +73,8 @@ test("el escritorio renueva su imagen sin solapar capturas y se pausa al volver 
     const chatCaptures = captures;
     await page.clock.fastForward(12000);
     expect(captures).toBe(chatCaptures);
-    await page.getByLabel("Mi asistente", { exact: true }).click();
-    await page.getByRole("button", { name: "Computadora", exact: true }).click();
+    await page.locator("summary").filter({ hasText: /^Herramientas$/ }).click();
+    await page.getByRole("button", { name: "Escritorio", exact: true }).click();
     await panel.getByLabel("Sesión de este espacio", { exact: true }).selectOption(desktop.id);
     await viewport.scrollIntoViewIfNeeded();
     await expect.poll(() => captures).toBeGreaterThan(chatCaptures);
@@ -133,6 +136,7 @@ test("una sesión pasa de iniciándose a disponible también en el selector y co
     await expect(panel.getByRole("button", { name: "Devolver control", exact: true })).toBeEnabled();
     await revealStart(panel, start);
     await expect(start).toBeDisabled();
+    await panel.getByText("Opciones de sesión", { exact: true }).click();
     await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
     await expect(picker.locator(`option[value="${starting.id}"]`)).toContainText("Escritorio detenido");
     await revealStart(panel, start);
@@ -294,8 +298,13 @@ test("escritorio persistente: conserva la sesión tras recargar y reanuda la mis
   await expect(panel.getByRole("button", { name: "Conservar escritorio persistente", exact: true })).toHaveCount(0);
   await page.reload();
   await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(desktop.id);
+  await expect(panel.getByRole("button", { name: "Cancelar tarea", exact: true })).toHaveCount(0);
+  await panel.getByRole("button", { name: "Escribir una tarea", exact: true }).click();
+  await expect(panel.getByLabel("Tarea para este escritorio", { exact: true })).toBeFocused();
+  await panel.getByText("Opciones de sesión", { exact: true }).click();
   await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
   await expect(panel.getByText(/El escritorio está detenido/)).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Tomar control", exact: true })).toHaveCount(0);
   await panel.getByRole("button", { name: "Reanudar el mismo escritorio", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Tomar control", exact: true })).toBeEnabled();
   await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(desktop.id);

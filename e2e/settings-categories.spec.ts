@@ -27,6 +27,7 @@ test("Preferencias personales lleva directamente a la seguridad de la cuenta", a
 });
 
 test("ajustes móviles: categorías, ancla estable durante la carga y destinos antiguos", async ({ page }, info) => {
+  test.slow();
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await loginAs(page, "socio@estudio.cl");
@@ -47,9 +48,9 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
   await page.route("**/api/admin/config-snapshot", async route => { await ready; await route.fulfill({ status: 200, contentType: "application/json", body: snapshot }); });
   try {
     await page.goto("/configuracion#runtime-settings");
-    const category = page.getByRole("combobox", { name: "Categoría de configuración" });
-    await expect(category).toHaveValue("aplicacion-datos");
-    await expect(category.locator("option")).toHaveCount(communicationsEnabled ? 7 : 6);
+    const setting = page.getByLabel("Ajuste seleccionado", { exact: true });
+    await expect(setting).toHaveValue("runtime-settings");
+    await expect(setting.locator("optgroup")).toHaveCount(communicationsEnabled ? 7 : 6);
     const runtime = page.locator("#runtime-settings");
     await expect(runtime).toHaveCount(1);
     await expect(runtime).toContainText("Cargando");
@@ -61,10 +62,9 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
       const expected = ["pjud-settings", "pjud-log"].includes(id) && !pjudEnabled ? 0 : 1;
       await expect(page.locator(`[id="${id}"]`)).toHaveCount(expected);
     }
-    await category.selectOption("conexiones-ia");
+    await setting.selectOption("cuentas-conectadas");
     await expect(page).toHaveURL(/#cuentas-conectadas$/);
-    const nav = page.getByRole("navigation", { name: "Secciones de configuración" });
-    await expect(nav.getByRole("link", { name: "Cuentas conectadas", exact: true })).toHaveAttribute("aria-current", "location");
+    await expect(setting).toHaveValue("cuentas-conectadas");
     const accounts = page.getByRole("region", { name: "Cuentas conectadas", exact: true });
     await expect(accounts.getByRole("listitem")).toHaveCount(4);
     await expect(accounts.getByRole("link", { name: /Google Drive/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=google");
@@ -72,14 +72,14 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
     await expect(accounts.getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=github");
     await expect(accounts.getByRole("link", { name: /Dropbox/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=dropbox");
     await expect(accounts.getByRole("link", { name: /OneDrive · Microsoft 365/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=microsoft");
-    await nav.getByRole("link", { name: "IA", exact: true }).click();
+    await setting.selectOption("llm-settings");
     await expect(page).toHaveURL(/#llm-settings$/);
-    await expect(nav.getByRole("link", { name: "IA", exact: true })).toHaveAttribute("aria-current", "location");
-    await category.selectOption("estudio-equipo");
+    await expect(setting).toHaveValue("llm-settings");
+    await setting.selectOption("estudio");
     await expect(page).toHaveURL(/#estudio$/);
     await page.goto("/configuracion#preferencias-altazor");
     await page.locator("#preferencias-altazor").getByRole("link", { name: "Cuentas conectadas", exact: true }).click();
-    await expect(nav.getByRole("link", { name: "Cuentas conectadas", exact: true })).toHaveAttribute("aria-current", "location");
+    await expect(setting).toHaveValue("cuentas-conectadas");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.screenshot({ path: info.outputPath("settings-categories-mobile.png"), fullPage: false });
   } finally { release(); }
@@ -109,17 +109,24 @@ test("el país muestra Comunicaciones de forma independiente de la modalidad PJU
     await expect(page.locator("#comunicaciones")).toHaveCount(0);
     await country.selectOption("CL");
     await page.getByRole("button", { name: "Guardar país" }).click();
+    const setting = page.getByLabel("Ajuste seleccionado", { exact: true });
+    await expect(setting.locator('option[value="comunicaciones"]')).toHaveCount(1);
+    await setting.selectOption("comunicaciones");
     await expect(page.locator("#comunicaciones").getByRole("link", { name: "Configurar correo" })).toBeVisible();
+    await setting.selectOption("case-management-settings");
     await expect(page.getByRole("radio", { name: "Gestión manual" })).toBeChecked();
     await page.getByRole("radio", { name: "Poder Judicial de Chile" }).check();
     await page.getByRole("button", { name: "Guardar modalidad" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Modalidad guardada" })).toBeVisible();
+    await setting.selectOption("work-country");
     await country.selectOption("AR");
     await page.getByRole("button", { name: "Guardar país" }).click();
     await expect(page.getByRole("status").filter({ hasText: "País de trabajo guardado" })).toBeVisible();
     await page.reload();
     await expect(country).toHaveValue("AR");
     await expect(page.locator("#comunicaciones")).toHaveCount(1);
+    await expect(page.locator("#comunicaciones")).toBeHidden();
+    await setting.selectOption("comunicaciones");
     await expect(page.locator("#comunicaciones")).toBeVisible();
     await page.setViewportSize({ width: 360, height: 800 });
     await page.emulateMedia({ colorScheme: "dark" });
@@ -137,7 +144,7 @@ test("ajustes: cambiar de categoría y usar atrás/adelante conserva campos y me
   await page.emulateMedia({ reducedMotion: "reduce" });
   await loginAs(page, "socio@estudio.cl");
   await page.goto("/configuracion#estudio");
-  const nav = page.getByRole("navigation", { name: "Secciones de configuración" });
+  const setting = page.getByLabel("Ajuste seleccionado", { exact: true });
   const name = page.locator('#estudio input[name="name"]');
   await name.fill("Edición ficticia sin guardar");
   // Exercise the real form feedback without changing even the fixture database.
@@ -148,23 +155,24 @@ test("ajustes: cambiar de categoría y usar atrás/adelante conserva campos y me
   page.on("request", request => { if (["POST", "PATCH", "DELETE"].includes(request.method())) writes.push(request.url()); });
   await page.locator("#estudio").getByRole("button", { name: "Guardar configuración", exact: true }).click();
   await expect(page.locator("#estudio").getByRole("status")).toContainText("No se pudo guardar");
-  await nav.getByRole("link", { name: "Conexiones e IA", exact: true }).click();
+  await setting.selectOption("cuentas-conectadas");
   await expect(page).toHaveURL(/#cuentas-conectadas$/);
-  await nav.getByRole("link", { name: "IA", exact: true }).click();
+  await setting.selectOption("llm-settings");
   await expect(page).toHaveURL(/#llm-settings$/);
+  await expect(name).toBeHidden();
   const key = page.getByTestId("llm-settings-form").locator('input[type="password"]').first();
   await key.fill("clave-ficticia-no-enviada");
-  await nav.getByRole("link", { name: "Aplicación y datos", exact: true }).click();
+  await setting.selectOption("idioma");
   await expect(page).toHaveURL(/#idioma$/);
   await page.goBack();
   await expect(page).toHaveURL(/#llm-settings$/);
-  await expect(nav.getByRole("link", { name: "IA", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(setting).toHaveValue("llm-settings");
   await expect(key).toHaveValue("clave-ficticia-no-enviada");
   await expect(name).toHaveValue("Edición ficticia sin guardar");
   await expect(page.locator("#estudio").getByRole("status")).toContainText("No se pudo guardar");
   await page.goForward();
   await expect(page).toHaveURL(/#idioma$/);
-  await expect(nav.getByRole("link", { name: "Idioma", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(setting).toHaveValue("idioma");
   expect(writes).toHaveLength(1);
   expect(writes[0]).toMatch(/\/api\/configuracion$/);
   await page.screenshot({ path: info.outputPath("settings-categories-desktop.png"), fullPage: false });
@@ -182,12 +190,12 @@ test("un enlace antiguo a Google se resuelve cuando termina de cargar su formula
   await page.route("**/api/integrations/google", async route => { await ready; await route.fulfill({ status: 200, contentType: "application/json", body: google }); });
   try {
     await page.goto("/configuracion#google-settings");
-    await expect(page.getByRole("combobox", { name: "Categoría de configuración" })).toHaveValue("conexiones-ia");
+    const setting = page.getByLabel("Ajuste seleccionado", { exact: true });
+    await expect(setting).toHaveValue("google-settings");
     release();
     const form = page.getByTestId("google-settings-form");
     await expect(form).toBeVisible();
-    const nav = page.getByRole("navigation", { name: "Secciones de configuración" });
-    await expect(nav.getByRole("link", { name: "Google del estudio", exact: true })).toHaveAttribute("aria-current", "location");
+    await expect(setting).toHaveValue("google-settings");
     await expect.poll(async () => form.evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   } finally { release(); }

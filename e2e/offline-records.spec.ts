@@ -321,10 +321,10 @@ test("un espacio anterior conserva los escritos y sus peticiones al añadir Clie
       await vault.write(data); vault.lock();
     }, { key, owner: f.a.id, draft, pending });
     await page.reload(); await unlock(page); await expect(page.getByRole("textbox", { name: "Texto del escrito", exact: true })).toHaveValue(pending.body);
-    await page.getByRole("button", { name: "Clientes", exact: true }).click(); await page.getByRole("button", { name: "Nuevo cliente local", exact: true }).click(); await edit(page, "cliente", `Cliente heredado ${f.tag}`);
+    await page.getByLabel("Área de trabajo", { exact: true }).selectOption("cliente"); await page.getByRole("button", { name: "Nuevo cliente local", exact: true }).click(); await edit(page, "cliente", `Cliente heredado ${f.tag}`);
     await page.reload(); await unlock(page); await expect(page.getByRole("textbox", { name: "Texto del escrito", exact: true })).toHaveValue(pending.body);
     await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toContainText("Escrito sincronizado");
     expect((await prisma.caseWritingDraft.findUniqueOrThrow({ where: { id: draft.id } })).body).toBe(pending.body);
-    await page.getByRole("button", { name: "Clientes", exact: true }).click(); await expect(page.getByLabel(names.cliente, { exact: true })).toHaveValue(`Cliente heredado ${f.tag}`);
+    await page.getByLabel("Área de trabajo", { exact: true }).selectOption("cliente"); await expect(page.getByLabel(names.cliente, { exact: true })).toHaveValue(`Cliente heredado ${f.tag}`);
   } finally { await f.cleanup(); }
 });

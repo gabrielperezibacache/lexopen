@@ -29,10 +29,13 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await expect(
     page.getByRole("heading", { name: "Configuración del estudio" })
   ).toBeVisible();
+  const setting = page.getByLabel("Ajuste seleccionado", { exact: true });
+  await setting.selectOption("usuarios");
   await expect(
     page.getByRole("heading", { name: "Usuarios del estudio" })
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Crear usuario" })).toBeVisible();
+  await setting.selectOption("host-status");
   await expect(page.getByRole("heading", { name: "Estado del Host" })).toBeVisible();
 
   await page.goto("/personas");

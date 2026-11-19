@@ -4,7 +4,7 @@
 <body>
 <header><a href="/dashboard" aria-label="Volver a LexOpen">LexOpen</a><span id="connection" role="status">Comprobando conexión…</span></header>
 <main>
-<h1>Trabajo sin conexión</h1><p class="intro">Prepare manuscritos, notas de lectura, escritos, clientes, tareas, causas, plazos, notas, minutas, documentos, adjuntos, eventos y trámites. Puede editar sus copias y crear registros locales cuando se interrumpa la conexión. Su copia se cifra en este navegador con una clave local.</p>
+<h1>Trabajo sin conexión</h1><p class="intro">Abre tus copias cifradas para trabajar en este navegador. Podrás sincronizar los cambios cuando vuelvas a conectarte al Host.</p>
 <p id="message" role="status" aria-live="polite"></p>
 <section id="gate" aria-label="Abrir espacio local">
 <form id="unlock-form"><label for="password">Clave del espacio local</label><input id="password" type="password" minlength="12" required autocomplete="current-password" aria-describedby="key-help"><p id="key-help">Al crear el espacio, elija al menos 12 caracteres. Esta clave es independiente de su cuenta. Si la pierde, deberá recuperar el trabajo desde sus descargas o desde el servidor.</p><button id="unlock" type="submit" disabled>Desbloquear</button></form>
@@ -13,7 +13,14 @@
 <section id="workspace" hidden>
 <div class="toolbar"><button id="lock" class="secondary" type="button">Bloquear espacio</button></div>
 <details class="help"><summary>Protección y sincronización</summary><p>Las copias locales no reflejan cambios ni revocaciones posteriores. Para sincronizar, inicie sesión con la misma cuenta. Se comprobarán el acceso, los respaldos y la versión actual. Las revisiones y las exportaciones aprobadas requieren conexión.</p><button id="delete-vault" class="text-button" type="button">Borrar espacio local</button></details>
-<nav class="toolbar" aria-label="Áreas del espacio local"><button id="tab-academic" class="secondary" type="button" aria-pressed="false">Manuscritos</button><button id="tab-booknotes" class="secondary" type="button" aria-pressed="false">Notas de lectura</button><button id="tab-writings" class="secondary" type="button" aria-pressed="true">Escritos</button><button id="tab-clientes" class="secondary" type="button" aria-pressed="false">Clientes</button><button id="tab-tasks" class="secondary" type="button" aria-pressed="false">Tareas</button><button id="tab-causes" class="secondary" type="button" aria-pressed="false">Causas</button><button id="tab-deadlines" class="secondary" type="button" aria-pressed="false">Plazos</button><button id="tab-notes" class="secondary" type="button" aria-pressed="false">Notas</button><button id="tab-documents" type="button" class="secondary">Documentos</button><button id="tab-attachments" type="button" class="secondary">Adjuntos</button><button id="tab-minutes" class="secondary" type="button" aria-pressed="false">Minutas</button><button id="tab-events" class="secondary" type="button" aria-pressed="false">Agenda</button><button id="tab-procedures" class="secondary" type="button" aria-pressed="false">Trámites</button></nav>
+<nav aria-label="Áreas del espacio local">
+  <label for="offline-area">Área de trabajo</label>
+  <select id="offline-area">
+    <optgroup label="Expedientes"><option value="cliente">Clientes</option><option value="causa">Causas</option><option value="writing" selected>Escritos</option><option value="documento">Documentos</option><option value="adjunto">Adjuntos</option><option value="minuta">Minutas</option></optgroup>
+    <optgroup label="Agenda"><option value="plazo">Plazos</option><option value="task">Tareas</option><option value="evento">Agenda</option><option value="tramite">Trámites</option></optgroup>
+    <optgroup label="Notas e investigación"><option value="nota">Notas</option><option value="academic">Manuscritos</option><option value="booknote">Notas de lectura</option></optgroup>
+  </select>
+</nav>
 <section id="writing-space" aria-label="Escritos locales">
 <div class="toolbar"><button id="pin" type="button" hidden>Preparar este escrito</button></div>
 <label for="drafts">Escritos preparados</label><select id="drafts"><option value="">Todavía no hay escritos preparados</option></select>

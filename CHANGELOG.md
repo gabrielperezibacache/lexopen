@@ -4,6 +4,10 @@
 
 La versión reúne las mejoras preparadas después de preview 10. La disponibilidad de sus instaladores y la aceptación del estudio se siguen en [el registro de producción](docs/ACEPTACION-1.1.0.md).
 
+- Inicio destaca los vencimientos y eventos que requieren atención. El menú móvil abre cada apartado directamente y la búsqueda reúne las coincidencias disponibles.
+- Las carteras, el calendario y los indicadores enlazan al expediente, plazo, pregunta o cobro correspondiente. Documentos muestra el destino de incorporación y facilita la descarga del original.
+- Altazor agrupa el escritorio, los Ícaros y las conexiones en Herramientas. Configuración muestra un apartado a la vez y conserva las ediciones al navegar. La instalación guía por separado al equipo principal y a quien se conecta al Host.
+
 - El flujo de distribución de 1.1.0 prepara un borrador con los archivos firmados para probar en el estudio. El piloto y la publicación utilizan los mismos archivos.
 - El ensayo de restauración del Host comprueba una causa de equipo, el cliente asociado, los bytes del documento, la fecha y responsable del plazo y el acceso de dos usuarios antes y después de recuperar la copia.
 

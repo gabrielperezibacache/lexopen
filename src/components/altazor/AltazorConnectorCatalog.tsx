@@ -9,6 +9,9 @@ import { connectorAccountPresentation, connectorFieldPresentation } from "@/lib/
 import { connectorAccountAvailability, connectorAvailability, connectorConnectionAvailability, connectorOAuthSnapshot, type ConnectorAccessChecks, type ConnectorOAuthSnapshot } from "@/lib/altazor/connectors/availability";
 import type { ConnectorCatalogEntry, ConnectorConnection, ConnectorInventory } from "@/lib/altazor/connectors/types";
 import type { ComputerStatus } from "@/lib/altazor/computer/types";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { AltazorPaneLink } from "./AltazorPaneLink";
+import type { Pane } from "./pane-location";
 import { EasyConnectorOAuth } from "./EasyConnectorOAuth";
 import { EASY_OAUTH_CONNECTOR, EASY_OAUTH_PROVIDERS } from "@/lib/altazor/connectors/easy-oauth-providers";
 import styles from "./AltazorConnectorCatalog.module.css";
@@ -22,7 +25,8 @@ const api = "/api/altazor/connectors";
 const withoutRuntime: ConnectorCatalogEntry[] = CONNECTOR_CATALOG.map(entry => ({ ...entry, fields: [], available: false, oauthReady: false }));
 function AdvancedOptions({ enabled, children }: { enabled: boolean; children: ReactNode }) { return enabled ? <details className={styles.setup}><summary>Opciones avanzadas</summary>{children}</details> : <>{children}</>; }
 
-export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }) {
+export function AltazorConnectorCatalog({ causaId, openPane }: { causaId?: string | null; openPane?: (pane: Pane) => void }) {
+  const en = useI18n().locale === "en";
   const uid = useId(), formRef = useRef<HTMLFormElement>(null), requestKey = useRef(operationKey());
   const loadVersion = useRef(0), loadRequest = useRef<AbortController | null>(null), mounted = useRef(false);
   const oauthStatusVersion = useRef(0);
@@ -156,9 +160,9 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   async function remove() { if (!connection || !removeConfirmed) return; const result = await mutate(`/${encodeURIComponent(connection.name)}`, { requestId: requestKey.current }, "DELETE"); if (result?.operation?.status === "completed") { setConnection(null); setRemoveConfirmed(false); requestKey.current = operationKey(); setNotice("Se retiró la conexión del gateway. Puede revocar también el permiso en la aplicación de origen."); } }
   async function disconnectEasy(connectionName: string, requestId: string) { const result = await mutate(`/${encodeURIComponent(connectionName)}`, { requestId }, "DELETE"); if (result?.operation?.status !== "completed") return false; setConnection(previous => previous?.name === connectionName ? null : previous); return true; }
   return <section className={styles.catalog} aria-labelledby={`${uid}-heading`} data-testid="altazor-connector-catalog">
-    <header className={styles.heading}><div><h2 id={`${uid}-heading`}>Aplicaciones</h2><p>Conecta las cuentas que quieres usar con Altazor.</p></div><Link2 size={25} aria-hidden="true" /></header>
+    <header className={styles.heading}><div><h2 id={`${uid}-heading`}>{en ? "Applications" : "Aplicaciones"}</h2><p>{en ? "Connect the accounts you want to use with Altazor." : "Conecta las cuentas que quieres usar con Altazor."}</p></div><Link2 size={25} aria-hidden="true" /></header>
     {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
-    {loading ? <p role="status">Comprobando tus aplicaciones…</p> : !computer?.configured ? <p className={styles.setup}>Prepara tu <a href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>escritorio de Altazor <ArrowRight size={15} aria-hidden="true" /></a> para conectar tus cuentas.</p> : (!easyProvider || checking || !verified || !inventory?.gateReady) && <div className={styles.runtime}><span role="status">{checking ? "Comprobando conexiones…" : !verified ? "Vuelve a comprobar tus conexiones." : inventory?.gateReady ? "Aplicaciones disponibles" : "Actualiza el escritorio de Altazor para habilitar estas conexiones."}</span><button type="button" disabled={busy || checking} onClick={() => { setError(""); void load().catch(cause => setError(cause.message)); }}><RefreshCw size={16} aria-hidden="true" />Comprobar estado</button></div>}
+    {loading ? <p role="status">{en ? "Checking your applications…" : "Comprobando tus aplicaciones…"}</p> : !computer?.configured ? <p className={styles.setup}>{en ? "Set up your " : "Prepara tu "}<AltazorPaneLink pane="computer" openPane={openPane} href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>{en ? "Altazor desktop" : "escritorio de Altazor"} <ArrowRight size={15} aria-hidden="true" /></AltazorPaneLink>{en ? " to connect your accounts." : " para conectar tus cuentas."}</p> : (!easyProvider || checking || !verified || !inventory?.gateReady) && <div className={styles.runtime}><span role="status">{checking ? "Comprobando conexiones…" : !verified ? "Vuelve a comprobar tus conexiones." : inventory?.gateReady ? "Aplicaciones disponibles" : "Actualiza el escritorio de Altazor para habilitar estas conexiones."}</span><button type="button" disabled={busy || checking} onClick={() => { setError(""); void load().catch(cause => setError(cause.message)); }}><RefreshCw size={16} aria-hidden="true" />Comprobar estado</button></div>}
     {!loading && !computer?.configured && <button type="button" disabled={busy || checking} onClick={() => { setError(""); void load().catch(cause => setError(cause.message)); }}><RefreshCw size={16} aria-hidden="true" />Comprobar estado</button>}
     {inventory?.operations?.map(operation => <div key={operation.id} className={styles.pending}><p>Hay un cambio de conexión sin confirmar. Revise el estado de la aplicación; reconocerlo aquí no repite ni confirma su resultado.</p><button type="button" disabled={busy || checking || !verified} onClick={async () => { const result = await mutate(`/operations/${encodeURIComponent(operation.id)}`, {}); if (result) { await load().catch(() => {}); setNotice("Revisión registrada. La operación anterior no se reenvió."); } }}>Revisé el estado; continuar sin repetir</button></div>)}
     {entry ? <div className={styles.detail}>

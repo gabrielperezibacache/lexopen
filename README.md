@@ -19,13 +19,17 @@ LexOpen es una aplicación de código abierto para profesionales y estudios jur�
 
 ## Información y acciones a mano
 
-Las pantallas priorizan el estado y los registros. Los formularios de incorporación, la preparación de causas y las ayudas se despliegan cuando los necesitas; plegarlos conserva el borrador. En Documentos, **Descargar** aparece directamente en cada registro. En Configuración, cada apartado indica si afecta a tu usuario, al navegador o a todo el estudio.
+En **Inicio → Tu jornada** aparecen los plazos vencidos, los próximos vencimientos y los eventos que requieren atención. Al pulsar un indicador se abre la lista que produce ese conteo. Si hoy está despejado, puedes pasar directamente a la agenda o trabajar con Altazor.
 
-En Clientes, la ficha avisa al salir con cambios sin guardar. Si se interrumpe la revisión de propuestas de Altazor, vuelve a comprobar el acceso y recupera tus ediciones cuando sigue vigente la misma revisión. El espacio sin conexión espera a que abra su almacenamiento antes de desbloquearlo; salir de la página cancela una apertura pendiente y limpia la clave del campo. [Preparación y recuperación](docs/TRABAJO-SIN-CONEXION.md).
+| Para trabajar en… | Abre |
+| --- | --- |
+| Un expediente | **Mis Causas → ficha de la causa**. Consulta el estado, abre la fuente de un plazo y regresa a la cartera con sus filtros. |
+| Un documento | **Documentos → Añadir archivos**. Revisa el cliente, la causa y el destino antes de subirlo. Puedes descargar el original desde la lista. |
+| Jurisprudencia | Elige el **Buscador Unificado**, las fuentes del estudio o una investigación guardada. |
+| La conversación de Altazor | **Herramientas** reúne el escritorio, los Ícaros y las conexiones. Al volver al chat puedes continuar el borrador con su contexto. |
+| Un ajuste | En **Configuración**, usa **Buscar un ajuste** o elige un apartado. Puedes cambiar de apartado y volver al formulario que estabas editando. |
 
-Los guardados con recibo conservan su identidad al reintentar. Si PostgreSQL rechaza una transacción por concurrencia, el Host espera antes de volver a intentarla y comprueba de nuevo los permisos; mantiene un máximo de cinco intentos. Un fallo de conexión con resultado incierto requiere comprobar el recibo, sin repetir automáticamente la operación.
-
-**Próximos plazos** abre los pendientes asignados a ti desde hoy hasta la fecha indicada, inclusive (hoy + 7 días), aunque cambien de mes. Los avisos de acceso, datos desactualizados y autorizaciones siguen visibles. [Criterios y comparación visual](docs/JERARQUIA-INFORMACION.md).
+**Próximos plazos** incluye los pendientes asignados a ti desde hoy hasta siete días después, incluso cuando cambia el mes. Los enlaces a un plazo individual abren su ficha con su fecha y responsable. [Inventario de pantallas y recorridos](docs/JERARQUIA-INFORMACION.md)
 
 ## Continuidad del expediente
 
@@ -56,11 +60,11 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 
 ## Primeros pasos
 
-1. **Elige el equipo principal.** Abre LexOpen, selecciona **Este PC es el servidor** y crea la primera cuenta de administración. En los demás equipos, selecciona **Conectar a un servidor** e introduce la dirección del Host.
+1. **Elige el equipo principal.** Abre LexOpen, selecciona **Guardar los datos del estudio** y crea la primera cuenta de administración. En los demás equipos, selecciona **Conectar a un servidor** e introduce la dirección del Host.
 2. **Configura tu estudio y su equipo.** Revisa el país de trabajo, los roles y las secciones habilitadas. En **Mi cuenta → Mi rol y permisos**, cada persona puede consultar su acceso efectivo.
 3. **Conecta Google una vez.** La administración autoriza la cuenta compartida del estudio y selecciona una carpeta de **Organización** en Drive. La misma conexión se utiliza para Drive, Calendar y Gmail; las cuentas antiguas pueden necesitar ampliar su autorización.
 4. **Organiza un cliente y su causa.** Abre **Nueva causa** desde el cliente para conservar su selección, o búscalo en el formulario. Prepara su carpeta y añade documentos: la ficha del cliente reúne sus archivos directos y los de sus causas accesibles, sin duplicarlos. Registra plazos y revisa las fuentes antes de preparar una audiencia o un escrito.
-5. **Empieza tu jornada.** Inicio conserva Altazor como espacio central y muestra tres indicadores compactos, también en móvil: vencidos pendientes, próximos plazos y eventos propios. Pulsa un indicador para abrir sus registros. **Ctrl+K / ⌘K** permite ir a un apartado; **Buscar un ajuste** te lleva a la configuración correspondiente.
+5. **Empieza tu jornada.** Consulta tus vencimientos y eventos en Inicio. En móvil, toca el menú y el apartado que necesitas. En el teclado, **Ctrl+K / ⌘K** abre la búsqueda de apartados.
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 

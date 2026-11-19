@@ -180,8 +180,9 @@ test("revisión visual de los apartados en escritorio y móvil", async ({
     for (const [name, path] of Object.entries(routes)) {
       if (name === "configuracion") await loginAs(page, "socio@estudio.cl");
       if (name === "biblioteca") await loginAs(page, "abogado@estudio.cl");
-      const response = await page.goto(path, { waitUntil: "networkidle" });
+      const response = await page.goto(path, { waitUntil: "domcontentloaded" });
       expect(response?.status(), path).toBe(200);
+      await expect(page.getByRole("main").getByRole("heading").first()).toBeVisible({ timeout: 25_000 });
       await page.evaluate(() => document.fonts.ready);
       expect(
         await page.evaluate(
@@ -196,3 +197,41 @@ test("revisión visual de los apartados en escritorio y móvil", async ({
     }
   }
 });
+
+const profileSamples = [
+  { name: "acceso", email: null, path: "/login", heading: "Sign in", locale: "en", theme: "dark", width: 360 },
+  { name: "portal", email: "cliente@andes.cl", path: "/portal", heading: "Portal del cliente", locale: "es", theme: "dark", width: 390 },
+  { name: "asistente", email: "asistente@estudio.cl", path: "/buscar", heading: "Search", locale: "en", theme: "light", width: 1366 },
+  { name: "administrador", email: "socio@estudio.cl", path: "/auditoria", heading: "Audit", locale: "en", theme: "dark", width: 1366 },
+] as const;
+
+for (const sample of profileSamples) {
+  test.describe(`muestra por perfil · ${sample.name}`, () => {
+    test.use({ locale: sample.locale, extraHTTPHeaders: { "Accept-Language": sample.locale }, colorScheme: sample.theme, viewport: { width: sample.width, height: 820 } });
+    test("estado visible, idioma, teclado y ancho", async ({ page }, info) => {
+      test.skip(info.project.name !== "chromium", "Una captura por combinación seleccionada.");
+      test.setTimeout(60_000);
+      if (sample.email) await loginAs(page, sample.email);
+      const response = await page.goto(sample.path);
+      expect(response?.status()).toBe(200);
+      await expect(page.locator("html")).toHaveAttribute("lang", sample.locale);
+      await expect(page.locator("html")).toHaveCSS("color-scheme", sample.theme);
+      await expect(page.getByRole("heading", { name: sample.heading, exact: true, level: 1 })).toBeVisible();
+      if (sample.email) {
+        const skip = page.locator('a[href="#main-content"]');
+        await skip.focus();
+        await skip.press("Enter");
+        await expect(page.getByRole("main")).toBeFocused();
+      } else {
+        const email = page.locator('input[name="email"]');
+        await expect(email).toBeEnabled();
+        await email.focus();
+        await email.press("Tab");
+        await expect(page.locator('input[name="password"]')).toBeFocused();
+      }
+      await page.evaluate(() => document.fonts.ready);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: info.outputPath(`${sample.name}-${sample.locale}-${sample.theme}-${sample.width}.png`), animations: "disabled" });
+    });
+  });
+}

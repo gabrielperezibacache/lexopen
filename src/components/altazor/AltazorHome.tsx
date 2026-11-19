@@ -17,16 +17,42 @@ import { AltazorIcaros } from "./AltazorIcaros";
 import { AltazorHelp } from "./AltazorHelp";
 import { useAltazorTimeline, type TimelineTurn } from "./useAltazorTimeline";
 import { useAltazorCompanion } from "./AltazorCompanionProvider";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import type { Pane } from "./pane-location";
 import { withCsrfHeaders } from "@/lib/client-csrf";
 import type { ComputerReview } from "@/lib/altazor/computer/types";
 import "./AltazorHome.css";
-const panes = [{ id: "chat", label: "Conversación", Icon: MessageSquare }, { id: "memory", label: "Memoria", Icon: BrainCircuit }, { id: "computer", label: "Computadora", Icon: Monitor }, { id: "icaros", label: "Ícaros", Icon: Feather }, { id: "help", label: "Ayuda a distancia", Icon: BellRing }] as const;
+const panes = [
+  { id: "chat", es: "Conversación", en: "Conversation", Icon: MessageSquare },
+  { id: "computer", es: "Escritorio", en: "Desktop", Icon: Monitor },
+  { id: "connectors", es: "Aplicaciones", en: "Applications", Icon: Link2 },
+  { id: "icaros", es: "Ícaros", en: "Ícaros", Icon: Feather },
+  { id: "memory", es: "Memoria", en: "Memory", Icon: BrainCircuit },
+  { id: "help", es: "Ayuda a distancia", en: "Remote help", Icon: BellRing },
+] as const;
+
 async function request<T>(url: string, body?: unknown, method = "POST"): Promise<T> {
   const response = await fetch(url, { method: body === undefined ? "GET" : method, headers: body === undefined ? undefined : withCsrfHeaders({ "Content-Type": "application/json" }), body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store" });
   const data = await response.json(); if (!response.ok) throw Object.assign(new Error(data.error || "No se pudo completar la acción. Tu trabajo se conserva."), { status: response.status }); return data;
 }
 export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivity?: boolean }) {
   const { icaroMemorySelections, selectIcaroMemory, continuation, setContinuation, continueJob, updates, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preferenceSaving } = useAltazorCompanion();
+  const { locale } = useI18n();
+  const english = locale === "en";
+  const home = useRef<HTMLDivElement>(null);
+  const tools = useRef<HTMLDetailsElement>(null);
+
+  function openPane(next: Pane) {
+    if (tools.current) tools.current.open = false;
+    if (next === "computer") setDesktopSelection(null);
+    choosePane(next);
+    requestAnimationFrame(() => {
+      if (next === "chat") { textarea.current?.focus(); return; }
+      const paneElement = home.current?.querySelector<HTMLElement>(`[data-altazor-pane="${next}"]`);
+      const target = paneElement?.querySelector<HTMLElement>("h2") ?? paneElement;
+      if (target) { target.tabIndex = -1; target.focus(); }
+    });
+  }
   const [desktopSelection, setDesktopSelection] = useState<{ causaId: string | null; id: string | null; review?: ComputerReview } | null>(null);
   const historyRef = useRef<HTMLElement>(null), followLatest = useRef(true);
   const anchors = useRef(new Map<string, { id: string; offset: number }>());
@@ -76,10 +102,25 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
     timeline.returnToLatest();
     void send();
   }
-  return <div className="altazor-home" data-testid="altazor-home">
-    <div className="altazor-identity-row"><header className="altazor-header"><AltazorMark size={48} state={busy || running || hasDelegations ? "thinking" : "ready"} label />{(busy || running || hasDelegations) && <span className="altazor-muted" role="status">Trabajando…</span>}</header>
-    <div className="altazor-toolbar-actions"><details className="altazor-tools"><summary title="Mi asistente" aria-label="Mi asistente"><Settings2 size={18} /><span className="sr-only">Mi asistente</span></summary><nav className="altazor-tabs" aria-label="Herramientas de ALTAZOR">{panes.map(({ id, label, Icon }) => <button key={id} type="button" aria-current={pane === id ? "page" : undefined} onClick={() => { if (id === "computer") setDesktopSelection(null); choosePane(id); }}><Icon size={18} /><span>{label}</span></button>)}</nav><div className="altazor-send-settings"><Link className="btn btn-ghost" href="/configuracion#preferencias-altazor">Configurar Altazor</Link></div></details></div></div>
-    {pane !== "chat" && <button type="button" className="btn btn-ghost altazor-return-to-chat" onClick={() => choosePane("chat")}><ArrowLeft size={16} aria-hidden="true" />Volver a la conversación</button>}
+  return <div ref={home} className="altazor-home" data-testid="altazor-home">
+    <div className="altazor-identity-row"><header className="altazor-header"><AltazorMark size={48} state={busy || running || hasDelegations ? "thinking" : "ready"} label />{(busy || running || hasDelegations) && <span className="altazor-muted" role="status">{english ? "Working…" : "Trabajando…"}</span>}</header>
+    <div className="altazor-toolbar-actions">
+      <details className="altazor-tools" ref={tools} onKeyDown={event => {
+        if (event.key !== "Escape" || !event.currentTarget.open) return;
+        event.stopPropagation();
+        event.currentTarget.open = false;
+        event.currentTarget.querySelector("summary")?.focus();
+      }}>
+        <summary><Settings2 size={18} aria-hidden="true" />{english ? "Tools" : "Herramientas"}</summary>
+        <nav className="altazor-tabs" aria-label={english ? "Altazor tools" : "Herramientas de Altazor"}>
+          {panes.map(({ id, es, en, Icon }) => <button key={id} type="button" aria-current={pane === id ? "page" : undefined} onClick={() => {
+            openPane(id);
+          }}><Icon size={18} aria-hidden="true" /><span>{english ? en : es}</span></button>)}
+        </nav>
+        <div className="altazor-send-settings"><Link className="btn btn-ghost" href="/configuracion#preferencias-altazor">{english ? "Altazor settings" : "Configurar Altazor"}</Link></div>
+      </details>
+    </div></div>
+    {pane !== "chat" && <button type="button" className="btn btn-ghost altazor-return-to-chat" onClick={() => openPane("chat")}><ArrowLeft size={16} aria-hidden="true" />{english ? "Back to conversation" : "Volver a la conversación"}</button>}
     <div hidden={pane !== "chat"}>
       <section className="altazor-conversation" aria-label="Conversación con ALTAZOR">
         {error && <p role="alert" className="altazor-error">{error}{initialFailed && <> <a href="/inicio">Volver a Mi jornada</a></>}</p>}{libraryNotice && <p role="status" className="altazor-notice">Guardado en Biblioteca: <Link href={`/biblioteca/${libraryNotice.id}`}>{libraryNotice.title}</Link>.</p>}
@@ -111,7 +152,7 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
             disabled={busy || uploading || attachmentIds.length > 0} onClick={leaveCaseContext}><X size={16} aria-hidden="true" /></button>
         </div>}
         <div className="altazor-composer" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void upload(event.dataTransfer.files); }}>
-          <label className="sr-only" htmlFor="altazor-message">Mensaje para ALTAZOR</label><textarea id="altazor-message" aria-describedby="altazor-keyboard-help" data-testid="inicio-composer" ref={textarea} placeholder="Escribe a ALTAZOR…" value={text} onChange={event => setText(event.target.value)} maxLength={8000} rows={3}
+          <label className="sr-only" htmlFor="altazor-message">{english ? "Message for Altazor" : "Mensaje para ALTAZOR"}</label><textarea id="altazor-message" aria-describedby="altazor-keyboard-help" data-testid="inicio-composer" ref={textarea} placeholder={english ? "Write to Altazor…" : "Escribe a ALTAZOR…"} value={text} onChange={event => setText(event.target.value)} maxLength={8000} rows={3}
             onPaste={event => {
               const files = event.clipboardData?.files;
               if (!files?.length) return;
@@ -120,10 +161,10 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
             }}
             onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(); } }} />
         {destination && !destination.permitted && <p className="altazor-connection-notice">Conecta ALTAZOR para empezar. <Link href="/configuracion#preferencias-altazor">Conectar</Link></p>}
-          <div className="altazor-composer-footer"><button type="button" className="btn btn-ghost" disabled={uploading || busy} onClick={() => input.current?.click()}><Paperclip size={18} /> {uploading ? "Preparando archivo…" : "Adjuntar"}</button><button type="button" className="btn btn-ghost altazor-composer-apps" aria-label="Aplicaciones" title="Aplicaciones" onClick={() => choosePane("connectors")}><Link2 size={18} aria-hidden="true" /><span>Aplicaciones</span></button><input ref={input} type="file" aria-label="Archivos para adjuntar al mensaje de ALTAZOR" className="sr-only" multiple accept=".pdf,.epub,.doc,.docx,.odt,.rtf,.txt,.md,.csv,.json,.html,.htm" onChange={event => void upload(event.target.files)} />{text.length >= 7200 && <span aria-live="polite">{8000-text.length} caracteres disponibles</span>}<button type="button" className="btn btn-primary" aria-label="Enviar mensaje a ALTAZOR" data-testid="inicio-send" disabled={!text.trim() || busy || uploading || Boolean(running) || preferenceSaving || loading || !destination?.permitted} onClick={sendMessage}><ArrowUp size={18} /> Enviar</button></div>
+          <div className="altazor-composer-footer"><button type="button" className="btn btn-ghost" disabled={uploading || busy} onClick={() => input.current?.click()}><Paperclip size={18} /> {uploading ? (english ? "Preparing file…" : "Preparando archivo…") : (english ? "Attach" : "Adjuntar")}</button><button type="button" className="btn btn-ghost altazor-composer-apps" aria-label={english ? "Applications" : "Aplicaciones"} title={english ? "Applications" : "Aplicaciones"} onClick={() => openPane("connectors")}><Link2 size={18} aria-hidden="true" /><span>{english ? "Applications" : "Aplicaciones"}</span></button><input ref={input} type="file" aria-label="Archivos para adjuntar al mensaje de ALTAZOR" className="sr-only" multiple accept=".pdf,.epub,.doc,.docx,.odt,.rtf,.txt,.md,.csv,.json,.html,.htm" onChange={event => void upload(event.target.files)} />{text.length >= 7200 && <span aria-live="polite">{8000-text.length} caracteres disponibles</span>}<button type="button" className="btn btn-primary" aria-label={english ? "Send message to Altazor" : "Enviar mensaje a ALTAZOR"} data-testid="inicio-send" disabled={!text.trim() || busy || uploading || Boolean(running) || preferenceSaving || loading || !destination?.permitted} onClick={sendMessage}><ArrowUp size={18} /> {english ? "Send" : "Enviar"}</button></div>
           <AltazorTurnMemoryPicker key={JSON.stringify([activeId, currentCase])} causaId={currentCase} selection={icaroMemorySelections}
             onChange={selectIcaroMemory} disabled={busy || loading || uploading || Boolean(running)} />
-          <details className="altazor-composer-help"><summary>Ayuda de teclado</summary><p id="altazor-keyboard-help" className="altazor-keyboard-help">Enter para enviar · Mayús + Enter para un salto de línea</p></details>
+          <details className="altazor-composer-help"><summary>{english ? "Keyboard help" : "Ayuda de teclado"}</summary><p id="altazor-keyboard-help" className="altazor-keyboard-help">{english ? "Enter to send · Shift + Enter for a new line" : "Enter para enviar · Mayús + Enter para un salto de línea"}</p></details>
         </div>
         {data?.attachments.length ? <details className="altazor-attachment-archive" open={attachmentIds.length ? true : undefined}><summary>Archivos de este contexto <span>{data.attachments.length}</span></summary><ul className="altazor-attachments">{data.attachments.map(file => <li key={file.id}><span>{file.sourceName}{file.status !== "ready" && <small>{file.status === "processing" ? "Preparando…" : "Revisar archivo"}</small>}</span>{attachmentIds.includes(file.id) ? <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`No adjuntar ${file.sourceName}`} onClick={() => setAttachmentIds(previous => previous.filter(id => id !== file.id))}><X size={16} /></button> : <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Adjuntar de nuevo ${file.sourceName}`} onClick={() => setAttachmentIds(previous => [...previous,file.id])}><Paperclip size={16} /></button>}<details className="altazor-attachment-options"><summary aria-label={`Opciones de ${file.sourceName}`}><Ellipsis size={18} /></summary><div><a href={`/api/altazor/conversations/${activeId}/attachments/${file.id}/original`}>Descargar original</a><button type="button" disabled={busy||uploading} onClick={()=>{setBusy(true);setError("");void request<{book:{id:string;title:string}}>(`/api/altazor/conversations/${activeId}/attachments/${file.id}/library`,{}).then(result=>setLibraryNotice(result.book)).catch(reason=>setError(reason.message)).finally(()=>setBusy(false));}}>Guardar en biblioteca</button><button type="button" disabled={busy} aria-label={`Retirar archivo ${file.sourceName}`} onClick={() => { void request(`/api/altazor/conversations/${activeId}/attachments/${file.id}`,{},"DELETE").then(() => { setAttachmentIds(previous => previous.filter(id => id !== file.id)); return reload(activeId); }).catch(reason => setError(reason.message)); }}>Retirar de la conversación</button></div></details></li>)}</ul></details> : null}
 
@@ -134,13 +175,13 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
       }} />}
     </div>
 
-    {visited.includes("memory") && <div hidden={pane !== "memory"}><AltazorMemory causaId={currentCase} /></div>}
-    {visited.includes("connectors") && <div hidden={pane !== "connectors"}><AltazorConnections causaId={currentCase} /></div>}
-    {visited.includes("computer") && <div hidden={pane !== "computer"}>
-      <AltazorComputer causaId={desktopSelection ? desktopSelection.causaId : currentCase} active={pane === "computer"} preferredSessionId={desktopSelection?.id ?? null} review={desktopSelection?.review} />
+    {visited.includes("memory") && <div data-altazor-pane="memory" hidden={pane !== "memory"}><AltazorMemory causaId={currentCase} /></div>}
+    {visited.includes("connectors") && <div data-altazor-pane="connectors" hidden={pane !== "connectors"}><AltazorConnections causaId={currentCase} openPane={openPane} /></div>}
+    {visited.includes("computer") && <div data-altazor-pane="computer" hidden={pane !== "computer"}>
+      <AltazorComputer openPane={!desktopSelection || desktopSelection.causaId === currentCase ? openPane : undefined} causaId={desktopSelection ? desktopSelection.causaId : currentCase} active={pane === "computer"} preferredSessionId={desktopSelection?.id ?? null} review={desktopSelection?.review} />
     </div>}
-    {visited.includes("icaros") && <div hidden={pane !== "icaros"}><AltazorIcaros causaId={currentCase} active={pane === "icaros"} /></div>}
-    {visited.includes("help") && <div hidden={pane !== "help"}><AltazorHelp active={pane === "help"} /></div>}
+    {visited.includes("icaros") && <div data-altazor-pane="icaros" hidden={pane !== "icaros"}><AltazorIcaros causaId={currentCase} active={pane === "icaros"} /></div>}
+    {visited.includes("help") && <div data-altazor-pane="help" hidden={pane !== "help"}><AltazorHelp active={pane === "help"} /></div>}
 
   </div>;
 }

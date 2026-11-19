@@ -4,7 +4,7 @@ Al preparar el equipo principal, LexOpen comprueba el motor Docker local e inici
 
 LexOpen identifica la arquitectura del motor y comprueba la huella SHA-256 antes de cargar un paquete oficial de su versión. Cuando no hay un paquete publicado, utiliza la receta verificada incluida en el instalador para construir el perfil local. Esa primera preparación necesita conexión y espacio para las herramientas. La receta comprueba la conversión de documentos, la lectura de PDF, el OCR y el audio antes de marcar el perfil como listo.
 
-Cuando las herramientas estén disponibles, abre **Mi asistente → Computadora** y vincula el escritorio que el administrador preparó para tu espacio. El diagnóstico del instalador comprueba el motor y la imagen local. La conexión se verifica por separado en LexOpen.
+Cuando las herramientas estén disponibles, abre **Altazor → Herramientas → Escritorio** y vincula el escritorio que el administrador preparó para tu espacio. El diagnóstico del instalador comprueba el motor y la imagen local. La conexión se verifica por separado en LexOpen.
 
 | Herramientas del escritorio | Trabajo que permiten |
 | --- | --- |
@@ -44,7 +44,7 @@ La persistencia del puesto no convierte en permanentes las autorizaciones de una
    El programa construye la imagen y prueba las herramientas con documentos sintéticos sin red como usuario del escritorio. Al terminar imprime el identificador `sha256:…` de la imagen y registra el perfil local para que lo detecte el asistente. Los paquetes Debian de la imagen quedan inventariados en `/usr/share/lexopen-desktop/packages.tsv`.
 3. Configura la instancia dedicada al profesional y al espacio con ese identificador en `containers.image`, actualizaciones automáticas de imagen desactivadas y su carpeta propia. La [guía de operación](../src/lib/altazor/computer/README.md) describe el proveedor de IA y la conexión al Host local. Vincula y comprueba el escritorio desde la aplicación.
 
-El instalador incluye el Host, Chromium y la receta del perfil. Los pasos manuales anteriores sirven también para diagnóstico y para instalaciones sin el asistente de Desktop. El motor de contenedores y el servicio dedicado de cada profesional conservan su preparación propia. Comprueba la conexión en **Mi asistente → Computadora** antes de enviar archivos o encargos.
+El instalador incluye el Host, Chromium y la receta del perfil. Los pasos manuales anteriores sirven también para diagnóstico y para instalaciones sin el asistente de Desktop. El motor de contenedores y el servicio dedicado de cada profesional conservan su preparación propia. Comprueba la conexión en **Altazor → Herramientas → Escritorio** antes de enviar archivos o encargos.
 
 ## Comprobar los paquetes de escritorio
 

@@ -97,3 +97,7 @@
 .work {padding-top:.75rem;}
 .sessions {margin-block:.5rem;}
 .expiry {margin-block:.5rem;}
+
+.sessionOptions { display: grid; align-items: start; }
+.sessionOptions summary { min-height: 44px; cursor: pointer; padding-inline: .6rem; }
+.sessionOptions[open] > button { margin-top: .25rem; }

@@ -1,7 +1,12 @@
 (function () {
   const statusEl = document.getElementById("status");
   const errorEl = document.getElementById("error");
-  const dataDirEl = document.getElementById("dataDir");
+  const english = navigator.language.toLowerCase().startsWith("en");
+  const tr = (es, en) => english ? en : es;
+  if (english) {
+    document.documentElement.lang = "en";
+    for (const element of document.querySelectorAll("[data-en]")) element.textContent = element.dataset.en;
+  }
   const versionEl = document.getElementById("version");
   const hostFields = document.getElementById("host-fields");
   const clientFields = document.getElementById("client-fields");
@@ -20,18 +25,20 @@
     const mode = selectedMode();
     hostFields.classList.toggle("hidden", mode !== "host");
     clientFields.classList.toggle("hidden", mode !== "client");
+    document.getElementById("host-options").hidden = mode !== "host";
   }
 
   function setBusy(busy) {
     continueBtn.disabled = busy;
+    document.querySelector("fieldset.modes").disabled = busy;
     if (retryBtn) retryBtn.disabled = busy;
     if (chooseDataBtn) chooseDataBtn.disabled = busy;
   }
 
-  function showError(msg) {
+  function showError(msg, retryStoredConfig = false) {
     errorEl.hidden = !msg;
     errorEl.textContent = msg || "";
-    if (retryBtn) retryBtn.hidden = !msg;
+    if (retryBtn) retryBtn.hidden = !msg || !retryStoredConfig;
   }
 
   document.querySelectorAll('input[name="mode"]').forEach((el) => {
@@ -43,17 +50,16 @@
 
   async function hydrate() {
     if (!window.lexopenDesktop) {
-      statusEl.textContent = "API desktop no disponible.";
+      statusEl.textContent = tr("API desktop no disponible.", "Desktop connection unavailable.");
       return;
     }
     window.lexopenDesktop.onAltazorPreparation(renderDesktopPreparation);
     const state = await window.lexopenDesktop.getState();
     renderDesktopPreparation(state.desktopPreparation);
-    dataDirEl.textContent = state.dataDir || "";
     document.getElementById("selectedDataDirectory").textContent = state.dataDir || "";
     if (versionEl) versionEl.textContent = state.version ? `v${state.version}` : "";
     if (state.status?.message) statusEl.textContent = state.status.message;
-    if (state.status?.phase === "error") showError(state.status.message);
+    if (state.status?.phase === "error") showError(state.status.message, true);
     const cfg = state.config || {};
     if (cfg.mode === "client") {
       document.querySelector('input[name="mode"][value="client"]').checked = true;
@@ -66,10 +72,11 @@
     document.getElementById("updateChecks").checked = cfg.updateChecks !== false;
     document.getElementById("updateChannel").value = cfg.updateChannel === "preview" ? "preview" : "stable";
     syncModeUi();
+    setBusy(false);
     if (cfg.mode === "host") void prepareDesktop();
     window.lexopenDesktop.onStatus((s) => {
       if (s?.message) statusEl.textContent = s.message;
-      if (s?.phase === "error") showError(s.message);
+      if (s?.phase === "error") showError(s.message, true);
       if (s?.phase === "starting-host" || s?.phase === "probing") {
         showError("");
         setBusy(true);
@@ -79,12 +86,14 @@
   }
 
   continueBtn.addEventListener("click", async () => {
+    const remote = document.getElementById("remoteUrl");
+    if (selectedMode() === "client" && !remote.reportValidity()) return;
     showError("");
     setBusy(true);
     statusEl.textContent =
       selectedMode() === "host"
-        ? "Arrancando servidor (puede tardar la primera vez)…"
-        : "Conectando al PC principal…";
+        ? tr("Arrancando servidor (puede tardar la primera vez)…", "Starting the server. The first launch may take a moment…")
+        : tr("Conectando al PC principal…", "Connecting to the Host…");
     const payload = {
       mode: selectedMode(),
       port: Number(document.getElementById("port").value) || 3000,
@@ -95,31 +104,36 @@
       updateChecks: document.getElementById("updateChecks").checked,
       updateChannel: document.getElementById("updateChannel").value,
     };
-    const res = await window.lexopenDesktop.saveSetup(payload);
-    setBusy(false);
+    let res;
+    try {
+      res = await window.lexopenDesktop.saveSetup(payload);
+    } catch {
+      showError(tr("Se interrumpió la conexión. Revisa el estado del Host antes de reintentar.", "Connection interrupted. Check the Host status before retrying."));
+      statusEl.textContent = "";
+      return;
+    } finally { setBusy(false); }
     if (!res?.ok) {
-      showError(res?.error || "No se pudo iniciar.");
-      statusEl.textContent = "Revise la configuración.";
+      showError(res?.error || tr("No se pudo iniciar.", "Unable to start."));
+      statusEl.textContent = tr("Revise la configuración.", "Check your settings.");
       return;
     }
     statusEl.textContent = res.updateRecognized
-      ? `Actualización reconocida · v${res.version}`
-      : "Listo — cargando LexOpen…";
+      ? tr(`Actualización reconocida · v${res.version}`, `Update recognized · v${res.version}`)
+      : tr("Listo — cargando LexOpen…", "Opening LexOpen…");
   });
 
   chooseDataBtn.addEventListener("click", async () => {
     setBusy(true); showError("");
     try {
       const result = await window.lexopenDesktop.chooseDataDirectory();
-      if (!result?.ok) { showError(result?.error || "No se pudo usar la carpeta."); return; }
+      if (!result?.ok) { showError(result?.error || tr("No se pudo usar la carpeta.", "Unable to use that folder.")); return; }
       if (result.cancelled) return;
-      dataDirEl.textContent = result.dataDir;
       document.getElementById("selectedDataDirectory").textContent = result.dataDir;
       if (result.port) document.getElementById("port").value = result.port;
       selectedPgPort = result.pgPort || 54329;
       document.getElementById("publicUrl").value = result.publicUrl || "";
-      statusEl.textContent = "Carpeta elegida. Continuar abrirá esos datos; no se ha movido ningún archivo.";
-    } catch { showError("No se pudo elegir la carpeta. Vuelva a intentarlo."); }
+      statusEl.textContent = tr("Carpeta elegida. Pulsa Continuar para abrir sus datos.", "Folder selected. Continue to open its data.");
+    } catch { showError(tr("No se pudo elegir la carpeta. Vuelva a intentarlo.", "Unable to select a folder. Try again.")); }
     finally { setBusy(false); }
   });
 
@@ -129,15 +143,15 @@
     desktopStatusEl.textContent = status.message;
     const ready = ["package-loaded", "profile-detected"].includes(status.state);
     prepareDesktopBtn.disabled = Boolean(status.busy);
-    prepareDesktopBtn.textContent = status.busy ? "Preparando…" : ready ? "Comprobar de nuevo" : "Volver a intentar";
+    prepareDesktopBtn.textContent = status.busy ? tr("Preparando…", "Preparing…") : ready ? tr("Comprobar de nuevo", "Check again") : tr("Volver a intentar", "Try again");
   }
 
   async function prepareDesktop(retry = false) {
-    renderDesktopPreparation({ busy: true, message: "Comprobando el escritorio…" });
+    renderDesktopPreparation({ busy: true, message: tr("Comprobando el escritorio…", "Checking the desktop…") });
     try {
       renderDesktopPreparation(await window.lexopenDesktop.prepareAltazorDesktop(retry));
     } catch {
-      renderDesktopPreparation({ message: "No se pudo preparar el escritorio. Vuelve a intentar." });
+      renderDesktopPreparation({ message: tr("No se pudo preparar el escritorio. Vuelve a intentar.", "Unable to prepare the desktop. Try again.") });
     }
   }
 
@@ -151,11 +165,14 @@
     retryBtn.addEventListener("click", async () => {
       showError("");
       setBusy(true);
-      statusEl.textContent = "Reintentando…";
-      await window.lexopenDesktop.retry();
-      setBusy(false);
+      statusEl.textContent = tr("Reintentando…", "Retrying…");
+      try {
+        await window.lexopenDesktop.retry();
+      } catch {
+        showError(tr("No se pudo reintentar. Comprueba la conexión con el Host.", "Unable to retry. Check the Host connection."), true);
+      } finally { setBusy(false); }
     });
   }
 
-  void hydrate();
+  void hydrate().catch(() => showError(tr("No se pudo leer la configuración. Vuelve a abrir LexOpen.", "Unable to load the settings. Reopen LexOpen.")));
 })();

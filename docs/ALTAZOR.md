@@ -18,7 +18,7 @@ Los mensajes guardados y los trabajos en curso se recuperan. Un mensaje que toda
 
 ## Continuar entre apartados
 
-Inicio y el panel lateral comparten conversación y borrador mientras navegas. «Mi asistente» reúne memoria, conexiones y computadora; Académico tiene un apartado propio. El Host puede continuar mensajes expresamente enviados durante un máximo de 24 horas, con permisos, sesión y fuentes vigentes; no confirma escrituras ni reproduce operaciones interrumpidas.
+Inicio y el panel lateral comparten conversación y borrador mientras navegas. «Herramientas» reúne memoria, conexiones y escritorio. Académico tiene un apartado propio. El Host puede continuar mensajes expresamente enviados durante un máximo de 24 horas, con permisos, sesión y fuentes vigentes; no confirma escrituras ni reproduce operaciones interrumpidas.
 
 Consulta [Sincronización](SINCRONIZACION.md) para conectar el contenido de Drive personal, separado del conector de metadatos de la computadora.
 

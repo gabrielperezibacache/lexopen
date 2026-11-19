@@ -122,7 +122,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
   }
   function render() {
     const data = getData(); $("writing-space").hidden = kind !== "writing"; $("records-space").hidden = kind === "writing" || fileArea.isKind(kind); fileArea.render(kind);
-    for (const [id, value] of [["tab-academic", "academic"], ["tab-booknotes", "booknote"], ["tab-writings", "writing"], ["tab-clientes", "cliente"], ["tab-tasks", "task"], ["tab-causes", "causa"], ["tab-deadlines", "plazo"], ["tab-notes", "nota"], ["tab-minutes", "minuta"], ["tab-documents", "documento"], ["tab-attachments", "adjunto"], ["tab-events", "evento"], ["tab-procedures", "tramite"]]) $(id).setAttribute("aria-pressed", String(kind === value));
+    $("offline-area").value = kind;
     if (!data) { renderOperation(null); bindings.render(null); memoActions.render(null); selected = ""; $("record-picker").replaceChildren(); $("record-fields").replaceChildren(); $("party-list").replaceChildren(); $("deadline-reviewed").checked = false; return; }
     data.records ||= [];
     if (kind === "writing" || fileArea.isKind(kind)) { renderOperation(null); bindings.render(null); memoActions.render(null); return; }
@@ -147,7 +147,17 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
     if (!res.ok || !value?.version) throw new Error(value?.error || "No se pudo preparar el registro. Compruebe su sesión y sus permisos.");
     return value;
   }
-  for (const [id, value] of [["tab-academic", "academic"], ["tab-booknotes", "booknote"], ["tab-writings", "writing"], ["tab-clientes", "cliente"], ["tab-tasks", "task"], ["tab-causes", "causa"], ["tab-deadlines", "plazo"], ["tab-notes", "nota"], ["tab-minutes", "minuta"], ["tab-documents", "documento"], ["tab-attachments", "adjunto"], ["tab-events", "evento"], ["tab-procedures", "tramite"]]) $(id).onclick = () => void run(async () => { await flush(); kind = value; selected = ""; render(); });
+  $("offline-area").onchange = () => {
+    const next = $("offline-area").value;
+    // Keep the previous area selected if saving its pending edits fails.
+    $("offline-area").value = kind;
+    void run(async () => {
+      await flush();
+      kind = next;
+      selected = "";
+      render();
+    });
+  };
   $("record-new").onclick = () => void run(async () => {
     if (["academic", "booknote"].includes(kind)) throw new Error("Prepare una copia desde su libro o manuscrito con conexión.");
     await flush(); const item = { localId: crypto.randomUUID(), kind, fields: defaults(kind), baseFields: null };

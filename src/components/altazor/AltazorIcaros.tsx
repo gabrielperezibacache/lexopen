@@ -1,6 +1,7 @@
 "use client";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, Feather, Plus, RefreshCw } from "lucide-react";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import type { IcaroDestination, IcaroJobView, IcaroMemoryRef, IcaroMemoryView, IcaroView } from "@/lib/altazor/icaros/types";
@@ -24,13 +25,14 @@ async function change<T>(url: string, data: unknown, method = "POST"): Promise<T
   return result.data;
 }
 function ProfileFields({ profile }: { profile?: IcaroView }) {
+  const en = useI18n().locale === "en";
   return <>
-    <label>Nombre del Ícaro<input name="name" required maxLength={80} defaultValue={profile?.name || ""} placeholder="Por ejemplo: Revisión de citas" /></label>
-    <label>Instrucciones del Ícaro<textarea name="instructions" rows={4} maxLength={4000} defaultValue={profile?.instructions || ""} placeholder="Su especialidad, criterios y formato de respuesta." /></label>
-    <label>Proveedor del Ícaro<select aria-label="Proveedor del Ícaro" name="provider" defaultValue={profile?.provider || "inherit"}><option value="inherit">Heredar mi configuración de IA</option><option value="study">Proveedor del estudio</option><option value="codex">Mi Codex personal</option></select></label>
-    <label>Modelo específico<input name="model" maxLength={160} defaultValue={profile?.model || ""} placeholder="Vacío para heredar el modelo" /></label>
-    <p className="altazor-panel-note">El modelo debe estar disponible en el proveedor elegido. La política del estudio y tus permisos se aplican siempre.</p>
-    <label className="altazor-check"><input name="memoryEnabled" type="checkbox" defaultChecked={profile?.memoryEnabled ?? false} />Permitir memoria propia de este Ícaro</label>
+    <label>{en ? "Ícaro name" : "Nombre del Ícaro"}<input name="name" required maxLength={80} defaultValue={profile?.name || ""} placeholder={en ? "For example, citation review" : "Por ejemplo, revisión de citas"} /></label>
+    <label>{en ? "Ícaro instructions" : "Instrucciones del Ícaro"}<textarea name="instructions" rows={4} maxLength={4000} defaultValue={profile?.instructions || ""} placeholder={en ? "Specialty, criteria and response format." : "Su especialidad, criterios y formato de respuesta."} /></label>
+    <label>{en ? "Ícaro provider" : "Proveedor del Ícaro"}<select aria-label={en ? "Ícaro provider" : "Proveedor del Ícaro"} name="provider" defaultValue={profile?.provider || "inherit"}><option value="inherit">{en ? "Use my AI settings" : "Heredar mi configuración de IA"}</option><option value="study">{en ? "Firm provider" : "Proveedor del estudio"}</option><option value="codex">{en ? "My Codex account" : "Mi Codex personal"}</option></select></label>
+    <label>{en ? "Specific model" : "Modelo específico"}<input name="model" maxLength={160} defaultValue={profile?.model || ""} placeholder={en ? "Leave blank to inherit the model" : "Vacío para heredar el modelo"} /></label>
+    <p className="altazor-panel-note">{en ? "Choose a model available from the selected provider. Firm policy and your permissions apply." : "El modelo debe estar disponible en el proveedor elegido. La política del estudio y tus permisos se aplican siempre."}</p>
+    <label className="altazor-check"><input name="memoryEnabled" type="checkbox" defaultChecked={profile?.memoryEnabled ?? false} />{en ? "Enable private memory for this Ícaro" : "Permitir memoria propia de este Ícaro"}</label>
   </>;
 }
 function profileValues(form: HTMLFormElement) {
@@ -41,6 +43,7 @@ export function AltazorIcaros({ causaId, active = true }: { causaId?: string | n
   return <IcarosPanel key={causaId || "personal"} causaId={causaId} active={active} />;
 }
 function IcarosPanel({ causaId, active }: { causaId?: string | null; active: boolean }) {
+  const en = useI18n().locale === "en";
   const [catalog, setCatalog] = useState<Catalog | null>(null), [selected, setSelected] = useState(""), [creating, setCreating] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const keys = useRef(createSubmissionKeys());
   const query = causaId ? `?${new URLSearchParams({ causaId })}` : "";
@@ -60,25 +63,41 @@ function IcarosPanel({ causaId, active }: { causaId?: string | null; active: boo
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo crear el Ícaro. Tus instrucciones se conservan."); }
     finally { setBusy(false); }
   }
-  return <section className="altazor-task-panel" data-testid="altazor-icaros" aria-label="Ícaros de Altazor">
-    <header className="altazor-panel-heading"><div><h2><Feather size={22} aria-hidden="true" />Ícaros</h2><p>Asistentes con una especialidad, un modelo y una memoria propia. Tú eliges qué encargarles y qué pueden recordar.</p></div><button type="button" className="btn btn-ghost" onClick={() => { setError(""); void reload().catch(reason => setError(reason.message)); }}><RefreshCw size={16} />Actualizar Ícaros</button></header>
-    <p className="altazor-panel-note">{causaId ? "Estos Ícaros pertenecen a esta causa." : "Estos Ícaros pertenecen a tu espacio personal."} Sus memorias no se comparten con otros usuarios ni entre perfiles.</p>
+  return <section className="altazor-task-panel" data-testid="altazor-icaros" aria-label={en ? "Altazor’s Ícaros" : "Ícaros de Altazor"}>
+    <header className="altazor-panel-heading"><div><h2><Feather size={22} aria-hidden="true" />Ícaros</h2><p>{causaId ? (en ? "Case specialists" : "Especialistas de esta causa") : (en ? "Personal specialists" : "Especialistas de tu espacio personal")}</p></div><button type="button" className="btn btn-ghost" onClick={() => { setError(""); void reload().catch(reason => setError(reason.message)); }}><RefreshCw size={16} />{en ? "Refresh Ícaros" : "Actualizar Ícaros"}</button></header>
     {error && <p role="alert" className="altazor-error">{error}</p>}
-    {!catalog && !error && <p role="status">Consultando tus Ícaros…</p>}
-    {selected ? <><button type="button" className="btn btn-ghost" onClick={() => setSelected("")}><ArrowLeft size={16} />Todos mis Ícaros</button><IcaroDetail key={selected} id={selected} active={active} onSaved={reload} /></> : <>
-      {catalog?.icaros.length ? <ul className="altazor-profile-list">{catalog.icaros.map(icaro => <li key={icaro.id}><button type="button" className="altazor-profile-card" onClick={() => setSelected(icaro.id)}><strong>{icaro.name}</strong><span>{icaro.destination.model || "Modelo por configurar"} · {icaro.memoryEnabled ? "Memoria propia habilitada" : "Sin memoria"}</span><small>{icaro.enabled ? icaro.destination.permitted ? "Disponible" : "Revisa su proveedor" : "Desactivado"}</small></button></li>)}</ul> : catalog && <p className="altazor-panel-empty">Crea tu primer Ícaro y define su especialidad.</p>}
-      {!creating && <button type="button" className="btn btn-primary" disabled={!catalog || Boolean(catalog && catalog.icaros.length >= catalog.limits.profiles)} onClick={() => setCreating(true)}><Plus size={16} />Crear Ícaro</button>}
-      {creating && <form className="altazor-panel-form" onSubmit={create}><fieldset disabled={busy}><legend>Nuevo Ícaro</legend><ProfileFields /><div className="altazor-panel-actions"><button className="btn btn-primary" type="submit">{busy ? "Creando…" : "Guardar Ícaro"}</button><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>Cancelar</button></div></fieldset></form>}
+    {!catalog && !error && <p role="status">{en ? "Loading your Ícaros…" : "Consultando tus Ícaros…"}</p>}
+    {selected ? <><button type="button" className="btn btn-ghost" onClick={() => setSelected("")}><ArrowLeft size={16} />{en ? "All my Ícaros" : "Todos mis Ícaros"}</button><IcaroDetail key={selected} id={selected} active={active} onSaved={reload} /></> : <>
+      {catalog?.icaros.length ? <ul className="altazor-profile-list">{catalog.icaros.map(icaro => <li key={icaro.id}><button type="button" className="altazor-profile-card" onClick={() => setSelected(icaro.id)}><strong>{icaro.name}</strong><span>{icaro.destination.model || (en ? "No model configured" : "Modelo por configurar")} · {icaro.memoryEnabled ? (en ? "Private memory enabled" : "Memoria propia habilitada") : (en ? "No memory" : "Sin memoria")}</span><small>{icaro.enabled ? icaro.destination.permitted ? (en ? "Available" : "Disponible") : (en ? "Check provider" : "Revisa su proveedor") : (en ? "Disabled" : "Desactivado")}</small></button></li>)}</ul> : catalog && <p className="altazor-panel-empty">{en ? "Create your first Ícaro and choose its specialty." : "Crea tu primer Ícaro y define su especialidad."}</p>}
+      {!creating && <button type="button" className="btn btn-primary" disabled={!catalog || Boolean(catalog && catalog.icaros.length >= catalog.limits.profiles)} onClick={() => setCreating(true)}><Plus size={16} />{en ? "Create Ícaro" : "Crear Ícaro"}</button>}
+      {creating && <form className="altazor-panel-form" onSubmit={create}><fieldset disabled={busy}><legend>{en ? "New Ícaro" : "Nuevo Ícaro"}</legend><ProfileFields /><div className="altazor-panel-actions"><button className="btn btn-primary" type="submit">{busy ? (en ? "Creating…" : "Creando…") : (en ? "Save Ícaro" : "Guardar Ícaro")}</button><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>{en ? "Cancel" : "Cancelar"}</button></div></fieldset></form>}
     </>}
   </section>;
 }
 
-const jobLabels: Record<string, string> = { queued: "En cola", running: "Trabajando", completed: "Completado", failed: "No completado", cancelled: "Detenido", blocked: "Acceso no disponible", interrupted: "Interrumpido" };
+function IcaroRecord({ summary, children, job = false }: { summary: ReactNode; children: ReactNode; job?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return <details className={job ? "altazor-panel-job" : undefined} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary className={job ? "altazor-job-summary" : undefined}>{summary}</summary>
+    {open && children}
+  </details>;
+}
+
+const spanishJobStatus: Record<string, string> = { queued: "En cola", running: "Trabajando", completed: "Completado", failed: "No completado", cancelled: "Detenido", blocked: "Acceso no disponible", interrupted: "Interrumpido" };
+const englishJobStatus: Record<string, string> = { queued: "Queued", running: "Working", completed: "Completed", failed: "Failed", cancelled: "Stopped", blocked: "Access unavailable", interrupted: "Interrupted" };
 function IcaroDetail({ id, active, onSaved }: { id: string; active: boolean; onSaved: () => Promise<void> }) {
+  const en = useI18n().locale === "en";
+  const [visibleCount, setVisibleCount] = useState(5);
+  const [supportOpened, setSupportOpened] = useState(false);
+  const jobHistory = useRef<HTMLElement>(null);
+  const memoryDetails = useRef<HTMLDetailsElement>(null);
+  const memoryEditor = useRef<HTMLDetailsElement>(null);
+  const memoryName = useRef<HTMLInputElement>(null);
   const [detail, setDetail] = useState<Detail | null>(null), [busy, setBusy] = useState(false), [executing, setExecuting] = useState(""), [error, setError] = useState("");
   const [instruction, setInstruction] = useState(""), [text, setText] = useState(""), [memorySelection, setMemorySelection] = useState<IcaroMemoryRef[]>([]), [allowRemote, setAllowRemote] = useState(false), [sources, setSources] = useState<AltazorSelectedSource[]>([]);
   const [consentDestination, setConsentDestination] = useState("");
-  const [memoryJob, setMemoryJob] = useState<IcaroJobView | null>(null);
+  const [memoryJobId, setMemoryJobId] = useState<string | null>(null);
+  const memoryJob = detail?.jobs.find(job => job.id === memoryJobId && job.available && job.status === "completed");
   const jobKeys = useRef(createSubmissionKeys()), memoryKeys = useRef(createSubmissionKeys());
   const url = `${base}/${encodeURIComponent(id)}`;
   const reload = useCallback(async (signal?: AbortSignal) => { const result = await read<Detail>(url, signal); if (!signal?.aborted) setDetail(result); }, [url]);
@@ -89,6 +108,12 @@ function IcaroDetail({ id, active, onSaved }: { id: string; active: boolean; onS
     queueMicrotask(refresh); const timer = window.setInterval(refresh, 6000);
     return () => { control.abort(); window.clearInterval(timer); };
   }, [active, reload]);
+  function reviewExtract(job: IcaroJobView) {
+    setMemoryJobId(job.id);
+    if (memoryDetails.current) memoryDetails.current.open = true;
+    if (memoryEditor.current) memoryEditor.current.open = true;
+    requestAnimationFrame(() => memoryName.current?.focus());
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!detail) return; setBusy(true); setError("");
     try { await change(url, { ...profileValues(event.currentTarget), expectedRevision: detail.icaro.revision, confirmed: true }, "PATCH"); await reload(); await onSaved(); }
@@ -124,9 +149,11 @@ function IcaroDetail({ id, active, onSaved }: { id: string; active: boolean; onS
     finally { setBusy(false); }
   }
   async function saveMemory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = event.currentTarget, fields = new FormData(form); setBusy(true); setError("");
+    event.preventDefault();
+    if (memoryJobId && !memoryJob) return;
+    const form = event.currentTarget, fields = new FormData(form); setBusy(true); setError("");
     const payload = { label: String(fields.get("label") || ""), ...(memoryJob ? { jobId: memoryJob.id } : { body: String(fields.get("body") || "") }), confirmed: true };
-    try { await change(`${url}/memory`, { ...payload, requestId: memoryKeys.current.forPayload(payload) }); memoryKeys.current.complete(payload); setMemoryJob(null); form.reset(); await reload(); }
+    try { await change(`${url}/memory`, { ...payload, requestId: memoryKeys.current.forPayload(payload) }); memoryKeys.current.complete(payload); setMemoryJobId(null); form.reset(); await reload(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo guardar la memoria."); }
     finally { setBusy(false); }
   }
@@ -136,16 +163,88 @@ function IcaroDetail({ id, active, onSaved }: { id: string; active: boolean; onS
     catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo olvidar este recuerdo."); }
     finally { setBusy(false); }
   }
-  if (!detail) return <p role={error ? "alert" : "status"}>{error || "Abriendo Ícaro…"}</p>;
+  if (!detail) return <p role={error ? "alert" : "status"}>{error || (en ? "Opening Ícaro…" : "Abriendo Ícaro…")}</p>;
   const { icaro, jobs, memory } = detail;
   const staleMemory = memorySelection.some(ref => !icaro.memoryEnabled || !memory.some(item => item.available && item.id === ref.id && item.hash === ref.hash && item.revision === ref.revision));
+  const visibleJobs = jobs.filter((job, index) => index < visibleCount || job.status === "queued" || job.status === "running");
+  const jobLabels = en ? englishJobStatus : spanishJobStatus;
+  function showMoreJobs() {
+    const next = jobs.findIndex((job, index) => index >= visibleCount && job.status !== "queued" && job.status !== "running");
+    if (next < 0) return;
+    setVisibleCount(next + 5);
+    requestAnimationFrame(() => jobHistory.current?.querySelectorAll<HTMLElement>(".altazor-job-summary")[next]?.focus());
+  }
   return <div className="altazor-icaro-detail" data-testid="altazor-icaro-detail">
-    <header className="altazor-panel-heading"><div><h3>{icaro.name}</h3><p>{icaro.destination.provider} · {icaro.destination.model || "Modelo sin configurar"}</p></div><button type="button" className="btn btn-ghost" disabled={busy || Boolean(executing)} onClick={toggle}>{icaro.enabled ? "Desactivar Ícaro" : "Activar Ícaro"}</button></header>
+    <header className="altazor-panel-heading"><div><h3>{icaro.name}</h3><p>{icaro.destination.provider} · {icaro.destination.model || (en ? "No model configured" : "Modelo sin configurar")}</p></div></header>
     {error && <p role="alert" className="altazor-error">{error}</p>}
-    <details className="altazor-panel-disclosure"><summary>Perfil, modelo y memoria del Ícaro</summary><form key={icaro.revision} className="altazor-panel-form" onSubmit={save}><fieldset disabled={busy || Boolean(executing)}><ProfileFields profile={icaro} /><button type="submit" className="btn btn-primary">Guardar perfil</button></fieldset></form></details>
-    {!icaro.destination.permitted && <p className="altazor-notice">El proveedor o modelo no está disponible según tu configuración. Revisa el perfil antes de encargarle trabajo.</p>}
-    <form className="altazor-panel-form" onSubmit={submitJob}><fieldset disabled={busy || Boolean(executing) || !icaro.enabled || !icaro.destination.permitted}><legend>Nuevo encargo para {icaro.name}</legend><label>Instrucción del encargo<textarea value={instruction} onChange={event => setInstruction(event.target.value)} required maxLength={6000} rows={3} /></label><label>Texto para este encargo<textarea value={text} onChange={event => setText(event.target.value)} maxLength={10000} rows={4} /></label><details className="altazor-panel-disclosure"><summary>Elegir fuentes · {sources.length}</summary><AltazorSources causaId={icaro.causaId} selected={sources} onChange={setSources} /></details>{(icaro.memoryEnabled || memorySelection.length > 0) && <IcaroMemoryChoices memory={icaro.memoryEnabled ? memory : []} selection={memorySelection} onChange={setMemorySelection} />}{icaro.destination.remote && <label className="altazor-check"><input type="checkbox" checked={allowRemote && consentDestination === icaro.destination.key} onChange={event => { setConsentDestination(icaro.destination.key); setAllowRemote(event.target.checked); }} />Autorizar el envío del encargo, el texto, las fuentes y los recuerdos elegidos a {icaro.destination.provider} · {icaro.destination.model}</label>}<button type="submit" className="btn btn-primary" disabled={!instruction.trim() || staleMemory || icaro.destination.remote && !(allowRemote && consentDestination === icaro.destination.key)}>Encargar a este Ícaro</button></fieldset></form>
-    <section className="altazor-panel-jobs" aria-label="Trabajos de este Ícaro"><h3>Encargos</h3>{jobs.length ? jobs.map(job => <article key={job.id} className="altazor-panel-job"><header><strong>{jobLabels[job.status] || "Estado por consultar"}</strong><time dateTime={job.createdAt}>{new Date(job.createdAt).toLocaleString("es-CL")}</time></header><AltazorMessageContent text={job.instruction} plain />{job.status === "running" && <p role="status">El Ícaro está preparando el resultado.</p>}{job.available && job.result && <AltazorMessageContent text={job.result} />}{!job.available && <p>El resultado ya no está disponible por un cambio en sus fuentes o permisos.</p>}<div className="altazor-panel-actions">{job.status === "queued" && <button className="btn btn-secondary" type="button" disabled={busy || Boolean(executing)} onClick={() => void execute(job)}>Ejecutar encargo</button>}{["queued", "running"].includes(job.status) && <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => void stop(job)}>Detener encargo</button>}{job.available && job.status === "completed" && job.result && <button className="btn btn-ghost" type="button" disabled={busy || !icaro.memoryEnabled} onClick={() => setMemoryJob(job)}>Conservar un extracto en memoria</button>}</div></article>) : <p className="altazor-panel-note">Todavía no hay encargos para este Ícaro.</p>}</section>
-    <section className="altazor-panel-memory" aria-label="Memoria de este Ícaro"><h3>Memoria propia</h3>{!icaro.memoryEnabled && <p className="altazor-panel-note">Activa la memoria en «Perfil, modelo y memoria del Ícaro» para conservar recuerdos nuevos.</p>}<p className="altazor-panel-note">Sólo se conserva lo que confirmas aquí. Desactivar su uso no elimina los recuerdos guardados.</p>{memory.map(item => <article key={item.id}><strong>{item.label}</strong><AltazorMessageContent text={item.available ? item.body : "Recuerdo no disponible por cambios en sus fuentes."} plain /><button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void forget(item)}>Olvidar este recuerdo</button></article>)}<details className="altazor-panel-disclosure" open={memoryJob ? true : undefined}><summary>{memoryJob ? "Confirmar el recuerdo del resultado" : "Añadir un recuerdo"}</summary><form key={memoryJob?.id || "manual"} className="altazor-panel-form" onSubmit={saveMemory}><fieldset disabled={busy || !icaro.memoryEnabled}><label>Nombre del recuerdo<input name="label" required maxLength={120} defaultValue={memoryJob?.instruction.slice(0, 120) || ""} /></label>{memoryJob ? <p>Se guardará un extracto de hasta 2.000 caracteres del resultado, con sus fuentes verificadas.</p> : <label>Contenido del recuerdo<textarea name="body" required rows={3} maxLength={2000} /></label>}<div className="altazor-panel-actions"><button type="submit" className="btn btn-primary">Confirmar y guardar recuerdo</button>{memoryJob && <button className="btn btn-ghost" type="button" onClick={() => setMemoryJob(null)}>Cancelar recuerdo</button>}</div></fieldset></form></details></section>
+    {!icaro.destination.permitted && <p className="altazor-notice">{en ? "Check the provider and model in the profile before assigning work." : "Revisa el proveedor y modelo del perfil antes de crear un encargo."}</p>}
+    {!icaro.enabled && <p className="altazor-notice">{en ? "This Ícaro is disabled. You can enable it in its profile." : "Este Ícaro está desactivado. Puedes activarlo en su perfil."}</p>}
+    <form className="altazor-panel-form" onSubmit={submitJob}>
+      <fieldset disabled={busy || Boolean(executing) || !icaro.enabled || !icaro.destination.permitted}>
+        <legend>{en ? "New assignment" : "Nuevo encargo"}</legend>
+        <label>{en ? "Assignment objective" : "Objetivo del encargo"}<textarea value={instruction} onChange={event => setInstruction(event.target.value)} required maxLength={6000} rows={3} /></label>
+        <details className="altazor-panel-disclosure" onToggle={event => { if (event.currentTarget.open) setSupportOpened(true); }}><summary>{en ? "Supporting text and sources" : "Texto de apoyo y fuentes"}{sources.length > 0 && ` · ${sources.length}`}</summary>
+          <label>{en ? "Text for this assignment" : "Texto para este encargo"}<textarea value={text} onChange={event => setText(event.target.value)} maxLength={10000} rows={4} /></label>
+          {supportOpened && <AltazorSources causaId={icaro.causaId} selected={sources} onChange={setSources} />}
+        </details>
+        {(icaro.memoryEnabled || memorySelection.length > 0) && <details className="altazor-panel-disclosure">
+          <summary>{en ? "Choose memories" : "Elegir recuerdos"} · {memorySelection.length}</summary>
+          <IcaroMemoryChoices memory={icaro.memoryEnabled ? memory : []} selection={memorySelection} onChange={setMemorySelection} />
+        </details>}
+        {staleMemory && <p role="alert">{en ? "Review the selected memories before sending." : "Revisa los recuerdos elegidos antes de enviar."}</p>}
+        {icaro.destination.remote && <label className="altazor-check"><input type="checkbox" checked={allowRemote && consentDestination === icaro.destination.key} onChange={event => {
+          setConsentDestination(icaro.destination.key); setAllowRemote(event.target.checked);
+        }} />{en ? "Authorize sending this assignment, text, sources and selected memories to" : "Autorizar el envío del encargo, el texto, las fuentes y los recuerdos elegidos a"} {icaro.destination.provider} · {icaro.destination.model}</label>}
+        <button type="submit" className="btn btn-primary" disabled={!instruction.trim() || staleMemory || icaro.destination.remote && !(allowRemote && consentDestination === icaro.destination.key)}>
+          {en ? "Assign to this Ícaro" : "Encargar a este Ícaro"}
+        </button>
+      </fieldset>
+    </form>
+    <section ref={jobHistory} className="altazor-panel-jobs" aria-label={en ? "Assignments for this Ícaro" : "Trabajos de este Ícaro"}>
+      <h3>{en ? "Recent assignments" : "Encargos recientes"}</h3>
+      {visibleJobs.map(job => <IcaroRecord key={job.id} job summary={<>
+          <strong>{job.instruction.length > 100 ? job.instruction.slice(0, 99) + "…" : job.instruction || (en ? "Assignment unavailable" : "Encargo no disponible")}</strong>
+          <span>{jobLabels[job.status] || (en ? "Status unavailable" : "Estado por consultar")} · <time dateTime={job.createdAt}>{new Date(job.createdAt).toLocaleString(en ? "en" : "es-CL")}</time></span>
+        </>}>
+        {job.instruction.length > 100 && <AltazorMessageContent text={job.instruction} plain />}
+        {job.available && job.result && <AltazorMessageContent text={job.result} />}
+        {job.available && !job.result && ["failed", "interrupted", "cancelled"].includes(job.status) && <p>{en ? "This assignment ended without a result." : "El encargo terminó sin un resultado."}</p>}
+        {!job.available && <p>{en ? "The sources or permissions for this result have changed." : "El resultado ya no está disponible por un cambio en sus fuentes o permisos."}</p>}
+        <div className="altazor-panel-actions">
+          {job.status === "queued" && <button className="btn btn-secondary" type="button" disabled={busy || Boolean(executing)} onClick={() => void execute(job)}>{en ? "Run assignment" : "Ejecutar encargo"}</button>}
+          {["queued", "running"].includes(job.status) && <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => void stop(job)}>{en ? "Stop assignment" : "Detener encargo"}</button>}
+          {job.available && job.status === "completed" && job.result && icaro.memoryEnabled && <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => reviewExtract(job)}>{en ? "Save an excerpt to memory" : "Conservar un extracto en memoria"}</button>}
+        </div>
+      </IcaroRecord>)}
+      {!jobs.length && <p className="altazor-panel-note">{en ? "No assignments yet." : "Todavía no hay encargos."}</p>}
+      {visibleJobs.length < jobs.length && <button type="button" className="btn btn-ghost" onClick={showMoreJobs}>{en ? "Show more assignments" : "Ver más encargos"}</button>}
+    </section>
+    <section aria-label={en ? "Memory for this Ícaro" : "Memoria de este Ícaro"}>
+      <details ref={memoryDetails} className="altazor-panel-disclosure"><summary>{en ? "Saved memories" : "Recuerdos guardados"} · {memory.length}</summary>
+        {memory.length === 0 && icaro.memoryEnabled && <p>{en ? "No memories saved for this Ícaro yet." : "Este Ícaro aún no tiene recuerdos guardados."}</p>}
+        {memory.map(item => <IcaroRecord key={item.id} summary={item.label}>
+          <AltazorMessageContent text={item.available ? item.body : (en ? "The sources for this memory have changed." : "Recuerdo no disponible por cambios en sus fuentes.")} plain />
+          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void forget(item)}>{en ? "Forget this memory" : "Olvidar este recuerdo"}</button>
+        </IcaroRecord>)}
+        {!icaro.memoryEnabled && <p>{en ? "Enable memory in the profile to save new entries." : "Activa la memoria en el perfil para guardar recuerdos nuevos."}</p>}
+        {icaro.memoryEnabled && <details ref={memoryEditor} className="altazor-panel-disclosure"><summary>{memoryJobId ? (en ? "Review excerpt" : "Revisar extracto") : (en ? "Add a memory" : "Añadir un recuerdo")}</summary>
+          <form key={memoryJobId || "manual"} className="altazor-panel-form" onSubmit={saveMemory}><fieldset disabled={busy}>
+            <label>{en ? "Memory name" : "Nombre del recuerdo"}<input ref={memoryName} name="label" required maxLength={120} defaultValue={memoryJob?.instruction.slice(0, 120) || ""} /></label>
+            {memoryJob ? <><p>{en ? "Excerpt to save with its verified sources" : "Extracto que se guardará con sus fuentes verificadas"}</p><AltazorMessageContent text={memoryJob.result.slice(0, 2000)} plain /></> : memoryJobId ? <p role="alert">{en ? "This result is no longer available." : "El resultado ya no está disponible."}</p> : <label>{en ? "Memory text" : "Contenido del recuerdo"}<textarea name="body" required maxLength={2000} rows={3} /></label>}
+            <div className="altazor-panel-actions"><button type="submit" className="btn btn-primary" disabled={Boolean(memoryJobId && !memoryJob)}>{en ? "Confirm and save memory" : "Confirmar y guardar recuerdo"}</button>
+              {memoryJobId && <button type="button" className="btn btn-ghost" onClick={() => setMemoryJobId(null)}>{en ? "Cancel excerpt" : "Cancelar recuerdo"}</button>}
+            </div>
+          </fieldset></form>
+        </details>}
+      </details>
+    </section>
+    <details className="altazor-panel-disclosure"><summary>{en ? "Profile, model and memory settings" : "Perfil, modelo y memoria del Ícaro"}</summary>
+      <form key={icaro.revision} className="altazor-panel-form" onSubmit={save}><fieldset disabled={busy || Boolean(executing)}>
+        <ProfileFields profile={icaro} /><button type="submit" className="btn btn-primary">{en ? "Save profile" : "Guardar perfil"}</button>
+      </fieldset></form>
+      <button type="button" className="btn btn-ghost" disabled={busy || Boolean(executing)} onClick={toggle}>
+        {icaro.enabled ? (en ? "Disable Ícaro" : "Desactivar Ícaro") : (en ? "Enable Ícaro" : "Activar Ícaro")}
+      </button>
+    </details>
   </div>;
 }

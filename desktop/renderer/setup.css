@@ -48,13 +48,6 @@ h1 {
   text-wrap: balance;
 }
 
-.lede {
-  margin: 10px 0 0;
-  max-width: 57ch;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
 .status {
   margin: 24px 0 0;
   padding: 10px 14px;
@@ -126,10 +119,6 @@ h1 {
   gap: 8px;
 }
 
-.data-directory .meta {
-  margin: 0;
-}
-
 .desktop-preparation {
   padding-block: 8px;
   border-block: 1px solid var(--line);
@@ -190,11 +179,8 @@ code {
   font-size: inherit;
 }
 
-footer {
-  margin-top: 28px;
-}
-
 .actions {
+  margin-block-start: 18px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -240,7 +226,7 @@ button:disabled {
 }
 
 :where(input, select, button, summary):focus-visible {
-  outline: 2px solid var(--iris-hover);
+  outline: 3px solid var(--iris);
   outline-offset: 3px;
 }
 
@@ -249,9 +235,25 @@ button:disabled {
   color: var(--danger);
 }
 
-.meta {
-  margin: 18px 0 0;
-  font-size: 0.8125rem;
-  color: var(--muted);
-  overflow-wrap: anywhere;
+[hidden], .status:empty, .version-line:empty { display: none !important; }
+fieldset.modes { border: 0; padding: 0; margin-inline: 0; min-inline-size: 0; }
+.modes legend { margin-bottom: 8px; font-weight: 600; }
+.data-directory code { overflow-wrap: anywhere; }
+#host-options { margin-block-start: 16px; }
+.desktop-preparation .fields { margin-block: 6px 12px; }
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --canvas: #faf9fd;
+    --surface: #ffffff;
+    --selected: #eeefff;
+    --ink: #202237;
+    --muted: #4e536d;
+    --iris: #414a9a;
+    --iris-hover: #343c84;
+    --line: #d9dbea;
+    --control-line: #848ba3;
+    --danger: #992638;
+  }
 }

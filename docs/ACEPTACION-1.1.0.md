@@ -10,6 +10,10 @@ LexOpen 1.1.0 estará lista para producción cuando dos integrantes del estudio 
 | 4. Retomar el trabajo de Altazor | El Host conserva encargos, fuentes, recuerdos seleccionados y recibos de las acciones. Las suites de ayuda usan transportes simulados. | El operador delega a un Ícaro la lectura del texto de un documento o del navegador, recibe una petición real en ntfy, cierra la ventana y reinicia el Host. Responde y comprueba que el encargo correcto continúa con sus fuentes y permisos. Tras un corte durante el guardado comprueba una sola acción registrada. |
 | 5. Completar el piloto y publicar | La etiqueta 1.1.0 prepara un borrador verificable con los archivos de la matriz nativa. | Dos integrantes identificables en el registro privado del estudio documentan diez días hábiles distintos en Santiago. Se anotan los defectos, la corrección y su verificación. La persona responsable aprueba la misma revisión y los mismos archivos que se ofrecerán en GitHub. |
 
+## Comprobar la interfaz del piloto
+
+Registrar la revisión de la interfaz que se instale y el SHA-256 de sus archivos. Los recibos de PR anteriores corresponden a sus propias compilaciones. Al iniciar cada jornada, abrir un vencimiento desde Inicio, cotejar fecha y responsable, y volver a la lista. Desde móvil, abrir una causa, descargar el original y retomar un borrador de Altazor después de consultar Herramientas. Comprobar con una cuenta de cliente que su pregunta abre la conversación correcta. [Recorridos por pantalla y rol](JERARQUIA-INFORMACION.md)
+
 ## Preparar el candidato
 
 1. El administrador del repositorio habilita el entorno protegido `desktop-release` para etiquetas y carga las credenciales de firma y el perfil público OAuth. La integración de Codex recibió HTTP 403 al intentar crear ese entorno el 19 de noviembre. [Configuración de firma](INSTALADORES.md) · [Seguimiento en GitHub](https://github.com/gabrielperezibacache/lexopen/issues/266)

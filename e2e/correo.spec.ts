@@ -32,7 +32,7 @@ test("correo PJUD separa la configuración personal de la bandeja", async ({
   expect(serialized).not.toContain("oauthRefreshEnc");
   expect(serialized).not.toContain("oauthAccessEnc");
 
-  await page.goto("/configuracion");
+  await page.goto("/configuracion#comunicaciones");
   await page.locator("main").getByRole("link", { name: "Configurar correo" }).click();
   await expect(page).toHaveURL(/\/configuracion\/correo$/, { timeout: 15_000 });
   await expect(page.getByTestId("mailbox-connect")).toBeVisible();

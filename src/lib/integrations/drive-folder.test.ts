@@ -1,3 +1,4 @@
+import { uploadDestination } from "../causas/upload-destination";
 import {
   driveFolderUrl,
   isPlaceholderDriveFolderId,
@@ -74,3 +75,11 @@ assert(stubFolderUrl("stub-1").includes("stub-1"), "stubFolderUrl");
 assert(makeStubFolderId("cuid_abc-123").startsWith("stub-folder-"), "makeStub");
 
 console.log("drive-folder.test.ts OK");
+
+const caseDestination = { id: "expediente", titulo: "Causa visible", clienteId: "c1", rit: "C-10", googleDriveFolderId: "Folder_123456", googleDriveFolderName: "Carpeta del estudio" };
+const chosen = uploadDestination(caseDestination, "Cliente");
+assert(chosen.drive?.id === "Folder_123456" && chosen.drive.name === "Carpeta del estudio" && chosen.clientId === "c1", "El destino conserva cliente y carpeta verificada del estudio");
+assert(!uploadDestination({ ...caseDestination, driveSyncSubscription: { account: "personal" } }, "Cliente").drive, "No ofrece una carpeta personal");
+for (const googleDriveFolderId of [null, "stub-folder-12345", "https://drive.google.com/drive/folders/abcdefgh", "ab"]) {
+  assert(!uploadDestination({ ...caseDestination, googleDriveFolderId }, "Cliente").drive, "No ofrece un ID de carpeta inválido o de demostración");
+}

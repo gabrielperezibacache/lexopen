@@ -1,0 +1,14 @@
+.body {
+  color-scheme: light dark;
+  margin: 0;
+  background: light-dark(#f6f6fb, #0d1022);
+  color: light-dark(#181c32, #f4f3f7);
+  font: 1rem/1.5 system-ui, sans-serif;
+}
+.main { margin: 12vh auto; max-width: 32rem; padding: 1rem 1.5rem; }
+.main h1 { font: 500 clamp(1.8rem, 5vw, 2.5rem)/1.2 Georgia, serif; }
+.actions { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.actions button, .actions a { display: inline-flex; align-items: center; min-height: 44px; font: inherit; }
+.actions button { background: light-dark(#3d4da1, #aab5ff); color: light-dark(white, #12162c); border: 0; border-radius: 8px; padding-inline: 1rem; cursor: pointer; }
+.actions a { color: light-dark(#303d83, #aab5ff); }
+.actions :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }

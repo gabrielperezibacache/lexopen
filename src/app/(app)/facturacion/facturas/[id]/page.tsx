@@ -1,3 +1,5 @@
+import { indicatorHref, indicatorMonth } from "@/lib/billing-overview";
+import { getLocale } from "@/lib/i18n/server";
 import { BillingNav } from "@/components/billing/BillingNav";
 import { InvoiceActions } from "@/components/billing/InvoiceActions";
 import { InvoiceAiPanel } from "@/components/billing/InvoiceAiPanel";
@@ -16,11 +18,15 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ desde?: string; mes?: string; pagina?: string }> };
 
-export default async function InvoiceDetailPage({ params }: Params) {
+export default async function InvoiceDetailPage({ params, searchParams }: Params) {
   const user = await requireStaff();
   const { id } = await params;
+  const { desde, mes, pagina } = await searchParams;
+  const english = (await getLocale()) === "en";
+  const indicator = desde === "pagos" || desde === "por-cobrar" ? desde : null;
+  const backHref = indicator ? indicatorHref(indicator, indicator === "pagos" ? indicatorMonth(mes).key : undefined, /^\d{1,8}$/.test(pagina || "") ? Number(pagina) : 1) : "/facturacion/facturas";
   const invoice = await prisma.invoice.findFirst({
     where: { AND: [scopedrelatedCausaWhere(user), { id }] },
     include: {
@@ -41,8 +47,8 @@ export default async function InvoiceDetailPage({ params }: Params) {
     <div className="mx-auto max-w-4xl space-y-6">
       <BillingNav />
       <div>
-        <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
-          ← Facturas
+        <Link href={backHref} className="text-sm text-[var(--sea)]">
+          ← {indicator === "pagos" ? (english ? "Payments received" : "Pagos recibidos") : indicator ? (english ? "Receivables" : "Por cobrar") : (english ? "Invoices" : "Facturas")}
         </Link>
         <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <div className="min-w-0">
