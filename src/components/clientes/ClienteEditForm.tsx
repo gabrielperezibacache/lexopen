@@ -1,8 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+
+const subscribeReady = () => () => {};
+const clientReady = () => true;
+const serverNotReady = () => false;
 
 export function ClienteEditForm({
   cliente,
@@ -23,6 +27,7 @@ export function ClienteEditForm({
   abogados: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
+  const ready = useSyncExternalStore(subscribeReady, clientReady, serverNotReady);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const dirty = useRef(false), saving = useRef(false);
@@ -38,7 +43,7 @@ export function ClienteEditForm({
   }
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (saving.current) return;
+    if (!ready || saving.current) return;
     const offline = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("data-offline") === "true";
     if (offline && !dirty.current) { openOffline(); return; }
     const fd = new FormData(e.currentTarget);
@@ -67,10 +72,10 @@ export function ClienteEditForm({
   }
 
   return (
-    <form onSubmit={onSubmit} onChange={() => { dirty.current = true; }} className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
+    <form method="post" aria-label="Datos del cliente" aria-busy={!ready || busy} onSubmit={onSubmit} onChange={() => { dirty.current = true; }} className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
       <label className="block space-y-2 text-sm font-medium sm:col-span-2">
         <span>Razón social / nombre</span>
-        <input disabled={busy}
+        <input disabled={!ready || busy}
         className="input"
         name="razonSocial"
         required
@@ -79,18 +84,18 @@ export function ClienteEditForm({
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span>RUT</span>
-        <input disabled={busy} className="input" name="rut" defaultValue={cliente.rut || ""} placeholder="RUT" />
+        <input disabled={!ready || busy} className="input" name="rut" defaultValue={cliente.rut || ""} placeholder="RUT" />
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span>Tipo</span>
-        <select disabled={busy} className="select" name="tipo" defaultValue={cliente.tipo}>
+        <select disabled={!ready || busy} className="select" name="tipo" defaultValue={cliente.tipo}>
         <option value="persona">Persona natural</option>
         <option value="empresa">Empresa</option>
       </select>
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span>Email</span>
-        <input disabled={busy}
+        <input disabled={!ready || busy}
         className="input"
         name="email"
         type="email"
@@ -100,7 +105,7 @@ export function ClienteEditForm({
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span>Teléfono</span>
-        <input disabled={busy}
+        <input disabled={!ready || busy}
         className="input"
         name="telefono"
         defaultValue={cliente.telefono || ""}
@@ -109,14 +114,14 @@ export function ClienteEditForm({
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span>Estado</span>
-        <select disabled={busy} className="select" name="estado" defaultValue={cliente.estado}>
+        <select disabled={!ready || busy} className="select" name="estado" defaultValue={cliente.estado}>
         <option value="activo">Activo</option>
         <option value="inactivo">Inactivo</option>
       </select>
       </label>
       <label className="block space-y-2 text-sm font-medium">
         <span>Abogado responsable</span>
-        <select disabled={busy}
+        <select disabled={!ready || busy}
         className="select"
         name="abogadoId"
         defaultValue={cliente.abogadoId || ""}
@@ -131,7 +136,7 @@ export function ClienteEditForm({
       </label>
       <label className="block space-y-2 text-sm font-medium sm:col-span-2">
         <span>Notas</span>
-        <textarea disabled={busy}
+        <textarea disabled={!ready || busy}
         className="textarea"
         name="notas"
         rows={2}
@@ -140,10 +145,10 @@ export function ClienteEditForm({
       />
       </label>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-        <button className="btn btn-secondary" type="submit" disabled={busy}>
+        <button className="btn btn-secondary" type="submit" disabled={!ready || busy}>
           {busy ? "Guardando…" : "Guardar datos"}
         </button>
-        <button className="btn btn-secondary" type="submit" data-offline="true" disabled={busy}>Trabajar sin conexión</button>
+        <button className="btn btn-secondary" type="submit" data-offline="true" disabled={!ready || busy}>Trabajar sin conexión</button>
         {msg && <span className="text-sm text-[var(--muted)]">{msg}</span>}
       </div>
     </form>

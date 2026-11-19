@@ -6,10 +6,14 @@ El espacio local permite editar escritos y manuscritos académicos preparados, c
 
 Con conexión, cree el espacio con una clave local de al menos 12 caracteres. Es independiente de su contraseña de cuenta y no se envía al Host. Si ya tenía escritos preparados, use la misma clave: sus copias y sus peticiones pendientes se conservan.
 
+Crear o desbloquear espera a que termine de abrirse el almacenamiento del navegador, incluso si éste restablece un botón antes de tiempo. Si abandona la página mientras espera, esa acción no abre después el espacio: vuelva a introducir la clave al regresar. Bloquear o salir limpia también el campo de la clave. Las copias cifradas conservan su formato y sus peticiones pendientes.
+
+Si aparece **No se pudo preparar la apertura sin conexión**, el navegador no pudo preparar la caché de navegación. Mantenga la página abierta mientras edita. Este aviso se distingue de la denegación del almacenamiento local: en ese caso, los botones de crear y desbloquear permanecen bloqueados y no se afirma que el espacio está abierto.
+
 - **Escritos:** abra un escrito y pulse **Trabajar sin conexión**. Se guardan primero los cambios del editor. En el espacio local, pulse **Preparar este escrito**.
 - **Manuscritos:** guarde los cambios del editor académico y pulse **Trabajar sin conexión**; después, **Preparar manuscrito**. Sólo se copia el texto de un resultado editable existente.
 - **Biblioteca:** desde el lector, pulse **Mis notas y marcador sin conexión** y **Preparar nota de lectura**. Cada usuario conserva sus propias notas aunque el libro pertenezca a una colección compartida.
-- **Clientes:** abra la ficha del cliente y pulse **Trabajar sin conexión**. Si modificó el formulario, se guardará antes de abrir el espacio. Pulse **Preparar cliente** para conservar una copia cifrada.
+- **Clientes:** espere a que se habiliten los controles de la ficha y pulse **Trabajar sin conexión**. Si modificó el formulario, se guardará antes de abrir el espacio. Pulse **Preparar cliente** para conservar una copia cifrada.
 - **Causas:** en la ficha, pulse **Trabajar sin conexión** y después **Preparar causa**. Se comprueba que puede modificarla.
 - **Plazos:** en la lista de Plazos, pulse **Sin conexión** y después **Preparar plazo**.
 - **Notas:** en la sección Notas de una causa, pulse **Sin conexión** y después **Preparar nota**.

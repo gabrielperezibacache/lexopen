@@ -51,6 +51,22 @@ async function fixture(page: Page) {
     },
   };
 }
+async function pauseVaultOnReload(page: Page) {
+  await page.addInitScript(() => {
+    const open = IDBFactory.prototype.open;
+    const pending: (() => void)[] = [];
+    Object.assign(window, { __releaseVaultOpen: () => pending.splice(0).forEach(fn => fn()), __pendingVaultOpen: () => pending.length });
+    IDBFactory.prototype.open = function (...args: Parameters<IDBFactory["open"]>) {
+      const request = open.apply(this, args);
+      Object.defineProperty(request, "onsuccess", { set(handler) {
+        request.addEventListener("success", event => pending.push(() => handler.call(request, event)));
+      } });
+      return request;
+    };
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __pendingVaultOpen(): number }).__pendingVaultOpen())).toBeGreaterThan(0);
+}
 async function unlock(page: Page) { await page.getByLabel("Clave del espacio local").fill(key); await page.getByRole("button", { name: "Desbloquear", exact: true }).click(); await expect(page.getByRole("navigation", { name: "Áreas del espacio local" })).toBeVisible(); }
 async function prepare(page: Page, url: string, kind: Kind) {
   await page.goto(url); await page.getByLabel("Clave del espacio local").fill(key); page.once("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Crear espacio cifrado", exact: true }).click();
@@ -156,6 +172,93 @@ test("el formulario de Clientes conserva sus datos ante una sincronización post
     await page.getByRole("button", { name: "Guardar datos", exact: true }).click(); await expect(page.getByText(/El cliente cambió en otra sesión/)).toBeVisible(); await expect(page.getByRole("textbox", { name: "Notas", exact: true })).toHaveValue("Edición del formulario abierta antes del cambio");
     expect((await prisma.cliente.findUniqueOrThrow({ where: { id: f.client.id } })).notas).toBe("Cambio sincronizado desde otra sesión");
   } finally { await f.cleanup(); }
+});
+
+test("Clientes espera a estar listo antes de admitir edición y conserva el texto tras hidratar", async ({ page, browser }) => {
+  const f = await fixture(page);
+  const context = await browser.newContext({
+    baseURL: new URL(page.url()).origin,
+    storageState: await page.context().storageState(),
+    serviceWorkers: "block",
+  });
+  const slow = await context.newPage();
+  let release!: () => void;
+  const scripts = new Promise<void>(resolve => { release = resolve; });
+  await slow.route("**/_next/static/**/*.js", async route => { await scripts; await route.continue(); });
+  try {
+    await slow.goto(`/clientes/${f.client.id}`, { waitUntil: "commit" });
+    const notes = slow.getByRole("textbox", { name: "Notas", exact: true });
+    await expect(notes).toHaveValue("Nota original");
+    await expect(notes).toBeDisabled();
+    await expect(slow.getByRole("button", { name: "Guardar datos", exact: true })).toBeDisabled();
+    release();
+    await expect(notes).toBeEnabled();
+    await notes.fill("Edición exacta después de activar el formulario");
+    await slow.getByRole("button", { name: "Guardar datos", exact: true }).click();
+    await expect(slow.getByText("Guardado", { exact: true })).toBeVisible();
+    await expect(notes).toHaveValue("Edición exacta después de activar el formulario");
+    expect((await prisma.cliente.findUniqueOrThrow({ where: { id: f.client.id } })).notas).toBe("Edición exacta después de activar el formulario");
+  } finally { release(); await slow.unrouteAll({ behavior: "wait" }); await context.close(); await f.cleanup(); }
+});
+
+test("desbloquear espera IndexedDB aunque el navegador restaure un botón habilitado", async ({ page }) => {
+  const f = await fixture(page);
+  try {
+    await prepare(page, f.url("task"), "task");
+    await pauseVaultOnReload(page);
+    await page.getByLabel("Clave del espacio local").fill(key);
+    await page.locator("#unlock").evaluate((button: HTMLButtonElement) => { button.disabled = false; });
+    await page.getByRole("button", { name: "Desbloquear", exact: true }).click();
+    await expect(page.locator("#workspace")).toBeHidden();
+    await expect(page.locator("#message")).not.toHaveAttribute("data-error", "true");
+    await page.evaluate(() => (window as unknown as { __releaseVaultOpen(): void }).__releaseVaultOpen());
+    await expect(page.getByRole("navigation", { name: "Áreas del espacio local" })).toBeVisible();
+    await expect(page.getByLabel("Título de la tarea", { exact: true })).toHaveValue(f.task.title);
+  } finally { await f.cleanup(); }
+});
+
+test("salir durante la apertura local cancela el desbloqueo pendiente y borra la clave visible", async ({ page }) => {
+  const f = await fixture(page);
+  try {
+    await prepare(page, f.url("task"), "task");
+    await pauseVaultOnReload(page);
+    await page.getByLabel("Clave del espacio local").fill(key);
+    await page.locator("#unlock").evaluate((button: HTMLButtonElement) => { button.disabled = false; });
+    await page.getByRole("button", { name: "Desbloquear", exact: true }).click();
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true })));
+    await expect(page.getByLabel("Clave del espacio local")).toHaveValue("");
+    await page.evaluate(() => (window as unknown as { __releaseVaultOpen(): void }).__releaseVaultOpen());
+    await expect(page.locator("#unlock")).toBeEnabled();
+    await expect(page.locator("#workspace")).toBeHidden();
+    await expect(page.locator("#message")).not.toHaveAttribute("data-error", "true");
+    await unlock(page);
+    await expect(page.getByLabel("Título de la tarea", { exact: true })).toHaveValue(f.task.title);
+  } finally { await f.cleanup(); }
+});
+
+test("un fallo al preparar la apertura sin conexión conserva disponible el almacenamiento local", async ({ page }) => {
+  await page.addInitScript(() => {
+    navigator.serviceWorker.register = async () => { throw new DOMException("Fictitious registration denial", "SecurityError"); };
+  });
+  await page.goto("/offline.html");
+  await expect(page.locator("#message")).toContainText("No se pudo preparar la apertura sin conexión");
+  await expect(page.getByRole("button", { name: "Crear espacio cifrado", exact: true })).toBeEnabled();
+  await expect(page.locator("#workspace")).toBeHidden();
+});
+
+test("un almacenamiento denegado no permite abrir el espacio aunque se reactive el botón", async ({ page }) => {
+  await page.addInitScript(() => {
+    IDBFactory.prototype.open = () => { throw new DOMException("Fictitious storage denial", "SecurityError"); };
+  });
+  await page.goto("/offline.html");
+  await expect(page.locator("#message")).toHaveAttribute("data-error", "true");
+  await expect(page.locator("#unlock")).toBeDisabled();
+  await page.getByLabel("Clave del espacio local").fill(key);
+  await page.locator("#unlock").evaluate((button: HTMLButtonElement) => { button.disabled = false; });
+  await page.getByRole("button", { name: "Desbloquear", exact: true }).click();
+  await expect(page.locator("#unlock")).toBeDisabled();
+  await expect(page.locator("#workspace")).toBeHidden();
+  await expect(page.locator("#message")).toHaveAttribute("data-error", "true");
 });
 
 test("Clientes guarda la edición antes de abrir la copia sin conexión", async ({ page }) => {
