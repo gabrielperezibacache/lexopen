@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import { randomInt } from "node:crypto";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
+
+// Both portal responses are supplied by the browser fixture.
+test.use({ serviceWorkers: "block" });
 test("búsqueda PJUD: páginas remotas, invalidación y preparación explícita", async ({ page }) => {
   test.setTimeout(180_000);
   const queries: unknown[] = [];
