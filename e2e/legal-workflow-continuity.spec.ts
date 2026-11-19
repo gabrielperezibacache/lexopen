@@ -23,9 +23,11 @@ const db = new PrismaClient({
 });
 const tag = randomUUID(),
   email = `flow-${tag}@example.test`,
-  reviewerEmail = `review-${tag}@example.test`;
+  reviewerEmail = `review-${tag}@example.test`,
+  outsiderEmail = `outsider-${tag}@example.test`;
 let ownerId = "",
   reviewerId = "",
+  outsiderId = "",
   clientId = "",
   causeId = "";
 async function json<T>(
@@ -60,6 +62,16 @@ test.beforeAll(async () => {
       },
     })
   ).id;
+  outsiderId = (
+    await db.user.create({
+      data: {
+        email: outsiderEmail,
+        name: "Profesional ajeno al equipo ficticio",
+        role: "abogado",
+        password: template.password,
+      },
+    })
+  ).id;
 });
 test.afterAll(async () => {
   try {
@@ -74,16 +86,16 @@ test.afterAll(async () => {
     }
     if (clientId) await db.cliente.deleteMany({ where: { id: clientId } });
     await db.auditEvent.deleteMany({
-      where: { actorId: { in: [ownerId, reviewerId].filter(Boolean) } },
+      where: { actorId: { in: [ownerId, reviewerId, outsiderId].filter(Boolean) } },
     });
     await db.commandExecution.deleteMany({
-      where: { ownerId: { in: [ownerId, reviewerId].filter(Boolean) } },
+      where: { ownerId: { in: [ownerId, reviewerId, outsiderId].filter(Boolean) } },
     });
     await db.notification.deleteMany({
-      where: { userId: { in: [ownerId, reviewerId].filter(Boolean) } },
+      where: { userId: { in: [ownerId, reviewerId, outsiderId].filter(Boolean) } },
     });
     await db.user.deleteMany({
-      where: { id: { in: [ownerId, reviewerId].filter(Boolean) } },
+      where: { id: { in: [ownerId, reviewerId, outsiderId].filter(Boolean) } },
     });
   } finally {
     await db.$disconnect();
@@ -120,6 +132,10 @@ test("cliente a escrito aprobado: respuesta perdida, documentos, tarea, plazo, a
   await expect(page.getByLabel("Cliente", { exact: true })).toHaveValue(
     clientId,
   );
+  const visibility = page.getByRole("combobox", { name: "Quién puede ver la causa", exact: true });
+  await expect(visibility).toHaveValue("estudio");
+  await visibility.selectOption("equipo");
+  await expect(page.getByText(/tú conservarás acceso desde el alta/)).toBeVisible();
   await page
     .getByLabel("Título", { exact: true })
     .fill(`Causa sin referencia ${tag}`);
@@ -144,6 +160,7 @@ test("cliente a escrito aprobado: respuesta perdida, documentos, tarea, plazo, a
   await page.getByRole("button", { name: "Crear causa", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByLabel("Título", { exact: true })).toBeDisabled();
+  await expect(visibility).toBeDisabled();
   await page
     .getByRole("button", { name: "Reintentar creación", exact: true })
     .click();
@@ -153,7 +170,21 @@ test("cliente a escrito aprobado: respuesta perdida, documentos, tarea, plazo, a
   expect(keys[0]).toBeTruthy();
   expect(keys[1]).toBe(keys[0]);
   expect(bodies[1]).toBe(bodies[0]);
+  expect(JSON.parse(bodies[0]).acceso).toBe("equipo");
   expect(await db.causa.count({ where: { clienteId: clientId } })).toBe(1);
+  expect((await db.causa.findUniqueOrThrow({ where: { id: causeId } })).acceso).toBe("equipo");
+  expect(await db.documento.count({ where: { causaId: causeId } })).toBe(0);
+  const outsiderContext = await browser.newContext({ baseURL: info.project.use.baseURL, locale: "es-CL" });
+  try {
+    const outsider = await outsiderContext.newPage();
+    await loginAs(outsider, outsiderEmail);
+    const hidden = await outsider.request.get(`/api/causas/${causeId}`);
+    expect(hidden.status()).toBe(404);
+    const listed = await json<{ id: string }[]>(await outsider.request.get(`/api/causas?q=${tag}`));
+    expect(listed.map(cause => cause.id)).not.toContain(causeId);
+  } finally {
+    await outsiderContext.close();
+  }
   await page.unroute((url) => url.pathname === "/api/causas");
   await page.goto(`/causas/${causeId}/expediente`, {
     waitUntil: "networkidle",

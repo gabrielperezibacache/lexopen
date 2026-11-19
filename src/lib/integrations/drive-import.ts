@@ -69,7 +69,11 @@ function transport(config: Awaited<ReturnType<typeof requireDriveSession>>, opti
         await options.assertActive?.(options.client || prisma);
         const response = await (options.fetch || fetch)(`${API}${path}`, { headers: { Authorization: `Bearer ${config.accessToken}` }, redirect: "error", signal: controller.signal, cache: "no-store" });
         if (!response.ok) { await response.body?.cancel(); throw fail(response.status === 401 ? "La conexión Drive venció; vuelva a conectar Google" : response.status === 403 ? "Google no permite leer o descargar este archivo con la cuenta conectada" : response.status === 404 ? "Archivo o carpeta de Drive no disponible" : "Drive no pudo completar la lectura; vuelva a intentar", response.status === 401 ? 401 : response.status === 403 ? 403 : response.status === 404 ? 404 : 502, response.status === 400 && path.includes("pageToken=") ? "drive_invalid_cursor" : "drive_api_error"); }
-        return await readBounded(response, max);
+        const bytes = await readBounded(response, max);
+        // A grant or case binding can be revoked while the response is streaming.
+        // Do not expose its metadata or persist its body using the old authority.
+        await options.assertActive?.(options.client || prisma);
+        return bytes;
       } catch (error) {
         if (controller.signal.aborted) throw fail("La lectura de Drive agotó su tiempo; vuelva a intentar", 504, "drive_timeout");
         if (error && typeof error === "object" && "status" in error) throw error;

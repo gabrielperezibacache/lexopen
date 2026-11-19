@@ -5,7 +5,7 @@ const id = z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
 const version = z.string().regex(/^[a-f0-9]{64}$/);
 const validCivil = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
 const date = z.string().refine(s => validCivil(s.slice(0, 10)) && (s.length === 10 || /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(s) && !Number.isNaN(Date.parse(s))), "Indique una fecha válida");
-export const legalCauseFields = causaCreateSchema.omit({ clienteId: true, abogadoId: true, conflictOverride: true, conflictNotes: true }).extend({
+export const legalCauseFields = causaCreateSchema.omit({ clienteId: true, abogadoId: true, acceso: true, conflictOverride: true, conflictNotes: true }).extend({
   titulo: z.string().trim().min(3).max(500), tribunal: z.string().trim().min(2).max(300), materia: z.string().trim().min(2).max(120),
   partes: causaCreateSchema.shape.partes.unwrap().max(50), fechaNotificacion: date.nullable(),
 }).strict();
