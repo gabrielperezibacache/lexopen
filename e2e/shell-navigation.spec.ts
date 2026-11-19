@@ -72,6 +72,40 @@ test("móvil conserva las siete áreas y Configuración para profesionales", asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
 
+test("los apartados se abren directamente desde el menú móvil y la barra contraída", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await loginAs(page, "abogado@estudio.cl");
+  await page.goto("/inicio");
+  await page.getByRole("button", { name: "Abrir menú", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Menú", exact: true });
+  const reveal = drawer.getByRole("button", { name: "Apartados de Agenda" });
+  await reveal.click();
+  await expect(reveal).toHaveAttribute("aria-expanded", "true");
+  await expect(page).toHaveURL(/\/inicio$/);
+  const deadlines = drawer.getByRole("link", { name: "Plazos", exact: true });
+  await deadlines.focus();
+  await deadlines.press("Enter");
+  await expect(page).toHaveURL(/\/plazos$/, { timeout: 30_000 });
+  await expect(drawer).not.toBeVisible();
+
+  await page.setViewportSize({ width: 1100, height: 800 });
+  const sidebar = page.getByTestId("desktop-sidebar");
+  await sidebar.getByRole("button", { name: "Contraer menú" }).click();
+  const trigger = sidebar.getByRole("button", { name: "Apartados de Agenda" });
+  await trigger.focus();
+  await trigger.press("Enter");
+  const panel = sidebar.getByRole("navigation", { name: "Agenda", exact: true });
+  await expect(panel.getByRole("link", { name: "Calendario" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await panel.getByRole("link", { name: "Tareas", exact: true }).click();
+  await expect(page).toHaveURL(/\/tareas$/, { timeout: 30_000 });
+  await expect(panel).toBeHidden();
+  await expect(sidebar.getByRole("button", { name: "Expandir menú" })).toBeVisible();
+});
+
 test("portal y paleta de cliente no ofrecen destinos internos", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await loginAs(page, "cliente@andes.cl");

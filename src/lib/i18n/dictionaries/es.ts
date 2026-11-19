@@ -181,6 +181,7 @@ export const es = {
   nav: {
     areas: { jornada: "Inicio", causas: "Causas", agenda: "Agenda", biblioteca: "Biblioteca", clientes: "Clientes", comunicaciones: "Comunicaciones", estudio: "Estudio" },
     secondary: { management: "Gestión", collaboration: "Equipo y colaboración", administration: "Administración" },
+    areaSections: "Apartados de {area}",
     mainNavigation: "Navegación principal",
     globalTools: "Herramientas globales",
     shortcuts: "Accesos de trabajo",
@@ -1020,6 +1021,13 @@ export const es = {
       searching: "Buscando…",
       resultsFor: "Resultados para «{q}»",
       empty: "Sin resultados para esta búsqueda.",
+      error: "No se pudo completar la búsqueda.",
+      start: "Empiece a buscar",
+      hint: "Pruebe con un RIT, cliente, palabra de minuta o término de jurisprudencia.",
+      caseActions: "Trámites",
+      spaceFiles: "Archivos de espacios",
+      spaceLabel: "Espacio",
+      spacesCount: "Espacios",
     },
     integraciones: {
       eyebrow: "Conectores",

@@ -183,6 +183,7 @@ export const en: Dictionary = {
   nav: {
     areas: { jornada: "Home", causas: "Matters", agenda: "Schedule", biblioteca: "Library", clientes: "Clients", comunicaciones: "Communications", estudio: "Firm" },
     secondary: { management: "Management", collaboration: "Team and collaboration", administration: "Administration" },
+    areaSections: "{area} sections",
     mainNavigation: "Main navigation",
     globalTools: "Global tools",
     shortcuts: "Work shortcuts",
@@ -1017,6 +1018,13 @@ export const en: Dictionary = {
       searching: "Searching…",
       resultsFor: "Results for “{q}”",
       empty: "No results for this search.",
+      error: "The search could not be completed.",
+      start: "Start a search",
+      hint: "Search by case number, client, meeting note or case law term.",
+      caseActions: "Case actions",
+      spaceFiles: "Workspace files",
+      spaceLabel: "Workspace",
+      spacesCount: "Workspaces",
     },
     integraciones: {
       eyebrow: "Connectors",

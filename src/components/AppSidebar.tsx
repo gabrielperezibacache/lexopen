@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Inbox, LayoutDashboard, Home, Briefcase, BookOpen, Files, CalendarClock, Puzzle,
   Bot, DoorOpen, Building2, ListTodo, CalendarDays, Search, Users, MessageSquare,
   GitBranch, Bell, CircleDollarSign, ClipboardPen, Shield, Settings, ContactRound,
-  AudioLines, X, PanelLeftClose, PanelLeftOpen, type LucideIcon,
+  AudioLines, ChevronDown, X, PanelLeftClose, PanelLeftOpen, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { FolioSymbol } from "@/components/ui/FolioSymbol";
@@ -15,7 +15,7 @@ import { UserSwitcher, type SessionUserSummary } from "@/components/auth/UserSwi
 import { useI18n } from "@/components/i18n/I18nProvider";
 import {
   activeNavigationArea, activeNavigationEntry, secondaryNavigation,
-  type NavigationEntry, type NavigationIcon, type NavigationModel,
+  type NavigationAreaId, type NavigationEntry, type NavigationIcon, type NavigationModel,
 } from "@/lib/navigation/catalog";
 
 const ICONS: Record<NavigationIcon, LucideIcon> = {
@@ -41,19 +41,28 @@ function SidebarChrome({ navigation, user, onNavigate, onClose, showClose, colla
   const activeArea = activeNavigationArea(navigation, pathname);
   const activeEntry = activeNavigationEntry(navigation, pathname);
   const secondary = secondaryNavigation(navigation, pathname);
+  const [disclosure, setDisclosure] = useState<{ path: string; area: NavigationAreaId | null } | null>(null);
+  const expandedArea = disclosure?.path === pathname ? disclosure.area : activeArea?.id;
   const settingsShortcut = navigation.utilities.find(entry => entry.id === "configuracion");
 
-  function entryLink(entry: NavigationEntry, compact = false) {
+  function entryLink(entry: NavigationEntry, compact = false, select = onNavigate) {
     const Icon = ICONS[entry.icon];
     const label = t(entry.labelKey);
     return <Link key={entry.id} href={entry.href}
       className={cn("nav-link shell-secondary-link", compact && "shell-nav-compact", activeEntry?.id === entry.id && "active")}
       aria-current={activeEntry?.id === entry.id ? "page" : undefined}
       aria-label={label}
-      title={compact ? label : undefined} onClick={onNavigate}>
+      title={compact ? label : undefined} onClick={select}>
       <Icon size={16} aria-hidden="true" className="shrink-0" />
       <span className={cn("min-w-0 flex-1", compact && "sr-only")}>{label}</span>
     </Link>;
+  }
+
+  function secondaryLinks(entries: NavigationEntry[], select = onNavigate) {
+    return entries.map((entry, index) => <div key={entry.id}>
+      {entry.groupKey && entry.groupKey !== entries[index - 1]?.groupKey && <p className="shell-nav-group">{t(entry.groupKey)}</p>}
+      {entryLink(entry, false, select)}
+    </div>);
   }
 
   return <>
@@ -75,21 +84,51 @@ function SidebarChrome({ navigation, user, onNavigate, onClose, showClose, colla
         {navigation.mode === "portal" ? navigation.entries.map(entry => entryLink(entry, collapsed)) : navigation.areas.map(area => {
           const Icon = ICONS[area.icon];
           const label = t(area.labelKey);
-          return <Link key={area.id} href={area.href} data-area={area.id}
-            className={cn("nav-link shell-area-link", collapsed && "shell-nav-compact", activeArea?.id === area.id && "active")}
-            aria-current={activeArea?.id === area.id ? "location" : undefined}
-            aria-label={label}
-            title={collapsed ? label : undefined} onClick={onNavigate}>
-            <Icon size={18} aria-hidden="true" className="shrink-0" />
-            <span className={cn("min-w-0 flex-1", collapsed && "sr-only")}>{label}</span>
-          </Link>;
+          const entries = secondaryNavigation(navigation, area.href);
+          const current = activeArea?.id === area.id;
+          const sectionLabel = t("nav.areaSections").replace("{area}", label);
+          if (collapsed && entries.length > 0) {
+            const panelId = `rail-sections-${area.id}`;
+            const home = navigation.entries.find(entry => entry.href === area.href);
+            const dismiss = () => document.getElementById(panelId)?.hidePopover();
+            return <div key={area.id}>
+              <button type="button" popoverTarget={panelId} className={cn("nav-link shell-area-link shell-nav-compact w-full", current && "active")}
+                aria-current={current ? "location" : undefined} aria-label={sectionLabel} title={sectionLabel}>
+                <Icon size={18} aria-hidden="true" />
+              </button>
+              <nav id={panelId} popover="auto" aria-label={label} className="shell-area-popover"
+                onToggle={event => { if (event.newState === "open") event.currentTarget.querySelector("a")?.focus(); }}>
+                <p className="shell-area-heading">{label}</p>
+                {home && entryLink(home, false, dismiss)}
+                {secondaryLinks(entries, dismiss)}
+              </nav>
+            </div>;
+          }
+          const panelId = `mobile-sections-${area.id}`;
+          const expanded = expandedArea === area.id;
+          return <div key={area.id}>
+            <div className="flex items-center">
+              <Link href={area.href} data-area={area.id}
+                className={cn("nav-link shell-area-link min-w-0 flex-1", collapsed && "shell-nav-compact", current && "active")}
+                aria-current={current ? "location" : undefined} aria-label={label}
+                title={collapsed ? label : undefined} onClick={onNavigate}>
+                <Icon size={18} aria-hidden="true" className="shrink-0" />
+                <span className={cn("min-w-0 flex-1", collapsed && "sr-only")}>{label}</span>
+              </Link>
+              {showClose && entries.length > 0 &&
+                <button type="button" className="shell-area-toggle" aria-label={sectionLabel} aria-controls={panelId} aria-expanded={expanded}
+                  onClick={() => setDisclosure({ path: pathname, area: expanded ? null : area.id })}>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </button>}
+            </div>
+            {showClose && entries.length > 0 && <nav id={panelId} aria-label={label} hidden={!expanded} className="shell-mobile-sections">
+              {expanded && secondaryLinks(entries)}
+            </nav>}
+          </div>;
         })}
       </nav>
-      {secondary.length > 0 && !collapsed && <nav aria-label={t(activeArea!.labelKey)} data-testid="secondary-navigation" className="shell-secondary-nav">
-        {secondary.map((entry, index) => <div key={entry.id}>
-          {entry.groupKey && entry.groupKey !== secondary[index - 1]?.groupKey && <p className="shell-nav-group">{t(entry.groupKey)}</p>}
-          {entryLink(entry)}
-        </div>)}
+      {secondary.length > 0 && !showClose && !collapsed && <nav aria-label={t(activeArea!.labelKey)} data-testid="secondary-navigation" className="shell-secondary-nav">
+        {secondaryLinks(secondary)}
       </nav>}
 
     </div>
