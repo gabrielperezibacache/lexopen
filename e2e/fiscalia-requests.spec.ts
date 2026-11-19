@@ -9,11 +9,11 @@ import { networkGateway } from "./fixtures/network-gateway";
 
 type Gateway = Awaited<ReturnType<typeof networkGateway>>;
 const networkTest = test.extend<{ network: Gateway }>({
-  network: async ({}, use, info) => {
+  network: async ({}, provide, info) => {
     const network = await networkGateway(String(info.project.use.baseURL));
-    try { await use(network); } finally { await network.close(); }
+    try { await provide(network); } finally { await network.close(); }
   },
-  baseURL: async ({ network }, use) => use(network.origin),
+  baseURL: async ({ network }, provide) => provide(network.origin),
 });
 function expectSameRetry(network: Gateway, path: string) {
   const attempts = network.requests.filter(request => request.method === "POST" && request.path === path);

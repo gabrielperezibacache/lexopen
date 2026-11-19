@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { apiRequest, loginAs } from "./helpers";
 import { fetchPublicLegalSource } from "../src/lib/research/sources";
 import { importLegalSource, type ResearchResult } from "../src/lib/research/service";
 
@@ -42,7 +42,7 @@ test("biblioteca: guardar cita, fijar versión, consultar y restaurar alcance, r
   await library.getByRole("button", { name: "Crear colección", exact: true }).click();
   const create = await createPending; expect(create.status(), await create.text()).toBe(201); collectionId = (await create.json()).collection.id;
   await expect(library.locator("#library-collection")).toHaveValue(collectionId);
-  const imported = await page.request.post("/api/research/sources", { data: { mode: "manual", url: sourceUrl, title: sourceTitle, text: sourceText } }); expect(imported.status(), await imported.text()).toBe(201);
+  const imported = await apiRequest(page).post("/api/research/sources", { data: { mode: "manual", url: sourceUrl, title: sourceTitle, text: sourceText } }); expect(imported.status(), await imported.text()).toBe(201);
   const original = await imported.json(); sourceId = original.sourceId;
   await page.goto(original.href);
   await expect(page.getByRole("heading", { name: sourceTitle, exact: true })).toBeVisible();
@@ -57,7 +57,7 @@ test("biblioteca: guardar cita, fijar versión, consultar y restaurar alcance, r
   await page.getByRole("button", { name: "Conservar esta versión", exact: true }).click();
   expect((await pinPending).status()).toBe(201);
   await expect(page.getByText("Versión y cita guardadas en su biblioteca.", { exact: true })).toBeVisible();
-  const newer = await page.request.post("/api/research/sources", { data: { mode: "manual", url: sourceUrl, title: sourceTitle, text: newerText } }); expect(newer.status(), await newer.text()).toBe(201);
+  const newer = await apiRequest(page).post("/api/research/sources", { data: { mode: "manual", url: sourceUrl, title: sourceTitle, text: newerText } }); expect(newer.status(), await newer.text()).toBe(201);
   expect((await newer.json()).id).not.toBe(original.id);
   await page.goto("/jurisprudencia#biblioteca");
   await library.locator("#library-collection").selectOption(collectionId);
@@ -99,7 +99,7 @@ test("biblioteca: guardar cita, fijar versión, consultar y restaurar alcance, r
   finally { await portalContext.close(); }
 
   const collection = await db.knowledgeCollection.findUniqueOrThrow({ where: { id: collectionId } });
-  const pinned = await page.request.post(`/api/knowledge/collections/${collectionId}/items`, { data: {
+  const pinned = await apiRequest(page).post(`/api/knowledge/collections/${collectionId}/items`, { data: {
     expectedRevision: collection.revision, citation: { kind: "legal", fragmentId: result.results[0].fragmentId, quote: sourceText },
   } });
   expect(pinned.status(), await pinned.text()).toBe(201);
