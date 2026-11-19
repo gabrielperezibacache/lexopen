@@ -5,7 +5,23 @@ import { hash } from "bcryptjs";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs, apiRequest } from "./helpers";
 import { addCivilDays, santiagoDateKey } from "../src/lib/chile-time";
+import { networkGateway } from "./fixtures/network-gateway";
 
+type Gateway = Awaited<ReturnType<typeof networkGateway>>;
+const networkTest = test.extend<{ network: Gateway }>({
+  network: async ({}, use, info) => {
+    const network = await networkGateway(String(info.project.use.baseURL));
+    try { await use(network); } finally { await network.close(); }
+  },
+  baseURL: async ({ network }, use) => use(network.origin),
+});
+function expectSameRetry(network: Gateway, path: string) {
+  const attempts = network.requests.filter(request => request.method === "POST" && request.path === path);
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0].idempotencyKey).toBeTruthy();
+  expect(attempts[1].idempotencyKey).toBe(attempts[0].idempotencyKey);
+  expect(attempts[1].body).toBe(attempts[0].body);
+}
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 test.afterAll(() => db.$disconnect());
 async function fixture(page: Page) {
@@ -18,9 +34,9 @@ async function fixture(page: Page) {
   } };
 }
 
-test("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva su seguimiento", async ({ page }, info) => {
+networkTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva su seguimiento", async ({ page, network }, info) => {
   test.setTimeout(90_000);
-  const f = await fixture(page), keys: string[] = [];
+  const f = await fixture(page), path = "/api/fiscalia/solicitudes";
   try {
     await page.goto(`/mi-fiscalia?causaId=${f.cause.id}`);
     const portal = page.getByRole("link", { name: "Abrir Mi Fiscalía con ClaveÚnica", exact: true });
@@ -31,18 +47,13 @@ test("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva
     await dialog.getByLabel("Asunto", { exact: true }).fill(f.title);
     await dialog.getByLabel("Tipo", { exact: true }).selectOption("copia");
     await dialog.getByLabel("Contenido", { exact: true }).fill("Solicito copia de los antecedentes para revisar la causa.");
-    await page.route("**/api/fiscalia/solicitudes", async route => {
-      if (route.request().method() !== "POST") return route.continue();
-      keys.push(route.request().headers()["idempotency-key"]);
-      if (keys.length > 1) return route.continue();
-      const response = await route.fetch(); expect(response.status()).toBe(201); await route.abort("failed");
-    });
+    network.dropNextPost(path);
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
     await expect(dialog.getByRole("alert")).toContainText("sin duplicar");
     await expect(dialog.getByLabel("Asunto", { exact: true })).toBeDisabled();
     await dialog.getByRole("button", { name: "Reintentar guardado", exact: true }).click();
     await expect(page.getByRole("heading", { name: f.title, exact: true })).toBeVisible();
-    expect(keys[0]).toBe(keys[1]); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
+    expectSameRetry(network, path); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
     await page.getByRole("button", { name: `Editar ${f.title}`, exact: true }).click();
     await dialog.getByLabel("Estado", { exact: true }).selectOption("ready");
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
@@ -135,7 +146,7 @@ test("Mi Fiscalía permite descartar un borrador sin fingir una presentación", 
   } finally { await f.cleanup(); }
 });
 
-test("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page }) => {
+networkTest("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page, network }) => {
   const f = await fixture(page);
   const date = addCivilDays(santiagoDateKey(new Date()), -1);
   const row = await db.fiscaliaRequest.create({ data: { causaId: f.cause.id, creatorId: f.owner.id, title: f.title, kind: "copia", body: "Solicitud de prueba presentada", status: "submitted", folio: "Orig-1", submittedAt: new Date(date) } });
@@ -148,20 +159,15 @@ test("ficha de Fiscalía conserva la rectificación y descarga la versión adjun
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Folio corregido", { exact: true }).fill("Folio-2");
     await dialog.getByLabel("Motivo de rectificación", { exact: true }).fill("Revisión del folio oficial.");
-    const keys: string[] = [];
-    await page.route(`**/api/fiscalia/solicitudes/${row.id}`, async route => {
-      if (route.request().method() !== "POST") return route.continue();
-      keys.push(route.request().headers()["idempotency-key"]);
-      if (keys.length > 1) return route.continue();
-      expect((await route.fetch()).status()).toBe(200);
-      return route.abort("failed");
-    });
+    const path = `/api/fiscalia/solicitudes/${row.id}`;
+    network.dropNextPost(path);
     await dialog.getByRole("button", { name: "Guardar rectificación" }).click();
     await dialog.getByRole("button", { name: "Comprobar guardado" }).click();
     const history = page.getByRole("region", { name: "Historial de la solicitud" });
     await expect(history).toContainText("Anterior: Orig-1");
     await expect(history).toContainText("Corregido: Folio-2");
-    expect(keys[0]).toBe(keys[1]);
+    expectSameRetry(network, path);
+    expect(await db.fiscaliaRequestEvent.count({ where: { requestId: row.id, correctionReason: "Revisión del folio oficial." } })).toBe(1);
     await page.getByRole("button", { name: "Vincular respaldo" }).click();
     await dialog.getByRole("button", { name: "Buscar", exact: true }).click();
     await dialog.getByLabel("Documento del expediente", { exact: true }).selectOption(doc.id);

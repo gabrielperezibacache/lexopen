@@ -2,14 +2,17 @@ import { createServer, request as forward } from "node:http";
 /** Loopback-only fault injector. Fail real HTTP streams, including service worker traffic. */
 export async function networkGateway(target: string) {
   let offline = false, dropPath = "", dropMethod = "PATCH";
-  const requests: Array<{ method: string; path: string; body: string }> = [];
+  const requests: Array<{ method: string; path: string; body: string; idempotencyKey?: string }> = [];
   const patches: Array<{ path: string; body: string }> = [];
   const server = createServer(async (req, res) => {
     if (offline) { res.destroy(); return; }
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const body = Buffer.concat(chunks), path = new URL(req.url || "/", target).pathname;
-    if (req.method !== "GET") requests.push({ method: req.method || "", path, body: body.toString() });
+    if (req.method !== "GET") {
+      const key = req.headers["idempotency-key"];
+      requests.push({ method: req.method || "", path, body: body.toString(), ...(typeof key === "string" ? { idempotencyKey: key } : {}) });
+    }
     if (req.method === "PATCH") patches.push({ path, body: body.toString() });
     const drop = req.method === dropMethod && path === dropPath;
     if (drop) dropPath = "";
