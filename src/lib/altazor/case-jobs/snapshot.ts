@@ -1,3 +1,4 @@
+import { caseJudicialStatus } from "@/lib/causas/judicial-status";
 import { santiagoDateKey } from "@/lib/chile-time";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -35,6 +36,7 @@ export async function caseSnapshot(
         procedimiento: true,
         ruc: true,
         clienteId: true,
+        pjudLastSyncAt: true, pjudLastSyncStatus: true, pjudMonitoreoActivo: true, pjudCuadernosCoverage: true,
       },
     }),
     db.documento.findMany({
@@ -86,9 +88,11 @@ export async function caseSnapshot(
       orderBy: { id: "asc" },
     }),
   ]);
+  const { pjudLastSyncAt, pjudLastSyncStatus, pjudMonitoreoActivo, pjudCuadernosCoverage, ...causeRecord } = cause;
+  const judicialSync = caseJudicialStatus({ pjudLastSyncAt, pjudLastSyncStatus, pjudMonitoreoActivo, pjudCuadernosCoverage });
   return JSON.parse(
     JSON.stringify({
-      cause,
+      cause: judicialSync.notice ? { ...causeRecord, judicialSync } : causeRecord,
       documents,
       deadlines: deadlines.map((d) => ({
         ...d,

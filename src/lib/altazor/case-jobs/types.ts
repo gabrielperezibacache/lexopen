@@ -72,6 +72,7 @@ export type CaseSnapshot = {
     procedimiento: string | null;
     ruc: string | null;
     clienteId: string | null;
+    judicialSync?: ReturnType<typeof import("@/lib/causas/judicial-status").caseJudicialStatus>;
   };
   documents: {
     id: string;

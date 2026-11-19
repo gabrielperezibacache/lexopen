@@ -20,7 +20,7 @@ import {
   createCaseWritingFromSnapshots,
 } from "@/lib/writings/service";
 import type { StoredWritingSource } from "@/lib/writings/source-types";
-import { createHelpRequest, getHelpRequest } from "../help/service";
+import { createHelpRequest, getHelpRequest, helpStatus } from "../help/service";
 import { caseSnapshot, snapshotHash, caseMetadataBlocks } from "./snapshot";
 import {
   reportSchema,
@@ -541,7 +541,7 @@ export async function readCaseJob(
       ? saved.map((s) => ({ ...JSON.parse(s.resultJson), title: s.label }))
       : [],
     help: help
-      ? { id: help.id, question: help.question, status:["pending","answered"].includes(help.status)&&new Date(help.expiresAt)<=new Date()?"expired":help.status, notificationStatus:help.notificationStatus }
+      ? { id: help.id, question: help.question, status: help.status, notificationStatus: help.notificationStatus }
       : null,
     savedSelection: available ? JSON.parse(job.selectionJson) : null,
     coordinator: available ? { provider: plan.destination.provider, model: plan.destination.model } : null,
@@ -840,6 +840,15 @@ export async function requestCaseHelp(
     const current = await caseJobAccess(job.id, user, db);
     if (current.job.cancelledAt || current.job.revision !== job.revision)
       throw changed();
+    if (current.job.status === "awaiting_help") {
+      const prior = await db.altazorHelpRequest.findFirst({
+        where: { id: current.job.helpRequestId ?? "", caseJobId: job.id, ownerId: current.actor.id },
+      });
+      if (!prior || !["expired", "cancelled"].includes(helpStatus(prior))) throw changed();
+      if (prior.status === "pending") {
+        await db.altazorHelpRequest.update({ where: { id: prior.id }, data: { status: "expired" } });
+      }
+    }
     const help = await createHelpRequest(
       current.actor,
       {
@@ -908,7 +917,7 @@ export async function resumeCaseJob(
     const help = await getHelpRequest(actor, job.helpRequestId).catch(
       () => null,
     );
-    if (help && (["expired", "cancelled"].includes(help.status)||new Date(help.expiresAt)<=new Date())) {
+    if (help && ["expired", "cancelled"].includes(help.status)) {
       await requestCaseHelp(job, help.question, actor);
       return readCaseJob(id, user);
     }

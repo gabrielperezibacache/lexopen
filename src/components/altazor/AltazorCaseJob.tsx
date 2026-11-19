@@ -331,8 +331,10 @@ export function AltazorCaseJob({ id, onContinue }: { id: string; onContinue?: (i
           ) : (
             <p className="text-sm">
               {job.help.status === "expired"
-                ? "La respuesta venció; el encargo se conserva."
-                : "Respuesta recibida; esperando continuación."}
+                ? "Venció el plazo para responder."
+                : job.help.status === "cancelled"
+                  ? "La solicitud de ayuda se detuvo."
+                  : "Respuesta recibida. El encargo espera su continuación."}
             </p>
           )}
         </div>
@@ -517,7 +519,7 @@ export function AltazorCaseJob({ id, onContinue }: { id: string; onContinue?: (i
             Revisar y reanudar
           </button>
         )}
-        {job.help?.status === "expired" && (
+        {job.help && ["expired", "cancelled"].includes(job.help.status) && (
           <button
             className="btn btn-secondary"
             disabled={busy}
