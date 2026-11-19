@@ -78,7 +78,9 @@ test("Documentos, causa y cliente descargan archivos y texto con su nombre y byt
   await loginAs(page, "socio@estudio.cl");
   for (const url of [`/documentos?q=${tag}`, `/causas/${causeId}#documentos`, `/clientes/${clientId}`]) {
     await page.goto(url);
-    const link = (index: number, tail: string) => page.locator(`a[href="/api/documentos/${ids[index]}/${tail}"]`);
+    const link = (index: number, tail: string) => page.getByRole("link").and(
+      page.locator(`a[href="/api/documentos/${ids[index]}/${tail}"]`),
+    );
     await expect(link(0, "content?download=1")).toHaveCount(0);
     await expect(link(7, "content?download=1")).toHaveCount(0);
     await expectDownload(page, link(3, "content?download=1"), "original.pdf", original);

@@ -5,7 +5,8 @@ import { hash } from "bcryptjs";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 
-test.use({ timezoneId: "Asia/Tokyo" });
+// Route each attempted mutation through Playwright so the simulated lost response reaches the UI.
+test.use({ timezoneId: "Asia/Tokyo", serviceWorkers: "block" });
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 test.afterAll(() => db.$disconnect());
 

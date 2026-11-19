@@ -4,6 +4,9 @@ import { expect, test } from "@playwright/test";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
 
+// Playwright must intercept the import requests before they can reach the Host.
+test.use({ serviceWorkers: "block" });
+
 const db = new PrismaClient();
 const createdIds: string[] = [];
 let setting: { id: string; caseManagementMode: string } | null = null;
@@ -167,12 +170,13 @@ test("el expediente retoma el progreso PJUD al volver y se recupera de una inter
       causaId: causa.id, status: phase, phase: phase === "running" ? "download" : phase,
       total: 2, completed: phase === "done" ? 2 : 0, saved: phase === "done" ? 2 : 0,
       skipped: 0, failed: 0, delayMs: 2500, maxPerRun: 20, currentLabel: null,
-      note: phase === "done" ? "Dos originales disponibles." : null,
+      note: phase === "idle" ? "Prueba local de importación." : phase === "done" ? "Dos originales disponibles." : null,
     } } });
   });
   await loginAs(page, "abogado@estudio.cl");
   await page.goto(`/causas/${causa.id}/expediente#incorporar-documentos`);
   const action = page.getByRole("button", { name: "Importar documentos PJUD", exact: true });
+  await expect(page.getByText("Prueba local de importación.", { exact: true })).toBeVisible();
   await action.click();
   await expect(page.getByRole("button", { name: "Importando 0/2…" })).toBeDisabled();
   await page.reload();
