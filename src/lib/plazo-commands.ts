@@ -13,6 +13,7 @@ import { executeCommand } from "@/lib/command-execution";
 import { writeAuditStrict } from "@/lib/audit";
 import { civilDateKey } from "@/lib/chile-time";
 import { calcularVencimientoYmd } from "@/lib/plazos";
+import { calculateCivilDeadline, civilEdition } from "@/lib/deadlines/civil-profile";
 import { parseDateInput } from "@/lib/date-input";
 import {
   requireDeadlineComputation,
@@ -40,6 +41,14 @@ export async function createPlazoCommand(
   const explicitDate = body.fechaLimite
     ? parseDateInput(body.fechaLimite)
     : null;
+  if (body.calculationProfile === "manual" && !explicitDate)
+    throw httpError("Indique la fecha límite revisada.", 422);
+  if (body.calculationProfile === "civil" && body.tipo && body.tipo !== "procesal")
+    throw httpError("El perfil civil solo cubre términos procesales individuales.", 422);
+  if (body.calculationProfile === "civil" && (explicitDate || body.tipoComputo))
+    throw httpError("El perfil civil requiere calcular la fecha desde la notificación. Para ingresar una fecha revisada, seleccione registro manual.", 422);
+  if (body.calculationProfile === "internal" && (!body.fechaNotificacion || !body.diasPlazo || explicitDate))
+    throw httpError("La estimación interna requiere fecha de inicio y duración.", 422);
   if (!explicitDate && !body.diasPlazo)
     throw httpError("Indique fechaLimite o diasPlazo", 400);
   return executeCommand({
@@ -74,18 +83,23 @@ export async function createPlazoCommand(
     },
     run: async (tx) => {
       if (!explicitDate) await requireDeadlineComputation(tx);
+      const civil = body.calculationProfile === "civil" ? calculateCivilDeadline({
+        notice: body.fechaNotificacion, days: body.diasPlazo,
+        notificationConfirmed: body.notificationConfirmed, scopeConfirmed: body.civilScopeConfirmed,
+      }) : null;
       const fechaLimite =
-        explicitDate ||
+        explicitDate || (civil && new Date(civil.date)) ||
         new Date(
           `${calcularVencimientoYmd({ desde: civilDateKey(fechaNotificacion || new Date()), dias: body.diasPlazo!, tipoComputo: body.tipoComputo || "habiles" })}T00:00:00.000Z`,
         );
       const plazo = await tx.plazo.create({
         data: {
-          ...(!explicitDate ? deadlineCalculation : {}),
+          ...(civil ? { calculationCountry: "CL", calculationRegime: civilEdition.id, civilCalculationBasis: { ...civil.basis, causaId: body.causaId || null, confirmedById: user.id } }
+            : !explicitDate ? deadlineCalculation : {}),
           titulo: body.titulo,
           descripcion: body.descripcion || null,
           fechaLimite,
-          fechaNotificacion,
+          fechaNotificacion: civil ? new Date(civil.basis.start) : fechaNotificacion,
           diasPlazo: body.diasPlazo || null,
           tipoComputo: body.tipoComputo || "habiles",
           esFatal: Boolean(body.esFatal),

@@ -14,6 +14,9 @@ import {
 } from "@/lib/deadlines/pagination";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { can } from "@/lib/auth/permissions";
+import { CivilDeadlineDetails } from "@/components/CivilDeadlineDetails";
+import { civilReviewReady } from "@/lib/deadlines/civil-profile";
+import { getWorkCountry } from "@/lib/config/work-country";
 import { PlazoForm } from "@/components/PlazoForm";
 import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { StatusBadge, UrgenciaBadge } from "@/components/ui";
@@ -309,6 +312,8 @@ export default async function PlazosPage({ searchParams }: Props) {
         className="space-y-3"
       >
         <PlazoForm
+          chile={await getWorkCountry() === "CL"}
+          civilAvailable={civilReviewReady()}
           causas={causeOptions.map((c) => ({
             id: c.id,
             label: c.rit || c.titulo,
@@ -385,7 +390,7 @@ export default async function PlazosPage({ searchParams }: Props) {
               </div>
               <p className="mt-1 break-words text-sm text-[var(--muted)]">
                 {formatCivilDate(p.fechaLimite)} ·{" "}
-                {labelTipoComputo(p.tipoComputo)}
+                {labelTipoComputo(p.tipoComputo, p.calculationRegime)}
                 {p.estado === "pendiente"
                   ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
                   : ""}{" "}
@@ -402,6 +407,7 @@ export default async function PlazosPage({ searchParams }: Props) {
                 )}{" "}
                 · {p.responsable?.name || h.noOwner}
               </p>
+              {p.civilCalculationBasis != null && <CivilDeadlineDetails value={p.civilCalculationBasis} currentRegime={p.calculationRegime} />}
               {p.descripcion && (
                 <p className="mt-2 text-sm text-[var(--muted)]">
                   {p.descripcion}

@@ -6,6 +6,32 @@ import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs, apiRequest } from "./helpers";
 import { addCivilDays, santiagoDateKey } from "../src/lib/chile-time";
 
+const retryTest = test.extend({ serviceWorkers: "block" });
+type Attempt = { key?: string; body: string | null; status?: number };
+async function loseFirstReceipt(page: Page, path: string, successStatus: number) {
+  const origin = new URL(page.url()).origin;
+  const attempts: Attempt[] = [];
+  await page.route(url => url.origin === origin && url.pathname === path, async route => {
+    const request = route.request();
+    if (request.method() !== "POST") return route.continue();
+    const attempt: Attempt = { key: request.headers()["idempotency-key"], body: request.postData() };
+    attempts.push(attempt);
+    if (attempts.length > 1) return route.continue();
+    const response = await route.fetch();
+    attempt.status = response.status();
+    if (attempt.status !== successStatus) return route.fulfill({ response });
+    await route.abort("failed");
+  });
+  return attempts;
+}
+function expectSameRetry(attempts: Attempt[], successStatus: number) {
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0].status).toBe(successStatus);
+  expect(attempts[0].key).toBeTruthy();
+  expect(attempts[1].key).toBe(attempts[0].key);
+  expect(attempts[0].body).toBeTruthy();
+  expect(attempts[1].body).toBe(attempts[0].body);
+}
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 test.afterAll(() => db.$disconnect());
 async function fixture(page: Page) {
@@ -18,9 +44,9 @@ async function fixture(page: Page) {
   } };
 }
 
-test("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva su seguimiento", async ({ page }, info) => {
+retryTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva su seguimiento", async ({ page }, info) => {
   test.setTimeout(90_000);
-  const f = await fixture(page), keys: string[] = [];
+  const f = await fixture(page), path = "/api/fiscalia/solicitudes";
   try {
     await page.goto(`/mi-fiscalia?causaId=${f.cause.id}`);
     const portal = page.getByRole("link", { name: "Abrir Mi Fiscalía con ClaveÚnica", exact: true });
@@ -31,18 +57,14 @@ test("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva
     await dialog.getByLabel("Asunto", { exact: true }).fill(f.title);
     await dialog.getByLabel("Tipo", { exact: true }).selectOption("copia");
     await dialog.getByLabel("Contenido", { exact: true }).fill("Solicito copia de los antecedentes para revisar la causa.");
-    await page.route("**/api/fiscalia/solicitudes", async route => {
-      if (route.request().method() !== "POST") return route.continue();
-      keys.push(route.request().headers()["idempotency-key"]);
-      if (keys.length > 1) return route.continue();
-      const response = await route.fetch(); expect(response.status()).toBe(201); await route.abort("failed");
-    });
+    const attempts = await loseFirstReceipt(page, path, 201);
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
+    await expect.poll(() => attempts[0]?.status).toBe(201);
     await expect(dialog.getByRole("alert")).toContainText("sin duplicar");
     await expect(dialog.getByLabel("Asunto", { exact: true })).toBeDisabled();
     await dialog.getByRole("button", { name: "Reintentar guardado", exact: true }).click();
     await expect(page.getByRole("heading", { name: f.title, exact: true })).toBeVisible();
-    expect(keys[0]).toBe(keys[1]); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
+    expectSameRetry(attempts, 201); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
     await page.getByRole("button", { name: `Editar ${f.title}`, exact: true }).click();
     await dialog.getByLabel("Estado", { exact: true }).selectOption("ready");
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
@@ -133,4 +155,40 @@ test("Mi Fiscalía permite descartar un borrador sin fingir una presentación", 
     expect(row.status).toBe("cancelled"); expect(row.folio).toBeNull(); expect(row.submittedAt).toBeNull();
     expect(await db.fiscaliaRequestEvent.count({ where: { requestId: id } })).toBe(2);
   } finally { await f.cleanup(); }
+});
+
+retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page }) => {
+  const f = await fixture(page);
+  const date = addCivilDays(santiagoDateKey(new Date()), -1);
+  const row = await db.fiscaliaRequest.create({ data: { causaId: f.cause.id, creatorId: f.owner.id, title: f.title, kind: "copia", body: "Solicitud de prueba presentada", status: "submitted", folio: "Orig-1", submittedAt: new Date(date) } });
+  const doc = await db.documento.create({ data: { causaId: f.cause.id, autorId: f.owner.id, nombre: "Comprobante ficticio.txt", mimeType: "text/plain", contenido: "Comprobante original" } });
+  try {
+    await page.goto(`/mi-fiscalia?causaId=${f.cause.id}`);
+    await page.getByRole("link", { name: f.title, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/mi-fiscalia/${row.id}$`));
+    await page.getByRole("button", { name: "Rectificar presentación", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Folio corregido", { exact: true }).fill("Folio-2");
+    await dialog.getByLabel("Motivo de rectificación", { exact: true }).fill("Revisión del folio oficial.");
+    const path = `/api/fiscalia/solicitudes/${row.id}`;
+    const attempts = await loseFirstReceipt(page, path, 200);
+    await dialog.getByRole("button", { name: "Guardar rectificación" }).click();
+    await expect.poll(() => attempts[0]?.status).toBe(200);
+    await dialog.getByRole("button", { name: "Comprobar guardado" }).click();
+    const history = page.getByRole("region", { name: "Historial de la solicitud" });
+    await expect(history).toContainText("Anterior: Orig-1");
+    await expect(history).toContainText("Corregido: Folio-2");
+    expectSameRetry(attempts, 200);
+    expect(await db.fiscaliaRequestEvent.count({ where: { requestId: row.id, correctionReason: "Revisión del folio oficial." } })).toBe(1);
+    await page.getByRole("button", { name: "Vincular respaldo" }).click();
+    await dialog.getByRole("button", { name: "Buscar", exact: true }).click();
+    await dialog.getByLabel("Documento del expediente", { exact: true }).selectOption(doc.id);
+    await dialog.getByRole("button", { name: "Guardar respaldo" }).click();
+    const link = history.getByRole("link", { name: "Comprobante ficticio.txt · versión 1" });
+    await expect(link).toBeVisible();
+    await db.documento.update({ where: { id: doc.id }, data: { version: 2, contenido: "Revisión posterior" } });
+    const result = await page.request.get((await link.getAttribute("href"))!);
+    expect(result.status()).toBe(200); expect(await result.text()).toBe("Comprobante original");
+    expect(result.headers()["content-disposition"]).toMatch(/^attachment;/);
+  } finally { await db.documento.deleteMany({ where: { id: doc.id } }); await f.cleanup(); }
 });

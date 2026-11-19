@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id), copy = value => structuredClone(val
 const sameId = (a, b) => (a || null) === (b || null);
 const token = ref => ({ id: ref.id, expectedVersion: ref.version });
 const causeKind = item => ["task", "plazo", "nota", "minuta", "evento", "tramite"].includes(item.kind);
+export const hasCivilDeadlineCalculation = item => item.kind === "plazo" && item.baseRelations?.calculationRegime?.startsWith("cl_cpc_individual_days_v");
 export function setupBindings({ getData, getItem, auth, flush, write, run, message, markDirty, getRemote, isCausePending }) {
   let results = [], nextAfter = null, proposal = null, lastItem = "";
   const shelf = () => { const data = getData(); if (!data) return { user: [], cause: [] }; return data.references ||= { user: [], cause: [] }; };
@@ -26,6 +27,16 @@ export function setupBindings({ getData, getItem, auth, flush, write, run, messa
       return choice;
     }
     return { id: local.remoteId, reference: local.baseRelations.caseReference };
+  }
+  function selectedCauseId(item) {
+    const cause = choices(item).cause;
+    return cause ? resolvedCause(cause, false)?.id : base(item).cause?.id;
+  }
+  function resetReviewIfCauseChanged(item, previousId) {
+    if (hasCivilDeadlineCalculation(item) && !sameId(previousId, selectedCauseId(item))) {
+      item.dateReviewed = false;
+      $("deadline-reviewed").checked = false;
+    }
   }
   function changes(item, validate = false) {
     const b = base(item), c = choices(item), result = {};
@@ -110,9 +121,14 @@ export function setupBindings({ getData, getItem, auth, flush, write, run, messa
     $("reference-more").hidden = !nextAfter;
   }
   $("binding-responsible").onchange = () => { const item = getItem(), id = $("binding-responsible").value || null; choices(item).responsible = { id, reference: copy(knownUsers(item).find(u => u.id === id) || null) }; pick(); };
-  $("binding-cause").onchange = () => { const item = getItem(), id = $("binding-cause").value || null; choices(item).cause = { id, reference: copy(knownCauses(item).find(c => c.id === id) || null) }; pick(); };
+  $("binding-cause").onchange = () => {
+    const item = getItem(), previousId = selectedCauseId(item), id = $("binding-cause").value || null;
+    choices(item).cause = { id, reference: copy(knownCauses(item).find(c => c.id === id) || null) };
+    resetReviewIfCauseChanged(item, previousId); pick();
+  };
   $("binding-undo").onclick = () => { const item = getItem(); if (!item) return;
-    const b = base(item); item.relationChoices = { responsible: { id: b.responsible?.id || null, reference: copy(b.responsible || null) }, cause: { id: b.cause?.id || null, reference: copy(b.cause || null) }, cases: (choices(item).cases || []).map(x => ({ ...x, link: Boolean((b.cases || []).some(r => r.id === x.id) || item.remoteId && x.reference?.clientId === item.remoteId) })) }; pick();
+    const b = base(item), previousId = selectedCauseId(item); item.relationChoices = { responsible: { id: b.responsible?.id || null, reference: copy(b.responsible || null) }, cause: { id: b.cause?.id || null, reference: copy(b.cause || null) }, cases: (choices(item).cases || []).map(x => ({ ...x, link: Boolean((b.cases || []).some(r => r.id === x.id) || item.remoteId && x.reference?.clientId === item.remoteId) })) };
+    resetReviewIfCauseChanged(item, previousId); pick();
   };
   function active(state) { if (!state || getData() !== state) throw new Error("El espacio se bloqueó o cambió mientras se revisaban las opciones. Vuelva a abrirlo."); }
   async function fetchReference(type, id) {
@@ -146,9 +162,11 @@ export function setupBindings({ getData, getItem, auth, flush, write, run, messa
   });
   $("binding-review-confirm").onclick = () => void run(async () => {
     const item = getItem(); if (!proposal || proposal.localId !== item?.localId || !item.referenceFailure) return;
+    const previousId = selectedCauseId(item);
     item.lastRejectedRequest = item.pending; delete item.pending; delete item.referenceFailure;
     if (proposal.remote) item.baseRelations = copy(proposal.remote.relations);
     item.relationChoices = proposal.next; for (const ref of proposal.refs) cache(ref.type, ref);
+    resetReviewIfCauseChanged(item, previousId);
     invalidate(); await write(); render(item); message("Referencias revisadas. Sus campos y elecciones se conservan; pulse Sincronizar registro para enviarlos.");
   });
   function accept(item, remote, refs = []) {

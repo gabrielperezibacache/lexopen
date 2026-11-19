@@ -299,7 +299,8 @@ async function analyze(
           "\nCorrespondencias de fuentes: " +
           refs.map((r, i) => `[R${i + 1}] = [${r.id}]`).join("; "),
         sources: [],
-        useMemory: false,
+        useMemory: member.useMemory,
+        ...(member.memorySelection?.length ? { memorySelection: member.memorySelection.map(({ id, revision, hash }) => ({ id, revision, hash })) } : {}),
         allowRemote: member.destination.remote,
         destinationKey: member.destination.key,
         confirmed: true,

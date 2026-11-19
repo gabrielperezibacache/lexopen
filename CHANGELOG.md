@@ -2,6 +2,11 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Jurisprudencia conserva una copia pública para el lector, la descarga y las citas. Las versiones históricas del PJUD pasan a custodia y disponen de un recorrido de recuperación y cotejo.
+- Mi Fiscalía incorpora una ficha individual con rectificación motivada de folio y fecha, historial paginado y comprobantes vinculados a una versión documental.
+- Los Ícaros reciben las notas seleccionadas para cada encargo. El chat permite retomar un informe autorizado después de otros turnos y recorrer páginas del historial.
+- Plazos distingue la fecha revisada, la estimación interna y la edición candidata del CPC chileno. Su activación depende de una revisión profesional documentada.
+
 - Las esperas de la causa incluyen las tareas bloqueadas y las solicitudes presentadas a Mi Fiscalía aunque haya gestiones anteriores. La ficha y la lectura de Altazor utilizan los mismos datos visibles.
 - Documentos distingue el original de su transcripción. La importación manual de OJV comprueba cuaderno y folio y permite recuperar el progreso del lote después de un reinicio del Host.
 - Drive organiza los nuevos destinos compartidos por cliente y causa. «Recibir ahora» continúa desde la posición guardada de la carpeta.

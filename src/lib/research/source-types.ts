@@ -12,6 +12,8 @@ export type FetchedLegalSource = {
   text: string;
   mimeType: string;
   rawBytes: Buffer;
+  /** PJUD imports persist a public projection of the reply. */
+  pjudPublicCopy?: { rol: string };
   coverageWarnings: string[];
   retrievedAt: Date;
 };

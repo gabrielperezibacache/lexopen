@@ -1,4 +1,5 @@
 "use client";
+import type { IcaroTurnSelection } from "@/lib/altazor/icaros/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { operationKey, createSubmissionKeys } from "@/lib/client-submission-key";
 import { withCsrfHeaders } from "@/lib/client-csrf";
@@ -30,6 +31,12 @@ export function useAltazorCompanionState() {
   const [libraryNotice,setLibraryNotice]=useState<{id:string;title:string}|null>(null);
   const [initialFailed, setInitialFailed] = useState(false);
   const [pane, setPane] = useState<Pane>("chat"), [visited, setVisited] = useState<Pane[]>(["chat"]), [conversations, setConversations] = useState<Conversation[]>([]), [activeId, setActiveId] = useState(""), [data, setData] = useState<ConversationData | null>(null), [destination, setDestination] = useState<AltazorDestination | null>(null), [causas, setCausas] = useState<{ id: string; titulo: string; rit: string | null }[]>([]), [scope, setScope] = useState(""), [text, setText] = useState(""), [attachmentIds, setAttachmentIds] = useState<string[]>([]), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false), [error, setError] = useState(""), [loading, setLoading] = useState(true);
+  const [continuation, setContinuation] = useState<{ conversationId: string; id: string; hash: string } | null>(null);
+  const memoryCaseId = data?.conversation.causaId ?? conversations.find(c => c.id === activeId)?.causaId ?? (activeId ? null : scope || null);
+  const memoryScope = JSON.stringify([activeId, memoryCaseId]);
+  const [memoryChoice, setMemoryChoice] = useState<{ scope: string; entries: IcaroTurnSelection[] } | null>(null);
+  const icaroMemorySelections = memoryChoice?.scope === memoryScope ? memoryChoice.entries : [];
+  const selectIcaroMemory = (entries: IcaroTurnSelection[]) => setMemoryChoice(entries.length ? { scope: memoryScope, entries } : null);
   const [preference, setPreference] = useState<CompanionPreference>({ activeConversationId: null, memoryEnabled: true, backgroundEnabled: true, revision: 0, selectionUnavailable: false });
   const preferenceWrites = useRef<Promise<unknown>>(Promise.resolve());
   const [preferenceSaving, setPreferenceSaving] = useState(false);
@@ -108,9 +115,18 @@ export function useAltazorCompanionState() {
     setPane(next); setVisited(previous => previous.includes(next) ? previous : [...previous, next]);
   }
   function chooseConversation(id: string, remember = true) {
+    setContinuation(null);
+    setMemoryChoice(null);
     if (remember) void savePreference({ activeConversationId: id || null });
     setLinkedDocumentId(""); setClarification(""); setScope(""); drafts.current.set(activeId || "new", text); liveId.current = id; setActiveId(id); setData(null); setText(drafts.current.get(id || "new") || ""); setAttachmentIds([]); setError(""); turnRequest.current = createSubmissionKeys();
     if(!id)conversationRequest.current=createSubmissionKeys();reflectConversationLocation(id);choosePane("chat", false);
+  }
+  function continueJob(conversationId: string, id: string, hash: string) {
+    if (busy || uploading || loading || (liveId.current !== conversationId && attachmentIds.length)) return;
+    if (liveId.current !== conversationId) chooseConversation(conversationId);
+    setContinuation({ conversationId, id, hash });
+    setClarification("");
+    textarea.current?.focus();
   }
   function leaveCaseContext() {
     if (busy || uploading || attachmentIds.length) return;
@@ -138,6 +154,12 @@ export function useAltazorCompanionState() {
     if (result.clarify) { setClarification(result.clarify); return null; }
     if (!result.conversation) throw new Error("No se pudo recuperar la conversación. Tu mensaje se conserva.");
     if (result.conversation.id !== liveId.current) {
+      const newScope = !liveId.current && result.conversation.causaId === memoryCaseId
+        ? JSON.stringify([result.conversation.id, result.conversation.causaId])
+        : null;
+      setMemoryChoice(previous => previous?.scope === memoryScope && newScope
+        ? { ...previous, scope: newScope }
+        : null);
       drafts.current.set(liveId.current || "new", text);
       liveId.current = result.conversation.id;
       setActiveId(result.conversation.id); setData(null); setScope(result.conversation.causaId || "");
@@ -152,11 +174,18 @@ export function useAltazorCompanionState() {
     if (!text.trim() || busy || uploading || running || loading || preferenceSaving) return; setBusy(true); setError(""); setClarification("");
     try {
       const expectedDestination = destination?.key, draftOrigin = liveId.current || "new", submittedText = text;
-      const id = await ensureConversation(true); if (!id) return;
+      // An explicit report belongs to this conversation, even if the question mentions another cause.
+      if (continuation && continuation.conversationId !== liveId.current) throw new Error("Selecciona nuevamente el encargo de esta conversación.");
+      const id = continuation ? continuation.conversationId : await ensureConversation(true); if (!id) return;
       const current = await reload(id);
-      const payload = { text, attachmentIds, automaticSources: true, documentoId: linkedDocumentId || undefined, ...prepareAssistantSubmission(current.destination, expectedDestination), useMemory: preference.memoryEnabled };
+      if (icaroMemorySelections.length && (memoryCaseId !== current.conversation.causaId || (activeId && activeId !== id))) {
+        throw new Error("La conversación cambió. Revisa la selección de recuerdos antes de enviarla.");
+      }
+      const payload = { text, ...(icaroMemorySelections.length ? { icaroMemorySelections } : {}), attachmentIds, ...(continuation ? { continueFrom: { id: continuation.id, hash: continuation.hash } } : {}), automaticSources: true, documentoId: linkedDocumentId || undefined, ...prepareAssistantSubmission(current.destination, expectedDestination), useMemory: preference.memoryEnabled };
       const result = await request<{ turnId: string }>(`/api/altazor/conversations/${id}/turns`, { ...payload, requestId: turnRequest.current.forPayload(payload), expectedRevision: current.conversation.revision });
       turnRequest.current.complete(payload);
+      setMemoryChoice(null);
+      setContinuation(null);
       if (drafts.current.get(draftOrigin) === submittedText) drafts.current.delete(draftOrigin);
       setText(current => current === text ? "" : current); drafts.current.delete(id); drafts.current.delete("new"); setAttachmentIds([]); setLinkedDocumentId(""); turnRequest.current = createSubmissionKeys(); await reload(id);
       const completed = await request<ConversationData>(`/api/altazor/conversations/${id}/turns/${result.turnId}/execute`, {}); if (liveId.current === id) setData(completed); await loadList();
@@ -212,5 +241,5 @@ export function useAltazorCompanionState() {
     }).catch(reason=>{if(!controller.signal.aborted && version === locationVersion.current)setError(reason.message);});
     return()=>controller.abort();
   }
-  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };
+  return { icaroMemorySelections, selectIcaroMemory, continuation, setContinuation, continueJob, linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };
 }

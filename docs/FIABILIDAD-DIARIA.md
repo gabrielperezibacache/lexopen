@@ -45,3 +45,13 @@ El perfil procesal civil chileno (#267), revisión profesional y ampliación del
 Se mantienen el escritorio persistente, las actualizaciones judiciales automáticas a las 08:00 y 22:00 de Chile, las manuales libres, los muros éticos y la cuenta Google compartida.
 
 Los evaluadores ya disponibles y sus límites están en [Evaluación jurídica e IA](EVALUACION-JURIDICA-IA.md). Una ejecución con fixtures no cierra la validación profesional ni acredita velocidad de modelos reales.
+
+## Recepción del piloto del estudio
+
+| Prueba en el equipo del estudio | Evidencia que conserva el responsable |
+| --- | --- |
+| Actualizar un Mac Apple Silicon con preview 10 y un respaldo disponible. Instalar la edición firmada desde el canal de publicación y abrir el mismo Host. | Versión anterior y nueva, SHA-256 del instalador, identidad Developer ID, aceptación de Gatekeeper, notarización y comprobación de una causa y su documento tras el reinicio. [Procedimiento de distribución](INSTALADORES.md) |
+| Ejecutar el evaluador sobre los modelos ya instalados en ese Mac, con Ollama en modo local. | Informe JSON y Markdown con hardware, edición y digest del modelo, corpus, tiempos y mediciones ausentes. [Comandos de evaluación](EVALUACION-JURIDICA-IA.md) |
+| Usar una causa de prueba autorizada. Desde OJV, consultar y descargar un documento. Desde la cuenta Google compartida, comprobar la carpeta Organización → cliente → causa. Pedir ayuda desde Altazor y responder por el canal ntfy habilitado. | Anotar versión del Host, hora en Santiago, recorrido, resultado y error observado. Comparar el documento descargado, comprobar la lectura de Drive desde un segundo usuario con acceso y verificar que la respuesta de ntfy se asocia al encargo correcto una sola vez. Omitir identificadores judiciales, contenido y credenciales al compartir el resultado. |
+
+La edición civil candidata y su revisión se siguen en [Plazos](PLAZOS-CUMPLIMIENTO.md). La publicación firmada requiere el entorno protegido de GitHub y las credenciales del editor. Las pruebas del piloto se registran cuando se ejecutan en el equipo y las cuentas del estudio.

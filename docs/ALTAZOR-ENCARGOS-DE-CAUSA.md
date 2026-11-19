@@ -28,7 +28,7 @@ El guardado usa recibos por propuesta. Si una operación falla, se muestran resu
 
 Una pregunta concreta conserva una identidad de un solo uso vinculada al encargo. Se puede responder en el chat o mediante ntfy/WhatsApp configurados, conforme a la política vigente. Los avisos remotos son mínimos; no contienen el expediente. Una respuesta no confirma propuestas ni concede permisos. Si vence la pregunta, el encargo permanece y puede solicitarse una nueva respuesta.
 
-Los modelos, sus destinos y las fuentes se comprueban durante la ejecución y al reutilizar resultados. En este primer flujo, los Ícaros no reciben memoria propia ni personal: el plan lo indica expresamente. La memoria de sus encargos manuales mantiene su funcionamiento independiente.
+Antes de enviar el encargo puedes elegir recuerdos para cada Ícaro de la causa. Cada selección admite hasta seis entradas y 6.000 caracteres entre títulos y contenidos. El plan muestra los títulos elegidos y el modelo que los recibirá. Al ejecutar y al reanudar se comprueban la revisión de cada recuerdo, su contenido, sus fuentes y el acceso actual a la causa. Si olvidas un recuerdo seleccionado, revisa el plan antes de continuar.
 
 Un mensaje posterior puede utilizar el informe y sus recibos como datos de contexto verificados. Conserva la huella de ese resultado; si cambia o pierde acceso a sus fuentes, la respuesta derivada queda no disponible. Estos mensajes usan contexto v2 para que un lector antiguo rechace dependencias que no sabe verificar; las conversaciones anteriores siguen admitiendo contexto v1. Para guardar una respuesta posterior como escrito, se requieren pasajes documentales seleccionados; el borrador del propio encargo conserva sus referencias desde su panel.
 

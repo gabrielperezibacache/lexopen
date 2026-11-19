@@ -1,7 +1,8 @@
 "use client";
+import { AltazorTurnMemoryPicker } from "./AltazorTurnMemoryPicker";
 import { AltazorCaseJob } from "./AltazorCaseJob";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowUp, BellRing, BrainCircuit, CircleStop, Ellipsis, Feather, Link2, MessageSquare, Monitor, Paperclip, Settings2, X } from "lucide-react";
 import { ResultCard, type AssistantResultItem } from "@/components/inicio/ResultCard";
 import { AltazorMark } from "./AltazorMark";
@@ -25,9 +26,11 @@ async function request<T>(url: string, body?: unknown, method = "POST"): Promise
   const data = await response.json(); if (!response.ok) throw Object.assign(new Error(data.error || "No se pudo completar la acción. Tu trabajo se conserva."), { status: response.status }); return data;
 }
 export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivity?: boolean }) {
-  const { updates, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preferenceSaving } = useAltazorCompanion();
+  const { icaroMemorySelections, selectIcaroMemory, continuation, setContinuation, continueJob, updates, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preferenceSaving } = useAltazorCompanion();
   const [desktopSelection, setDesktopSelection] = useState<{ causaId: string | null; id: string | null; review?: ComputerReview } | null>(null);
   const historyRef = useRef<HTMLElement>(null), followLatest = useRef(true);
+  const anchors = useRef(new Map<string, { id: string; offset: number }>());
+  const restoring = useRef(false);
   const [followingLatest, setFollowingLatest] = useState(true);
   const activeTurn = data?.turns.at(-1);
   const timelineVersion = `${activeTurn?.id ?? ""}/${activeTurn?.status ?? ""}/${data?.conversation.revision ?? ""}`;
@@ -37,11 +40,30 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
     ...(timeline.readingOlder ? [] : updates.updates).map(update => ({ kind: "update" as const, date: update.occurredAt, id: update.id, update })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   const latest = entries.at(-1);
+  function changePage(direction: "older" | "newer") {
+    const region = historyRef.current;
+    if (!region) return;
+    const top = region.getBoundingClientRect().top;
+    const first = [...region.querySelectorAll<HTMLElement>("[data-history-id]")].find(item => item.getBoundingClientRect().bottom > top);
+    if (first) anchors.current.set(timeline.pageKey, { id: first.dataset.historyId!, offset: first.getBoundingClientRect().top - top });
+    restoring.current = true;
+    followLatest.current = false;
+    if (direction === "older") timeline.loadOlder(); else timeline.loadNewer();
+  }
+  useLayoutEffect(() => {
+    if (!restoring.current || timeline.status !== "ready" || !historyRef.current) return;
+    const region = historyRef.current;
+    const anchor = anchors.current.get(timeline.pageKey);
+    const item = anchor && region.querySelector<HTMLElement>(`[data-history-id="${CSS.escape(anchor.id)}"]`);
+    if (item && anchor) region.scrollTop += item.getBoundingClientRect().top - region.getBoundingClientRect().top - anchor.offset;
+    else region.scrollTop = 0;
+    restoring.current = false;
+  }, [timeline.pageKey, timeline.status]);
   const latestVersion = latest?.kind === "turn" ? `${latest.id}/${latest.turn.status}/${latest.turn.assistantText}/${latest.turn.progress?.completed}/${latest.turn.results.length}` : latest?.id;
   useEffect(() => {
     const region = historyRef.current;
-    if (pane === "chat" && region && followLatest.current) region.scrollTop = region.scrollHeight;
-  }, [latestVersion, pane]);
+    if (pane === "chat" && !timeline.readingOlder && region && followLatest.current) region.scrollTop = region.scrollHeight;
+  }, [latestVersion, pane, timeline.readingOlder]);
   async function handleTurnAction(turn: typeof timeline.turns[number], action: TurnAction) {
     try { await turnAction(turn, action, turn.conversationId); }
     finally { timeline.refresh(); }
@@ -63,20 +85,25 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
         {error && <p role="alert" className="altazor-error">{error}{initialFailed && <> <a href="/inicio">Volver a Mi jornada</a></>}</p>}{libraryNotice && <p role="status" className="altazor-notice">Guardado en Biblioteca: <Link href={`/biblioteca/${libraryNotice.id}`}>{libraryNotice.title}</Link>.</p>}
         <section className="altazor-history" aria-label="Historial con Altazor" ref={historyRef} onScroll={event => { const region = event.currentTarget; followLatest.current = region.scrollHeight-region.scrollTop-region.clientHeight<80; setFollowingLatest(followLatest.current); }} tabIndex={0}>
           {(timeline.hasMore || timeline.readingOlder) && <div className="altazor-history-controls">
-            {timeline.hasMore && <button type="button" className="btn btn-ghost" onClick={() => { followLatest.current = false; timeline.loadOlder(); }}>Ver mensajes anteriores</button>}
-            {timeline.readingOlder && <button type="button" className="btn btn-ghost" onClick={() => { followLatest.current = true; timeline.returnToLatest(); }}>Volver a lo reciente</button>}
+            {timeline.hasMore && <button type="button" className="btn btn-ghost" onClick={() => changePage("older")}>Ver mensajes anteriores</button>}
+            {timeline.canReadNewer && <button type="button" className="btn btn-ghost" onClick={() => changePage("newer")}>Ver mensajes posteriores</button>}
+            {timeline.readingOlder && <button type="button" className="btn btn-ghost" onClick={() => { anchors.current.clear(); restoring.current = false; followLatest.current = true; timeline.returnToLatest(); }}>Volver a lo reciente</button>}
           </div>}
           {timeline.status === "unavailable" && <p role="status" className="altazor-muted">No pude recuperar el historial. <button className="btn btn-ghost" type="button" onClick={timeline.refresh}>Reintentar</button></p>}
           {entries.length === 0 && (timeline.status === "loading" ? <p role="status">Recuperando conversación…</p> : <div className="altazor-welcome"><p>¿En qué trabajamos hoy?</p></div>)}
           {entries.length > 0 && <ol className="altazor-turns">{entries.map(entry => (
-            <li key={entry.id}>{entry.kind === "update"
+            <li key={entry.id} data-history-id={entry.id}>{entry.kind === "update"
               ? <AltazorUpdateMessage update={entry.update} />
-              : <AltazorTurnMessage turn={entry.turn} busy={busy} onAction={action => void handleTurnAction(entry.turn, action)} />}
+              : <AltazorTurnMessage turn={entry.turn} busy={busy} onContinue={uploading || loading || busy || (activeId !== entry.turn.conversationId && attachmentIds.length > 0) ? undefined : (id, hash) => continueJob(entry.turn.conversationId, id, hash)} onAction={action => void handleTurnAction(entry.turn, action)} />}
             </li>
           ))}</ol>}
         {updates.status === "unavailable" && <p role="status" className="altazor-muted">No pude comprobar si hay avisos nuevos. Puedes <Link href="/plazos">abrir Plazos</Link> mientras vuelvo a intentarlo.</p>}
         </section>
         {!followingLatest && !timeline.readingOlder && <button type="button" className="btn btn-ghost altazor-latest" onClick={() => { followLatest.current = true; setFollowingLatest(true); historyRef.current?.scrollTo({ top: historyRef.current.scrollHeight, behavior: "instant" }); }}>Ir al mensaje más reciente<ArrowUp size={15} aria-hidden="true" className="altazor-latest-arrow" /></button>}
+        {continuation && <div className="altazor-context-line">
+          <span>Informe del encargo seleccionado</span>
+          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setContinuation(null)}>Quitar informe</button>
+        </div>}
         {clarification && <p className="altazor-clarification" role="status"><strong>Altazor</strong>{clarification}</p>}
         {currentCase && <div className="altazor-context-line">
           <span className="altazor-case-context">{currentLabel}</span>
@@ -94,6 +121,8 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
             onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(); } }} />
         {destination && !destination.permitted && <p className="altazor-connection-notice">Conecta ALTAZOR para empezar. <Link href="/configuracion#preferencias-altazor">Conectar</Link></p>}
           <div className="altazor-composer-footer"><button type="button" className="btn btn-ghost" disabled={uploading || busy} onClick={() => input.current?.click()}><Paperclip size={18} /> {uploading ? "Preparando archivo…" : "Adjuntar"}</button><button type="button" className="btn btn-ghost altazor-composer-apps" aria-label="Aplicaciones" title="Aplicaciones" onClick={() => choosePane("connectors")}><Link2 size={18} aria-hidden="true" /><span>Aplicaciones</span></button><input ref={input} type="file" aria-label="Archivos para adjuntar al mensaje de ALTAZOR" className="sr-only" multiple accept=".pdf,.epub,.doc,.docx,.odt,.rtf,.txt,.md,.csv,.json,.html,.htm" onChange={event => void upload(event.target.files)} />{text.length >= 7200 && <span aria-live="polite">{8000-text.length} caracteres disponibles</span>}<button type="button" className="btn btn-primary" aria-label="Enviar mensaje a ALTAZOR" data-testid="inicio-send" disabled={!text.trim() || busy || uploading || Boolean(running) || preferenceSaving || loading || !destination?.permitted} onClick={sendMessage}><ArrowUp size={18} /> Enviar</button></div>
+          <AltazorTurnMemoryPicker key={JSON.stringify([activeId, currentCase])} causaId={currentCase} selection={icaroMemorySelections}
+            onChange={selectIcaroMemory} disabled={busy || loading || uploading || Boolean(running)} />
           <details className="altazor-composer-help"><summary>Ayuda de teclado</summary><p id="altazor-keyboard-help" className="altazor-keyboard-help">Enter para enviar · Mayús + Enter para un salto de línea</p></details>
         </div>
         {data?.attachments.length ? <details className="altazor-attachment-archive" open={attachmentIds.length ? true : undefined}><summary>Archivos de este contexto <span>{data.attachments.length}</span></summary><ul className="altazor-attachments">{data.attachments.map(file => <li key={file.id}><span>{file.sourceName}{file.status !== "ready" && <small>{file.status === "processing" ? "Preparando…" : "Revisar archivo"}</small>}</span>{attachmentIds.includes(file.id) ? <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`No adjuntar ${file.sourceName}`} onClick={() => setAttachmentIds(previous => previous.filter(id => id !== file.id))}><X size={16} /></button> : <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Adjuntar de nuevo ${file.sourceName}`} onClick={() => setAttachmentIds(previous => [...previous,file.id])}><Paperclip size={16} /></button>}<details className="altazor-attachment-options"><summary aria-label={`Opciones de ${file.sourceName}`}><Ellipsis size={18} /></summary><div><a href={`/api/altazor/conversations/${activeId}/attachments/${file.id}/original`}>Descargar original</a><button type="button" disabled={busy||uploading} onClick={()=>{setBusy(true);setError("");void request<{book:{id:string;title:string}}>(`/api/altazor/conversations/${activeId}/attachments/${file.id}/library`,{}).then(result=>setLibraryNotice(result.book)).catch(reason=>setError(reason.message)).finally(()=>setBusy(false));}}>Guardar en biblioteca</button><button type="button" disabled={busy} aria-label={`Retirar archivo ${file.sourceName}`} onClick={() => { void request(`/api/altazor/conversations/${activeId}/attachments/${file.id}`,{},"DELETE").then(() => { setAttachmentIds(previous => previous.filter(id => id !== file.id)); return reload(activeId); }).catch(reason => setError(reason.message)); }}>Retirar de la conversación</button></div></details></li>)}</ul></details> : null}
@@ -119,7 +148,7 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
 
 type TurnAction = "confirm" | "reject" | "execute" | "cancel";
 
-function AltazorTurnMessage({ turn, busy, onAction }: { turn: TimelineTurn; busy: boolean; onAction: (action: TurnAction) => void }) {
+function AltazorTurnMessage({ turn, busy, onAction, onContinue }: { turn: TimelineTurn; busy: boolean; onContinue?: (id: string, hash: string) => void; onAction: (action: TurnAction) => void }) {
   if (turn.available === false) return <><p className="altazor-muted">Contenido no disponible. Cambió el acceso a una fuente.</p>{turn.results.filter(r=>r.result.card?.type==="case-job"&&typeof r.result.card.id==="string").map(r=><AltazorCaseJob key={String(r.result.card!.id)} id={String(r.result.card!.id)}/>)}</>;
   const canAct = turn.conversationStatus === "active";
   const inProgress = ["queued", "running", "delegating"].includes(turn.status);
@@ -149,7 +178,7 @@ function AltazorTurnMessage({ turn, busy, onAction }: { turn: TimelineTurn; busy
         <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => onAction("reject")}>Descartar plan</button>
       </div>}
       {!inProgress && cards.length > 0 && <details className="altazor-result-details"><summary>Ver resultados y detalles · {cards.length}</summary>{cards.map((item, index) => <ResultCard key={index} item={{ toolId: item.toolId, ...item.result } as AssistantResultItem} />)}</details>}
-      {turn.results.filter(item=>item.result.card?.type==="case-job"&&typeof item.result.card.id==="string").map(item=><AltazorCaseJob key={String(item.result.card!.id)} id={String(item.result.card!.id)}/>)}
+      {turn.results.filter(item=>item.result.card?.type==="case-job"&&typeof item.result.card.id==="string").map(item=><AltazorCaseJob key={String(item.result.card!.id)} id={String(item.result.card!.id)} onContinue={canAct ? onContinue : undefined}/>)}
       {Boolean(turn.delegations?.length) && <details className="altazor-result-details"><summary>Ver encargos a Ícaros · {turn.delegations!.length}</summary><ul className="altazor-delegation-list">{turn.delegations!.map(job => <li key={job.id}><strong>{job.icaroName || "Ícaro no disponible"}</strong><span>{({ queued: "En cola", running: "Trabajando", completed: "Completado", failed: "No completado", cancelled: "Detenido", blocked: "Acceso no disponible", interrupted: "Interrumpido" } as Record<string, string>)[job.status] || "Estado por consultar"}</span>{job.available && job.result && <AltazorMessageContent text={job.result} />}</li>)}</ul><Link href={`/inicio?${new URLSearchParams({ altazor: "icaros", ...(turn.causaId ? { causaId: turn.causaId } : {}) })}`}>Abrir mis Ícaros</Link></details>}
       {canAct && inProgress && <div className="altazor-running">
         {!turn.progress && <span role="status">{turn.status === "queued" ? "Encargo en cola" : "Trabajando…"}</span>}

@@ -383,7 +383,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
                     {p.titulo}
                   </div>
                   <div className="text-xs text-[var(--muted)]">
-                    {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo)}
+                    {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo, p.calculationRegime)}
                     {p.estado === "pendiente"
                       ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
                       : ""}

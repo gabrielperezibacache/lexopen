@@ -11,6 +11,7 @@ import { evidenceResourceReadWhere, evidenceFragmentHref } from "@/lib/evidence/
 import { resolveCitation } from "@/lib/knowledge/citations";
 import { audioPublicationContext, type AudioTranscriptCitation } from "@/lib/knowledge/audio-transcript";
 import { resolveLibraryScope, libraryScopeStillAuthorized, type LibrarySelection } from "@/lib/knowledge/library";
+import { publicJudgmentFile, publicJudgmentRol } from "./pjud-judgments";
 import { validatePublicLegalSourceUrl } from "./sources";
 import type { FetchedLegalSource } from "./source-types";
 import { RESEARCH_LIMITS, RESEARCH_SOURCE_KINDS, rankResearchText, researchQuerySchema, researchTerms, type ResearchQuery, type ResearchSourceKind } from "./search";
@@ -71,20 +72,29 @@ export async function importLegalSource(input: LegalSourceImport, user: CausaAcc
   const canonicalUrl = validatePublicLegalSourceUrl(input.canonicalUrl);
   if (!RESEARCH_SOURCE_KINDS.includes(input.kind as ResearchSourceKind) || !input.title.trim() || input.title.length > 1000 || !input.organism.trim() || input.organism.length > 300) throw httpError("Metadatos de fuente inválidos", 400);
   if (!input.text.trim() || input.text.length > MAX_EVIDENCE_TEXT || !Buffer.isBuffer(input.rawBytes) || !input.rawBytes.length || input.rawBytes.length > MAX_STORAGE_OBJECT_BYTES) throw httpError("La fuente está vacía o supera el límite de importación", 413);
+  const isPublicJudgment = new URL(canonicalUrl).hostname === "juris.pjud.cl";
+  if (isPublicJudgment) {
+    const id = publicJudgmentId(canonicalUrl);
+    const rol = publicJudgmentRol(input.pjudPublicCopy?.rol);
+    if (!id || !input.pjudPublicCopy || input.acquisitionMethod === "manual" || input.title !== `Sentencia PJUD ${rol || id}` ||
+        input.externalId !== `PJUD:${id}` || !input.rawBytes.equals(publicJudgmentFile(canonicalUrl, id, rol, input.text))) {
+      throw httpError("Recupere la versión pública de la sentencia desde el Buscador Unificado.", 422);
+    }
+  }
+  const method = isPublicJudgment ? "pjud_public" : input.acquisitionMethod || "retrieved";
   const sourceSha256 = sha256(input.rawBytes), textSha256 = sha256(input.text);
   const dates = { publishedAt: dateOrNull(input.publishedAt), effectiveFrom: dateOrNull(input.effectiveFrom), effectiveTo: dateOrNull(input.effectiveTo) };
   const suppliedMetadata = { title: input.title, organism: input.organism, kind: input.kind, externalId: input.externalId || null, mimeType: input.mimeType || null, publishedAt: iso(dates.publishedAt), effectiveFrom: iso(dates.effectiveFrom), effectiveTo: iso(dates.effectiveTo) };
   const storageKey = `legal-sources/${sha256(canonicalUrl)}/${sourceSha256}`;
   await putObject({ key: storageKey, body: input.rawBytes, contentType: input.mimeType });
   const chunks = splitEvidenceText(input.text);
-  const method = input.acquisitionMethod || "retrieved";
-  if (!["retrieved", "manual"].includes(method)) throw httpError("Procedencia inválida", 400);
   const warnings = [...new Set((input.coverageWarnings || []).slice(0, 20).map(w => String(w).slice(0, 500)))];
   if (method === "manual") warnings.push("Texto incorporado manualmente: su coincidencia con la publicación oficial requiere revisión");
   return transaction(client, async tx => {
     const actor = await actorFor(user, tx);
     const existingSource = await tx.legalSource.findUnique({ where: { canonicalUrl } });
-    const existingVersion = existingSource ? await tx.legalSourceVersion.findUnique({ where: { sourceId_sourceSha256_textSha256: { sourceId: existingSource.id, sourceSha256, textSha256 } }, select: { title: true, organism: true, kind: true, externalId: true, mimeType: true, publishedAt: true, effectiveFrom: true, effectiveTo: true } }) : null;
+    const existingVersion = existingSource ? await tx.legalSourceVersion.findUnique({ where: { sourceId_sourceSha256_textSha256: { sourceId: existingSource.id, sourceSha256, textSha256 } }, select: { reviewState: true, title: true, organism: true, kind: true, externalId: true, mimeType: true, publishedAt: true, effectiveFrom: true, effectiveTo: true } }) : null;
+    if (existingVersion && existingVersion.reviewState !== "available") throw httpError("La versión permanece bajo custodia del Host.", 409);
     if (method === "manual" && existingVersion) {
       const frozen = { title: existingVersion.title, organism: existingVersion.organism, kind: existingVersion.kind, externalId: existingVersion.externalId, mimeType: existingVersion.mimeType, publishedAt: iso(existingVersion.publishedAt), effectiveFrom: iso(existingVersion.effectiveFrom), effectiveTo: iso(existingVersion.effectiveTo) };
       if (JSON.stringify(frozen) !== JSON.stringify(suppliedMetadata)) throw httpError("Esta versión ya conserva otros metadatos. Revise la fuente o incorpore una nueva versión documental", 409);
@@ -141,11 +151,12 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
     const siteVersionIds = siteFiles.flatMap(file => file.evidenceResource?.versions.map(v => v.id) || []);
     const documentVersionIds = [...new Set([...caseVersionIds, ...siteVersionIds, ...library.documentVersionIds])];
     const resourceWhere: Prisma.DocumentResourceWhereInput = { AND: [evidenceResourceReadWhere(actor), { OR: [{ documento: documentWhere }, { siteFile: siteFileWhere }, { id: { in: library.citations.flatMap(citation => citation.resourceId ? [citation.resourceId] : []) } }] }] };
-    const legalWhere = { kind: { in: sourceKinds } };
+    const legalWhere = { kind: { in: sourceKinds }, versions: { some: { reviewState: "available" } } };
     const legalSourcesAvailable = input.libraryOnly ? 0 : await tx.legalSource.count({ where: legalWhere });
-    const sources = input.libraryOnly ? [] : await tx.legalSource.findMany({ where: legalWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: RESEARCH_LIMITS.legalSources, select: { id: true, kind: true, versions: { orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } });
-    const legalVersionIds = [...new Set([...sources.flatMap(source => source.versions.map(v => v.id)), ...library.legalVersionIds])];
-    const legalVersionsInScope = legalVersionIds.length ? await tx.legalSourceVersion.findMany({ where: { id: { in: legalVersionIds } }, select: { id: true, kind: true } }) : [];
+    const sources = input.libraryOnly ? [] : await tx.legalSource.findMany({ where: legalWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: RESEARCH_LIMITS.legalSources, select: { id: true, kind: true, versions: { where: { reviewState: "available" }, orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } });
+    const selectedLegalIds = [...new Set([...sources.flatMap(source => source.versions.map(v => v.id)), ...library.legalVersionIds])];
+    const legalVersionsInScope = selectedLegalIds.length ? await tx.legalSourceVersion.findMany({ where: { id: { in: selectedLegalIds }, reviewState: "available" }, select: { id: true, kind: true } }) : [];
+    const legalVersionIds = legalVersionsInScope.map(version => version.id);
     const [legalRanks, documentRanks] = await Promise.all([rankFragmentIds(tx, "legal", legalVersionIds, terms), rankFragmentIds(tx, "document", documentVersionIds, terms)]);
     const legalRows = legalRanks.length ? await tx.legalSourceFragment.findMany({ where: { id: { in: legalRanks.slice(0, RESEARCH_LIMITS.candidatesPerKind).map(row => row.id) }, versionId: { in: legalVersionIds } }, select: { id: true, ordinal: true, text: true, textSha256: true, version: { select: legalVersionSelect } } }) : [];
     const documentRows = documentRanks.length ? await tx.documentEvidenceFragment.findMany({ where: { id: { in: documentRanks.slice(0, RESEARCH_LIMITS.candidatesPerKind).map(row => row.id) }, versionId: { in: documentVersionIds }, version: { resource: resourceWhere }, OR: [{ pageId: null }, { page: { version: { resource: resourceWhere } } }] }, select: { id: true, versionId: true, ordinal: true, text: true, textSha256: true, pageId: true, pageStartOffset: true, pageEndOffset: true, version: { select: documentVersionSelect }, page: { select: { pageNumber: true, method: true, status: true } } } }) : [];
@@ -250,7 +261,7 @@ async function scopeStillAuthorized(scopeJson: string, actor: CausaAccessUser, t
 async function verifiedCitation(input: Pick<ResearchCitation, "kind" | "fragmentId" | "quote">, user: CausaAccessUser, tx: ResearchClient) {
   if (!["legal", "document"].includes(input.kind) || typeof input.fragmentId !== "string" || !input.fragmentId || input.fragmentId.length > 100 || typeof input.quote !== "string" || !input.quote.trim() || input.quote.length > 10_000) throw httpError("Cita inválida", 400);
   if (input.kind === "legal") {
-    const row = await tx.legalSourceFragment.findUnique({ where: { id: input.fragmentId }, select: { id: true, ordinal: true, text: true, textSha256: true, versionId: true, version: { select: { sourceSha256: true } } } });
+    const row = await tx.legalSourceFragment.findFirst({ where: { id: input.fragmentId, version: { reviewState: "available" } }, select: { id: true, ordinal: true, text: true, textSha256: true, versionId: true, version: { select: { sourceSha256: true } } } });
     if (!row) throw httpError("Cita no encontrada", 404);
     return { verified: verifyEvidenceQuote(row, input.quote), fragmentId: row.id, quote: input.quote, versionId: row.versionId, textSha256: row.textSha256, sourceSha256: row.version.sourceSha256, ...audioPublicationContext(null), pageNumber: null, href: `/jurisprudencia/fuentes/${row.versionId}?fragment=${row.ordinal}#fragment-${row.ordinal}` };
   }
@@ -299,14 +310,15 @@ export async function listResearchRuns(user: CausaAccessUser, client: PrismaClie
 export async function listLegalSources(user: CausaAccessUser, client: PrismaClient = prisma) {
   return transaction(client, async tx => {
     await actorFor(user, tx);
-    return tx.legalSource.findMany({ orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 100, select: { id: true, canonicalUrl: true, title: true, organism: true, kind: true, externalId: true, versions: { orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: legalVersionSelect } } });
+    const sources = await tx.legalSource.findMany({ where: { versions: { some: { reviewState: "available" } } }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 100, select: { id: true, canonicalUrl: true, title: true, organism: true, kind: true, externalId: true, versions: { where: { reviewState: "available" }, orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: legalVersionSelect } } });
+    return sources.map(source => ({ ...source, title: source.versions[0].title, organism: source.versions[0].organism, externalId: source.versions[0].externalId }));
   });
 }
 export async function readLegalSourceVersion(id: string, user: CausaAccessUser, query: { after?: number; q?: string } = {}, client: PrismaClient = prisma) {
   if (query.after !== undefined && (!Number.isSafeInteger(query.after) || query.after < 0) || (query.q?.length || 0) > 200) throw httpError("Filtro de fuentes inválido", 400);
   return transaction(client, async tx => {
     await actorFor(user, tx);
-    const version = await tx.legalSourceVersion.findUnique({ where: { id }, select: { ...legalVersionSelect, _count: { select: { fragments: true } } } });
+    const version = await tx.legalSourceVersion.findFirst({ where: { id, reviewState: "available" }, select: { ...legalVersionSelect, _count: { select: { fragments: true } } } });
     if (!version) throw httpError("Fuente no encontrada", 404);
     const rows = await tx.legalSourceFragment.findMany({ where: { versionId: id, ordinal: { gt: query.after || 0 }, ...(query.q ? { text: { contains: query.q, mode: "insensitive" } } : {}) }, orderBy: { ordinal: "asc" }, take: 51, select: { id: true, ordinal: true, text: true, textSha256: true, startOffset: true, endOffset: true } });
     return { ...version, canonicalUrl: version.source.canonicalUrl, warnings: metadata(version.metadataJson).warnings, fragments: rows.slice(0, 50), nextAfter: rows.length > 50 ? rows[49].ordinal : null, originalHref: `/api/research/sources/${id}/original` };
@@ -314,9 +326,38 @@ export async function readLegalSourceVersion(id: string, user: CausaAccessUser, 
 }
 export async function readLegalSourceOriginal(id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
   await actorFor(user, client);
-  const version = await client.legalSourceVersion.findUnique({ where: { id }, select: { sourceStorageKey: true, sourceSha256: true, mimeType: true, title: true } });
+  const version = await client.legalSourceVersion.findFirst({ where: { id, reviewState: "available" }, select: { sourceStorageKey: true, sourceSha256: true, mimeType: true, title: true, retrievedAt: true } });
   if (!version?.sourceStorageKey) throw httpError("Original no encontrado", 404);
   const bytes = await getObject(version.sourceStorageKey);
   if (!bytes || sha256(bytes) !== version.sourceSha256) throw httpError("El original no coincide con la versión registrada", 409);
-  return { bytes, mimeType: version.mimeType, name: `${version.title.slice(0, 100)}.${version.mimeType?.includes("html") ? "html" : version.mimeType?.includes("xml") ? "xml" : version.mimeType?.includes("json") ? "json" : "txt"}` };
+  return { bytes, sourceSha256: version.sourceSha256, retrievedAt: version.retrievedAt, mimeType: version.mimeType, name: `${version.title.slice(0, 100)}.${version.mimeType?.includes("html") ? "html" : version.mimeType?.includes("xml") ? "xml" : version.mimeType?.includes("json") ? "json" : "txt"}` };
+}
+
+
+function publicJudgmentId(url: string) {
+  return /^https:\/\/juris\.pjud\.cl\/busqueda\?Civiles#sentencia-([1-9]\d{0,14})$/.exec(url)?.[1] ?? null;
+}
+
+export async function listJudgmentsAwaitingRecovery(user: CausaAccessUser, after = "", client: PrismaClient = prisma) {
+  if (after.length > 120) throw httpError("Página de revisión inválida", 400);
+  return transaction(client, async tx => {
+    await actorFor(user, tx);
+    const rows = await tx.legalSource.findMany({
+      where: { id: { gt: after }, versions: { some: { reviewState: "quarantined" }, none: { reviewState: "available", acquisitionMethod: "pjud_public" } } },
+      orderBy: { id: "asc" }, take: 51, select: { id: true, canonicalUrl: true },
+    });
+    return { items: rows.slice(0, 50).map(row => ({ id: row.id, judgmentId: publicJudgmentId(row.canonicalUrl) })),
+      next: rows.length > 50 ? rows[49].id : null };
+  });
+}
+
+/** The recovery view may disclose only the official numeric selection, never old titles or content. */
+export async function quarantinedJudgmentSelection(id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+  return transaction(client, async tx => {
+    await actorFor(user, tx);
+    const version = await tx.legalSourceVersion.findFirst({ where: { id, reviewState: "quarantined" },
+      select: { source: { select: { canonicalUrl: true } } } });
+    if (!version) return null;
+    return { judgmentId: publicJudgmentId(version.source.canonicalUrl) };
+  });
 }

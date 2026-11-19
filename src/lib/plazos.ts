@@ -259,7 +259,9 @@ export function labelDiasRestantes(dias: number) {
   return `vence en ${dias} días`;
 }
 
-export function labelTipoComputo(tipo: string) {
+export function labelTipoComputo(tipo: string, regime?: string | null) {
+  if (regime?.startsWith("cl_cpc_individual_days_v")) return `CPC individual · ${regime.split("_").at(-1)}`;
+  if (regime === null) return "Fecha registrada";
   if (tipo === "corridos") return "Corridos";
   if (tipo === "habiles") return "Hábiles";
   return tipo;

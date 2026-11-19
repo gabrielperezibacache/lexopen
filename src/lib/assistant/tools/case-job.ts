@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import { serializable, canonicalJson } from "@/lib/command-execution";
 import { STAFF_ROLES } from "@/lib/auth/roles";
+import { turnIcaroMemorySelections } from "@/lib/altazor/icaros/turn-memory";
 import { snapshotHash } from "@/lib/altazor/case-jobs/snapshot";
 import {
   createCaseJob,
@@ -37,7 +38,8 @@ export async function resolveCaseJobInput(ctx: ToolContext, objective: string) {
       "Resume el objetivo del encargo en hasta 2000 caracteres; los documentos se seleccionan desde la causa.",
       409,
     );
-  const plan = await prepareCasePlan(conversationId, objective, actor);
+  const selections = ctx.nativeTurnId ? await turnIcaroMemorySelections(ctx.nativeTurnId, conversationId, actor) : [];
+  const plan = await prepareCasePlan(conversationId, objective, actor, prisma, selections);
   return { objective, plan, planHash: snapshotHash(plan) };
 }
 export async function assertCaseJobToolAccess(ctx: ToolContext) {

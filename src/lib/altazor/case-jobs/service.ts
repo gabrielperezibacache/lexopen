@@ -1,3 +1,4 @@
+import { caseReportText } from "./report-reference";
 import { santiagoDateKey } from "@/lib/chile-time";
 import type { Prisma, AltazorCaseJob } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -11,7 +12,8 @@ import { serializable, canonicalJson } from "@/lib/command-execution";
 import { writeAuditStrict } from "@/lib/audit";
 import { icaroDestination } from "../icaros/destination";
 import { verifyAltazorSources } from "../resources";
-import { cancelIcaroJob } from "../icaros/service";
+import type { IcaroTurnSelection } from "../icaros/types";
+import { cancelIcaroJob, readSelectedIcaroMemory } from "../icaros/service";
 import { createTask } from "@/lib/tasks/service";
 import {
   createCaseWriting,
@@ -39,6 +41,7 @@ export async function prepareCasePlan(
   objective: string,
   user: CausaAccessUser,
   db: Db = prisma,
+  selections: IcaroTurnSelection[] = [],
 ): Promise<CaseJobPlan> {
   const { actor, conversation } = await conversationFor(
     conversationId,
@@ -78,8 +81,10 @@ export async function prepareCasePlan(
       .toLocaleLowerCase("es")
       .match(/[\p{L}]{4,}/gu)
       ?.filter((w) => words.has(w)).length || 0;
+  const chosen = new Map(selections.map(s => [s.icaroId, s.entries]));
   profiles.sort(
     (a, b) =>
+      Number(chosen.has(b.id)) - Number(chosen.has(a.id)) ||
       score(b) - score(a) ||
       a.name.localeCompare(b.name) ||
       a.id.localeCompare(b.id),
@@ -88,15 +93,20 @@ export async function prepareCasePlan(
   for (const p of profiles) {
     if (team.length === 2) break;
     const target = await icaroDestination(actor.id, p);
-    if (target.permitted)
+    if (target.permitted) {
+      const entries = chosen.get(p.id);
+      const memory = entries?.length ? await readSelectedIcaroMemory(p.id, actor, entries, db) : [];
       team.push({
         id: p.id,
         name: p.name,
         revision: p.revision,
-        useMemory: false,
+        useMemory: memory.length > 0,
+        ...(memory.length ? { memorySelection: memory } : {}),
         destination: target,
       });
+    }
   }
+  if (selections.some(s => !team.some(m => m.id === s.icaroId))) throw changed();
   return {
     version: 1,
     asOf: new Date().toISOString(),
@@ -109,7 +119,7 @@ export async function prepareCasePlan(
 }
 export function planPreview(plan: CaseJobPlan) {
   const counts = plan.snapshot;
-  return `Datos disponibles al iniciar: ${new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", dateStyle: "short", timeStyle: "short" }).format(new Date(plan.asOf))}, hora de Chile. No se consultará OJV.\nRevisar «${counts.cause.titulo}»: ${counts.documents.length} documentos, ${counts.tasks.length} tareas y ${counts.deadlines.length} plazos registrados.\nObjetivo: ${plan.objective}\nAltazor: ${plan.destination.model} · ${plan.destination.endpoint} (${plan.destination.remote ? "remoto" : "local"}).\n${plan.team.length ? plan.team.map((p) => `Ícaro ${p.name}: ${p.destination.model} · ${p.destination.endpoint} (${p.destination.remote ? "remoto" : "local"}); sin memoria.`).join("\n") : "Altazor trabajará solo: no hay Ícaros habilitados con destino permitido en esta causa."}\nCompartir únicamente el expediente accesible indicado, por bloques. No copiar historial, adjuntos ni memoria personal.\nPreparar informe y propuestas; guardar tareas y borradores requiere una confirmación posterior. No actualizar OJV, enviar comunicaciones ni cerrar plazos.`;
+  return `Datos disponibles al iniciar: ${new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", dateStyle: "short", timeStyle: "short" }).format(new Date(plan.asOf))}, hora de Chile. No se consultará OJV.\nRevisar «${counts.cause.titulo}»: ${counts.documents.length} documentos, ${counts.tasks.length} tareas y ${counts.deadlines.length} plazos registrados.\nObjetivo: ${plan.objective}\nAltazor: ${plan.destination.model} · ${plan.destination.endpoint} (${plan.destination.remote ? "remoto" : "local"}).\n${plan.team.length ? plan.team.map((p) => `Ícaro ${p.name}: ${p.destination.model} · ${p.destination.endpoint} (${p.destination.remote ? "remoto" : "local"}); ${p.memorySelection?.length ? `memoria propia (${p.memorySelection.length}): ${p.memorySelection.map(m => m.label).join(", ")}.` : "sin memoria."}`).join("\n") : "Altazor trabajará solo: no hay Ícaros habilitados con destino permitido en esta causa."}\nCompartir únicamente el expediente accesible indicado, por bloques. No copiar historial, adjuntos ni memoria personal.\nPreparar informe y propuestas; guardar tareas y borradores requiere una confirmación posterior. No actualizar OJV, enviar comunicaciones ni cerrar plazos.`;
 }
 export async function validateCasePlan(
   plan: CaseJobPlan,
@@ -146,6 +156,13 @@ export async function validateCasePlan(
       !member.destination.permitted
     )
       throw changed();
+    const selection = member.memorySelection ?? [];
+    if (member.useMemory !== (selection.length > 0)) throw changed();
+    if (selection.length) {
+      const refs = selection.map(({ id, revision, hash }) => ({ id, revision, hash }));
+      const current = await readSelectedIcaroMemory(member.id, actor, refs, db);
+      if (canonicalJson(selection) !== canonicalJson(current)) throw changed();
+    }
   }
 }
 export async function caseJobAccess(
@@ -470,7 +487,7 @@ export async function readCaseJob(
     available && job.helpRequestId
       ? await getHelpRequest(actor, job.helpRequestId).catch(() => null)
       : null;
-  return {
+  const view: CaseJobView = {
     id: job.id,
     causaId: job.causaId,
     available,
@@ -527,12 +544,20 @@ export async function readCaseJob(
       ? { id: help.id, question: help.question, status:["pending","answered"].includes(help.status)&&new Date(help.expiresAt)<=new Date()?"expired":help.status, notificationStatus:help.notificationStatus }
       : null,
     savedSelection: available ? JSON.parse(job.selectionJson) : null,
-    coordinator:available?{provider:plan.destination.provider,model:plan.destination.model}:null,team:available?plan.team.map(m=>({name:m.name,provider:m.destination.provider,model:m.destination.model})):[],
+    coordinator: available ? { provider: plan.destination.provider, model: plan.destination.model } : null,
+    team: available ? plan.team.map(member => ({
+      name: member.name,
+      provider: member.destination.provider,
+      model: member.destination.model,
+      memoryLabels: (member.memorySelection ?? []).map(entry => entry.label),
+    })) : [],
     pendingPlan:
       available && job.status === "awaiting_plan"
         ? { preview: planPreview(plan), hash: snapshotHash(plan) }
         : null,
   };
+  const text = caseReportText(view);
+  return { ...view, continuationHash: text ? snapshotHash({ plan: job.planJson, text }) : null };
 }
 export async function cancelCaseJob(
   id: string,
@@ -853,7 +878,7 @@ export async function resumeCaseJob(
     ["completed", "cancelled", "saving"].includes(job.status)
   )
     throw changed();
-  if (job.status === "awaiting_plan") {
+  if (job.status === "awaiting_plan" && confirmation !== undefined) {
     if (confirmation !== snapshotHash(plan))
       throw httpError("Confirma el plan actualizado antes de continuar", 409);
     await serializable(async (tx) => {
@@ -955,7 +980,26 @@ export async function resumeCaseJob(
       "El expediente cambió después de confirmar registros. Conservamos los recibos: prepara un nuevo encargo para revisar lo pendiente.",
       409,
     );
-  const fresh = await prepareCasePlan(job.conversationId, job.objective, actor);
+  // A changed context requires a second preview. Reuse only the exact chosen memories;
+  // an unavailable selection can be removed, but must never be replaced by newer notes.
+  const selections: IcaroTurnSelection[] = [];
+  for (const member of plan.team) {
+    if (!member.memorySelection?.length) continue;
+    const refs = member.memorySelection.map(({ id, revision, hash }) => ({ id, revision, hash }));
+    try {
+      await readSelectedIcaroMemory(member.id, actor, refs, prisma);
+      selections.push({ icaroId: member.id, entries: refs });
+    } catch (error) {
+      if (!isUnavailableCaseContext(error)) throw error;
+    }
+  }
+  let fresh: CaseJobPlan;
+  try {
+    fresh = await prepareCasePlan(job.conversationId, job.objective, actor, prisma, selections);
+  } catch (error) {
+    if (!selections.length || !isUnavailableCaseContext(error)) throw error;
+    fresh = await prepareCasePlan(job.conversationId, job.objective, actor);
+  }
   await serializable(async (tx) => {
     const current = await caseJobAccess(id, user, tx, false);
     if (current.job.revision !== expectedRevision || current.job.cancelledAt)

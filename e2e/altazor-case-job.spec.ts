@@ -25,6 +25,7 @@ let server: Server | undefined,
   firmId = "",
   priorMode = "";
 const models: string[] = [];
+const memoryReaders: string[] = [];
 test.beforeAll(async () => {
   const seed = await db.user.findUniqueOrThrow({
     where: { email: "abogado@estudio.cl" },
@@ -81,6 +82,12 @@ test.beforeAll(async () => {
       instructions: "Revisar sólo los antecedentes elegidos.",
       provider: "study",
       model: "specialist-fictitious",
+      memoryEnabled: true,
+      memories: { create: {
+        ownerId, requestId: randomUUID(), inputSha256: tag, label: "Criterio interno elegido",
+        body: "Memoria ficticia exclusiva del especialista",
+        sourcesJson: JSON.stringify({ version: 1, refs: [], memory: [] }),
+      } },
     },
   });
   const firm = await db.firmSettings.findFirstOrThrow();
@@ -102,6 +109,7 @@ test.beforeAll(async () => {
       messages: { content: string }[];
     };
     models.push(input.model);
+    if (input.messages.some(message => message.content.includes("Memoria ficticia exclusiva del especialista"))) memoryReaders.push(input.model);
     let content =
       "Análisis ficticio: cotejar el antecedente con el expediente.";
     if (input.messages[0].content.includes("Devuelve SOLO JSON")) {
@@ -223,6 +231,9 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
   test.setTimeout(180000);
   await loginAs(page, email);
   await page.goto(`/inicio?causaId=${causeId}`, { waitUntil: "networkidle" });
+  await page.getByText("Recuerdos para delegar", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Ícaro", exact: true }).selectOption({ label: "Revisor de prueba" });
+  await page.getByRole("checkbox", { name: "Criterio interno elegido", exact: true }).check();
   await page
     .getByRole("textbox", { name: "Mensaje para ALTAZOR", exact: true })
     .fill("Revisa esta causa, organiza los pendientes y prepara un borrador");
@@ -239,6 +250,7 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
     page.getByText(/Ícaro Revisor de prueba: specialist-fictitious/),
   ).toBeVisible();
   expect(await db.altazorCaseJob.count({ where: { ownerId } })).toBe(0);
+  await expect(page.getByText(/memoria propia \(1\): Criterio interno elegido/)).toBeVisible();
   expect(models).toHaveLength(0);
   await confirm.click();
   await expect(
@@ -280,6 +292,8 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
   );
   expect(models).toContain("coordinator-fictitious");
   expect(models).toContain("specialist-fictitious");
+  expect(memoryReaders).toContain("specialist-fictitious");
+  expect(memoryReaders).not.toContain("coordinator-fictitious");
   const fresh = await context.newPage();
   await fresh.goto(
     `/inicio?conversacion=${job.conversationId}&causaId=${causeId}`,
@@ -293,6 +307,10 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
     card.getByText("Listo para revisar", { exact: true }),
   ).toBeVisible();
   const taskTitle = card.getByLabel("Título de tarea", { exact: true });
+  await card.getByRole("button", { name: "Continuar este encargo", exact: true }).click();
+  await expect(fresh.getByText("Informe del encargo seleccionado", { exact: true })).toBeVisible();
+  await fresh.getByRole("button", { name: "Quitar informe", exact: true }).click();
+  await expect(fresh.getByText("Informe del encargo seleccionado", { exact: true })).toHaveCount(0);
   const keepDraft = card.getByRole("checkbox", { name: "Guardar borrador privado" });
   const jobUrl = `**/api/altazor/case-jobs/${job.id}`;
   await taskTitle.fill("Tarea ajustada por el profesional");

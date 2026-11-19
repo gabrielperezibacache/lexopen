@@ -38,3 +38,11 @@ export function fiscaliaValidation(input: FiscaliaInput, before: FiscaliaState |
   if (input.answeredAt && (!input.submittedAt || input.answeredAt < input.submittedAt || input.answeredAt > santiagoDateKey(now))) return "Compruebe la fecha de respuesta respecto de la presentación y de hoy.";
   return null;
 }
+
+export const fiscaliaDetailAction = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("correct"), expectedUpdatedAt: z.iso.datetime(),
+    folio: z.string().trim().min(1).max(120), submittedAt: z.string().refine(isValidYmd, "Fecha no válida"),
+    reason: z.string().trim().min(3, "Indique el motivo de la rectificación").max(2000) }),
+  z.strictObject({ action: z.literal("attach"), expectedUpdatedAt: z.iso.datetime(), evidenceKind: z.enum(["receipt", "answer"]),
+    documentoId: z.string().min(1).max(120), version: z.number().int().positive() }),
+]);

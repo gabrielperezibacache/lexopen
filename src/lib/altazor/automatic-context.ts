@@ -67,10 +67,10 @@ export async function automaticAltazorSources(user: CausaAccessUser, query: { te
       const found = await searchBooksWithScope({ query: terms.join(" "), bookIds: books.map(book => book.id), collectionIds: [], limit: 3 }, actor, client);
       for (const citation of found.result.results) add({ kind: "book", bookId: citation.bookId, fragmentId: citation.fragmentId, quote: citation.quote });
     }
-    const legal = await client.legalSource.findMany({ orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 100, select: { versions: { orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } });
+    const legal = await client.legalSource.findMany({ where: { versions: { some: { reviewState: "available" } } }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 100, select: { versions: { where: { reviewState: "available" }, orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } });
     const versionIds = legal.flatMap(source => source.versions.map(version => version.id));
     if (versionIds.length) {
-      const fragments = await client.legalSourceFragment.findMany({ where: { versionId: { in: versionIds } }, orderBy: [{ versionId: "asc" }, { ordinal: "asc" }], take: 3000, select: { id: true, versionId: true, text: true } });
+      const fragments = await client.legalSourceFragment.findMany({ where: { versionId: { in: versionIds }, version: { reviewState: "available" } }, orderBy: [{ versionId: "asc" }, { ordinal: "asc" }], take: 3000, select: { id: true, versionId: true, text: true } });
       for (const { row } of rankBookFragments(fragments, terms).slice(0, 3)) add({ kind: "legal", fragmentId: row.id, versionId: row.versionId, quote: quote(row.text) }, row.text);
     }
   }

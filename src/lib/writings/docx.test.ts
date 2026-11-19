@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { renderCaseWriting } from "./export";
 import { assertPlainDocx } from "@/lib/workbench/docx";
 import { assertWritingDocx, readWritingDocxParts, renderCaseWritingDocx } from "./docx";
 import type { WritingDraftView, WritingReferenceView } from "./types";
@@ -22,6 +23,19 @@ test("Word package has native footnotes linked to server-captured sources", () =
   assert.doesNotMatch(document, /\[\^R1\]|## Argumento|<script>/);
   assert.doesNotMatch(parts.get("word/_rels/document.xml.rels")!, /TargetMode|Target="https?:/);
   assert.throws(() => assertPlainDocx(bytes), "the recipe validator remains restricted to five parts");
+});
+test("court public copies retain their retrieval basis in every writing export", () => {
+  const citation = { ...reference.source.citations[0], verificationBasis: "public_version" as const, retainedSha256: null };
+  const publicDraft = { ...draft, references: [{ ...reference, source: { ...reference.source, citations: [citation] } }] };
+  const cause = { id: "fake-case", titulo: "Causa ficticia", rit: null };
+  for (const format of ["markdown", "text"] as const) {
+    const exported = renderCaseWriting(publicDraft, cause, format);
+    assert.match(exported, /Versión pública recuperada SHA-256/);
+    assert.doesNotMatch(exported, /Original conservado SHA-256/);
+  }
+  const parts = readWritingDocxParts(renderCaseWritingDocx(publicDraft, cause));
+  assert.match(parts.get("word/document.xml")!, /Versión pública recuperada/);
+  assert.match(parts.get("word/footnotes.xml")!, /Versión pública recuperada/);
 });
 test("Word rejects unsupported citation markers, fake handwritten definitions and corrupt bytes", () => {
   const cause = { titulo: "Causa ficticia", rit: null };

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
-import { createIcaro, executeIcaroJob } from "@/lib/altazor/icaros/service";
+import { createIcaro, executeIcaroJob, saveIcaroMemory } from "@/lib/altazor/icaros/service";
 import { runAssistantTurn } from "../pipeline";
 import { confirmAltazorTurn, createAltazorTurn, executeAltazorTurn, readAltazorConversation } from "@/lib/altazor/conversations";
 import { createAltazorAttachment, deleteAltazorAttachment } from "@/lib/altazor/attachments";
@@ -21,19 +21,26 @@ async function main() {
   try {
     const owner = await prisma.user.create({ data: { email: `${tag}@icaros-tool.invalid`, name: "Icaro native owner", role: "abogado", password: "not-a-login" } }); ids.push(owner.id);
     const outsider = await prisma.user.create({ data: { email: `${tag}-other@icaros-tool.invalid`, name: "Icaro outsider", role: "abogado", password: "not-a-login" } }); ids.push(outsider.id);
-    const { icaro } = await createIcaro({ requestId: `profile-${tag}`, name: "Revisor", provider: "study", model: "fixture-icaro", confirmed: true }, owner);
+    const { icaro } = await createIcaro({ requestId: `profile-${tag}`, name: "Revisor", provider: "study", model: "fixture-icaro", memoryEnabled: true, confirmed: true }, owner);
     const otherProfile = await createIcaro({ requestId: `other-${tag}`, name: "Revisor", provider: "study", model: "fixture-icaro", confirmed: true }, outsider);
     const conversation = await prisma.altazorConversation.create({ data: { ownerId: owner.id, requestId: `conversation-${tag}`, scopeKey: "personal", title: "Icaro tool native fixture", revision: 2, nextOrdinal: 2 } }); conversations.push(conversation.id);
     const attachment = await createAltazorAttachment(conversation.id, { requestId: `attachment-${tag}`, name: "fictitious-private.txt", bytes: Buffer.from("PARENT_ATTACHMENT_MUST_NOT_COPY") }, owner, prisma);
     const planId = `altazor-${randomUUID()}`; plans.push(planId);
+    const { memory } = await saveIcaroMemory(icaro.id, { requestId: `chosen-${tag}`, label: "Nota elegida", body: "CHOSEN_FOR_ICARO_ONLY", confirmed: true }, owner);
+    const selection = [{ id: memory.id, hash: memory.hash, revision: memory.revision }];
     const text = "Delega a Ícaro Revisor: Prepara una síntesis del encargo explícito.";
     const destination = { provider: "fixture-parent", model: "fixture-parent", endpoint: "http://127.0.0.1:19996/v1", endpointHash: "fictitious-parent-endpoint", remote: false, permitted: true, key: "a".repeat(64) };
     const options = { destination: async () => destination };
-    const turn = await prisma.altazorTurn.create({ data: { conversationId: conversation.id, ownerId: owner.id, requestId: `turn-${tag}`, ordinal: 1, inputSha256: "fictitious-turn-hash", userText: text, planId, status: "queued", actorSessionVersion: owner.sessionVersion, contextJson: JSON.stringify({ version: 1, refs: [], attachmentIds: [attachment.attachment.id], memoryDependencies: [], historyTurnIds: [] }), destinationJson: JSON.stringify({ ...destination, allowRemote: false, useMemory: false }) } });
+    const turn = await prisma.altazorTurn.create({ data: { conversationId: conversation.id, ownerId: owner.id, requestId: `turn-${tag}`, ordinal: 1, inputSha256: "fictitious-turn-hash", userText: text, planId, status: "queued", actorSessionVersion: owner.sessionVersion, contextJson: JSON.stringify({ version: 1, icaroMemorySelections: [{ icaroId: icaro.id, entries: selection }], refs: [], attachmentIds: [attachment.attachment.id], memoryDependencies: [], historyTurnIds: [] }), destinationJson: JSON.stringify({ ...destination, allowRemote: false, useMemory: false }) } });
     const ctx: ToolContext = { userId: owner.id, role: "abogado", chatId: conversation.id, nativeTurnId: turn.id, scope: { causaId: null } };
     const prepared = await runAssistantTurn({ text, user: { id: owner.id, role: "abogado" }, chatId: conversation.id, nativeTurnId: turn.id, scope: { causaId: null }, planId, context: "PARENT_CONTEXT_MUST_NOT_COPY", history: [{ role: "assistant", content: "PARENT_HISTORY_MUST_NOT_COPY" }] });
     assert.equal(prepared.clarify, undefined, prepared.clarify); assert.equal(prepared.autoResults, undefined); assert.equal(prepared.previewSteps.length, 1);
     const input = icaroDelegarSchema.parse(prepared.previewSteps[0].input);
+    assert.deepEqual(input.memorySelection, selection);
+    assert.match(prepared.previewSteps[0].preview, /Nota elegida/);
+    await assert.rejects(async () => icaroDelegarTool.preview({ ...input, memorySelection: undefined }, ctx), (error: unknown) => (error as { status?: number }).status === 409, "an old preview with memory enabled cannot authorize unspecified notes");
+    assert.ok(!prepared.previewSteps[0].preview.includes("CHOSEN_FOR_ICARO_ONLY"));
+    await saveIcaroMemory(icaro.id, { requestId: `late-${tag}`, label: "Nueva nota", body: "NEWER_UNUSED_MEMORY", confirmed: true }, owner);
     assert.equal(input.icaroId, icaro.id); assert.equal(input.profileRevision, icaro.revision);
     assert.equal((await prisma.altazorIcaroJob.count({ where: { ownerId: owner.id } })), 0, "preparation never enqueues");
     await assert.rejects(icaroDelegarTool.execute(input, ctx), /Confirma este encargo/);
@@ -52,6 +59,8 @@ async function main() {
     const childResult = "ICARO_NATIVE_RESULT_FOR_PARENT: síntesis ficticia terminada.";
     await executeIcaroJob(jobs[0].id, owner, { ask: async input => {
       assert.equal(JSON.stringify(input.messages).includes("PARENT_ATTACHMENT_MUST_NOT_COPY"), false);
+      assert.ok(JSON.stringify(input.messages).includes("CHOSEN_FOR_ICARO_ONLY"));
+      assert.ok(!JSON.stringify(input.messages).includes("NEWER_UNUSED_MEMORY"));
       return { source: "llm" as const, content: childResult, requireApproval: true, provider: "custom" as const, model: "fixture-icaro" };
     } });
     const finished = await readAltazorConversation(conversation.id, owner, prisma, {}, options);

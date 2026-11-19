@@ -911,6 +911,7 @@ model Plazo {
   diasPlazo     Int?
   calculationCountry String?
   calculationRegime String?
+  civilCalculationBasis Json? // Original approved civil calculation, retained after manual amendments.
   tipoComputo   String   @default("habiles") // habiles | corridos
   esFatal       Boolean  @default(false)
   tipo          String   @default("procesal")
@@ -1845,6 +1846,8 @@ model LegalSource {
 }
 
 model LegalSourceVersion {
+  /// Quarantined legacy PJUD material stays under Host custody and outside every reading path.
+  reviewState      String @default("available")
   id               String @id @default(cuid())
   sourceId         String
   source           LegalSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -3253,6 +3256,15 @@ model FiscaliaRequestEvent {
   actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
   status String
   action String
+  correctionReason String?
+  previousFolio String?
+  correctedFolio String?
+  previousSubmittedAt DateTime?
+  correctedSubmittedAt DateTime?
+  evidenceKind String?
+  documentoId String?
+  documentVersion Int?
+  documentSha256 String?
   createdAt DateTime @default(now())
   @@index([requestId, createdAt])
 }

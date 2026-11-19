@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ICARO_LIMITS } from "./types";
 import { altazorSourceInputSchema } from "../resource-input";
 
 export const icaroId = z.string().min(1).max(200).regex(/^[A-Za-z0-9_-]+$/);
@@ -19,9 +20,14 @@ export const updateIcaroSchema = z.object({
   expectedRevision: z.number().int().positive(), name: profile.name.optional(), instructions: profile.instructions.optional(),
   provider: profile.provider.optional(), model: profile.model.optional(), memoryEnabled: profile.memoryEnabled.optional(), enabled: z.boolean().optional(), confirmed: z.literal(true),
 }).strict();
+export const icaroMemorySelectionSchema = z.array(z.object({
+  id: icaroId, revision: z.number().int().positive(), hash: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict()).max(ICARO_LIMITS.memoryEntriesInContext).refine(
+  entries => new Set(entries.map(entry => entry.id)).size === entries.length, "Seleccionaste el mismo recuerdo dos veces",
+);
 export const createIcaroJobSchema = z.object({
   requestId, instruction: z.string().trim().min(1).max(6000), text: z.string().max(10000).default(""),
-  sources: z.array(altazorSourceInputSchema).max(8).default([]), useMemory: z.boolean().default(false),
+  sources: z.array(altazorSourceInputSchema).max(8).default([]), useMemory: z.boolean().default(false), memorySelection: icaroMemorySelectionSchema.optional(),
   allowRemote: z.boolean().default(false), destinationKey: z.string().regex(/^[a-f0-9]{64}$/),
   parentJobId: icaroId.nullish().transform(value => value || null), confirmed: z.literal(true),
 }).strict();
@@ -31,3 +37,7 @@ export const saveIcaroMemorySchema = z.union([
   z.object({ ...memoryCommon, jobId: icaroId }).strict(),
 ]);
 export const forgetIcaroMemorySchema = z.object({ expectedRevision: z.number().int().positive(), confirmed: z.literal(true) }).strict();
+
+export const icaroTurnSelectionsSchema = z.array(z.object({
+  icaroId, entries: icaroMemorySelectionSchema.refine(entries => entries.length > 0),
+}).strict()).max(2).refine(rows => new Set(rows.map(row => row.icaroId)).size === rows.length, "Selecciona cada Ícaro una sola vez");

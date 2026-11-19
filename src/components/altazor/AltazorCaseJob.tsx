@@ -22,7 +22,7 @@ const labels: Record<string, string> = {
   cancelled: "Cancelado",
   saving: "Guardando registros confirmados", waiting:"Esperando resultado",failed:"No completado",
 };
-export function AltazorCaseJob({ id }: { id: string }) {
+export function AltazorCaseJob({ id, onContinue }: { id: string; onContinue?: (id: string, hash: string) => void }) {
   const [job, setJob] = useState<CaseJobView | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -296,7 +296,16 @@ export function AltazorCaseJob({ id }: { id: string }) {
           </button>
         </div>
       )}
-      {job.available&&<details className="text-sm"><summary>Equipo y modelos confirmados</summary><p>Altazor · {job.coordinator?.model} · {job.coordinator?.provider}</p><ul>{job.team.map(m=><li key={m.name+":"+m.model}>{m.name} · {m.model} · {m.provider}</li>)}</ul></details>}
+      {job.available && <details className="text-sm">
+        <summary>Equipo y modelos confirmados</summary>
+        <p>Altazor · {job.coordinator?.model} · {job.coordinator?.provider}</p>
+        <ul>{job.team.map((member, index) => <li key={index}>
+          {member.name} · {member.model} · {member.provider}
+          {member.memoryLabels?.length > 0 && <ul aria-label={`Recuerdos elegidos para ${member.name}`} className="ml-5 list-disc">
+            {member.memoryLabels.map((label, i) => <li key={i}>{label}</li>)}
+          </ul>}
+        </li>)}</ul>
+      </details>}
       {job.help && (
         <div className="space-y-2">
           <p className="text-sm">{job.help.question}</p>
@@ -382,6 +391,8 @@ export function AltazorCaseJob({ id }: { id: string }) {
           )}
         </div>
       )}
+      {job.available && job.continuationHash && onContinue && <button type="button" className="btn btn-secondary" disabled={busy}
+        onClick={() => onContinue(id, job.continuationHash!)}>Continuar este encargo</button>}
       {job.available && job.status === "awaiting_review" && (
         <fieldset disabled={busy || uncertain} className="min-w-0 space-y-3">
           <legend className="font-semibold">Registros propuestos</legend>

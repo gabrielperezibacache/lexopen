@@ -11,7 +11,7 @@ import {
   altazorDestination,
   createAltazorConversation,
 } from "../conversations";
-import { createIcaro, saveIcaroMemory } from "../icaros/service";
+import { createIcaro, saveIcaroMemory, forgetIcaroMemory } from "../icaros/service";
 import { answerHelpRequest } from "../help/service";
 import {
   prepareCasePlan,
@@ -231,17 +231,26 @@ async function main() {
       },
       owner,
     );
-    const make = async (concurrent = true) => {
+    const approvedMemory = (await saveIcaroMemory(profile.id, {
+      requestId: randomUUID(), label: "Criterio elegido", body: "ONLY_SELECTED_SPECIALIST_MEMORY", sources: [], confirmed: true,
+    }, owner)).memory;
+    const memoryRef = { id: approvedMemory.id, revision: approvedMemory.revision, hash: approvedMemory.hash };
+    const chosenMemories = [{ icaroId: profile.id, entries: [memoryRef] }];
+    const make = async (concurrent = true, includeMemory = false) => {
       const plan = await prepareCasePlan(
         conversation.id,
         "Revisa esta causa, organiza pendientes y prepara un borrador",
-        owner,
+        owner, prisma, includeMemory ? chosenMemories : [],
       );
       assert.deepEqual(
         plan.snapshot.documents.map((d) => d.id),
         [doc.id],
       );
-      assert.equal(plan.team[0].useMemory, false);
+      assert.equal(plan.team[0].useMemory, includeMemory);
+      if (includeMemory) {
+        assert.match(planPreview(plan), /Criterio elegido/);
+        assert.doesNotMatch(planPreview(plan), /ONLY_SELECTED_SPECIALIST_MEMORY|Recuerdo privado/);
+      }
       const planId = `altazor-${randomUUID()}`;
       await prisma.assistantPlanRecord.create({
         data: {
@@ -287,6 +296,7 @@ async function main() {
             refs: [],
             historyTurnIds: [],
             memoryDependencies: [],
+            ...(includeMemory ? { icaroMemorySelections: chosenMemories } : {}),
           }),
         },
       });
@@ -346,7 +356,7 @@ async function main() {
       where: { conversationId: conversation.id, status: "running" },
       data: { status: "failed", leaseToken: null, leaseExpiresAt: null },
     });
-    const job = await make();
+    const job = await make(true, true);
     await assert.rejects(readCaseJob(job.id, other), status(404));
     await assert.rejects(
       confirmCaseProposals(
@@ -489,6 +499,8 @@ async function main() {
     );
     assert(calls.some((c) => c.model === "review-specialist"));
     assert(calls.some((c) => c.model === "study-default"));
+    assert(calls.some(c => c.model === "review-specialist" && c.text.includes("ONLY_SELECTED_SPECIALIST_MEMORY")));
+    assert(calls.filter(c => c.model === "study-default").every(c => !c.text.includes("ONLY_SELECTED_SPECIALIST_MEMORY")));
     assert(
       calls.every(
         (c) =>
@@ -627,9 +639,36 @@ async function main() {
       ),
       status(409),
     );
+    // The origin card is now outside the six-turn automatic history window.
+    const beforeGap = await prisma.altazorConversation.findUniqueOrThrow({ where: { id: conversation.id } });
+    await prisma.altazorTurn.createMany({ data: Array.from({ length: 8 }, (_, i) => ({
+      conversationId: conversation.id, ownerId: owner.id, ordinal: beforeGap.nextOrdinal + i,
+      requestId: randomUUID(), inputSha256: tag, status: "completed", userText: "Otro asunto",
+      assistantText: "Respuesta ficticia", contextJson: JSON.stringify({ version: 1, refs: [], attachmentIds: [], historyTurnIds: [], memoryDependencies: [] }),
+    })) });
+    const advanced = await prisma.altazorConversation.update({ where: { id: conversation.id }, data: { nextOrdinal: { increment: 8 }, revision: { increment: 8 } } });
+    const currentHash = (await readCaseJob(job.id, owner)).continuationHash!;
+    assert.ok(currentHash);
+    const selected = { id: job.id, hash: currentHash };
+    const selectionInput = { text: "Continúa la revisión", requestId: randomUUID(), expectedRevision: advanced.revision, destinationKey: destination.key, allowRemote: true, continueFrom: selected };
+    await assert.rejects(createAltazorTurn(conversation.id, { ...selectionInput, continueFrom: { id: job.id, hash: "0".repeat(64) } }, owner), status(409));
+    const different = await createAltazorConversation({ requestId: randomUUID(), causaId: cause.id, title: "Conversación independiente" }, owner);
+    await assert.rejects(createAltazorTurn(different.conversation.id, { ...selectionInput, expectedRevision: different.conversation.revision }, owner), status(404));
+    await assert.rejects(createAltazorTurn(conversation.id, selectionInput, other), status(404));
+    const explicit = await createAltazorTurn(conversation.id, selectionInput, owner);
+    let sentContext = "";
+    await executeAltazorTurn(conversation.id, explicit.turnId, owner, prisma, { execute: async request => {
+      sentContext = request.context || "";
+      assert(!request.history?.some(message => message.content.includes("Texto editado por el profesional")));
+      return { planId: null, previewSteps: [], autoResults: [{ toolId: "respuesta.libre", result: { ok: true, message: "Continuación comprobada" } }], streamEvents: [], classification: { source: "rule", toolIds: ["respuesta.libre"], prompt: "fixture" } };
+    } });
+    assert(sentContext.includes("Texto editado por el profesional"));
+    assert(sentContext.length <= 32_000);
     const changing = await make();
     await advanceCaseJob(changing.id, owner);
     await advanceCaseJob(changing.id, owner);
+    const latestConversation = await prisma.altazorConversation.findUniqueOrThrow({ where: { id: conversation.id } });
+    const queued = await createAltazorTurn(conversation.id, { ...selectionInput, requestId: randomUUID(), expectedRevision: latestConversation.revision }, owner);
     const keptBefore = await prisma.altazorCaseJobStep.findMany({
       where: { jobId: changing.id, status: "completed", kind: "analyze" },
       select: { id: true },
@@ -651,6 +690,11 @@ async function main() {
       null,
     );
     const beforeRefreshCalls = calls.length;
+    let calledAfterChange = false;
+    const changedContext = await executeAltazorTurn(conversation.id, queued.turnId, owner, prisma, { execute: async () => { calledAfterChange = true; throw Error("Unverified report"); } });
+    assert.equal(calledAfterChange, false);
+    assert.equal(changedContext.turns.find(t => t.id === explicit.turnId)?.available, false);
+    assert.equal(changedContext.turns.find(t => t.id === queued.turnId)?.status, "blocked");
     assert.equal(
       (await readAltazorConversation(conversation.id, owner)).turns.find(
         (t) => t.id === follow.turnId,
@@ -682,6 +726,18 @@ async function main() {
         "unchanged completed metadata analysis is retained",
       );
     askQuestion = true;
+    const withdrawn = await make(false, true);
+    await forgetIcaroMemory(profile.id, memoryRef.id, { expectedRevision: memoryRef.revision, confirmed: true }, owner);
+    const priorCalls = calls.length;
+    await assert.rejects(advanceCaseJob(withdrawn.id, owner), status(409));
+    const blockedMemory = await readCaseJob(withdrawn.id, owner);
+    assert.equal(blockedMemory.available, false);
+    const replacement = await resumeCaseJob(withdrawn.id, owner, blockedMemory.revision);
+    assert.equal(replacement.status, "awaiting_plan");
+    assert.match(replacement.pendingPlan!.preview, /sin memoria/);
+    assert.doesNotMatch(replacement.pendingPlan!.preview, /Criterio elegido/);
+    assert.equal(calls.length, priorCalls);
+    await cancelCaseJob(withdrawn.id, owner, replacement.revision);
     const waiting = await make();
     await withRejectedAudit(owner.id, "altazor.help.wait", async () => {
       assert.equal((await run(waiting.id)).status, "interrupted");

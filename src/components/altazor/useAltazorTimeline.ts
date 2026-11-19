@@ -12,8 +12,8 @@ export type TimelineTurn = Turn & {
 type TimelinePage = { turns: TimelineTurn[]; before: string | null };
 type TimelineState = { status: "ready" | "unavailable"; cursor: string | null; page: TimelinePage | null };
 
-async function readPage(signal: AbortSignal, before?: string | null): Promise<TimelinePage> {
-  const query = before ? `?${new URLSearchParams({ before })}` : "";
+async function readPage(signal: AbortSignal, cursor: string): Promise<TimelinePage> {
+  const query = cursor ? `?${cursor}` : "";
   const response = await fetch(`/api/altazor/timeline${query}`, { signal, cache: "no-store" });
   if (!response.ok) throw Object.assign(new Error("Timeline unavailable"), { status: response.status });
   return response.json();
@@ -21,7 +21,9 @@ async function readPage(signal: AbortSignal, before?: string | null): Promise<Ti
 
 export function useAltazorTimeline(enabled: boolean, version: string, working: boolean) {
   const [state, setState] = useState<TimelineState | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
+  // Store only cursor parameters. Every visit fetches and verifies the page again.
+  const [pages, setPages] = useState<string[]>([""]);
+  const cursor = pages.at(-1) || "";
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -39,10 +41,9 @@ export function useAltazorTimeline(enabled: boolean, version: string, working: b
       try {
         const page = await readPage(controller.signal, cursor);
         if (!controller.signal.aborted) setState({ status: "ready", page, cursor });
-      } catch (error) {
+      } catch {
         if (!controller.signal.aborted) {
-          const restricted = [401, 403, 404].includes((error as { status?: number }).status || 0);
-          setState(previous => ({ status: "unavailable", page: !restricted && previous?.cursor === cursor ? previous.page : null, cursor }));
+          setState({ status: "unavailable", page: null, cursor });
         }
       } finally {
         if (request === controller) request = null;
@@ -74,10 +75,19 @@ export function useAltazorTimeline(enabled: boolean, version: string, working: b
   return {
     turns: page?.turns ?? [],
     status: current?.status ?? "loading",
-    readingOlder: cursor !== null,
+    pageKey: pages.length === 1 ? "newest" : cursor,
+    readingOlder: Boolean(cursor),
+    canReadNewer: pages.length > 1,
     hasMore: Boolean(page?.before),
-    loadOlder: () => { if (page?.before) setCursor(page.before); },
-    returnToLatest: () => setCursor(null),
+    loadOlder: () => {
+      const newest = page?.turns.at(-1);
+      if (!page?.before || !newest) return;
+      const older = new URLSearchParams({ before: page.before }).toString();
+      const through = new URLSearchParams({ through: `${newest.createdAt}~${newest.id}` }).toString();
+      setPages(stack => [...(!cursor ? [through] : stack), older]);
+    },
+    loadNewer: () => setPages(stack => stack.length > 1 ? stack.slice(0, -1) : stack),
+    returnToLatest: () => setPages([""]),
     refresh: () => setRefreshKey(key => key + 1),
   };
 }

@@ -18,7 +18,7 @@ async function main() {
   assert.equal(source.mimeType, "application/json");
   assert.ok(source.text.trim() && source.rawBytes.length);
   console.log(JSON.stringify({ checkedAt: new Date().toISOString(), transport: proxy ? "test-env-proxy" : "production-dns-pinned", resultCount: result.items.length, totalReported: result.totalReported,
-    externalId: source.externalId, textChars: source.text.length, originalBytes: source.rawBytes.length,
+    externalId: source.externalId, textChars: source.text.length, publicVersionBytes: source.rawBytes.length,
     sourceSha256: createHash("sha256").update(source.rawBytes).digest("hex"),
     textSha256: createHash("sha256").update(source.text).digest("hex"), stored: false, pdf: false, modelUsed: false }));
 }

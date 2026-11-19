@@ -32,12 +32,12 @@ async function scope(causaId: string, user: CausaAccessUser, client: WritingSour
   await assertCausaAccess(causaId, actor, { auditOverride: false }, client);
   return actor;
 }
-function knowledgeCitation(value: StoredCitation & { title: string; href: string; warnings: string[]; isCurrent: boolean; partial: boolean }): WritingCitation {
+function knowledgeCitation(value: StoredCitation & { title: string; href: string; warnings: string[]; isCurrent: boolean; partial: boolean; acquisitionMethod?: string }): WritingCitation {
   const { kind, fragmentId, quote, versionId, quoteSha256, textSha256, sourceSha256, sourceKey, pageNumber } = value;
   return { kind: "knowledge", snapshot: { kind, fragmentId, quote, versionId, quoteSha256, textSha256, sourceSha256, sourceKey, pageNumber }, title: value.title, reference: value.title,
     locator: value.pageNumber ? `Página ${value.pageNumber}` : `Fragmento preparado · ${value.fragmentId.slice(-8)}`, href: value.href, quote: value.quote,
     sourceKey: value.sourceKey, sourceSha256: value.sourceSha256, textSha256: value.textSha256, quoteSha256: value.quoteSha256, pageNumber: value.pageNumber,
-    verificationBasis: "original", retainedSha256: null,
+    verificationBasis: value.acquisitionMethod === "pjud_public" ? "public_version" : "original", retainedSha256: null,
     warnings: unique([...value.warnings, ...(!value.isCurrent ? ["Cita de una versión conservada anterior; revise si corresponde usarla."] : []), ...(value.partial ? ["La extracción es parcial; revise el original conservado."] : [])]) };
 }
 function bookCitation(value: BookCitation): WritingCitation {
@@ -47,7 +47,7 @@ function bookCitation(value: BookCitation): WritingCitation {
     warnings: unique([...(value.verificationBasis === "retained_text" ? ["Cotejado contra el texto conservado. El original no se conservó y no puede cotejarse ahora."] : []), ...(value.partial || value.extractionMethod === "ocr" ? ["Hay extracción parcial u OCR: revise la lectura y contraste el original cuando esté conservado."] : []), ...(value.sourceType && value.sourceType !== "book" ? [judicialMetadataNotice] : [])]) };
 }
 function hearingCitation(value: HearingCitation, workspaceId: string): WritingCitation {
-  const base = value.origin === "book" ? bookCitation(value.snapshot) : knowledgeCitation({ ...value.snapshot, title: value.title, href: value.href, warnings: [], isCurrent: true, partial: false });
+  const base = value.origin === "book" ? bookCitation(value.snapshot) : knowledgeCitation({ ...value.snapshot, title: value.title, href: value.href, warnings: [], isCurrent: true, partial: false, acquisitionMethod: value.publicVersion ? "pjud_public" : undefined });
   return { ...base, kind: "hearing", snapshot: storedHearingCitation(value), workspaceId, reference: value.reference, locator: value.locator, warnings: unique([...base.warnings, ...(value.warning ? [value.warning] : [])]) };
 }
 function fingerprint(source: Omit<StoredWritingSource, "fingerprint">): string {

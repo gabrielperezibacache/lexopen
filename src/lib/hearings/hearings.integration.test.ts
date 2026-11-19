@@ -13,7 +13,7 @@ import { importBook, readBook, createBookCollection, updateBookCollection } from
 import { createHearing, listHearings, readHearing, updateHearing, attachHearingSource, updateHearingSource, deleteHearingSource, createHearingNote, updateHearingNote, deleteHearingNote, verifyHearingMaterial, exportHearing, exportHearingBrief } from "./service";
 import { readHearingSource } from "./sources";
 import { readHearingPage, prepareHearingSource } from "./pages";
-import { createHearingTurn } from "./chat";
+import { createHearingTurn, hearingMessages } from "./chat";
 const status = (expected: number) => (e: unknown) => (e as { status?: number }).status === expected;
 async function main() {
  const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL); assert.equal(url, new URL(process.env.DATABASE_URL!).toString());
@@ -100,6 +100,26 @@ async function main() {
   const version = await db.legalSourceVersion.create({ data: { sourceId: legal.id, sourceSha256: sha256(legalBytes), textSha256: sha256(publicText), text: publicText, sourceStorageKey: legalKey, title: "Norma ficticia", organism: "Organismo de prueba", kind: "normativa", retrievedAt: new Date(), acquisitionMethod: "manual", fragments: { create: { ordinal: 1, text: publicText, textSha256: sha256(publicText), startOffset: 0, endOffset: publicText.length } } } });
   const legalSource = await attachHearingSource(causa.id, workspace.id, { kind: "legal", refId: version.id }, owner, db), legalView = await readHearingSource(causa.id, workspace.id, legalSource.id, owner, {}, db); assert.equal(legalView.fragments[0].text, publicText);
   assert.ok((await verifyHearingMaterial(causa.id, workspace.id, { citation: { sourceId: legalSource.id, fragmentId: legalView.fragments[0].id, quote: publicText } }, owner, db)).text.includes("Aporte manual"));
+  const historicalPassage = { sourceId: legalSource.id, fragmentId: legalView.fragments[0].id, quote: publicText };
+  const historicalNote = await createHearingNote(causa.id, workspace.id, { title: "Nota del fallo", body: publicText, citation: historicalPassage }, owner, db);
+  await db.legalSourceVersion.update({ where: { id: version.id }, data: { reviewState: "quarantined" } });
+  const quarantinedWorkspace = await readHearing(causa.id, workspace.id, owner, db);
+  assert.equal(quarantinedWorkspace.sources.find(row => row.id === legalSource.id)?.available, false);
+  assert.equal(quarantinedWorkspace.notes.find(row => row.id === historicalNote.id)?.available, false);
+  assert.ok(!JSON.stringify(quarantinedWorkspace).includes(publicText));
+  await assert.rejects(readHearingSource(causa.id, workspace.id, legalSource.id, owner, {}, db), status(404));
+  await assert.rejects(exportHearingBrief(causa.id, workspace.id, { notes: [{ id: historicalNote.id, revision: 1 }] }, owner, db), status(404));
+  const recoveredText = "La versión pública consigna únicamente los fundamentos.", recoveredBytes = Buffer.from(recoveredText), recoveredKey = `hearing-fixtures/${tag}/public`;
+  await putObject({ key: recoveredKey, body: recoveredBytes });
+  const recovered = await db.legalSourceVersion.create({ data: { sourceId: legal.id, sourceSha256: sha256(recoveredBytes), textSha256: sha256(recoveredText), text: recoveredText, sourceStorageKey: recoveredKey, title: "Fallo público ficticio", organism: "Tribunal de prueba", kind: "jurisprudence", retrievedAt: new Date(), acquisitionMethod: "pjud_public", fragments: { create: { ordinal: 1, text: recoveredText, textSha256: sha256(recoveredText), startOffset: 0, endOffset: recoveredText.length } } } });
+  const publicSource = await attachHearingSource(causa.id, workspace.id, { kind: "legal", refId: recovered.id }, owner, db);
+  const publicReading = await readHearingSource(causa.id, workspace.id, publicSource.id, owner, {}, db);
+  assert.equal(publicReading.downloadLabel, "Versión pública recuperada");
+  const checked = await verifyHearingMaterial(causa.id, workspace.id, { citation: { sourceId: publicSource.id, fragmentId: publicReading.fragments[0].id, quote: recoveredText } }, owner, db);
+  assert.match(checked.text, /Versión pública recuperada SHA-256/);
+  const publicNote = await createHearingNote(causa.id, workspace.id, { title: "Nota pública", body: "Revisar fundamentos", citation: { sourceId: publicSource.id, fragmentId: publicReading.fragments[0].id, quote: recoveredText } }, owner, db);
+  assert.ok(publicNote.available && publicNote.citation);
+  assert.match(JSON.stringify(hearingMessages("Revisar", [publicNote.citation], [])), /public_version/);
   // Physical PDF page, same source/version scope and current case access.
   const pdfBytes = await readFile("src/lib/evidence/pdf-fixtures/mixed-three-pages.pdf"), pdfKey = `hearing-fixtures/${tag}/original.pdf`; await putObject({ key: pdfKey, body: pdfBytes });
   const pdfDoc = await db.documento.create({ data: { nombre: "PDF ficticio.pdf", mimeType: "application/pdf", storageKey: pdfKey, causaId: causa.id, autorId: owner.id } }); documentIds.push(pdfDoc.id);

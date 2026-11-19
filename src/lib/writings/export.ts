@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { readCaseWritingForExport } from "./service";
+import { writingVerificationLabels } from "./source-types";
 import type { WritingDraftView } from "./types";
 import { renderCaseWritingDocx } from "./docx";
 const safeHref = (href: string) => /^\/(?!\/)[^\s<>]*$/.test(href) ? href : "";
@@ -36,7 +37,7 @@ export function renderCaseWriting(draft: WritingDraftView, cause: { id: string; 
       return [`[${ref.id}] ${label[source.kind]}: ${source.title}`, `Contenido incorporado:\n${source.text}`, safeHref(source.href), ...source.warnings, ...source.citations.map((citation, index) => [
         `Respaldo ${index + 1}: ${citation.reference}. ${citation.locator}.`, `Pasaje literal corroborado:\n${citation.quote}`,
         `Cita SHA-256: ${citation.quoteSha256}`, `Texto SHA-256: ${citation.textSha256}`, `Identidad de fuente: ${citation.sourceKey}`,
-        citation.verificationBasis === "retained_text" ? `Texto conservado SHA-256: ${citation.retainedSha256}. Original no conservado. Huella del archivo importado sin cotejo actual: ${citation.sourceSha256}` : `Original conservado SHA-256: ${citation.sourceSha256}`,
+        citation.verificationBasis === "retained_text" ? `Texto conservado SHA-256: ${citation.retainedSha256}. Original no conservado. Huella del archivo importado sin cotejo actual: ${citation.sourceSha256}` : `${writingVerificationLabels[citation.verificationBasis]} SHA-256: ${citation.sourceSha256}`,
         safeHref(citation.href), ...citation.warnings,
       ].filter(Boolean).join("\n"))].filter(Boolean).join("\n");
     }).join("\n\n") : "Este escrito no incorpora referencias corroboradas."}\n\nALCANCE\n${[...new Set(scope)].join("\n")}\n`;
@@ -46,7 +47,7 @@ export function renderCaseWriting(draft: WritingDraftView, cause: { id: string; 
     const content = [`**${label[source.kind]}: ${md(source.title)}**`, "Contenido incorporado:", block(source.text), ...(safeHref(source.href) ? [`[Volver al origen](${safeHref(source.href)})`] : []), ...source.warnings.map(md), ...source.citations.flatMap((citation, index) => [
       `**Respaldo ${index + 1}.** ${md(citation.reference)}. ${md(citation.locator)}.`, "Pasaje literal corroborado:", block(citation.quote),
       `Cita SHA-256: ${citation.quoteSha256}. Texto SHA-256: ${citation.textSha256}. Identidad de fuente: ${citation.sourceKey}.`,
-      citation.verificationBasis === "retained_text" ? `Texto conservado SHA-256: ${citation.retainedSha256}. Original no conservado. Huella del archivo importado sin cotejo actual: ${citation.sourceSha256}.` : `Original conservado SHA-256: ${citation.sourceSha256}.`,
+      citation.verificationBasis === "retained_text" ? `Texto conservado SHA-256: ${citation.retainedSha256}. Original no conservado. Huella del archivo importado sin cotejo actual: ${citation.sourceSha256}.` : `${writingVerificationLabels[citation.verificationBasis]} SHA-256: ${citation.sourceSha256}.`,
       ...(safeHref(citation.href) ? [`[Abrir el pasaje](${safeHref(citation.href)})`] : []), ...citation.warnings.map(md),
     ])].join("\n\n");
     return `[^${ref.id}]: ${content.split("\n").map((line, index) => `${index ? "    " : ""}${line}`).join("\n")}`;

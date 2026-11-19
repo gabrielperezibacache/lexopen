@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { withRejectedAudit } from "@/lib/testing/audit-failure";
+import { hashReference } from "./references";
 import { readOfflineEntity, syncOfflineEntity } from "./service";
 import { createPlazoCommand, updatePlazoCommand } from "@/lib/plazo-commands";
 const status = (n: number) => (e: unknown) => (e as { status?: number }).status === n;
@@ -40,6 +41,14 @@ async function main() {
     await assert.rejects(createPlazoCommand(reader, { titulo: "Prohibido", causaId: id, fechaLimite: "2026-12-01" }, randomUUID()), status(403));
     const ds = await readOfflineEntity(assistant, "plazo", pid);
     await assert.rejects(syncOfflineEntity(assistant, { kind: "plazo", action: "update", requestId: randomUUID(), entityId: pid, expectedVersion: ds.version, fields: { ...ds.fields, estado: "cumplido" } }), status(403));
+    const { civilCalculationBasis, ...legacyDeadline } = await prisma.plazo.findUniqueOrThrow({ where: { id: pid } });
+    assert.equal(civilCalculationBasis, null);
+    const sourceCases = await prisma.causa.findMany({ where: { id }, select: { id: true, updatedAt: true, tribunal: true, materia: true, procedimiento: true } });
+    const legacyVersion = hashReference({ ...legacyDeadline, minutaAcciones: [], tasks: [], sourceCases });
+    assert.equal(ds.version, legacyVersion, "a migrated manual deadline still matches a pre-migration offline copy");
+    const oldDraft = { kind: "plazo", action: "update", entityId: pid, expectedVersion: legacyVersion, fields: { ...ds.fields, descripcion: "Edición preparada antes de actualizar el Host" } };
+    await syncOfflineEntity(a, { ...oldDraft, requestId: randomUUID() });
+    await assert.rejects(syncOfflineEntity(a, { ...oldDraft, requestId: randomUUID() }), status(409), "the original version rejects a real subsequent change");
     const beforeState = await readOfflineEntity(a, "plazo", pid);
     await prisma.causa.update({ where: { id }, data: { procedimiento: "Procedimiento revisado" } });
     await assert.rejects(syncOfflineEntity(a, { kind: "plazo", action: "update", requestId: randomUUID(), entityId: pid, expectedVersion: beforeState.version, dateReviewed: true, fields: { ...beforeState.fields, fechaLimite: "2026-11-24T00:00:00.000Z" } }), status(409), "a case change invalidates the previous review context");
@@ -61,6 +70,26 @@ async function main() {
     assert.equal((await prisma.plazo.findUniqueOrThrow({ where: { id: pid } })).calculationCountry, "CL");
     const changedDate = await readOfflineEntity(a, "plazo", pid); await syncOfflineEntity(a, { ...close, requestId: randomUUID(), expectedVersion: changedDate.version, dateReviewed: true, fields: { ...changedDate.fields, fechaLimite: "2026-12-01T00:00:00.000Z" } });
     assert.equal((await prisma.plazo.findUniqueOrThrow({ where: { id: pid } })).calculationCountry, null); assert.notEqual(old.version, changedDate.version);
+    // Synthetic stored provenance exercises the transfer workflow without approving a legal profile.
+    const originalBasis = { profile: "cl_cpc_individual_days_v1", causaId: id, confirmedById: a.id, start: "2026-11-30", due: "2026-12-01" };
+    const civilRow = await prisma.plazo.create({ data: { titulo: "Fixture de traslado civil", fechaLimite: new Date("2026-12-01"), fechaNotificacion: new Date("2026-11-30"),
+      causaId: id, responsableId: a.id, diasPlazo: 1, calculationCountry: "CL", calculationRegime: originalBasis.profile, civilCalculationBasis: originalBasis } });
+    deadlines.push(civilRow.id);
+    const civilSnapshot = await readOfflineEntity(a, "plazo", civilRow.id);
+    const otherCase = unique[0].id;
+    const targetRef = (await readOfflineEntity(a, "causa", otherCase)).relations as { caseReference: { version: string } };
+    const currentCaseRef = (await readOfflineEntity(a, "causa", id)).relations as { caseReference: { version: string } };
+    const transfer = { kind: "plazo", action: "update", entityId: civilRow.id, expectedVersion: civilSnapshot.version, fields: civilSnapshot.fields,
+      relations: { cause: { id: otherCase, expectedVersion: targetRef.caseReference.version, previous: { id, expectedVersion: currentCaseRef.caseReference.version } } } };
+    await assert.rejects(syncOfflineEntity(a, { ...transfer, dateReviewed: false, requestId: randomUUID() }), status(422));
+    await syncOfflineEntity(a, { ...transfer, dateReviewed: true, requestId: randomUUID() });
+    const transferred = await prisma.plazo.findUniqueOrThrow({ where: { id: civilRow.id } });
+    assert.equal(transferred.causaId, otherCase); assert.equal(transferred.calculationRegime, null); assert.equal(transferred.diasPlazo, null);
+    assert.deepEqual(transferred.civilCalculationBasis, originalBasis, "historical provenance retains the original cause and professional");
+    const afterTransfer = await readOfflineEntity(a, "plazo", civilRow.id);
+    await prisma.plazo.update({ where: { id: civilRow.id }, data: { civilCalculationBasis: { ...originalBasis, due: "2026-12-02" }, updatedAt: transferred.updatedAt } });
+    assert.notEqual((await readOfflineEntity(a, "plazo", civilRow.id)).version, afterTransfer.version, "the version includes retained civil provenance even after manual transfer");
+
     const caseBefore = await prisma.causa.findUniqueOrThrow({ where: { id } }), staleRef = (await readOfflineEntity(a, "causa", id)).relations as { caseReference: { version: string } };
     const staleDeadline = { ...deadline, requestId: randomUUID(), fields: { ...deadlineFields, titulo: `Referencia ${tag}` }, relations: { cause: { id, expectedVersion: staleRef.caseReference.version } } };
     await prisma.causa.update({ where: { id }, data: { titulo: "Referencia modificada" } });

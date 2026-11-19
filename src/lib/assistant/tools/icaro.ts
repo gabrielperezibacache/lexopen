@@ -4,7 +4,9 @@ import { httpError } from "@/lib/auth/access";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { canonicalJson } from "@/lib/command-execution";
 import { digest } from "@/lib/personal-connectors/core";
-import { createIcaroJob, listIcaros } from "@/lib/altazor/icaros/service";
+import { createIcaroJob, listIcaros, readSelectedIcaroMemory } from "@/lib/altazor/icaros/service";
+import { icaroMemorySelectionSchema } from "@/lib/altazor/icaros/schemas";
+import { turnIcaroMemorySelections } from "@/lib/altazor/icaros/turn-memory";
 import { icaroDestination } from "@/lib/altazor/icaros/destination";
 import { icaroProfile, icaroScope, icaroSelectedSources } from "./icaro-access";
 import type { AssistantPlan, ToolContext } from "../types";
@@ -13,7 +15,7 @@ import type { AssistantTool } from "./types";
 export const icaroListarSchema = z.object({}).strict();
 export const icaroDelegarSchema = z.object({
   icaroId: z.string().min(1).max(200).regex(/^[A-Za-z0-9_-]+$/), instruction: z.string().trim().min(1).max(6000),
-  profileRevision: z.number().int().positive(), destinationKey: z.string().regex(/^[a-f0-9]{64}$/), sourceKey: z.string().regex(/^[a-f0-9]{64}$/), useMemory: z.boolean(),
+  profileRevision: z.number().int().positive(), destinationKey: z.string().regex(/^[a-f0-9]{64}$/), sourceKey: z.string().regex(/^[a-f0-9]{64}$/), useMemory: z.boolean(), memorySelection: icaroMemorySelectionSchema.optional(),
 }).strict();
 type Delegation = z.infer<typeof icaroDelegarSchema>;
 const normalizedName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("es");
@@ -32,12 +34,17 @@ export async function resolveIcaroToolInput(input: Record<string, unknown>, ctx:
   }
   const { actor, profile } = await icaroProfile(ctx, id, true), selected = await icaroSelectedSources(ctx), destination = await icaroDestination(actor.id, profile);
   if (!destination.permitted) throw httpError("El proveedor del Ícaro no está permitido o no tiene modelo configurado.", 409);
-  return { icaroId: id, instruction: input.instruction, profileRevision: profile.revision, destinationKey: destination.key, sourceKey: selected.sourceKey, useMemory: profile.memoryEnabled && !/\bsin\s+(?:(?:su|la)\s+)?memoria\b/.test(text) };
+  const choices = await turnIcaroMemorySelections(selected.turn.id, selected.conversationId, actor);
+  const memorySelection = /\bsin\s+(?:(?:su|la)\s+)?memoria\b/.test(text) ? [] : choices.find(choice => choice.icaroId === id)?.entries || [];
+  return { icaroId: id, instruction: input.instruction, profileRevision: profile.revision, destinationKey: destination.key, sourceKey: selected.sourceKey, useMemory: memorySelection.length > 0, memorySelection };
 }
 async function preview(input: Delegation, ctx: ToolContext) {
   const { actor, profile } = await icaroProfile(ctx, input.icaroId, true), selected = await icaroSelectedSources(ctx), destination = await icaroDestination(actor.id, profile);
   if (profile.revision !== input.profileRevision || destination.key !== input.destinationKey || selected.sourceKey !== input.sourceKey || !destination.permitted || input.useMemory && !profile.memoryEnabled) throw httpError("El perfil, destino o fuentes cambiaron. Prepara un encargo nuevo.", 409);
-  return `Delegar a Ícaro «${profile.name}».\nModelo: ${destination.model} · proveedor: ${destination.provider} · ${destination.remote ? "remoto" : "local"}.\nDestino: ${destination.endpoint}.\nFuentes seleccionadas para compartir: ${selected.refs.length}. Memoria propia del Ícaro: ${input.useMemory ? "activada" : "no se usará"}.\nEl historial, la memoria y los adjuntos de la conversación no se copian al encargo.\n\n${input.instruction}\n\nEl encargo se pondrá en cola; Altazor mostrará su resultado cuando termine.`;
+  const selection = input.memorySelection || [];
+  if (input.useMemory !== (selection.length > 0)) throw httpError("El plan anterior no identifica los recuerdos. Prepara un nuevo encargo.", 409);
+  const memory = selection.length ? await readSelectedIcaroMemory(profile.id, actor, selection) : [];
+  return `Delegar a Ícaro «${profile.name}».\nModelo: ${destination.model} · proveedor: ${destination.provider} · ${destination.remote ? "remoto" : "local"}.\nDestino: ${destination.endpoint}.\nFuentes seleccionadas para compartir: ${selected.refs.length}. Memoria propia del Ícaro: ${memory.length ? `${memory.length} (${memory.map(entry => entry.label).join(", ")})` : "no se usará"}.\nEl historial, la memoria y los adjuntos de la conversación no se copian al encargo.\n\n${input.instruction}\n\nEl encargo se pondrá en cola; Altazor mostrará su resultado cuando termine.`;
 }
 export const icaroListarTool: AssistantTool<z.infer<typeof icaroListarSchema>> = {
   id: "icaro.listar", description: "Consulta los perfiles Ícaros propios del ámbito actual, su modelo y memoria independiente.", kind: "read", roles: [...STAFF_ROLES], inputSchema: icaroListarSchema,
@@ -61,7 +68,7 @@ export const icaroDelegarTool: AssistantTool<Delegation> = {
     if (!plan?.needsConfirm || plan.id !== match[1] || step?.toolId !== "icaro.delegar" || canonicalJson(step.input) !== canonicalJson(input) || step.preview !== await preview(input, ctx) || turn.planId !== plan.id || turn.status !== "running" || !turn.leaseToken || !turn.leaseExpiresAt || turn.leaseExpiresAt <= new Date()) throw httpError("El plan delegado cambió, no está confirmado o venció. Prepara uno nuevo.", 409);
     await ctx.authorizeContext(); ctx.signal?.throwIfAborted();
     const { actor, profile } = await icaroProfile(ctx, input.icaroId, true), destination = await icaroDestination(actor.id, profile);
-    const { job } = await createIcaroJob(input.icaroId, { requestId: `assistant-icaro:${digest(`${actor.id}:${ctx.commandKey}`)}`, instruction: input.instruction, text: "", sources: [], useMemory: input.useMemory, allowRemote: destination.remote, destinationKey: input.destinationKey, parentJobId: null, confirmed: true }, actor, { sources: selected.refs, authorizeContext: ctx.authorizeContext, origin: { conversationId: selected.conversationId, turnId: turn.id } });
+    const { job } = await createIcaroJob(input.icaroId, { requestId: `assistant-icaro:${digest(`${actor.id}:${ctx.commandKey}`)}`, instruction: input.instruction, text: "", sources: [], memorySelection: input.memorySelection, useMemory: input.useMemory, allowRemote: destination.remote, destinationKey: input.destinationKey, parentJobId: null, confirmed: true }, actor, { sources: selected.refs, authorizeContext: ctx.authorizeContext, origin: { conversationId: selected.conversationId, turnId: turn.id } });
     return { ok: true, message: `Encargo delegado a Ícaro «${profile.name}». Estado: ${job.status}. Altazor lo seguirá desde esta conversación.`, entityId: job.id, card: { type: "icaro", id: job.id, jobId: job.id, icaroId: profile.id, name: profile.name, status: job.status, href: "/inicio?altazor=icaros" } };
   },
 };

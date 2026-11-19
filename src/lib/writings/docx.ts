@@ -2,6 +2,7 @@
 // checker remains unchanged; ZIP bounds/CRC checks follow that same profile.
 import { inflateRawSync } from "node:zlib";
 import { Parser } from "htmlparser2";
+import { writingVerificationLabels } from "./source-types";
 const MAX = 2_000_000;
 const PARTS = new Set(["word/footnotes.xml", "[Content_Types].xml", "_rels/.rels", "word/document.xml", "word/styles.xml", "word/_rels/document.xml.rels"]);
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main", REL = "http://schemas.openxmlformats.org/package/2006/relationships", CT = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -111,7 +112,7 @@ function archive(records: Record<string, string>) {
 const labels = { document: "Pasaje del expediente", fact: "Hecho registrado", note: "Nota personal de audiencia", book: "Pasaje de biblioteca" };
 const safeHref = (href: string) => /^\/(?!\/)[^\s<>]*$/.test(href) ? href : "";
 function shortReference(ref: WritingReferenceView) {
-  return [ref.id + ". " + labels[ref.source.kind] + ": " + ref.source.title, ...ref.source.citations.map(citation => `${citation.reference}. ${citation.locator}.${citation.verificationBasis === "retained_text" ? " Cotejada con el texto conservado; original no conservado." : ""}`), ...ref.source.warnings, ...(!ref.source.citations.length ? ["Observación del profesional; sin corroboración documental."] : [])].join("\n");
+  return [ref.id + ". " + labels[ref.source.kind] + ": " + ref.source.title, ...ref.source.citations.map(citation => `${citation.reference}. ${citation.locator}.${citation.verificationBasis === "retained_text" ? " Cotejada con el texto conservado; original no conservado." : citation.verificationBasis === "public_version" ? " Versión pública recuperada." : ""}`), ...ref.source.warnings, ...(!ref.source.citations.length ? ["Observación del profesional; sin corroboración documental."] : [])].join("\n");
 }
 export function renderCaseWritingDocx(draft: WritingDraftView, cause: { titulo: string; rit: string | null }, generatedAt = new Date().toISOString()) {
   const references = new Map(draft.references.map(ref => [ref.id, ref])), used: { referenceId: string; noteId: number }[] = [];
@@ -130,7 +131,7 @@ export function renderCaseWritingDocx(draft: WritingDraftView, cause: { titulo: 
     runs += run(content.slice(after));
     return `<w:p>${heading ? '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>' : ""}${runs}</w:p>`;
   }).join("");
-  const appendix = draft.references.map(ref => [paragraph(`${ref.id} · ${labels[ref.source.kind]} · ${ref.source.title}`, "Heading1"), paragraph(ref.source.text), paragraph(safeHref(ref.source.href)), ...ref.source.citations.flatMap(citation => [paragraph(`${citation.reference}. ${citation.locator}.`), paragraph(`Pasaje literal corroborado: «${citation.quote}»`), paragraph(`Identidad del pasaje: ${citation.quoteSha256}. Texto: ${citation.textSha256}. Fuente: ${citation.sourceKey}.`), paragraph(citation.verificationBasis === "retained_text" ? `Texto conservado: ${citation.retainedSha256}. Original no conservado.` : `Original conservado: ${citation.sourceSha256}.`), paragraph(safeHref(citation.href)), ...citation.warnings.map(warning => paragraph(warning))]), ...ref.source.warnings.map(warning => paragraph(warning))].join("")).join("");
+  const appendix = draft.references.map(ref => [paragraph(`${ref.id} · ${labels[ref.source.kind]} · ${ref.source.title}`, "Heading1"), paragraph(ref.source.text), paragraph(safeHref(ref.source.href)), ...ref.source.citations.flatMap(citation => [paragraph(`${citation.reference}. ${citation.locator}.`), paragraph(`Pasaje literal corroborado: «${citation.quote}»`), paragraph(`Identidad del pasaje: ${citation.quoteSha256}. Texto: ${citation.textSha256}. Fuente: ${citation.sourceKey}.`), paragraph(citation.verificationBasis === "retained_text" ? `Texto conservado: ${citation.retainedSha256}. Original no conservado.` : `${writingVerificationLabels[citation.verificationBasis]}: ${citation.sourceSha256}.`), paragraph(safeHref(citation.href)), ...citation.warnings.map(warning => paragraph(warning))]), ...ref.source.warnings.map(warning => paragraph(warning))].join("")).join("");
   const notes = used.map(({referenceId,noteId}) => `<w:footnote w:id="${noteId}"><w:p><w:r><w:footnoteRef/></w:r>${run(" " + shortReference(references.get(referenceId)!))}</w:p></w:footnote>`).join("");
   const records = {
     "[Content_Types].xml": '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/></Types>',
