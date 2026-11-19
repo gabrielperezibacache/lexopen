@@ -4,7 +4,7 @@ En Windows, el Host inicia y detiene PostgreSQL mediante `pg_ctl`, con espera de
 
 La aplicación de escritorio empaquetada y el Host ejecutado desde un clon tienen actualizadores distintos. Ambos conservan la carpeta de datos. Descargar código o un instalador no acredita que el Host haya reiniciado con la versión nueva.
 
-La versión `1.1.0-preview.9` prepara las correcciones descritas aquí; su disponibilidad depende de una publicación que supere las comprobaciones. Esta entrega incorpora comprobaciones, preparación y recibos. Las pruebas descritas al final usan datos ficticios, componentes reales del actualizador y sustitutos de servicios nativos; no acreditan una actualización firmada real en todos los sistemas.
+Para el candidato 1.1.0, el estudio registra la actualización desde preview 10 en un Mac Apple Silicon con Gatekeeper activo. Los ensayos automatizados de esta guía usan datos ficticios. [Aceptación y evidencia del equipo](ACEPTACION-1.1.0.md)
 
 ## Escritorio empaquetado
 

@@ -210,13 +210,11 @@ jobs:
       - name: Assemble verified feeds, manifest and checksums
         shell: bash
         run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA" --consume-input
-      - name: Publish only after all native and application checks pass
+      - name: Create the signed release after native and application checks
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(node -p 'require("./package.json").version')"
           node desktop/scripts/release-notes.mjs > "$RUNNER_TEMP/lexopen-release-notes.md"
-          FLAGS=()
-          if [[ "$VERSION" == *-* ]]; then FLAGS+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" release/* --verify-tag --title "LexOpen $VERSION" --generate-notes --notes-file "$RUNNER_TEMP/lexopen-release-notes.md" "${FLAGS[@]}"
+          node desktop/scripts/create-release.mjs "$VERSION" "$RUNNER_TEMP/lexopen-release-notes.md"

@@ -5,6 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { assembleRelease } from "./assemble-release.mjs";
+import { verifyPilotDraft } from "./verify-pilot-draft.mjs";
 import { toolpackName, toolpackReceiptName } from "../altazor-toolpack.cjs";
 import desktopProfile from "../altazor-desktop-profile.json" with { type: "json" };
 const revision = "a".repeat(40);
@@ -27,7 +28,7 @@ async function fixture(version = "1.1.0-preview.1") {
     }
     const base = { version, platform, arch }, buildId = `build-${target}`;
     await fs.writeFile(path.join(dir, `lexopen-packaged-${target}.json`), JSON.stringify({ ...base, sourceRevision: revision, sourceDirty: false, buildId, distributedOAuth: publicOAuth }));
-    await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false }));
+    await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredCaseAccessAndDeadline: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false }));
     await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, ...(platform === "darwin" ? { artifacts } : {}), codeSignatureValid: platform === "darwin", gatekeeperAccepted: platform === "darwin", publisherAuthenticated: platform === "darwin", notarized: platform === "darwin", dmgVerified: platform === "darwin", artifactCodeSignatureValid: platform === "darwin", artifactGatekeeperAccepted: platform === "darwin" }));
     const feed = `${channel}${platform === "darwin" ? "-mac" : platform === "linux" ? "-linux" : ""}.yml`;
     await fs.writeFile(path.join(dir, feed), JSON.stringify({ version, files: entries }));
@@ -51,7 +52,7 @@ await check("four native targets assemble with both macOS architectures and exac
 });
 await check("publication rejects a native package without tested backup restoration", async f => {
   const file=path.join(f.input,"linux-x64","lexopen-smoke-linux-x64.json"),report=JSON.parse(await fs.readFile(file,"utf8"));
-  delete report.backupRestoredDatabase;await fs.writeFile(file,JSON.stringify(report));
+  delete report.backupRestoredCaseAccessAndDeadline;await fs.writeFile(file,JSON.stringify(report));
   await assert.rejects(assembleRelease(f),/Incomplete Host smoke/);
 });
 for (const field of ["codeSignatureValid", "publisherAuthenticated", "notarized", "gatekeeperAccepted", "dmgVerified", "artifactCodeSignatureValid", "artifactGatekeeperAccepted"]) await check(`macOS publication requires ${field}, including previews`, async f => {
@@ -125,7 +126,77 @@ await check("stale source revision cannot be released", async f => { await asser
 await check("feed cannot refer outside release artifacts", async f => {
   const file = path.join(f.input, "darwin-x64", "preview-mac.yml"), data = JSON.parse(await fs.readFile(file, "utf8")); data.files[0].url = "../private.zip"; await fs.writeFile(file, JSON.stringify(data)); await assert.rejects(assembleRelease(f), /Invalid update path/);
 });
-await check("unsigned preview cannot become stable", async f => { await assert.rejects(assembleRelease(f), /publisher authentication/); }, "1.1.0");
+await check("a stable PR can verify unsigned packages without reaching publication", async f => {
+  await assert.rejects(assembleRelease(f), /publisher authentication: win32-x64/);
+  for (const target of ["darwin-x64", "darwin-arm64"]) {
+    const file = path.join(f.input, target, `lexopen-signature-${target}.json`);
+    const report = JSON.parse(await fs.readFile(file, "utf8"));
+    report.publisherAuthenticated = false;
+    report.notarized = false;
+    for (const artifact of Object.values(report.artifacts)) {
+      artifact.publisherAuthenticated = false;
+      artifact.notarized = false;
+    }
+    await fs.writeFile(file, JSON.stringify(report));
+  }
+  await assert.rejects(assembleRelease(f), /Public macOS release/);
+  for (const target of ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"]) await changeProfile(f, target, undefined);
+  const result = await assembleRelease({ ...f, verificationOnly: true });
+  assert.equal(result.channel, "latest");
+  assert.equal(result.publishable, false);
+  assert.equal(result.distributedOAuth, undefined);
+}, "1.1.0");
+await check("the read-only pilot receipt binds the stable tag, draft ID, inventory and GitHub digests to the signed manifest", async f => {
+  const windows = path.join(f.input, "win32-x64", "lexopen-signature-win32-x64.json");
+  const signature = JSON.parse(await fs.readFile(windows, "utf8"));
+  await fs.writeFile(windows, JSON.stringify({ ...signature, publisherAuthenticated: true }));
+  await assembleRelease(f);
+  const assets = [];
+  const downloads = new Map();
+  for (const name of await fs.readdir(f.output)) {
+    const id = assets.length + 1;
+    const bytes = await fs.readFile(path.join(f.output, name));
+    assets.push({ id, name, size: bytes.length, digest: "sha256:" + crypto.createHash("sha256").update(bytes).digest("hex"), state: "uploaded" });
+    if (["SHA256SUMS", "release-manifest.json"].includes(name)) downloads.set(id, bytes);
+  }
+  const draft = { id: 322, draft: true, prerelease: false };
+  function verify({ inventory = assets, releases = [draft], commit = revision, metadata = downloads } = {}) {
+    return verifyPilotDraft(revision, (route, ...args) => {
+      const rows = values => Buffer.from(values.map(row => JSON.stringify(row)).join("\n") + "\n");
+      if (route.endsWith("/releases?per_page=100")) {
+        assert.match(args.at(-1), /select\(\.tag_name == "v1\.1\.0"\)/);
+        return rows(releases);
+      }
+      if (route.endsWith("/commits/refs/tags/v1.1.0")) return Buffer.from(commit);
+      if (route.endsWith("/releases/322/assets?per_page=100")) return rows(inventory);
+      assert.deepEqual(args, ["-H", "Accept: application/octet-stream"]);
+      const bytes = metadata.get(Number(route.split("/").at(-1)));
+      assert.ok(bytes, "Only the manifest and checksums should be downloaded");
+      return bytes;
+    });
+  }
+  const receipt = verify();
+  assert.equal(receipt.releaseId, draft.id);
+  assert.equal(receipt.revision, revision);
+  assert.equal(receipt.assets.length, assets.length);
+  assert.equal("sha256:" + receipt.checksumsSha256, assets.find(asset => asset.name === "SHA256SUMS").digest);
+  for (const releases of [[], [draft, draft], [{ ...draft, draft: false }], [{ ...draft, prerelease: true }]]) assert.throws(() => verify({ releases }), /borrador/);
+  assert.throws(() => verify({ commit: "b".repeat(40) }), /etiqueta/);
+  const executable = assets.find(asset => asset.name.endsWith(".exe"));
+  assert.throws(() => verify({ inventory: assets.filter(asset => asset !== executable) }), /difiere del manifiesto/);
+  assert.throws(() => verify({ inventory: [...assets, { ...executable, id: 51, name: "otro.exe" }] }), /fuera del manifiesto/);
+  assert.throws(() => verify({ inventory: assets.map(asset => asset === executable ? { ...asset, digest: "sha256:" + "f".repeat(64) } : asset) }), /difiere del manifiesto/);
+  assert.throws(() => verify({ inventory: [{ ...executable, state: "starter" }] }), /incompleto/);
+  for (const [id, bytes] of downloads) {
+    const corrupt = new Map(downloads).set(id, Buffer.alloc(bytes.length));
+    assert.throws(() => verify({ metadata: corrupt }), /bytes/);
+  }
+  const sumAsset = assets.find(asset => asset.name === "SHA256SUMS");
+  const altered = Buffer.from(downloads.get(sumAsset.id)); altered[0] ^= 1;
+  const alteredHash = "sha256:" + crypto.createHash("sha256").update(altered).digest("hex");
+  assert.throws(() => verify({ metadata: new Map(downloads).set(sumAsset.id, altered),
+    inventory: assets.map(asset => asset === sumAsset ? { ...asset, digest: alteredHash } : asset) }), /SHA256SUMS difiere/);
+}, "1.1.0");
 await check("unlisted files and symlinks fail closed", async f => {
   await fs.writeFile(path.join(f.input, "credentials.json"), "fixture"); await assert.rejects(assembleRelease(f), /Unexpected release input/);
   await fs.rm(path.join(f.input, "credentials.json")); await fs.symlink(path.join(f.input, "darwin-x64", `LexOpen-${f.version}-mac-x64.zip`), path.join(f.input, "alias")); await assert.rejects(assembleRelease(f), /Symlinks/);

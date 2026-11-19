@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { releaseNotes } from "./release-notes.mjs";
+import { createDesktopRelease } from "./create-release.mjs";
 import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, LINUX_PRISMA_BINARY_TARGETS, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, stageDistributedOAuthProfile, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 import { copyTrackedRuntimeResources, preparePrismaRuntimeEngines } from "./prepare-resources.mjs";
 const require = createRequire(import.meta.url), yaml = require("js-yaml");
@@ -221,9 +222,34 @@ try {
   assert.equal(workflow.jobs.assemble.steps.find(step => step.uses === "actions/upload-artifact@v7").with.name, "verification-only-installers");
   assert.equal(publishingAssembly.run.includes("--verification-only"), false);
   assert.equal(workflow.jobs.assemble.if, "${{ !startsWith(github.ref, 'refs/tags/') }}");
-  const publishCommand = workflow.jobs.publish.steps.find(step => step.name === "Publish only after all native and application checks pass").run;
+  const publishCommand = workflow.jobs.publish.steps.at(-1).run;
   assert.ok(publishCommand.indexOf("node desktop/scripts/release-notes.mjs") >= 0);
-  assert.ok(publishCommand.indexOf("node desktop/scripts/release-notes.mjs") < publishCommand.indexOf("gh release create"));
+  assert.ok(publishCommand.indexOf("node desktop/scripts/release-notes.mjs") < publishCommand.indexOf("node desktop/scripts/create-release.mjs"));
+  assert.deepEqual(workflow.jobs.publish.needs, ["validation", "native"]);
+  assert.equal(workflow.jobs.publish.if, "startsWith(github.ref, 'refs/tags/')");
+  const revision = "a".repeat(40);
+  const assets = ["release/candidate.dmg", "release/SHA256SUMS", "release/release-manifest.json"];
+  function runPolicy(version, { existing = "", resolved = revision, apiOffline = false } = {}) {
+    const calls = [];
+    const run = () => createDesktopRelease({ tag: `v${version}`, version, revision, notesFile: "notes.md", assets }, args => {
+      calls.push(args);
+      if (args[0] !== "api") return "";
+      if (apiOffline) throw new Error("GitHub unavailable");
+      return args.includes("--paginate") ? existing : resolved;
+    });
+    return { run, calls };
+  }
+  for (const [version, expectedFlags] of [["1.1.0", ["--draft", "--target", revision]], ["1.1.0-preview.11", ["--prerelease"]], ["1.1.1", []]]) {
+    const policy = runPolicy(version);
+    policy.run();
+    assert.deepEqual(policy.calls.at(-1), ["release", "create", `v${version}`, ...assets, "--verify-tag", "--title", `LexOpen ${version}`, "--generate-notes", "--notes-file", "notes.md", ...expectedFlags]);
+    assert.equal(policy.calls.length, version === "1.1.0" ? 3 : 1);
+  }
+  for (const failure of [{ existing: "728" }, { resolved: "b".repeat(40) }, { apiOffline: true }]) {
+    const policy = runPolicy("1.1.0", failure);
+    assert.throws(policy.run);
+    assert.ok(policy.calls.every(args => args[0] === "api"), "An existing candidate, moved tag or failed lookup must stop before any release write");
+  }
   const releaseManifest = { version: "fixture", sourceRevision: "rev", publishable: true, signatures: [{ platform: "win32", publisherAuthenticated: false }] };
   const signedMacApp = { codeSignatureValid: true, publisherAuthenticated: true, notarized: true, gatekeeperAccepted: true };
   for (const arch of ["x64", "arm64"]) releaseManifest.signatures.push({

@@ -1,6 +1,18 @@
 # Changelog
 
-## 1.1.0-preview.11 — en preparación (no publicada)
+## 1.1.0
+
+La versión reúne las mejoras preparadas después de preview 10. La disponibilidad de sus instaladores y la aceptación del estudio se siguen en [el registro de producción](docs/ACEPTACION-1.1.0.md).
+
+- El flujo de distribución de 1.1.0 prepara un borrador con los archivos firmados para probar en el estudio. El piloto y la publicación utilizan los mismos archivos.
+- El ensayo de restauración del Host comprueba una causa de equipo, el cliente asociado, los bytes del documento, la fecha y responsable del plazo y el acceso de dos usuarios antes y después de recuperar la copia.
+
+- El formulario y la API de alta de causas permiten elegir el acceso desde el primer guardado. En una causa reservada, los profesionales ajenos quedan excluidos antes de incorporar documentos o plazos.
+- El respaldo coteja archivos y huellas con el directorio de origen antes de publicarse. Una copia dañada se descarta antes de rotar el respaldo anterior.
+- La restauración desde el menú del Host y desde la línea de comandos reubica las rutas administradas cuando los datos se recuperan en otra carpeta.
+- La ficha y Altazor distinguen una consulta judicial fallida, una cobertura parcial y una importación CSV. Una importación local conserva los movimientos y la fecha de la última consulta oficial.
+- Drive revalida la cuenta compartida, la carpeta de la causa y los permisos al recibir los datos de Google. Si cambian durante la descarga, se detiene la incorporación del documento.
+- Altazor conserva las respuestas de ayuda recibidas a tiempo y las aplica al reanudar el encargo tras reiniciar el Host. La recepción por WhatsApp respeta la configuración vigente del estudio.
 
 - Jurisprudencia conserva una copia pública para el lector, la descarga y las citas. Las versiones históricas del PJUD pasan a custodia y disponen de un recorrido de recuperación y cotejo.
 - Mi Fiscalía incorpora una ficha individual con rectificación motivada de folio y fecha, historial paginado y comprobantes vinculados a una versión documental.

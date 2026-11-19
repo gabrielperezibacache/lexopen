@@ -11,7 +11,7 @@
 
 LexOpen es una aplicación de código abierto para profesionales y estudios jurídicos, con herramientas de investigación y docencia. Conserva los documentos y la base de datos en un **Host** que administras. Tu equipo accede a ese servidor con cuentas y permisos propios.
 
-**Versión del código: 1.1.0-preview.11, en preparación.** La última descarga publicada es la preview 10; no contiene todas las mejoras actuales de `main`. Esta preparación simplifica la información en pantalla y añade historiales paginados, búsqueda completa de documentos y auditoría, verificación de integridad de respaldos y protección del audio pendiente. La publicación de Mac requiere firma, notarización y aceptación de Gatekeeper. [Historial de cambios](CHANGELOG.md) · [Fiabilidad y validaciones pendientes](docs/FIABILIDAD-DIARIA.md)
+**LexOpen 1.1.0.** La aplicación y los instaladores de escritorio comparten esta versión. La disponibilidad para instalar se consulta en las publicaciones de GitHub. El estudio puede seguir las pruebas de actualización, restauración, trabajo por causa y aceptación del piloto. [Publicaciones](https://github.com/gabrielperezibacache/lexopen/releases) · [Seguimiento de producción](docs/ACEPTACION-1.1.0.md) · [Cambios](CHANGELOG.md)
 
 ![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
 
@@ -29,7 +29,7 @@ Los guardados con recibo conservan su identidad al reintentar. Si PostgreSQL rec
 
 ## Continuidad del expediente
 
-Si se pierde la respuesta al crear una causa, **Reintentar creación** recupera esa misma operación; conserva los datos hasta confirmar el resultado. El servidor vuelve a comprobar los permisos y conflictos. La referencia judicial mantiene su control de duplicados; dos asuntos manuales distintos pueden tener el mismo título.
+Al crear una causa, elige si está disponible para el estudio o solo para su equipo. La elección se aplica en el primer guardado. Si se pierde la respuesta al crearla, **Reintentar creación** recupera esa misma operación; conserva los datos hasta confirmar el resultado. El servidor vuelve a comprobar los permisos y conflictos. La referencia judicial mantiene su control de duplicados; dos asuntos manuales distintos pueden tener el mismo título.
 
 Los documentos del cliente incluyen los de sus causas accesibles, con contador y paginación coherentes. Los originales se conservan; TXT y Markdown válidos se extraen localmente, incluidos textos UTF-16 con BOM. Puedes preparar una audiencia, promover una observación revisada a hecho del expediente y citar su documento en un escrito con segundo revisor. La mesa privada conserva su acceso propio. Exportar el escrito no completa tareas ni plazos: cada cierre requiere su acción explícita. [Recorrido y comprobaciones](docs/CONTINUIDAD-TRABAJO-JURIDICO.md).
 
@@ -41,16 +41,14 @@ El informe muestra fuentes cotejadas y limitaciones de lectura. Las tareas y el 
 
 ## Descargar e instalar
 
-[**Publicaciones y descargas verificadas**](https://github.com/gabrielperezibacache/lexopen/releases) · [Versión 1.1.0-preview.10](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.10)
+Abre **Publicaciones y descargas** y elige la versión disponible. La edición estable lleva la etiqueta `v1.1.0` cuando está publicada. Si solo aparecen previews, revisa sus notas antes de instalar. En el Mac del estudio, busca los recibos de firma Developer ID, notarización y aceptación de Gatekeeper correspondientes a tu arquitectura. [Publicaciones y descargas](https://github.com/gabrielperezibacache/lexopen/releases) · [Antecedentes de preview 10](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.10)
 
-La publicación ofrece estos paquetes cuando finalizan las comprobaciones de la aplicación y de las cuatro plataformas. Si la versión todavía no aparece, utiliza la última publicación disponible; un trabajo de CI pendiente no equivale a un instalador publicado.
-
-| Equipo | Archivo que debes elegir |
+| Equipo | Archivo dentro de la versión elegida |
 | --- | --- |
-| Windows Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.10-win-x64.exe` |
-| Mac con chip Apple | `LexOpen-1.1.0-preview.10-mac-arm64.dmg` |
-| Mac Intel | `LexOpen-1.1.0-preview.10-mac-x64.dmg` |
-| Linux Intel/AMD de 64 bits | `LexOpen-1.1.0-preview.10-linux-amd64.deb` o `LexOpen-1.1.0-preview.10-linux-x86_64.AppImage` |
+| Windows Intel/AMD de 64 bits | Instalador `win-x64.exe` |
+| Mac con chip Apple | Imagen de disco `mac-arm64.dmg` |
+| Mac Intel | Imagen de disco `mac-x64.dmg` |
+| Linux Intel/AMD de 64 bits | Paquete `linux-amd64.deb` o `linux-x86_64.AppImage` |
 
 Los paquetes incluyen el servidor, PostgreSQL y Chromium nativos. No necesitas instalar Node ni npm para abrir el programa. El escritorio de Altazor, los modelos y OCR tienen preparación adicional. Windows ARM y Linux ARM no están en esta matriz.
 
