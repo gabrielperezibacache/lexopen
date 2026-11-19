@@ -1,5 +1,5 @@
 import { studyDriveMode } from "@/lib/integrations/google-study-drive";
-import { caseDriveRevision, linkAltazorDriveFolder } from "@/lib/integrations/case-drive";
+import { caseDriveRevision, copyIntakeToStudyFolder, linkAltazorDriveFolder } from "@/lib/integrations/case-drive";
 import { configureOrganizationDrive, organizationDriveState } from "@/lib/integrations/drive-organization";
 import { assertCsrf, canReadFlagged, handleRouteError, httpError, requireStaff } from "@/lib/api";
 import { assertCausaAccess, assertCausaCapability, documentReadWhere, plazoAccessWhere, requiredCausaWhere } from "@/lib/auth/causa-access";
@@ -102,6 +102,12 @@ export async function POST(req: Request) {
       const doc = await prisma.documento.findFirst({ where: { id: String(body.documentoId), ...documentReadWhere(user) } });
       if (!doc || !canReadFlagged(user, doc)) throw httpError("Documento no encontrado", 404);
       if (doc.causaId) await assertCausaCapability(doc.causaId, user, "causa.write");
+      if (body.action === "push-documento" && body.studyFolderId !== undefined && await studyDriveMode()) {
+        if (!doc.causaId || typeof body.studyFolderId !== "string") throw httpError("Revisa la carpeta de esta causa antes de copiar el documento.", 409);
+        const copy = await copyIntakeToStudyFolder(doc.causaId, doc.id, body.studyFolderId, user);
+        if (copy.state === "failed") throw httpError(copy.message, 409);
+        return NextResponse.json({ status: copy.state === "completed" ? "uploaded" : copy.state, message: copy.message, file: copy.file }, { status: copy.state === "completed" ? 200 : 202 });
+      }
     }
     if (body.minutaId) {
       const doc = await prisma.minuta.findFirst({ where: { id: String(body.minutaId), ...requiredCausaWhere(user) } });

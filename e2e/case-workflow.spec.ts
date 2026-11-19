@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { apiRequest, authenticateApiRequests, loginAs } from "./helpers";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Workflow browser fixtures require local storage");
@@ -33,7 +33,8 @@ test.afterAll(async () => {
 test("recorrido de causa: biblioteca y lector conservan contexto, escrito recibe volumen y el muro ético protege la remisión", async ({ page }, info) => {
   test.setTimeout(120_000);
   await loginAs(page, email);
-  const imported = await page.request.post("/api/books", { multipart: { requestId: randomUUID(), title: "Lectura de trabajo · demostración", author: "Material ficticio", preserveOriginal: "true", file: { name: "lectura-demo.txt", mimeType: "text/plain", buffer: Buffer.from("Material de demostración. La lectura del contrato exige distinguir el pasaje conservado de la observación del profesional. No es una obra jurídica publicada.") } } });
+  await authenticateApiRequests(page);
+  const imported = await apiRequest(page).post("/api/books", { multipart: { requestId: randomUUID(), title: "Lectura de trabajo · demostración", author: "Material ficticio", preserveOriginal: "true", file: { name: "lectura-demo.txt", mimeType: "text/plain", buffer: Buffer.from("Material de demostración. La lectura del contrato exige distinguir el pasaje conservado de la observación del profesional. No es una obra jurídica publicada.") } } });
   expect(imported.status(), await imported.text()).toBe(201);
   bookId = (await imported.json()).book.id;
   storageKey = (await db.libraryBook.findUniqueOrThrow({ where: { id: bookId }, select: { storageKey: true } })).storageKey;
@@ -92,9 +93,9 @@ test("recorrido de causa: biblioteca y lector conservan contexto, escrito recibe
   await capture("writing", ".writing-paper");
   const draftId = new URL(page.url()).searchParams.get("draft");
   expect(draftId).toBeTruthy();
-  const newer = await page.request.post(`/api/causas/${causaId}/writings`, { data: { requestId: randomUUID(), title: "Otro escrito posterior", body: "Este escrito no debe sustituir el retorno al original." } });
+  const newer = await apiRequest(page).post(`/api/causas/${causaId}/writings`, { data: { requestId: randomUUID(), title: "Otro escrito posterior", body: "Este escrito no debe sustituir el retorno al original." } });
   expect(newer.status(), await newer.text()).toBe(201);
-  const desk = await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title: "Mesa privada del recorrido" } });
+  const desk = await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title: "Mesa privada del recorrido" } });
   expect(desk.status(), await desk.text()).toBe(201);
   const deskId = (await desk.json()).id as string;
   const returnTo = `/mis-causas?q=demostrativa&materia=civil#causa-${causaId}`;

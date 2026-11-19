@@ -2,6 +2,7 @@ import type { Dictionary } from "./es";
 
 export const en: Dictionary = {
   judicialOperations: {
+    channelPaused: "Judicial follow-up paused",
     connection: "Connection",
     consultation: "Query",
     tracking: "Follow-up",

@@ -87,7 +87,14 @@ El barrido de `information-hierarchy.spec.ts` captura 14 pantallas en escritorio
 | Asistente | Búsqueda global | Inglés, claro | 1366 px |
 | Administrador | Auditoría | Inglés, oscuro | 1366 px |
 
-Las siguientes capturas documentan una revisión anterior. Para ver los resultados de esta entrega, consultar las capturas de la ejecución actual de Playwright.
+Estas capturas de la entrega muestran la jornada de un abogado ficticio y la configuración inicial de una cuenta administradora. El barrido completo se guarda en los resultados de Playwright.
+
+| Pantalla | Escritorio de 1366 px | Móvil de 360 px |
+| --- | --- | --- |
+| Inicio | [Ver jornada](ui/informacion/inicio-escritorio-v1.1.png) | [Ver jornada](ui/informacion/inicio-movil-v1.1.png) |
+| Configuración | [Ver ajustes](ui/informacion/ajustes-escritorio-v1.1.png) | [Ver ajustes](ui/informacion/ajustes-movil-v1.1.png) |
+
+Las siguientes comparaciones corresponden a una revisión anterior.
 
 | Pantalla | Antes | Después |
 | --- | --- | --- |

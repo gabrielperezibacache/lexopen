@@ -27,6 +27,8 @@ export default function GlobalError({ error, retry }: {
         {error.digest && <p>{english ? "Support reference" : "Referencia para soporte"} <code>{error.digest}</code></p>}
         <div className={styles.actions}>
           <button type="button" onClick={retry}>{english ? "Try again" : "Reintentar"}</button>
+          {/* Recovery must reload the document even if the app router failed. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/">{english ? "Back to LexOpen" : "Volver a LexOpen"}</a>
         </div>
       </main>

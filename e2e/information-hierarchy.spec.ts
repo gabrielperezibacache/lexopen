@@ -143,46 +143,46 @@ test("jornada y próximos plazos coinciden; el formulario conserva el borrador a
   ).toBeVisible();
 });
 
-test("revisión visual de los apartados en escritorio y móvil", async ({
-  page,
-}, info) => {
-  test.skip(
-    info.project.name !== "chromium",
-    "Visual captures in Chromium; interactions run in all three engines.",
-  );
-  test.setTimeout(180_000);
-  await loginAs(page, "abogado@estudio.cl");
-  const cause = await db.causa.findFirstOrThrow({
-    where: { abogado: { email: "abogado@estudio.cl" } },
-    orderBy: { createdAt: "asc" },
-  });
-  const routes = {
-    inicio: "/inicio",
-    causas: "/mis-causas",
-    ficha: `/causas/${cause.id}`,
-    expediente: `/causas/${cause.id}/expediente`,
-    documentos: "/documentos",
-    plazos: "/plazos",
-    configuracion: "/configuracion",
-    biblioteca: "/biblioteca",
-    tareas: "/tareas",
-    calendario: "/calendario",
-    fuentes: "/jurisprudencia",
-    clientes: "/clientes",
-    mensajes: "/mensajes",
-    finanzas: "/facturacion",
-  };
-  for (const [mode, size] of [
-    ["desktop", { width: 1366, height: 900 }],
-    ["mobile", { width: 360, height: 800 }],
-  ] as const) {
+for (const [mode, size] of [
+  ["desktop", { width: 1366, height: 900 }],
+  ["mobile", { width: 360, height: 800 }],
+] as const) {
+  test(`revisión visual de los apartados en ${mode}`, async ({ page }, info) => {
+    test.skip(
+      info.project.name !== "chromium",
+      "Visual captures in Chromium; interactions run in all three engines.",
+    );
+    test.setTimeout(180_000);
+    await loginAs(page, "abogado@estudio.cl");
+    const cause = await db.causa.findFirstOrThrow({
+      where: { abogado: { email: "abogado@estudio.cl" } },
+      orderBy: { createdAt: "asc" },
+    });
+    const routes = {
+      inicio: "/inicio",
+      causas: "/mis-causas",
+      ficha: `/causas/${cause.id}`,
+      expediente: `/causas/${cause.id}/expediente`,
+      documentos: "/documentos",
+      plazos: "/plazos",
+      biblioteca: "/biblioteca",
+      tareas: "/tareas",
+      calendario: "/calendario",
+      fuentes: "/jurisprudencia",
+      clientes: "/clientes",
+      mensajes: "/mensajes",
+      finanzas: "/facturacion",
+      configuracion: "/configuracion",
+    };
     await page.setViewportSize(size);
     for (const [name, path] of Object.entries(routes)) {
       if (name === "configuracion") await loginAs(page, "socio@estudio.cl");
-      if (name === "biblioteca") await loginAs(page, "abogado@estudio.cl");
       const response = await page.goto(path, { waitUntil: "domcontentloaded" });
       expect(response?.status(), path).toBe(200);
       await expect(page.getByRole("main").getByRole("heading").first()).toBeVisible({ timeout: 25_000 });
+      if (name === "inicio") {
+        await expect(page.getByText(/Recuperando conversación…|Consultando escritorio…/)).toHaveCount(0);
+      }
       await page.evaluate(() => document.fonts.ready);
       expect(
         await page.evaluate(
@@ -195,8 +195,8 @@ test("revisión visual de los apartados en escritorio y móvil", async ({
         animations: "disabled",
       });
     }
-  }
-});
+  });
+}
 
 const profileSamples = [
   { name: "acceso", email: null, path: "/login", heading: "Sign in", locale: "en", theme: "dark", width: 360 },

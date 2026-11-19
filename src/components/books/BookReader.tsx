@@ -18,6 +18,7 @@ import "./library.css";
 type ReaderTool = "passages" | "info" | "settings";
 export function BookReader({ bookId, causaId, writingDraftId }: { bookId: string; causaId?: string; writingDraftId?: string }) {
   const workflowQuery = useSearchParams();
+  const libraryHref = causaId ? caseLibraryHref(causaId, writingDraftId, workflowQuery) : "/biblioteca";
   const id = useId(), panelId = `${id}-tools`;
   const [data, setData] = useState<BookDetail | null>(null), [reload, setReload] = useState(0), [after, setAfter] = useState(0), [page, setPage] = useState<number | null>(null), [loadedPage, setLoadedPage] = useState<number | null>(null);
   const [error, setError] = useState(""), [loading, setLoading] = useState(true), [panelOpen, setPanelOpen] = useState(false), [tool, setTool] = useState<ReaderTool>("info"), [settingsVisited, setSettingsVisited] = useState(false);
@@ -51,7 +52,7 @@ export function BookReader({ bookId, causaId, writingDraftId }: { bookId: string
     {data.limited && <p className="book-small">Se muestran hasta 100 fragmentos por lectura. Continúe para recorrer los restantes.</p>}
   </section>;
   return <div className="personal-law-library book-reader" data-theme="walnut">
-    <Link href={causaId ? caseLibraryHref(causaId, writingDraftId, workflowQuery) : "/biblioteca"} className="book-reader-back"><ArrowLeft size={16} aria-hidden="true" />Volver a mi biblioteca</Link>
+    <Link href={libraryHref} className="book-reader-back"><ArrowLeft size={16} aria-hidden="true" />Volver a mi biblioteca</Link>
     {error && <div role="alert" className="book-error"><p>{error}</p><button className="btn btn-ghost" onClick={update}>Intentar de nuevo</button></div>}
     {loading && <p className="book-loading" role="status">Abriendo el libro y sus pasajes…</p>}
     {book && data && <>
@@ -64,7 +65,7 @@ export function BookReader({ bookId, causaId, writingDraftId }: { bookId: string
           <div className="context-panel-tools" aria-label="Herramientas del libro">{physical && <button type="button" aria-pressed={tool === "passages"} onClick={() => setTool("passages")}>Pasajes y citas</button>}<button type="button" aria-pressed={tool === "info"} onClick={() => setTool("info")}>Ficha y descargas</button>{book.owned && <button type="button" aria-pressed={tool === "settings"} onClick={() => showTool("settings")}>Personalizar este libro</button>}</div>
           {physical && <div hidden={tool !== "passages"}>{passages}</div>}
           <section hidden={tool !== "info"} className="book-reader-information"><div className="book-reader-info-cover"><BookObject book={book} /></div><h3>Ficha de la fuente</h3><p>{book.sourceType !== "book" ? formatBookReference(book) : [book.edition, book.publisher, book.year].filter(Boolean).join(" · ") || "Complete la ficha bibliográfica antes de usarla en un escrito."}</p>{book.judicial && <div className="book-judicial-notice"><p>{judicialMetadataNotice}</p>{book.judicial.officialUrl && <a href={book.judicial.officialUrl} target="_blank" rel="noopener noreferrer">Abrir enlace de procedencia declarado</a>}</div>}{book.identifier && <p>{book.identifier}</p>}<p>{bookStatusLabel[book.status] || book.status} · {book.pageCount ? `${book.pageCount} páginas físicas` : "Localización por pasaje"} · {book.fragmentCount} pasajes</p><div className="book-actions"><a className="btn btn-secondary" href={`/api/books/${bookId}/${originalRetained ? "original" : "text"}`}><Download size={16} aria-hidden="true" />{originalRetained ? "Descargar original" : "Descargar texto conservado"}</a>{originalRetained && book.convertedToText && <a className="book-text-action" href={`/api/books/${bookId}/text`}>Descargar texto preparado</a>}</div><details className="book-original-details"><summary>{originalRetained ? "Identidad del original conservado" : "Identidad del texto conservado"}</summary><p>Archivo de procedencia: {book.sourceName}</p><p className="book-file-hash">{originalRetained ? "SHA-256 del original conservado" : "Huella de procedencia del archivo importado, no conservado"}: {book.sourceSha256}</p>{!originalRetained && book.retainedSha256 && <p className="book-file-hash">SHA-256 del texto conservado: {book.retainedSha256}</p>}<p>La ficha bibliográfica es aportada por el propietario. El cotejo no certifica su autoría ni vigencia.</p></details></section>
-          {book.owned && settingsVisited && <div hidden={tool !== "settings"}><BookSettings key={`${book.id}:${book.revision}`} book={book} onSaved={() => { setTool("info"); update(); }} /></div>}
+          {book.owned && settingsVisited && <div hidden={tool !== "settings"}><BookSettings key={`${book.id}:${book.revision}`} book={book} libraryHref={libraryHref} onSaved={() => { setTool("info"); update(); }} /></div>}
         </ContextPanel>
       </div>
     </>}

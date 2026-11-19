@@ -83,9 +83,9 @@ Algunos requisitos particulares:
 
 ## Guardar y escribir un secreto
 
-1. Abra **Conexiones → Secretos**, asigne nombre y aplicación e introduzca el valor únicamente en su formulario reservado. El usuario es opcional y se muestra en la lista.
+1. Abra **Herramientas → Aplicaciones → Secretos**, asigne nombre y aplicación e introduzca el valor únicamente en su formulario reservado. El usuario es opcional y se muestra en la lista.
 2. El valor se guarda cifrado. La lista y la consulta individual devuelven sólo metadatos. Sustituirlo, o cambiar su nombre o aplicación, requiere introducir de nuevo el valor.
-3. Abra la Computadora, tome el control y seleccione el campo de la página. Elija el secreto, indique el origen HTTPS y el campo que usted comprobó y prepare su uso.
+3. Abra **Herramientas → Escritorio**, tome el control y seleccione el campo de la página. Elija el secreto, indique el origen HTTPS y el campo que usted comprobó y prepare su uso.
 4. Revise el destino declarado y confirme **Escribir una vez**. La autorización dura hasta 60 segundos, pertenece a esa sesión y versión del secreto y se consume antes del envío. No pulsa Enter ni envía el formulario; mantiene el control manual.
 5. Compruebe el resultado. Si la respuesta es incierta, revise si se escribió antes de autorizar otro uso. Cambiar el campo mediante los controles de LexOpen, devolver el control, rotar el secreto o perder acceso invalida la autorización pendiente.
 
@@ -136,7 +136,7 @@ Prepara la imagen y una configuración nueva siguiendo la [guía del escritorio]
 ### Habilitarlo en LexOpen
 
 1. Active `ALTAZOR_COMPUTER_ENABLED=1` en el Host y mantenga un listener explícito en loopback, mediante `LEXOPEN_BIND=127.0.0.1` o su equivalente admitido. La función está desactivada por defecto.
-2. Desde un navegador local, configure en Computadora el endpoint loopback, token y proveedor. Un navegador remoto no puede configurar servicios de loopback del Host. El adaptador no admite gateways remotos/TLS.
+2. Desde un navegador local, abra **Herramientas → Escritorio → Configurar gateway local dedicado** e indique la dirección local, el token y el proveedor. Un navegador remoto no puede configurar servicios de loopback del Host. El adaptador no admite gateways remotos/TLS.
 3. Confirme la instancia independiente para ese profesional y ámbito, compruebe su estado y configure las conexiones necesarias.
 4. Abra la sesión con selección explícita. LexOpen transmite `['-']` para ninguna conexión: una lista vacía en el contrato original del gateway significaría todas.
 5. Pruebe autorizaciones, control y cierre con archivos y cuentas de prueba antes de utilizar documentos del estudio.

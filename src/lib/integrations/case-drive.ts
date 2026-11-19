@@ -176,6 +176,28 @@ async function assertCaseState(causaId: string, saved: Saved, db: Db) {
   const [cause, subscription] = await Promise.all([db.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } }), db.driveSyncSubscription.findUnique({ where: { causaId }, select: { generation: true } })]);
   if (cause.googleDriveFolderId !== saved.caseFolderId || (subscription?.generation ?? null) !== saved.subscriptionGeneration) throw httpError("La carpeta de la causa cambió durante la operación. Revisa el resultado anterior.", 409);
 }
+/** Copy a confirmed intake to the same Organization folder shown before submission. */
+export async function copyIntakeToStudyFolder(causaId: string, documentoId: string, expectedFolderId: string, user: CausaAccessUser, options: Options = {}) {
+  const db = options.client || prisma;
+  await actor(causaId, user, db);
+  const account = options.account || await resolveStudyDriveAccount(user, options.client);
+  const caseRevision = await caseDriveRevision(causaId, db);
+  const binding = await readAltazorDriveFolderBinding(causaId, db);
+  if (account.source !== "study" || binding?.source !== "study" || binding.folderId !== expectedFolderId) {
+    throw httpError("La carpeta de Organización cambió. Revisa el destino en el expediente.", 409);
+  }
+  await assertAltazorDriveFolderBinding(causaId, user, binding, account, db);
+  const source = await documentSnapshot(causaId, documentoId, user, db);
+  const requestId = digest(canonicalJson(["intake", documentoId, source.version, source.sha256, caseRevision, account.bindingRevision]));
+  const common = { requestId, connectionId: account.connectionId, bindingRevision: account.bindingRevision, confirmed: true as const };
+  const command = { ...common, action: "upload-document" as const, caseRevision, documentoId, documentVersion: source.version, sourceSha256: source.sha256 };
+  const managed = { ...options, account };
+  const result = await runCaseDriveCommand(causaId, user, command, managed);
+  return result.state === "unknown" || result.state === "pending"
+    ? runCaseDriveCommand(causaId, user, { ...common, action: "reconcile" }, managed)
+    : result;
+}
+
 export async function runCaseDriveCommand(causaId: string, user: CausaAccessUser, input: CaseDriveCommand, options: Options = {}): Promise<CaseDriveResult> {
   input = caseDriveCommandSchema.parse(input);
   const db = options.client || prisma; await actor(causaId, user, db);

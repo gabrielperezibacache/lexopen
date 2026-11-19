@@ -1,5 +1,6 @@
 export const es = {
   judicialOperations: {
+    channelPaused: "Seguimiento judicial en pausa",
     connection: "Conexión",
     consultation: "Consulta",
     tracking: "Seguimiento",

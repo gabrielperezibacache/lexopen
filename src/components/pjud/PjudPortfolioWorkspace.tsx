@@ -82,6 +82,7 @@ export default function MonitoreoCausasPage() {
   const [fallidos, setFallidos] = useState<Fallido[]>([]);
   const [resumen, setResumen] = useState<Record<string, number> | null>(null);
   const [scheduler, setScheduler] = useState<Scheduler | null>(null);
+  const [provider, setProvider] = useState<{ liveIngestConfigured?: boolean; managementMode?: string } | null>(null);
   const [filter, setFilter] = useState<
     "todas" | Semaforo | "monitoreadas" | "fallidas"
   >("monitoreadas");
@@ -96,8 +97,9 @@ export default function MonitoreoCausasPage() {
       const res = await fetch("/api/causas/monitoreo", { cache: "no-store" });
       if (!res.ok) throw new Error("unavailable");
       const data = await res.json();
+      if (!Array.isArray(data.items)) throw new Error("invalid portfolio response");
       setItems(data.items || []); setFallidos(data.fallidos || []);
-      setResumen(data.resumen || null); setScheduler(data.scheduler || null);
+      setResumen(data.resumen || null); setScheduler(data.scheduler || null); setProvider(data.provider || null);
     } catch { setLoadError(operations.loadFailed); }
     finally { setLoading(false); }
   }
@@ -111,10 +113,13 @@ export default function MonitoreoCausasPage() {
       })
       .then((data) => {
         if (!active) return;
+        if (!Array.isArray(data.items)) throw new Error("invalid portfolio response");
+        setLoadError("");
         setItems(data.items || []);
         setFallidos(data.fallidos || []);
         setResumen(data.resumen || null);
         setScheduler(data.scheduler || null);
+        setProvider(data.provider || null);
       })
       .catch(() => { if (active) setLoadError(operations.loadFailed); })
       .finally(() => { if (active) setLoading(false); });
@@ -281,7 +286,7 @@ export default function MonitoreoCausasPage() {
 
       <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5" aria-label={operations.operationState}>
         <dl className="grid gap-5 md:grid-cols-3">
-          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.connection}</dt><dd className="mt-2 font-medium">{scheduler ? scheduler.configured ? operations.channelConfigured : operations.channelPending : operations.notVerified}</dd><dd className="mt-1 text-sm text-[var(--ink-soft)]">{operations.connectionScope}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.connection}</dt><dd className="mt-2 font-medium">{provider?.managementMode === "manual" ? operations.channelPaused : typeof provider?.liveIngestConfigured === "boolean" ? provider.liveIngestConfigured ? operations.channelConfigured : operations.channelPending : operations.notVerified}</dd><dd className="mt-1 text-sm text-[var(--ink-soft)]">{operations.connectionScope}</dd></div>
           <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.consultation}</dt><dd className="mt-2 font-medium">{loading ? operations.loading : loadError ? operations.notVerified : `${items.length} ${operations.loadedCases}`}</dd><dd className="mt-1 text-sm text-[var(--ink-soft)]">{operations.caseCoverage}</dd></div>
           <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.tracking}</dt><dd className="mt-2 font-medium">{resumen ? `${resumen.monitoreadas} ${operations.monitored}` : operations.notVerified}</dd><dd className="mt-1"><Link className="text-sm text-[var(--sea)] underline" href="/causas/mis-causas#ingreso-manual">{operations.connectOjv}</Link></dd></div>
         </dl>
@@ -340,7 +345,7 @@ export default function MonitoreoCausasPage() {
                   </div>
                 </div>
                 <span className="text-xs text-rose-700/70">
-                  {fmtShort(f.createdAt)}
+                  {fmtShort(f.createdAt, operations.noAttempt)}
                 </span>
               </li>
             ))}

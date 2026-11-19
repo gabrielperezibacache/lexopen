@@ -100,11 +100,11 @@ La [metadata OIDC pública de LinkedIn](https://www.linkedin.com/oauth/.well-kno
 
 El conector envía un nonce por intento y exige su correspondencia en el ID token, conforme a [OIDC Core, validación del ID token](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation). La metadata y la guía públicas de LinkedIn consultadas no detallan ese eco; esta revisión no acredita su comportamiento con una cuenta real. Se conserva la comprobación sin relajar firma, audiencia, nonce o caducidad.
 
-## Computadora del asistente
+## Escritorio de Altazor
 
-**Computadora** conecta un escritorio opcional mediante un broker de LexOpen. Cada profesional y ámbito utiliza un gateway dedicado; un mismo endpoint no se comparte entre causas. El motor de escritorio es un contenedor, no una VM con kernel propio.
+En **Herramientas → Escritorio** puedes abrir el escritorio que el Host haya preparado para ti. Cada profesional y ámbito utiliza un gateway dedicado; un mismo endpoint no se comparte entre causas. El motor de escritorio es un contenedor, no una VM con kernel propio.
 
-El recorrido permite crear una sesión con caducidad, enviar un encargo y archivos expresamente elegidos, observar capturas, tomar el control para un ingreso manual, devolverlo, cancelar una tarea y cerrar la sesión. LexOpen conserva sus propios permisos y recibos. No entrega su base de datos, el almacenamiento completo ni sus credenciales al escritorio.
+Los escritorios nuevos conservan los archivos, las aplicaciones y la conversación al detenerlos. Puedes enviar un encargo con los archivos que elijas, observar el visor, tomar y devolver el control o cancelar una tarea en curso. En un escritorio listo, **Opciones de sesión → Detener escritorio** apaga la máquina. **Reanudar el mismo escritorio** recupera esa sesión. LexOpen conserva sus propios permisos y recibos. No entrega su base de datos, el almacenamiento completo ni sus credenciales al escritorio.
 
 La vista ampliada actualiza las capturas mientras está visible y pausa las consultas al ocultarla. Si la apertura falla después de crear una sesión, vuelve a comprobar el listado y muestra la sesión pendiente para revisarla o detenerla, sin reenviar el encargo. Una comprobación fallida de conexiones deja su estado **Sin comprobar** y bloquea las operaciones hasta recibir una respuesta actual.
 
@@ -114,7 +114,7 @@ El adaptador está desactivado por defecto. No instala ni inicia un motor al abr
 
 La Mesa de documentos por causa sigue disponible para su receta local de Word y Markdown. El escritorio amplía ese recorrido; la existencia de un botón no prueba que haya un entorno preparado. La interfaz muestra el estado real de configuración y comprobación.
 
-Las instrucciones del adaptador, el contrato fijado y las limitaciones de cierre y caducidad están en [Computadora: operación y pruebas](../src/lib/altazor/computer/README.md).
+Las instrucciones del adaptador, el contrato fijado y el tratamiento de las sesiones temporales anteriores están en [Operación y pruebas del escritorio](../src/lib/altazor/computer/README.md).
 
 ## Texto del navegador y de documentos
 

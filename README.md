@@ -13,9 +13,12 @@ LexOpen es una aplicación de código abierto para profesionales y estudios jur�
 
 **LexOpen 1.1.0.** La aplicación y los instaladores de escritorio comparten esta versión. La disponibilidad para instalar se consulta en las publicaciones de GitHub. El estudio puede seguir las pruebas de actualización, restauración, trabajo por causa y aceptación del piloto. [Publicaciones](https://github.com/gabrielperezibacache/lexopen/releases) · [Seguimiento de producción](docs/ACEPTACION-1.1.0.md) · [Cambios](CHANGELOG.md)
 
-![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/ui/informacion/inicio-movil-v1.1.png">
+  <img src="docs/ui/informacion/inicio-escritorio-v1.1.png" alt="Inicio de LexOpen con el próximo vencimiento y el chat de Altazor en un estudio de prueba">
+</picture>
 
-*Las imágenes de la galería son ilustrativas y utilizan expedientes ficticios; algunos controles han evolucionado desde su captura.*
+*Las capturas utilizan expedientes ficticios. La galería conserva también vistas de versiones anteriores.*
 
 ## Información y acciones a mano
 
@@ -138,11 +141,11 @@ Al abrir una causa, **Estado de la causa** muestra automáticamente sus plazos a
 
 **Mi Fiscalía** reúne la preparación de solicitudes por causa, RUC, folio de presentación, respuesta e historial. Abre el portal oficial para ingresar con la misma ClaveÚnica del Registro Civil, sin pedir otra contraseña en LexOpen. La presentación se completa en el portal; cada solicitud tiene una ficha con historial, rectificaciones motivadas de folio y fecha, y acceso al comprobante o respuesta en la versión documental vinculada. [Flujo, permisos y alcance](docs/MI-FISCALIA.md). Los plazos abiertos desde una causa conservan su filtro al cambiar de mes o de vista.
 
-El escritorio de Altazor es persistente: conserva archivos, aplicaciones y conversación sin vencimiento automático. Puede trabajar en segundo plano, detenerse y reanudarse como la misma máquina. Las conexiones disponibles se seleccionan juntas y mantienen los permisos del estudio. Los escritorios temporales anteriores pueden conservarse expresamente desde Computadora. [Persistencia, respaldo y operación](docs/ESCRITORIO-ALTAZOR.md#un-puesto-de-trabajo-persistente).
+El escritorio de Altazor es persistente: conserva archivos, aplicaciones y conversación sin vencimiento automático. Puede trabajar en segundo plano, detenerse y reanudarse como la misma máquina. Las conexiones disponibles se seleccionan juntas y mantienen los permisos del estudio. Los escritorios temporales anteriores pueden conservarse expresamente desde **Herramientas → Escritorio**. [Persistencia, respaldo y operación](docs/ESCRITORIO-ALTAZOR.md#un-puesto-de-trabajo-persistente).
 
 Altazor conserva la conversación y sus adjuntos, propone un plan resumido y cuenta las acciones. Puedes consultar los detalles bajo demanda y revisar los cambios preparados. El visor permite seguir una sesión activa del escritorio.
 
-En **Computadora → Historial de descargas** puedes consultar recibos anteriores por fecha, estado y conexión, incluso con el escritorio cerrado. Se distinguen confirmaciones verificadas, fallos y resultados sin confirmar. El historial conserva los permisos actuales de cada usuario y causa, y muestra solo metadatos.
+En **Herramientas → Escritorio → Historial de descargas** puedes consultar recibos anteriores por fecha, estado y conexión, incluso con el escritorio cerrado. Se distinguen confirmaciones verificadas, fallos y resultados sin confirmar. El historial conserva los permisos actuales de cada usuario y causa, y muestra solo metadatos.
 
 El escritorio prioriza leer texto del navegador y de los documentos antes de recurrir a capturas. **Ícaros** permite elegir el modelo y las notas concretas que recibe cada especialista. Desde el chat se puede retomar un informe de la misma causa y conversación, incluso después de cerrar el navegador. **Ayuda a distancia** conserva una solicitud en espera y permite responder por ntfy o WhatsApp cuando el canal está conectado. Estas capacidades requieren configurar el perfil de escritorio, el worker y los canales correspondientes.
 

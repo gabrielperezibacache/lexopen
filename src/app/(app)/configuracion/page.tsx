@@ -150,7 +150,8 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
   };
 }
 
-export default async function ConfiguracionPage() {
+export default async function ConfiguracionPage({ searchParams }: { searchParams: Promise<{ section?: string | string[] }> }) {
+  const { section } = await searchParams;
   const user = await requireStaff();
   const [{ dict, locale, t }, mode, country] = await Promise.all([getI18n(), getCaseManagementMode(), getWorkCountry()]);
   const h = dict.hubs.configuracion;
@@ -191,7 +192,7 @@ export default async function ConfiguracionPage() {
         eyebrow={h.eyebrow}
         title={canManage ? h.title : dict.nav.settings}
       />
-      <ConfigSectionNav categories={categories} sections={Object.fromEntries(
+      <ConfigSectionNav categories={categories} initialSection={typeof section === "string" ? section : ""} sections={Object.fromEntries(
         categories.flatMap(category => category.sections.map(({ id }) => [id, sections[id]]))
       )} />
     </div>

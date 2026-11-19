@@ -23,7 +23,8 @@ function subscribe(listener: () => void) {
   };
 }
 
-export function ConfigSectionNav({ categories, sections }: {
+export function ConfigSectionNav({ categories, sections, initialSection }: {
+  initialSection: string;
   categories: ReturnType<typeof configCategoriesForMode>;
   sections: Record<string, ReactNode>;
 }) {
@@ -31,7 +32,7 @@ export function ConfigSectionNav({ categories, sections }: {
   const [query, setQuery] = useState("");
   const select = useRef<HTMLSelectElement>(null);
   const hash = useSyncExternalStore(subscribe, () => window.location.hash, () => "");
-  const active = configSectionFromHash(hash, categories)?.id ?? categories[0].sections[0].id;
+  const active = configSectionFromHash(hash || initialSection, categories)?.id ?? categories[0].sections[0].id;
   // Open a form on first visit. Keep it mounted afterwards to retain drafts and feedback.
   const [visited, setVisited] = useState(() => new Set([active]));
   if (!visited.has(active)) setVisited(new Set([...visited, active]));

@@ -34,7 +34,8 @@ test("la delegación administra el estudio y la revocación de IA permite cerrar
   await loginAs(page, emails.delegated);
   await page.goto("/configuracion#work-country");
   await expect(page.locator("#work-country").getByRole("combobox", { name: "País", exact: true })).toBeVisible();
-  await expect(page.getByTestId("users-admin-panel")).toHaveCount(1);
+  await page.getByLabel("Ajuste seleccionado", { exact: true }).selectOption("usuarios");
+  await expect(page.getByTestId("users-admin-panel")).toBeVisible();
   await page.goto("/cuenta#permisos");
   const permissions = page.getByTestId("my-permissions");
   await expect(permissions).toContainText("Puedes administrar la configuración compartida");
