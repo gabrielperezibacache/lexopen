@@ -2,6 +2,9 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Clientes: la edición y el guardado se habilitan cuando el formulario está activo en el navegador, evitando escribir sobre controles todavía pendientes de hidratación.
+- Trabajo sin conexión: el desbloqueo espera la apertura de IndexedDB aunque el navegador restablezca un botón habilitado. Una salida de página cancela la apertura pendiente y borra la clave visible. Un fallo al preparar la caché de navegación se distingue de un fallo del almacenamiento cifrado.
+
 - Guardados concurrentes: los conflictos de serialización confirmados por PostgreSQL esperan de forma progresiva antes de reintentar, conservando el límite de intentos, los permisos vigentes y el recibo atómico. Los errores de resultado incierto y de auditoría no se reintentan automáticamente.
 - Regresiones de navegación: las comprobaciones de preparación de causas y del compositor de Inicio distinguen la pantalla visible de las copias ocultas conservadas por el navegador, sin elegir arbitrariamente entre dos controles visibles.
 

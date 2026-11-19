@@ -21,6 +21,8 @@ LexOpen es una aplicación de código abierto para profesionales y estudios jur�
 
 Las pantallas priorizan el estado y los registros. Los formularios de incorporación, la preparación de causas y las ayudas se despliegan cuando los necesitas; plegarlos conserva el borrador. En Documentos, **Descargar** aparece directamente en cada registro. En Configuración, cada apartado indica si afecta a tu usuario, al navegador o a todo el estudio.
 
+En Clientes, los controles se habilitan cuando el formulario está listo para recibir cambios. El espacio sin conexión espera a que abra su almacenamiento antes de desbloquearlo; salir de la página cancela una apertura pendiente y limpia la clave del campo. [Preparación y recuperación](docs/TRABAJO-SIN-CONEXION.md).
+
 Los guardados con recibo conservan su identidad al reintentar. Si PostgreSQL rechaza una transacción por concurrencia, el Host espera antes de volver a intentarla y comprueba de nuevo los permisos; mantiene un máximo de cinco intentos. Un fallo de conexión con resultado incierto requiere comprobar el recibo, sin repetir automáticamente la operación.
 
 **Próximos plazos** abre los pendientes asignados a ti desde hoy hasta la fecha indicada, inclusive (hoy + 7 días), aunque cambien de mes. Los avisos de acceso, datos desactualizados y autorizaciones siguen visibles. [Criterios y comparación visual](docs/JERARQUIA-INFORMACION.md).

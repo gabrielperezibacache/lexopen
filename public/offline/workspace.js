@@ -2,6 +2,7 @@ import { setupRecords } from "/offline/records.js";
 import { openVaultStore } from "/offline/vault.js";
 const $ = id => document.getElementById(id);
 let vault, data, selected = "", dirty = false, editVersion = 0, busy = false, timer, writes = Promise.resolve();
+let storageAvailable = false, pageEpoch = 0;
 const params = new URLSearchParams(location.search), caseId = params.get("case"), draftId = params.get("draft");
 const validId = value => /^[a-zA-Z0-9_-]{1,100}$/.test(value || "");
 const records = setupRecords({ getData: () => data, auth, flush, write, run, message, markDirty });
@@ -47,16 +48,34 @@ function write() {
 async function flush() { clearTimeout(timer); while (dirty) { const version = editVersion; await write(); if (version === editVersion) dirty = false; localState(); } await writes; }
 async function run(action) {
   if (busy) return;
+  const epoch = pageEpoch;
   busy = true;
   document.querySelectorAll("button,input,textarea,select").forEach(node => { node.disabled = true; });
-  try { await action(); }
-  catch (error) { message(error.message || "No se pudo completar la operación. La copia local se conserva.", true); }
-  finally { busy = false; document.querySelectorAll("button,input,textarea,select").forEach(node => { node.disabled = false; }); records.refreshActions(); }
+  try {
+    // A restored browser control can become enabled before IndexedDB opens.
+    // Wait for the same initialization instead of treating it as unavailable.
+    await storageInitialized;
+    if (epoch !== pageEpoch) return;
+    await action();
+  }
+  catch (error) { if (epoch === pageEpoch) message(error.message || "No se pudo completar la operación. La copia local se conserva.", true); }
+  finally {
+    busy = false;
+    document.querySelectorAll("button,input,textarea,select").forEach(node => { node.disabled = false; });
+    $("create").disabled = $("unlock").disabled = !storageAvailable;
+    records.refreshActions();
+  }
 }
 async function open(password, create = false) {
-  if (!vault) throw new Error("El almacenamiento local no está disponible en este navegador.");
-  if (create) { const user = await auth(); data = await vault.create(password, user.id); }
-  else data = await vault.unlock(password);
+  const epoch = pageEpoch;
+  const current = () => { if (epoch !== pageEpoch) throw new Error("La página cambió. Vuelva a desbloquear el espacio local."); };
+  await storageInitialized;
+  current();
+  let opened;
+  if (create) { const user = await auth(); current(); opened = await vault.create(password, user.id); }
+  else opened = await vault.unlock(password);
+  current();
+  data = opened;
   $("password").value = "";
   selected = data.entries.some(item => item.id === draftId) ? draftId : data.entries[0]?.id || "";
   data.records ||= [];
@@ -130,19 +149,25 @@ $("remove").onclick = () => void run(async () => {
   if (!confirm("¿Quitar este escrito del navegador? Descargue primero los cambios que necesite conservar.")) return;
   data.entries = data.entries.filter(value => value.id !== item.id); await write(); selected = data.entries[0]?.id || ""; render(); message("Copia local quitada. El escrito del servidor se conserva.");
 });
-function lock() { vault?.lock(); data = undefined; selected = ""; dirty = false; render(); $("password").focus(); }
+function lock() { vault?.lock(); data = undefined; selected = ""; dirty = false; $("password").value = ""; render(); $("password").focus(); }
 $("lock").onclick = () => void run(async () => { await flush(); lock(); message("Espacio bloqueado. Introduzca la clave local para volver a abrirlo."); });
 $("delete-vault").onclick = () => void run(async () => {
   await flush(); if (!confirm("¿Borrar todos los registros de este navegador, incluidos los cambios sin sincronizar? Descargue antes cualquier texto que necesite conservar.")) return;
   await vault.remove(); lock(); $("create").hidden = false; $("unlock").hidden = true; message("Espacio local borrado.");
 });
 window.addEventListener("beforeunload", event => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
-window.addEventListener("pagehide", () => { clearTimeout(timer); lock(); });
+window.addEventListener("pagehide", () => { pageEpoch++; clearTimeout(timer); lock(); });
 window.addEventListener("online", network); window.addEventListener("offline", network); network();
-try {
+const storageInitialized = (async () => {
   vault = await openVaultStore();
   const exists = await vault.exists(); $("create").hidden = exists; $("unlock").hidden = !exists;
-  $("create").disabled = false; $("unlock").disabled = false;
+  storageAvailable = true;
+  $("create").disabled = busy; $("unlock").disabled = busy;
   if (!exists) message("Cree el espacio con conexión y prepare las copias que necesite. Después puede continuar sin conexión.");
-  if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/sw.js");
-} catch (error) { message(error.message, true); $("create").disabled = true; $("unlock").disabled = true; }
+})();
+try { await storageInitialized; }
+catch (error) { message(error.message, true); $("create").disabled = true; $("unlock").disabled = true; }
+if (storageAvailable && "serviceWorker" in navigator) {
+  try { await navigator.serviceWorker.register("/sw.js"); }
+  catch { message("No se pudo preparar la apertura sin conexión. Mantenga esta página abierta mientras edita.", true); }
+}
