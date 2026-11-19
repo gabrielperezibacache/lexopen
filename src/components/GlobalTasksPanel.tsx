@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
 import { apiMutation } from "@/lib/api-mutation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
+import { hasUnconfirmedOutcome } from "@/lib/command-status";
 import { civilDateKey, formatCivilDate } from "@/lib/chile-time";
 import type { TaskWorkspaceFilters } from "@/lib/tasks/workspace";
 
@@ -127,7 +128,8 @@ function TaskEditor({ task, cases, sites, initialCaseId, currentUserId, onClose,
     });
     setSaving(false);
     if (!response.ok) {
-      const uncertain = retryingSave || response.status === 0 || response.status === 408 || response.status >= 500;
+      const uncertain = hasUnconfirmedOutcome(response);
+      if (!uncertain) pending.current = null;
       setRetryingSave(uncertain);
       setError(uncertain ? "No se pudo confirmar la tarea. Reintente el guardado para comprobarlo sin duplicarla." : response.error);
       return;

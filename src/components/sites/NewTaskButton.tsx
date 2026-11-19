@@ -7,6 +7,7 @@ import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
+import { hasUnconfirmedOutcome } from "@/lib/command-status";
 
 const STATUS_LABEL: Record<string, string> = {
   todo: "Por hacer",
@@ -51,7 +52,8 @@ export function NewTaskButton({
     });
     setBusy(false);
     if (!result.ok) {
-      const uncertain = retrying || result.status === 0 || result.status === 408 || result.status >= 500;
+      const uncertain = hasUnconfirmedOutcome(result);
+      if (!uncertain) pending.current = null;
       setRetrying(uncertain);
       setError(uncertain ? "No se pudo confirmar la tarea. Reintente el guardado para comprobarlo sin duplicarla." : result.error);
       return;

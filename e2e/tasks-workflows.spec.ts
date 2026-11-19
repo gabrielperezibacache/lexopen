@@ -82,6 +82,43 @@ test("tareas: creación y finalización con respuesta perdida sin duplicar efect
   } finally { await f.cleanup(); }
 });
 
+for (const scope of ["global", "espacio"] as const) {
+  test(`tarea ${scope}: un rechazo definitivo tras un reintento permite corregir el borrador`, async ({ page }) => {
+    const f = await fixture(page);
+    const attempts: { key: string; body: string | null }[] = [];
+    try {
+      await page.goto(scope === "global" ? "/tareas" : `/sites/${f.site.id}/tareas`);
+      await page.getByRole("button", { name: "Nueva tarea", exact: true }).first().click();
+      const dialog = page.getByRole("dialog", { name: "Nueva tarea", exact: true });
+      const title = dialog.getByLabel("Título", { exact: true });
+      const submit = dialog.getByRole("button", { name: scope === "global" ? "Crear tarea" : "Crear", exact: true });
+      await title.fill(f.title);
+      await page.route(scope === "global" ? "**/api/tasks" : `**/api/sites/${f.site.id}/tasks`, async route => {
+        if (route.request().method() !== "POST") return route.continue();
+        attempts.push({ key: route.request().headers()["idempotency-key"], body: route.request().postData() });
+        if (attempts.length === 1) return route.abort("failed");
+        if (attempts.length === 2) return route.fulfill({ status: 422, json: { error: "Revise el título de la tarea." } });
+        return route.continue();
+      });
+      await submit.click();
+      await expect(title).toBeDisabled();
+      await dialog.getByRole("button", { name: "Reintentar guardado", exact: true }).click();
+      await expect(dialog.getByRole("alert")).toHaveText("Revise el título de la tarea.");
+      await expect(title).toBeEnabled();
+      await expect(title).toHaveValue(f.title);
+      expect(attempts[1]).toEqual(attempts[0]);
+      const corrected = `${f.title} corregida`;
+      await title.fill(corrected);
+      await submit.click();
+      await expect(dialog).not.toBeVisible();
+      expect(attempts).toHaveLength(3);
+      expect(attempts[0].key).toBeTruthy();
+      expect(attempts[2].key).not.toBe(attempts[0].key);
+      expect(await db.task.count({ where: { creatorId: f.user.id, title: corrected } })).toBe(1);
+    } finally { await f.cleanup(); }
+  });
+}
+
 test("tareas del espacio: acuse incompleto, reintento único y protección de cambios recientes", async ({ page }) => {
   const f = await fixture(page), keys: string[] = [];
   try {

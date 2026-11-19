@@ -1,51 +1,28 @@
-import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { httpError } from "@/lib/auth/access";
-import { assertCausaCapability } from "@/lib/auth/causa-access";
-import { fetchPjudMovimientos } from "@/lib/pjud/provider";
-import { normalizePjudCuaderno, type PjudFetchedMovimiento } from "@/lib/pjud/types";
-import { pjudDocumentRefHash } from "@/lib/pjud/document-identity";
+import { serializable } from "@/lib/command-execution";
+import { fetchSafeOutbound } from "@/lib/net/safe-url";
+import { fetchPjudMovimientos } from "./provider";
+import { normalizePjudCuaderno, type PjudFetchedMovimiento } from "./types";
+import { pjudDocumentRefHash } from "./document-identity";
 import {
-  backupMovimientoDocuments,
-  ingestPjudDocumentBuffer,
-  isBackupableDocumentoRef,
-  pjudDocDownloadDelayMs,
-  pjudDocDownloadMaxPerRun,
-} from "@/lib/pjud/pdf-backup";
-
-export type CausaDocImportStatus = {
-  causaId: string;
-  status: "idle" | "running" | "done" | "failed";
-  phase: "idle" | "scrape" | "download" | "done";
-  total: number;
-  completed: number;
-  saved: number;
-  skipped: number;
-  failed: number;
-  currentLabel: string | null;
-  note: string | null;
-  delayMs: number;
-  maxPerRun: number;
-  startedAt: string | null;
-  finishedAt: string | null;
-};
-
-type JobRecord = CausaDocImportStatus & {
-  promise?: Promise<void>;
-};
-
-const jobs = new Map<string, JobRecord>();
-/** Global lock: only one causa document import at a time (protect OJV). */
-let globalRunningCausaId: string | null = null;
+  ingestPjudDocumentBuffer, isBackupableDocumentoRef, listPendingPjudDocumentMovimientos,
+  readPjudDocumentResponse, validPjudDownloadedContent,
+} from "./pdf-backup";
+import {
+  authorizeManualImport, claimManualImport, finishClaim, LEASE_MS, updateClaim, type ClaimedManualImport,
+} from "./manual-import-store";
+export { getCausaDocImportStatus, startCausaDocImport, type CausaDocImportStatus } from "./manual-import-store";
 
 /** Folio sólo es identidad dentro de su cuaderno y cuando hay un único match. */
 export async function findDocumentImportMovimiento(
   causaId: string,
-  movement: Pick<PjudFetchedMovimiento, "externalId" | "folio" | "cuaderno">
+  movement: Pick<PjudFetchedMovimiento, "externalId" | "folio" | "cuaderno">,
+  db: Prisma.TransactionClient = prisma
 ) {
   const select = { id: true, documentoRef: true, folio: true, cuaderno: true, titulo: true } as const;
   if (movement.externalId) {
-    const exact = await prisma.causaMovimiento.findFirst({
+    const exact = await db.causaMovimiento.findFirst({
       where: { causaId, externalId: movement.externalId },
       select,
     });
@@ -61,7 +38,7 @@ export async function findDocumentImportMovimiento(
   const folio = movement.folio?.trim();
   const cuaderno = movement.cuaderno?.trim();
   if (!folio || !normalizePjudCuaderno(cuaderno)) return null;
-  const matches = await prisma.causaMovimiento.findMany({
+  const matches = await db.causaMovimiento.findMany({
     where: {
       causaId,
       folio,
@@ -73,286 +50,149 @@ export async function findDocumentImportMovimiento(
   return matches.length === 1 ? matches[0] : null;
 }
 
-function idleStatus(causaId: string): CausaDocImportStatus {
-  return {
-    causaId,
-    status: "idle",
-    phase: "idle",
-    total: 0,
-    completed: 0,
-    saved: 0,
-    skipped: 0,
-    failed: 0,
-    currentLabel: null,
-    note: null,
-    delayMs: pjudDocDownloadDelayMs(),
-    maxPerRun: pjudDocDownloadMaxPerRun(),
-    startedAt: null,
-    finishedAt: null,
-  };
+type WorkerOptions = {
+  causaId?: string;
+  fetchMovimientos?: typeof fetchPjudMovimientos;
+  fetchDocument?: typeof fetchSafeOutbound;
+  enqueue?: Parameters<typeof ingestPjudDocumentBuffer>[0]["enqueue"];
+};
+type MovementIdentity = Pick<PjudFetchedMovimiento, "externalId" | "folio" | "cuaderno">;
+type Movement = NonNullable<Awaited<ReturnType<typeof findDocumentImportMovimiento>>>;
+
+async function assertActive(job: ClaimedManualImport, db: Prisma.TransactionClient = prisma) {
+  await updateClaim(job, {}, db);
+  await authorizeManualImport(job.causaId, job.actorId, db);
 }
 
-function publicStatus(job: JobRecord): CausaDocImportStatus {
-  return {
-    causaId: job.causaId,
-    status: job.status,
-    phase: job.phase,
-    total: job.total,
-    completed: job.completed,
-    saved: job.saved,
-    skipped: job.skipped,
-    failed: job.failed,
-    currentLabel: job.currentLabel,
-    note: job.note,
-    delayMs: job.delayMs,
-    maxPerRun: job.maxPerRun,
-    startedAt: job.startedAt,
-    finishedAt: job.finishedAt,
-  };
-}
-
-export function getCausaDocImportStatus(causaId: string): CausaDocImportStatus {
-  const job = jobs.get(causaId);
-  return job ? publicStatus(job) : idleStatus(causaId);
-}
-
-export function isCausaDocImportRunning(causaId?: string) {
-  if (causaId) {
-    return jobs.get(causaId)?.status === "running";
-  }
-  return globalRunningCausaId != null;
-}
-
-async function countPendingDocumentoRefs(causaId: string) {
-  const rows = await prisma.causaMovimiento.findMany({
-    where: { causaId, documentoRef: { not: null } },
-    select: { documentoRef: true },
-    take: 200,
-  });
-  return rows.filter((r) => {
-    const ref = r.documentoRef?.trim();
-    if (!ref || ref.startsWith("doc:") || ref.startsWith("lexopen:")) return false;
-    return isBackupableDocumentoRef(ref) || /^https?:\/\//i.test(ref);
-  }).length;
-}
-
-async function runImport(causaId: string, actorId: string) {
-  const job = jobs.get(causaId);
-  if (!job) return;
-
-  const max = pjudDocDownloadMaxPerRun();
-  const delayMs = pjudDocDownloadDelayMs();
-  job.delayMs = delayMs;
-  job.maxPerRun = max;
-
-  async function assertActive() {
-    await assertPjudManagementEnabled();
-    const actor = await prisma.user.findUniqueOrThrow({
-      where: { id: actorId },
-      select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
-    });
-    await assertCausaCapability(causaId, actor, "causa.write");
-  }
-
-  try {
-    await assertActive();
-    const causa = await prisma.causa.findUnique({
-      where: { id: causaId },
-      select: {
-        id: true,
-        rit: true,
-        ruc: true,
-        tribunal: true,
-        titulo: true,
-        caratula: true,
-      },
-    });
-    if (!causa) throw httpError("Causa no encontrada", 404);
-
-    const pendingBefore = await countPendingDocumentoRefs(causaId);
-    job.total = Math.min(Math.max(pendingBefore, 1), max);
-    job.phase = "scrape";
-    job.currentLabel = "Consultando OJV / Mis Causas…";
-    job.note =
-      "Importa cada PDF a LexOpen (Documento) de inmediato, en cola secuencial.";
-
-    // Phase 1: authenticated/public scrape captures PDF bytes with session cookies.
-    let scrapeSaved = 0;
-    try {
-      const fetchResult = await fetchPjudMovimientos({
-        id: causa.id,
-        rit: causa.rit,
-        ruc: causa.ruc,
-        tribunal: causa.tribunal,
-        titulo: causa.titulo,
-        caratula: causa.caratula,
-      }, { assertActive });
-      await assertActive();
-
-      // Persist OJV http refs onto local movimientos so phase 2 / UI can import them.
-      for (const m of fetchResult.movimientos) {
-        const ref = m.documentoRef?.trim();
-        if (!m.externalId || !ref || !/^https?:\/\//i.test(ref)) continue;
-        if (ref.startsWith("doc:")) continue;
-        const mov = await prisma.causaMovimiento.findFirst({
-          where: { causaId, externalId: m.externalId },
-          select: { id: true, documentoRef: true },
-        });
-        if (!mov || mov.documentoRef?.startsWith("doc:")) continue;
-        if (mov.documentoRef !== ref) {
-          await prisma.causaMovimiento.updateMany({
-            where: { id: mov.id, causaId, documentoRef: mov.documentoRef },
-            data: { documentoRef: ref },
-          });
-        }
-      }
-
-      const withBytes = fetchResult.movimientos.filter(
-        (m) => m.documentoBytes?.byteLength
-      );
-      job.total = Math.max(job.total, Math.min(withBytes.length, max));
-      job.phase = "download";
-
-      for (const m of withBytes) {
-        if (scrapeSaved >= max) break;
-        if (!m.documentoBytes?.byteLength) continue;
-
-        const mov = await findDocumentImportMovimiento(causaId, m);
-        if (!mov || mov.documentoRef?.startsWith("doc:")) {
-          job.skipped += 1;
-          job.completed += 1;
-          continue;
-        }
-        job.currentLabel =
-          mov.folio?.trim()
-            ? `Folio ${mov.folio}`
-            : (mov.titulo || m.titulo).slice(0, 80);
-        try {
-          const id = await ingestPjudDocumentBuffer({
-            causaId,
-            movimientoId: mov.id,
-            bytes: m.documentoBytes,
-            filename: m.documentoFilename,
-            esReceptor: m.esReceptor,
-            actorId,
-            expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),
-          });
-          if (id) {
-            scrapeSaved += 1;
-            job.saved += 1;
-          } else {
-            job.skipped += 1;
-          }
-        } catch {
-          job.failed += 1;
-        }
-        job.completed += 1;
-      }
-    } catch (error) {
-      job.note =
-        error instanceof Error
-          ? `Scrape: ${error.message}. Se intentará respaldo por URL si hay enlaces.`
-          : "Scrape falló; se intentará respaldo por URL.";
-    }
-
-    // Phase 2: remaining http(s) refs — sequential + delay; always force LexOpen ingest.
-    job.phase = "download";
-    job.currentLabel = "Importando pendientes a LexOpen…";
-    const remainingBudget = Math.max(0, max - scrapeSaved);
-    if (remainingBudget > 0) {
-      const backup = await backupMovimientoDocuments(causaId, {
-        max: remainingBudget,
-        delayMs,
-        actorId,
-        force: true,
-        onProgress: (info) => {
-          job.currentLabel = info.label;
-          job.completed = scrapeSaved + info.index;
-          job.total = Math.max(job.total, scrapeSaved + info.total);
-        },
+/** The same cuaderno/folio check protects a stored link and its captured bytes. */
+async function resolveImportSource(job: ClaimedManualImport, movement: PjudFetchedMovimiento) {
+  return serializable(async tx => {
+    await assertActive(job, tx);
+    const row = await findDocumentImportMovimiento(job.causaId, movement, tx);
+    if (!row || row.documentoRef?.startsWith("doc:") || row.documentoRef?.startsWith("lexopen:")) return null;
+    const link = movement.documentoRef?.trim();
+    if (link && isBackupableDocumentoRef(link) && row.documentoRef !== link) {
+      const updated = await tx.causaMovimiento.updateMany({
+        where: { id: row.id, causaId: job.causaId, documentoRef: row.documentoRef, folio: row.folio, cuaderno: row.cuaderno },
+        data: { documentoRef: link },
       });
-      job.saved += backup.saved;
-      job.skipped += backup.skipped;
-      if (backup.attempted === 0 && scrapeSaved === 0) {
-        job.note =
-          job.note ||
-          "No había documentos pendientes. Sincronice movimientos primero y vuelva a importar.";
-      }
+      if (!updated.count) return null;
+      row.documentoRef = link;
     }
-
-    job.status = "done";
-    job.phase = "done";
-    job.currentLabel = null;
-    job.finishedAt = new Date().toISOString();
-    job.note =
-      job.saved > 0
-        ? `Importados ${job.saved} documento(s) a LexOpen (disponibles en el timeline y el expediente para ver, descargar y usar con IA)${job.failed ? ` · ${job.failed} fallido(s)` : ""}.`
-        : job.note ||
-          "No se importaron documentos nuevos. Revise sync PJUD / scrape activo.";
-  } catch (error) {
-    job.status = "failed";
-    job.phase = "done";
-    job.finishedAt = new Date().toISOString();
-    job.currentLabel = null;
-    job.note =
-      error instanceof Error ? error.message : "Error al importar documentos";
-  } finally {
-    if (globalRunningCausaId === causaId) globalRunningCausaId = null;
-  }
+    return row;
+  });
 }
 
-/**
- * Start a sequential document import for one causa.
- * Only one import runs globally at a time to avoid saturating OJV.
- */
-export function startCausaDocImport(causaId: string, actorId: string): {
-  started: boolean;
-  alreadyRunning: boolean;
-  globalBusy: boolean;
-  status: CausaDocImportStatus;
-} {
-  const existing = jobs.get(causaId);
-  if (existing?.status === "running") {
-    return {
-      started: false,
-      alreadyRunning: true,
-      globalBusy: false,
-      status: publicStatus(existing),
-    };
-  }
-  if (globalRunningCausaId && globalRunningCausaId !== causaId) {
-    const other = jobs.get(globalRunningCausaId);
-    return {
-      started: false,
-      alreadyRunning: false,
-      globalBusy: true,
-      status: other
-        ? {
-            ...idleStatus(causaId),
-            note: `Espere: ya hay una descarga en curso en otra causa (${globalRunningCausaId.slice(0, 8)}…).`,
-            status: "idle",
-          }
-        : {
-            ...idleStatus(causaId),
-            note: "Espere: ya hay una descarga de documentos en curso.",
+async function runBatch(job: ClaimedManualImport, options: WorkerOptions) {
+  const { causaId, actorId } = job;
+  const completed = new Set([...job.savedIds, ...job.skippedIds, ...job.failedIds]);
+  let saved = job.savedIds.length, failed = job.failedIds.length;
+  let coverageNote = job.phase === "download" ? job.note : null;
+  const remaining = () => job.maxPerRun - completed.size;
+
+  async function importDocument(mov: Movement, read: () => Promise<{
+    bytes: Buffer; filename?: string | null; mime?: string | null; esReceptor?: boolean;
+  } | null>, identity?: MovementIdentity) {
+    if (completed.has(mov.id) || remaining() <= 0) return;
+    await assertActive(job);
+    await updateClaim(job, { currentLabel: mov.folio ? `Folio ${mov.folio}` : "Importando documento" });
+    let result: "saved" | "skipped" | "failed" = "skipped";
+    try {
+      const original = await read();
+      if (!original) result = "failed";
+      else {
+        const received = await ingestPjudDocumentBuffer({
+          causaId, movimientoId: mov.id, actorId, bytes: original.bytes, filename: original.filename,
+          mimeHint: original.mime, esReceptor: original.esReceptor, enqueue: options.enqueue,
+          expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),
+          manualBatch: {
+            guard: async tx => {
+              await assertActive(job, tx);
+              if (identity && (await findDocumentImportMovimiento(causaId, identity, tx))?.id !== mov.id) {
+                throw new Error("Cambió la identidad del movimiento.");
+              }
+            },
+            saved: async tx => { await updateClaim(job, { savedIds: { push: mov.id } }, tx); },
           },
-    };
+        });
+        // A concurrent sync may have linked it first, without consuming a saved receipt from this batch.
+        if (received && await prisma.pjudManualImport.count({ where: { id: job.id, savedIds: { has: mov.id } } })) result = "saved";
+      }
+    } catch {
+      await assertActive(job);
+      // The original and its checkpoint commit together, including after an ambiguous database response.
+      result = await prisma.pjudManualImport.count({ where: { id: job.id, savedIds: { has: mov.id } } }) ? "saved" : "failed";
+    }
+    if (result === "saved") saved++;
+    if (result === "failed") { failed++; await updateClaim(job, { failedIds: { push: mov.id } }); }
+    if (result === "skipped") await updateClaim(job, { skippedIds: { push: mov.id } });
+    completed.add(mov.id);
   }
 
-  const job: JobRecord = {
-    ...idleStatus(causaId),
-    status: "running",
-    phase: "scrape",
-    startedAt: new Date().toISOString(),
-    note: "Iniciando descarga secuencial…",
-  };
-  globalRunningCausaId = causaId;
-  jobs.set(causaId, job);
-  job.promise = runImport(causaId, actorId);
-  return {
-    started: true,
-    alreadyRunning: false,
-    globalBusy: false,
-    status: publicStatus(job),
-  };
+  if (job.phase === "scrape") {
+    await assertActive(job);
+    const cause = await prisma.causa.findUniqueOrThrow({ where: { id: causaId }, select: {
+      id: true, rit: true, ruc: true, tribunal: true, titulo: true, caratula: true,
+    } });
+    await updateClaim(job, { currentLabel: "Consultando OJV", note: null });
+    const found = await (options.fetchMovimientos ?? fetchPjudMovimientos)(cause, { assertActive: () => assertActive(job) })
+      .catch(() => null);
+    if (!found || found.provider === "none" || found.demo) coverageNote = "No se pudo consultar OJV.";
+    else if (found.cuadernos?.status === "partial") coverageNote = "Quedaron cuadernos pendientes de lectura.";
+    await assertActive(job);
+    for (const movement of found && !found.demo ? found.movimientos : []) {
+      if (!movement.documentoBytes?.length && !isBackupableDocumentoRef(movement.documentoRef)) continue;
+      const row = await resolveImportSource(job, movement);
+      if (row && movement.documentoBytes?.length) {
+        const bytes = movement.documentoBytes;
+        await importDocument(row, async () => {
+          const filename = movement.documentoFilename;
+          const mime = /\.pdf$/i.test(filename || "") ? "application/pdf" : "application/octet-stream";
+          const ref = isBackupableDocumentoRef(row.documentoRef) ? row.documentoRef! : "https://www.pjud.cl/documento";
+          if (!validPjudDownloadedContent(bytes, mime, ref, 20 * 1024 * 1024)) return null;
+          return { bytes, mime, filename, esReceptor: movement.esReceptor };
+        }, movement);
+      }
+    }
+    await updateClaim(job, { phase: "download", note: coverageNote });
+  }
+  await assertActive(job);
+  const pending = remaining() > 0 ? await listPendingPjudDocumentMovimientos(causaId, remaining(), [...completed]) : [];
+  await updateClaim(job, { total: completed.size + pending.length, currentLabel: "Descargando documentos" });
+  for (const [i, row] of pending.entries()) {
+    if (i > 0 && job.delayMs) await new Promise(resolve => setTimeout(resolve, job.delayMs));
+    await importDocument(row, async () => {
+      const ref = row.documentoRef!;
+      const response = await (options.fetchDocument ?? fetchSafeOutbound)(ref, {
+        allowHttp: process.env.NODE_ENV !== "production", signal: AbortSignal.timeout(45_000), headers: { Accept: "application/pdf,*/*" },
+      });
+      if (!response.ok) { await response.body?.cancel(); return null; }
+      const mime = response.headers.get("content-type") || "application/octet-stream";
+      const bytes = await readPjudDocumentResponse(response);
+      if (!validPjudDownloadedContent(bytes, mime, ref, 20 * 1024 * 1024)) return null;
+      return { bytes, mime, filename: new URL(ref).pathname.split("/").pop(), esReceptor: row.esReceptor };
+    });
+  }
+  await assertActive(job);
+  const incomplete = Boolean(coverageNote) || failed > 0;
+  const note = [`Documentos importados: ${saved}.`, ...(failed ? [`Fallidos: ${failed}.`] : []),
+    ...(coverageNote ? [coverageNote] : []), ...(incomplete ? ["Puede volver a intentar los pendientes."] : [])].join(" ");
+  await finishClaim(job, incomplete ? "failed" : "done", note);
+}
+
+/** Called after a manual request and by the Host worker to reclaim an interrupted batch. */
+export async function processManualDocumentImport(options: WorkerOptions = {}) {
+  const job = await claimManualImport(options.causaId);
+  if (!job) return;
+  // A slow portal request may outlast the lease. Renewal never revives an expired claim.
+  const heartbeat = setInterval(() => { void updateClaim(job, {}).catch(() => undefined); }, LEASE_MS / 3);
+  heartbeat.unref();
+  try {
+    await runBatch(job, options);
+  } catch {
+    await finishClaim(job, "failed", "La importación se interrumpió. Compruebe el acceso a la causa y la configuración del Host.")
+      .catch(() => undefined); // A replacement worker owns the next report if our lease expired.
+  } finally {
+    clearInterval(heartbeat);
+  }
 }

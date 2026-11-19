@@ -21,7 +21,7 @@ LexOpen es una aplicación de código abierto para profesionales y estudios jur�
 
 Las pantallas priorizan el estado y los registros. Los formularios de incorporación, la preparación de causas y las ayudas se despliegan cuando los necesitas; plegarlos conserva el borrador. En Documentos, **Descargar** aparece directamente en cada registro. En Configuración, cada apartado indica si afecta a tu usuario, al navegador o a todo el estudio.
 
-En Clientes, los controles se habilitan cuando el formulario está listo para recibir cambios. El espacio sin conexión espera a que abra su almacenamiento antes de desbloquearlo; salir de la página cancela una apertura pendiente y limpia la clave del campo. [Preparación y recuperación](docs/TRABAJO-SIN-CONEXION.md).
+En Clientes, la ficha avisa al salir con cambios sin guardar. Si se interrumpe la revisión de propuestas de Altazor, vuelve a comprobar el acceso y recupera tus ediciones cuando sigue vigente la misma revisión. El espacio sin conexión espera a que abra su almacenamiento antes de desbloquearlo; salir de la página cancela una apertura pendiente y limpia la clave del campo. [Preparación y recuperación](docs/TRABAJO-SIN-CONEXION.md).
 
 Los guardados con recibo conservan su identidad al reintentar. Si PostgreSQL rechaza una transacción por concurrencia, el Host espera antes de volver a intentarla y comprueba de nuevo los permisos; mantiene un máximo de cinco intentos. Un fallo de conexión con resultado incierto requiere comprobar el recibo, sin repetir automáticamente la operación.
 
@@ -127,6 +127,8 @@ Se conservan la respuesta y el texto con versiones y hashes. Los previews o marc
 Los escritos permiten asignar una versión a un segundo profesional con acceso vigente a la causa y sus fuentes. Solo la persona asignada registra la decisión; la asignación permite revisar y mantiene la edición en manos del autor. Cambiar el texto exige una nueva asignación.
 
 ### Altazor AI e Ícaros
+
+En **Documentos** puedes descargar el original o el texto disponible. Al importar desde OJV, LexOpen coteja el cuaderno y el folio antes de asociar el archivo. Puedes volver a la causa para consultar el progreso del lote.
 
 Al abrir una causa, **Estado de la causa** muestra automáticamente sus plazos abiertos y vencidos, escritos pendientes de resolución, tareas en espera y gestiones actuales. Altazor genera una lectura con referencias a esos registros usando la IA configurada. El panel comprueba cambios cada minuto mientras está visible y, durante la visita, evita repetir consultas iguales al modelo mientras no cambien los datos o el día en Chile. Si el proveedor falla o está en demostración, conserva los hechos registrados sin presentar una respuesta ficticia como análisis real. Las referencias de la lectura enlazan solo registros del contexto visible; las desconocidas se señalan y las respuestas tardías no sustituyen una comprobación más reciente. [Fuentes, actualización y límites del estado automático](docs/ESTADO-CAUSA.md).
 

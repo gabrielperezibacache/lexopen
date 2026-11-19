@@ -3,7 +3,7 @@
 Al abrir el expediente manual o PJUD aparece **Estado de la causa**, sin pedir un resumen en el chat. El panel presenta inmediatamente registros accesibles y solicita una lectura de Altazor con el proveedor y la política de IA del estudio, si el usuario puede usar el asistente.
 
 - **Plazos próximos y vencidos:** plazos pendientes o marcados vencidos, fecha guardada y carácter fatal. Prioriza una selección de vencidos y próximos vencimientos. Los históricos no desplazan la consulta de los próximos. La distancia usa días calendario y la fecha civil de Chile, incluso al cambiar el día UTC; no vuelve a calcular términos procesales.
-- **Qué se espera:** movimientos marcados pendientes de resolución y tareas abiertas con espera registrada de cliente, tribunal, contraparte o equipo, o bloqueadas. Una etapa procesal por sí sola no prueba una espera. Las marcas pueden requerir actualización.
+- **Qué se espera:** movimientos marcados pendientes de resolución y tareas abiertas con espera registrada de cliente, tribunal, contraparte o equipo, o bloqueadas, y solicitudes de Mi Fiscalía registradas como presentadas. Las tareas en espera y las solicitudes presentadas se cuentan antes de seleccionar ejemplos, incluso cuando carecen de fecha de seguimiento. Una etapa procesal por sí sola no prueba una espera. Las marcas pueden requerir actualización.
 - **Qué se necesita ahora:** preparar los plazos cercanos, revisar vencimientos, atender trámites y tareas, asignar responsables y completar los datos que faltan.
 - **Información por comprobar:** ausencia de fecha de notificación, plazos o movimientos, monitoreo judicial no activo, sincronización incompleta y selección limitada de pendientes.
 

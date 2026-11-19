@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
@@ -29,7 +29,7 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "No hay Markdown extraído" }, { status: 404 });
     }
     return new NextResponse(doc.extractedMarkdown, {
-      headers: downloadResponseHeaders(`${doc.nombre}.md`, "text/markdown"),
+      headers: downloadResponseHeaders(`${doc.nombre}.md`, "text/markdown", { attachment: new URL(req.url).searchParams.get("download") === "1" }),
     });
   } catch (e) {
     return handleRouteError(e);

@@ -100,10 +100,16 @@ test("guardado incierto se recupera tras recargar, sin reenviar el documento", a
 
 test("recepción automática reutiliza la cuenta y fija carpeta y generación", async ({ page }) => {
   await isolate(page); const inputs: unknown[] = [];
-  await page.route(`**/api/integrations/google/drive/${causaId}/sync`, route => { if (route.request().method() === "POST") inputs.push(route.request().postDataJSON()); return route.fulfill({ json: { enabled: inputs.length > 0, intervalMinutes: 60, lastRunAt: null, status: "paused", note: null, canConfigure: true, account: "altazor", connectionId, bindingRevision, folderId, generation: 2, accounts: { study: { configured: false }, personal: { connected: false, label: "", reason: null }, altazor: { connected: true, canManage: true, reason: null } } } }); });
+  await page.route(`**/api/integrations/google/drive/${causaId}/sync`, route => { if (route.request().method() === "POST") {
+    const body = route.request().postDataJSON(); inputs.push(body);
+    if (body.action === "receive-now") return route.fulfill({ status: 202, json: { running: true } });
+  } return route.fulfill({ json: { enabled: inputs.length > 0, intervalMinutes: 60, lastRunAt: null, status: "paused", note: null, canConfigure: true, account: "altazor", connectionId, bindingRevision, folderId, generation: 2, accounts: { study: { configured: false }, personal: { connected: false, label: "", reason: null }, altazor: { connected: true, canManage: true, reason: null } } } }); });
   await page.reload(); await page.getByRole("button", { name: "Activar recepción automática", exact: true }).click();
   await expect(page.getByRole("button", { name: "Recibir ahora", exact: true })).toBeVisible();
   expect(inputs).toEqual([{ enabled: true, intervalMinutes: 60, account: "altazor", connectionId, bindingRevision, folderId, generation: 2 }]);
+  await page.getByRole("button", { name: "Recibir ahora", exact: true }).click();
+  await expect(page.getByText("La recepción está en curso.", { exact: true })).toBeVisible();
+  expect(inputs.at(-1)).toEqual({ action: "receive-now" });
   await page.getByText("Frecuencia y opciones", { exact: true }).click(); await expect(page.getByLabel("Conexión anterior", { exact: true })).toHaveCount(0);
 });
 

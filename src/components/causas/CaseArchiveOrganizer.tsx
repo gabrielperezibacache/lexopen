@@ -1,9 +1,11 @@
 "use client";
 
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import type { DocumentDownloadOptions } from "@/lib/sites/document-download-options";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ArrowDownToLine, FileText, FolderPlus } from "lucide-react";
+import { FileText, FolderPlus } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import type { OrganizationAction } from "@/lib/causas/document-organization";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
@@ -17,6 +19,7 @@ type ArchiveDocument = {
   status: string | null;
   folder: string | null;
   source: string;
+  downloads?: DocumentDownloadOptions;
   hasStudyCopy: boolean;
   copyToStudyFolderId: string | null;
   assistantHref: string | null;
@@ -144,7 +147,6 @@ export function CaseArchiveOrganizer({
     {documents.length ? <ul className="divide-y divide-[var(--line)] border-b border-[var(--line)]" aria-label="Documentos">
       {documents.map(document => {
         const status = documentStatus(document.status);
-        const filePath = `/api/documentos/${encodeURIComponent(document.id)}/content`;
         return <li key={document.id} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
           <div className="flex min-w-0 items-start gap-2">
             {canWrite && <label className="grid min-h-11 min-w-11 shrink-0 cursor-pointer place-items-center">
@@ -173,7 +175,7 @@ export function CaseArchiveOrganizer({
             <details>
               <summary className="min-h-11 cursor-pointer py-3 text-[var(--sea)]">Opciones</summary>
               <div className="flex flex-col items-start">
-                <a className="inline-flex min-h-11 items-center gap-2 text-[var(--sea)] hover:underline" href={filePath}><ArrowDownToLine size={16} aria-hidden="true" />Descargar</a>
+                <DocumentDownloads id={document.id} options={document.downloads} className="inline-flex min-h-11 items-center text-[var(--sea)] hover:underline" />
                 {document.copyToStudyFolderId && <DocumentDriveAction documentId={document.id} studyFolderId={document.copyToStudyFolderId} hasBinary hasText={false} />}
               </div>
             </details>

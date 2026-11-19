@@ -1,3 +1,4 @@
+import { documentDownloadOptions } from "@/lib/sites/document-download-options";
 import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -6,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { CaseArchiveOrganizer } from "@/components/causas/CaseArchiveOrganizer";
 import { CaseDocumentNews } from "@/components/causas/CaseDocumentNews";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
+import { studyDriveMode } from "@/lib/integrations/google-study-drive";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -164,6 +166,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const destinationNames = new Map(destinations.map(value => [value.id, value.path]));
   const studyDriveFolderId = (!causa.driveSyncSubscription || causa.driveSyncSubscription.account === "study") &&
     isRealDriveFolderId(causa.googleDriveFolderId) ? causa.googleDriveFolderId : null;
+  const downloads = await documentDownloadOptions(documents.map(document => document.id));
   const rows = documents.map(document => {
     const fromDrive = document.driveImport?.causaId === id;
     const fromPjud = Boolean(document.pjudDocumentJobs.length || document.caseIntakes.length || document.storageKey?.startsWith("pjud/"));
@@ -171,6 +174,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       id: document.id, name: document.nombre, route: document.ruta, status: document.extractionStatus,
       folder: document.archivePlacement ? destinationNames.get(document.archivePlacement.folderId) || null : null,
       source: fromDrive && fromPjud ? "Google Drive y OJV" : fromDrive ? "Importado de Drive" : fromPjud ? "Descargado de OJV" : "LexOpen",
+      downloads: downloads.get(document.id),
       hasStudyCopy: Boolean(studyDriveFolderId && document.googleDriveId),
       copyToStudyFolderId: canWrite && document.storageKey && !fromDrive && !document.googleDriveId && !document.confidencial && !document.privilegio ? studyDriveFolderId : null,
       assistantHref: canAsk ? assistant(document.id) : null,
@@ -245,7 +249,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       {managementMode === "pjud_cl" && causa.rit && validarRit(causa.rit) && <CausaDocumentImportButton causaId={id} />}
     </ContextDisclosure></section>}
     <ContextDisclosure id="drive-del-expediente" title="Archivos de Google Drive" className="panel rounded-[var(--radius-lg)] px-4">
-      <DriveFolderPanel canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
+      <DriveFolderPanel sharedOrganization={await studyDriveMode()} canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
     </ContextDisclosure>
   </div>;
 }

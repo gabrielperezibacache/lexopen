@@ -16,16 +16,19 @@ async function fixture(version = "1.1.0-preview.1") {
     const dir = path.join(input, target); await fs.mkdir(dir, { recursive: true });
     const [platform, arch] = target.split("-"), osname = platform === "darwin" ? "mac" : platform === "win32" ? "win" : "linux";
     const assets = platform === "darwin" ? ["dmg", "zip"] : platform === "win32" ? ["exe", "zip"] : ["AppImage", "deb"], entries = [];
+    const artifacts = {};
     for (const ext of assets) {
       const artifactArch = platform === "linux" ? ext === "deb" ? "amd64" : "x86_64" : arch;
       const name = `LexOpen-${version}-${osname}-${artifactArch}.${ext}`, bytes = Buffer.from(`Fictitious installer bytes: ${name}`);
       await fs.writeFile(path.join(dir, name), bytes);
+      if (platform === "darwin") artifacts[ext] = { name, sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+        codeSignatureValid: true, publisherAuthenticated: true, notarized: true, gatekeeperAccepted: true };
       entries.push({ url: name, size: bytes.length, sha512: crypto.createHash("sha512").update(bytes).digest("base64") });
     }
     const base = { version, platform, arch }, buildId = `build-${target}`;
     await fs.writeFile(path.join(dir, `lexopen-packaged-${target}.json`), JSON.stringify({ ...base, sourceRevision: revision, sourceDirty: false, buildId, distributedOAuth: publicOAuth }));
     await fs.writeFile(path.join(dir, `lexopen-smoke-${target}.json`), JSON.stringify({ ...base, buildId, sourceRevision: revision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, backupRestoredDatabase: true, backupRestoredFiles: true, backupRestoredSettings: true, backupSourcePreserved: true, backupRollbackVerified: true, externalNodeUsed: false, demoSeedUsed: false }));
-    await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, codeSignatureValid: platform === "darwin", gatekeeperAccepted: platform === "darwin", publisherAuthenticated: platform === "darwin", notarized: platform === "darwin", dmgVerified: platform === "darwin", artifactCodeSignatureValid: platform === "darwin", artifactGatekeeperAccepted: platform === "darwin" }));
+    await fs.writeFile(path.join(dir, `lexopen-signature-${target}.json`), JSON.stringify({ ...base, ...(platform === "darwin" ? { artifacts } : {}), codeSignatureValid: platform === "darwin", gatekeeperAccepted: platform === "darwin", publisherAuthenticated: platform === "darwin", notarized: platform === "darwin", dmgVerified: platform === "darwin", artifactCodeSignatureValid: platform === "darwin", artifactGatekeeperAccepted: platform === "darwin" }));
     const feed = `${channel}${platform === "darwin" ? "-mac" : platform === "linux" ? "-linux" : ""}.yml`;
     await fs.writeFile(path.join(dir, feed), JSON.stringify({ version, files: entries }));
   }
@@ -57,6 +60,24 @@ for (const field of ["codeSignatureValid", "publisherAuthenticated", "notarized"
   await fs.writeFile(file, JSON.stringify(report));
   await assert.rejects(assembleRelease(f), /Public macOS release/);
   assert.equal((await assembleRelease({ ...f, verificationOnly: true })).publishable, false);
+});
+await check("the updater ZIP must pass independently of the DMG, including previews", async f => {
+  const file = path.join(f.input, "darwin-x64", "lexopen-signature-darwin-x64.json");
+  const report = JSON.parse(await fs.readFile(file, "utf8"));
+  report.artifacts.zip.notarized = false;
+  await fs.writeFile(file, JSON.stringify(report));
+  await assert.rejects(assembleRelease(f), /mac-x64\.zip\/notarized/);
+  assert.equal((await assembleRelease({ ...f, verificationOnly: true })).publishable, false);
+});
+await check("verification rejects a missing ZIP receipt or a receipt from another architecture", async f => {
+  const file = path.join(f.input, "darwin-arm64", "lexopen-signature-darwin-arm64.json");
+  const report = JSON.parse(await fs.readFile(file, "utf8"));
+  const other = JSON.parse(await fs.readFile(path.join(f.input, "darwin-x64", "lexopen-signature-darwin-x64.json"), "utf8"));
+  for (const zip of [undefined, other.artifacts.zip, { ...report.artifacts.zip, sha256: other.artifacts.zip.sha256 }]) {
+    report.artifacts.zip = zip;
+    await fs.writeFile(file, JSON.stringify(report));
+    await assert.rejects(assembleRelease({ ...f, verificationOnly: true }), /Artifact receipt mismatch/);
+  }
 });
 await check("publication requires all three identities even without desktop toolpacks", async f => {
   await changeProfile(f, "win32-x64", undefined);
@@ -99,7 +120,7 @@ await check("verification with valid public identities remains not publishable",
   assert.equal(manifest.publishable, false); assert.deepEqual(manifest.distributedOAuth, publicOAuth);
 });
 await check("missing native target blocks publication", async f => { await fs.rm(path.join(f.input, "win32-x64"), { recursive: true }); await assert.rejects(assembleRelease(f), /Missing native/); });
-await check("modified installer cannot pass its update checksum", async f => { await fs.appendFile(path.join(f.input, "darwin-arm64", `LexOpen-${f.version}-mac-arm64.zip`), "tamper"); await assert.rejects(assembleRelease(f), /checksum mismatch/); });
+await check("modified installer cannot pass its artifact receipt", async f => { await fs.appendFile(path.join(f.input, "darwin-arm64", `LexOpen-${f.version}-mac-arm64.zip`), "tamper"); await assert.rejects(assembleRelease(f), /Artifact receipt mismatch/); });
 await check("stale source revision cannot be released", async f => { await assert.rejects(assembleRelease({ ...f, revision: "b".repeat(40) }), /Unverified source/); });
 await check("feed cannot refer outside release artifacts", async f => {
   const file = path.join(f.input, "darwin-x64", "preview-mac.yml"), data = JSON.parse(await fs.readFile(file, "utf8")); data.files[0].url = "../private.zip"; await fs.writeFile(file, JSON.stringify(data)); await assert.rejects(assembleRelease(f), /Invalid update path/);

@@ -11,7 +11,7 @@ import { pollNtfy, publishNtfy } from "@/lib/notify/providers/ntfy";
 import { createWhatsAppMetaProvider } from "@/lib/notify/providers/whatsapp";
 import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
 import { altazorActor, altazorTransaction, conversationFor } from "../access";
-import { getHelpChannelConfig, getWhatsAppMetaConfig } from "./config";
+import { getHelpChannelConfig, getWhatsAppMetaConfig, remoteHelpAllowed } from "./config";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 export type HelpRequestView = ReturnType<typeof publicHelpRequest>;
@@ -99,8 +99,7 @@ export async function listHelpRequests(user: { id: string }, client: PrismaClien
 export async function notifyHelpRequest(ownerId: string, id: string, client: PrismaClient = prisma, transports = { publishNtfy, createWhatsAppMetaProvider }) {
   const row = await ownRequest(id, { id: ownerId }, client);
   if (row.status !== "pending" || row.expiresAt <= new Date()) return publicHelpRequest(row);
-  const policy = await client.firmSettings.findFirst({ select: { assistantLlmMode: true } });
-  if (policy?.assistantLlmMode === "local_only") {
+  if (!await remoteHelpAllowed(client)) {
     await client.altazorHelpRequest.updateMany({ where: { id, ownerId, notificationStatus: { in: ["pending", "unconfigured", "restricted"] } }, data: { notificationStatus: "restricted" } });
     return getHelpRequest({ id: ownerId }, id, client);
   }
@@ -168,7 +167,7 @@ export async function pollHelpReplies(user: { id: string }, client: PrismaClient
       if ([403, 404, 409, 410].includes((error as { status?: number }).status || 0)) await client.altazorHelpRequest.updateMany({ where: { id: row.id, ownerId: user.id, status: "pending" }, data: { status: "cancelled" } });
     }
   }
-  if (!rows.length) return { accepted: 0 };
+  if (!rows.length || !await remoteHelpAllowed(client)) return { accepted: 0 };
   const replies = await poll(config.ntfy, rows[0].createdAt);
   let accepted = 0;
   for (const reply of replies) {

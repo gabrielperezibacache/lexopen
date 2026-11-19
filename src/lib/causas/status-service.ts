@@ -24,16 +24,30 @@ export async function readCaseStatus(id: string, user: CausaAccessUser, db = pri
   const today = santiagoDateKey(new Date());
   const taskWhere = taskWorkspaceWhere(user, { causaId: id });
   const fiscaliaWhere = { causaId: id, causa: causaAccessWhere(user), status: { notIn: ["closed", "cancelled"] } };
-  const [pendientes, upcoming, tasks, taskCount, fiscaliaRequests, fiscaliaCount] = await Promise.all([
+  const waitingTaskWhere = { AND: [taskWhere, { OR: [
+    { status: { in: ["waiting_client", "blocked"] } }, { waitingOn: { not: "" } },
+  ] }] };
+  const submittedWhere = { ...fiscaliaWhere, status: "submitted" };
+  const taskFields = { id: true, title: true, status: true, waitingOn: true, assignee: { select: { name: true } } } as const;
+  const requestFields = { id: true, title: true, status: true, folio: true, followUpDate: true } as const;
+  const [pendientes, upcoming, tasks, taskCount, fiscaliaRequests, fiscaliaCount,
+    waitingTasks, waitingTaskCount, submitted, submittedCount] = await Promise.all([
     db.causaMovimiento.findMany({ where: { causaId: id, pendienteResolucion: true, causa: causaAccessWhere(user) }, orderBy: [{ fecha: "desc" }, { id: "asc" }], take: 20, select: { id: true, titulo: true, fecha: true, fuente: true } }),
     // Many historical overdue records must not hide the next real deadlines.
     db.plazo.findMany({ where: { AND: [plazos, { causaId: id, causa: causaAccessWhere(user), OR: [{ fechaLimite: { gte: santiagoMidnight(today) } }, { fechaLimite: new Date(today) }] }] }, orderBy: [{ fechaLimite: "asc" }, { id: "asc" }], take: 20, select: { id: true, titulo: true, estado: true, fechaLimite: true, esFatal: true } }),
-    db.task.findMany({ where: taskWhere, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 40, select: { id: true, title: true, status: true, waitingOn: true, assignee: { select: { name: true } } } }),
+    db.task.findMany({ where: taskWhere, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 40, select: taskFields }),
     db.task.count({ where: taskWhere }),
-    db.fiscaliaRequest.findMany({ where: fiscaliaWhere, orderBy: [{ followUpDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 20, select: { id: true, title: true, status: true, folio: true, followUpDate: true } }),
+    db.fiscaliaRequest.findMany({ where: fiscaliaWhere, orderBy: [{ followUpDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 20, select: requestFields }),
     db.fiscaliaRequest.count({ where: fiscaliaWhere }),
+    db.task.findMany({ where: waitingTaskWhere, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 5, select: taskFields }),
+    db.task.count({ where: waitingTaskWhere }),
+    db.fiscaliaRequest.findMany({ where: submittedWhere, orderBy: [{ followUpDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 5, select: requestFields }),
+    db.fiscaliaRequest.count({ where: submittedWhere }),
   ]);
-  const status = buildCaseStatus({ ...row, plazos: [...new Map([...row.plazos, ...upcoming].map(p => [p.id, p])).values()], pendientes, tasks, taskCount, fiscaliaRequests, fiscaliaCount });
+  const status = buildCaseStatus({ ...row, plazos: [...new Map([...row.plazos, ...upcoming].map(p => [p.id, p])).values()], pendientes, tasks, taskCount,
+    waitingTasks, waitingTaskCount, submittedCount, fiscaliaCount,
+    fiscaliaRequests: [...new Map([...fiscaliaRequests, ...submitted].map(r => [r.id, r])).values()],
+  });
   const fingerprint = createHash("sha256").update(JSON.stringify({ user: { id: user.id, role: user.role, grants: user.capabilityGrants, revokes: user.capabilityRevokes }, status })).digest("hex");
   return { status, fingerprint };
 }

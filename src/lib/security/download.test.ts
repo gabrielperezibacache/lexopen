@@ -44,3 +44,9 @@ assert.equal(documentBodyForDownload({ nombre: "documento", storageKey: null, co
 
 const damagedOriginal = Buffer.from("Original almacenado con formato incorrecto");
 assert.deepEqual(documentBodyForDownload({ nombre: "archivo.pdf", storageKey: "stored", contenido: "texto extraído", mimeType: "application/pdf" }, damagedOriginal), damagedOriginal);
+const word = { nombre: "escrito.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", contenido: "Solo el texto extraído", storageKey: null };
+assert.equal(documentBodyForDownload(word, null), null);
+assert.equal(documentBodyForDownload({ ...word, mimeType: null }, null), null);
+assert.equal(documentBodyForDownload({ ...word, nombre: "escrito", mimeType: "text/plain" }, null)?.toString(), word.contenido);
+assert.equal(documentBodyForDownload({ ...word, nombre: "borrador.md", mimeType: null }, null)?.toString(), word.contenido);
+assert.match(downloadResponseHeaders("resolución.pdf", "application/pdf", { attachment: true })["Content-Disposition"], /^attachment;/);

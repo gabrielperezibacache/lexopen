@@ -361,6 +361,10 @@ export async function verifyCaseReferences(
       { causaId: job.causaId, client: db },
     );
 }
+function isUnavailableCaseContext(error: unknown) {
+  return [400, 401, 403, 404, 409, 410, 413, 422].includes(Number((error as { status?: number } | null)?.status));
+}
+
 export async function readCaseJob(
   id: string,
   user: CausaAccessUser,
@@ -370,7 +374,8 @@ export async function readCaseJob(
   let available = true;
   try {
     await caseJobAccess(id, actor);
-  } catch {
+  } catch (error) {
+    if (!isUnavailableCaseContext(error)) throw error;
     available = false;
   }
   const [steps, counts, saved] = await Promise.all([
@@ -456,7 +461,8 @@ export async function readCaseJob(
       )
         throw changed();
     }
-  } catch {
+  } catch (error) {
+    if (!isUnavailableCaseContext(error)) throw error;
     available = false;
     report = null;
   }

@@ -25,10 +25,11 @@ async function main() {
     const doc = await prisma.documento.create({ data: { causaId: cause.id, autorId: owner.id, nombre: "Contrato.pdf", mimeType: "application/pdf", storageKey: "synthetic-original", version: 1 } });
     const foreignDoc = await prisma.documento.create({ data: { causaId: otherCase.id, autorId: outsider.id, nombre: "Other.pdf", storageKey: "synthetic-other-original" } });
     const ctx: ToolContext = { userId: owner.id, role: "abogado", chatId: conversation.id, scope: { causaId: cause.id } };
+    let studyOrganization = false;
     const state: typeof getCaseDriveState = async (causaId, user, _options, documentoId) => {
       stateReads++; assert.equal(causaId, cause.id); assert.equal(user.id, owner.id);
       const source = documentoId ? await prisma.documento.findUniqueOrThrow({ where: { id: documentoId } }) : undefined;
-      return { causaId, account: "altazor", connected: true, canRead: true, canManage, connectionId: "fictitious-drive-account", bindingRevision: accountRevision, caseRevision, canConfigure: true, reason: null, folder: folderPresent ? { id: "fixture_folder", name: "Expediente", url: "https://drive.google.com/drive/folders/fixture_folder" } : null,
+      return { causaId, ...(studyOrganization ? { organizedTarget: { name: "C-1 · Referencia", revision: "e".repeat(64) } } : {}), account: studyOrganization ? "study" : "altazor", connected: true, canRead: true, canManage, connectionId: "fictitious-drive-account", bindingRevision: accountRevision, caseRevision, canConfigure: true, reason: null, folder: folderPresent ? { id: "fixture_folder", name: "Expediente", url: "https://drive.google.com/drive/folders/fixture_folder" } : null,
         ...(source ? { document: { id: source.id, name: source.nombre, version: source.version, sourceSha256: sourceSha, bytes: 14, mime: "application/pdf", canSave: true, reason: null, remoteTargetState: remote ? "ready" : "none", ...(remote ? { remoteId: "fixture_previous", remoteVersion: "11" } : {}) } } : {}) } as Awaited<ReturnType<typeof getCaseDriveState>>;
     };
     const command: typeof executeCaseDriveCommand = async (causaId, user, input) => {
@@ -103,6 +104,12 @@ async function main() {
     folderPresent = false; const folder = await approved("drive.crearCarpeta", { nombre: "Expediente nuevo" });
     driveCrearCarpetaSchema.parse(folder.input); driveGuardarDocumentoSchema.parse(prepared.input);
     await tools.crear.execute(folder.input as never, folder.context); assert.equal(calls.at(-1)?.action, "create-folder");
+    studyOrganization = true;
+    const organized = await approved("drive.crearCarpeta", { nombre: "Nombre libre" });
+    assert.equal(organized.input.nombre, "C-1 · Referencia");
+    await tools.crear.execute(organized.input as never, organized.context);
+    assert.equal(calls.at(-1)?.action, "prepare-organized-folder");
+    studyOrganization = false;
     assert.equal(await prisma.altazorComputerSession.count({ where: { ownerId: owner.id } }), 0, "Host Drive tools never require or create a desktop");
     console.log("Assistant Drive PG PASS: exact source resolution, source/account/case snapshots, confirmed plan+lease+current ACL, reserved document denial, stable one-use command keys and unknown outcomes. Cloud replies are simulated; no desktop created.");
   } finally {

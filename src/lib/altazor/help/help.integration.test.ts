@@ -107,6 +107,10 @@ async function main() {
     await client.firmSettings.update({ where: { organizationId }, data: { assistantLlmMode: "local_only" } });
     assert.equal((await notifyHelpRequest(owner.id, restricted.id, client, transports)).notificationStatus, "restricted");
     assert.equal(publishCalls, 1);
+    const localQuestion = await createHelpRequest(owner, { ...input, requestKey: "local-web-answer", computerTurnId: "local-web" }, client);
+    const localPoll = await pollHelpReplies(owner, client, async () => assert.fail("Local-only help must never poll ntfy"));
+    assert.equal(localPoll.accepted, 0);
+    assert.equal((await answerHelpRequest(owner, { requestId: localQuestion.id, response: "Respuesta en LexOpen" }, client)).accepted, true);
     await client.firmSettings.update({ where: { organizationId }, data: { assistantLlmMode: "remote_allowed" } });
     assert.equal((await notifyHelpRequest(owner.id, restricted.id, client, transports)).notificationStatus, "notified", "a policy-blocked wait can notify when remote help is permitted again");
     assert.equal(publishCalls, 2);

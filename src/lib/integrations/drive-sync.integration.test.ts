@@ -6,7 +6,7 @@ import path from "node:path";
 import { prisma } from "@/lib/db";
 import { ingestManualCaseDocument } from "@/lib/causas/document-intake";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
-import { configureDriveSync, processDueDriveSyncSubscriptions } from "./drive-sync";
+import { requestImmediateDriveSync, configureDriveSync, processDueDriveSyncSubscriptions } from "./drive-sync";
 
 async function main() {
   assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
@@ -58,8 +58,21 @@ async function main() {
     await configureDriveSync(causaId, user, { enabled: true, intervalMinutes: 60, account: "study" });
     const run = async () => { await prisma.driveSyncSubscription.update({ where: { causaId }, data: { nextRunAt: new Date(0) } }); return processDueDriveSyncSubscriptions({ ...deps, causaId }); };
     const first = await run(); assert.equal(first[0].imported, 20); assert.equal(first[0].complete, false);
-    assert.ok((await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } })).scanCursor);
-    const second = await run(); assert.equal(second[0].imported, 20);
+    const partial = await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } });
+    assert.ok(partial.scanCursor);
+    const triggers = await Promise.all([requestImmediateDriveSync(causaId, user), requestImmediateDriveSync(causaId, user)]);
+    assert.ok(triggers.every(trigger => !trigger.running));
+    const queued = await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } });
+    assert.equal(queued.generation, partial.generation); assert.equal(queued.scanCursor, partial.scanCursor);
+    duringDownload = async () => {
+      duringDownload = undefined;
+      const active = await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } });
+      assert.deepEqual(await requestImmediateDriveSync(causaId, user), { running: true });
+      const retained = await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } });
+      assert.equal(retained.leaseToken, active.leaseToken); assert.equal(retained.generation, active.generation);
+      assert.deepEqual(await processDueDriveSyncSubscriptions({ ...deps, causaId }), []);
+    };
+    const second = await processDueDriveSyncSubscriptions({ ...deps, causaId }); assert.equal(second[0].imported, 20);
     const third = await run(); assert.equal(third[0].imported, 5); assert.equal(third[0].complete, true);
     assert.equal(downloads, 45); assert.equal(enqueued, 44); assert.equal(await prisma.documento.count({ where: { causaId } }), 45);
     assert.equal((await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } })).scanCursor, null);
@@ -76,6 +89,7 @@ async function main() {
     await run();
     assert.equal(await prisma.documento.count({ where: { causaId } }), 46, "pausing during download must prevent its commit");
     const paused = await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } });
+    await assert.rejects(requestImmediateDriveSync(causaId, user), (e: unknown) => (e as { status?: number }).status === 409, "manual polling cannot reactivate a paused subscription");
     assert.equal(paused.enabled, false); assert.equal(paused.status, "paused", "the obsolete worker must not overwrite a newer configuration");
     duringDownload = undefined;
     await configureDriveSync(causaId, user, { enabled: true, intervalMinutes: 60, account: "study" });
@@ -98,6 +112,7 @@ async function main() {
     const downloadsBeforeMove = downloads;
     const movedFolder = await run(); assert.equal(movedFolder[0].status, "partial"); assert.equal(downloads, downloadsBeforeMove, "moving a folder out of the selected tree must stop its downloads");
     await prisma.causaMiembro.create({ data: { causaId, userId: other.id, rol: "colaborador" } });
+    await assert.rejects(requestImmediateDriveSync(causaId, other), (e: unknown) => (e as { status?: number }).status === 403, "another professional cannot trigger the owner's connection");
     await assert.rejects(configureDriveSync(causaId, other, { enabled: true, intervalMinutes: 60, account: "study" }), (error: unknown) => (error as { status: number }).status === 403, "an active subscription cannot be taken over");
     await configureDriveSync(causaId, user, { enabled: false, intervalMinutes: 60, account: "study" });
     const beforeHandover = await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } });

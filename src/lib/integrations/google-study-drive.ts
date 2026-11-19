@@ -16,7 +16,7 @@ function commandHash(command: DriveWriteCommand) {
   return digest(canonicalJson({ request_id, context_key, bindingRevision, action, folder_id, file_id, name, mime, sha256, expected_version, confirmed }));
 }
 export const STUDY_ORGANIZATION_KEY = "google-organization-root:study";
-export async function studyDriveMode(db = prisma) { return Boolean(await db.commandExecution.findUnique({ where: { key: STUDY_ORGANIZATION_KEY }, select: { id: true } })); }
+export async function studyDriveMode(db: typeof prisma | Prisma.TransactionClient = prisma) { return Boolean(await db.commandExecution.findUnique({ where: { key: STUDY_ORGANIZATION_KEY }, select: { id: true } })); }
 export async function resolveStudyDriveAccount(user: CausaAccessUser, db = prisma, fetcher: typeof fetch = fetch): Promise<ManagedDriveAccount> {
   const initial = await requireDriveSession(), row = await db.integrationConfig.findUniqueOrThrow({ where: { provider: "google" } });
   const connectionId = createHash("sha256").update(JSON.stringify([row.id, initial.connectedEmail || "study"])).digest("hex");

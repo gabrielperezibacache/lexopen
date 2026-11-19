@@ -292,9 +292,35 @@ test("encargo por chat: confirma equipo, continúa sin ventana y recupera un gua
   await expect(
     card.getByText("Listo para revisar", { exact: true }),
   ).toBeVisible();
-  await card
-    .getByLabel("Título de tarea", { exact: true })
-    .fill("Tarea ajustada por el profesional");
+  const taskTitle = card.getByLabel("Título de tarea", { exact: true });
+  const keepDraft = card.getByRole("checkbox", { name: "Guardar borrador privado" });
+  const jobUrl = `**/api/altazor/case-jobs/${job.id}`;
+  await taskTitle.fill("Tarea ajustada por el profesional");
+  await keepDraft.uncheck();
+
+  // A failed refresh must hide unverified data and keep local edits for the same revision.
+  await fresh.route(jobUrl, route => route.fulfill({ status: 503 }), { times: 1 });
+  await card.getByRole("button", { name: "Actualizar estado" }).click();
+  await expect(taskTitle).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Confirmar registros seleccionados" })).toHaveCount(0);
+  await card.getByRole("button", { name: "Comprobar encargo" }).click();
+  await expect(taskTitle).toHaveValue("Tarea ajustada por el profesional");
+  await expect(keepDraft).not.toBeChecked();
+
+  await db.altazorCaseJob.update({ where: { id: job.id }, data: { revision: { increment: 1 } } });
+  await card.getByRole("button", { name: "Actualizar estado" }).click();
+  await expect(card.getByRole("alert")).toContainText("Las propuestas cambiaron");
+  await expect(taskTitle).toHaveValue("Cotejar el antecedente");
+  await expect(keepDraft).toBeChecked();
+
+  // Even if the same revision becomes available again, a confirmed access denial clears edits.
+  await taskTitle.fill("Edición anterior a la revocación");
+  await fresh.route(jobUrl, route => route.fulfill({ status: 403 }), { times: 1 });
+  await card.getByRole("button", { name: "Actualizar estado" }).click();
+  await expect(taskTitle).toHaveCount(0);
+  await card.getByRole("button", { name: "Comprobar encargo" }).click();
+  await expect(taskTitle).toHaveValue("Cotejar el antecedente");
+  await taskTitle.fill("Tarea ajustada por el profesional");
   const bodies: string[] = [];
   await fresh.route(
     `**/api/altazor/case-jobs/${job.id}/confirm`,

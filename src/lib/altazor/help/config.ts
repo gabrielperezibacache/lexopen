@@ -26,6 +26,11 @@ function key(ownerId: string) { return `altazor-help:${sha256Hex(ownerId)}`; }
 function unpack<T>(raw: string | undefined): T | null {
   try { const envelope = JSON.parse(raw || "{}"); const plain = decryptSecret(envelope.secret); return plain ? JSON.parse(plain) as T : null; } catch { return null; }
 }
+export async function remoteHelpAllowed(client: Client) {
+  const policy = await client.firmSettings.findFirst({ select: { assistantLlmMode: true } });
+  return policy?.assistantLlmMode !== "local_only";
+}
+
 export async function getHelpChannelConfig(ownerId: string, client: Client = prisma): Promise<HelpChannelConfig> {
   const row = await client.integrationConfig.findUnique({ where: { provider: key(ownerId) } });
   return unpack<HelpChannelConfig>(row?.configJson) ?? { ntfy: null, whatsapp: { enabled: false, channelId: null } };

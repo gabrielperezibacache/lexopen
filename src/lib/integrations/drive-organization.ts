@@ -1,3 +1,4 @@
+import { organizationNodeKey, organizationSteps, rootFor, type Root } from "./drive-organization-path";
 import { resolveStudyDriveAccount, STUDY_ORGANIZATION_KEY } from "./google-study-drive";
 import type { Prisma } from "@prisma/client";
 /** A per-professional organization root, bound to the existing Google account. No new OAuth. */
@@ -20,9 +21,9 @@ export const organizationDriveSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("organize"), kind: z.enum(["causa", "site", "user"]), id: z.string().min(1).max(160), revision: z.string().min(1).max(40), confirmed: z.literal(true) }).strict(),
 ]);
 type Db = typeof prisma | Prisma.TransactionClient;
-type Root = { folderId: string; name: string; connectionId: string; bindingRevision: string; revision: string };
+
 type Options = { client?: typeof prisma; account?: ManagedDriveAccount; signal?: AbortSignal; authorizeContext?: () => Promise<void> };
-const rootKey = () => STUDY_ORGANIZATION_KEY;
+
 async function staff(user: CausaAccessUser, db: Db) {
   const actor = await db.user.findUniqueOrThrow({ where: { id: user.id } });
   if (!isStaff(actor.role)) throw httpError("Se requiere una cuenta del equipo", 403);
@@ -33,12 +34,6 @@ async function accountFor(user: CausaAccessUser, options: Options) {
   if (!account || account.ownerId !== user.id) throw httpError("Conecta tu cuenta de Google para continuar", 409);
   await account.assertActive();
   return account;
-}
-async function rootFor(db: Db): Promise<Root | null> {
-  const record = await db.commandExecution.findUnique({ where: { key: rootKey() } });
-  if (!record || !record.resultJson) return null;
-  const schema = z.object({ folderId: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/), name: z.string(), connectionId: z.string(), bindingRevision: hex, revision: z.string().uuid() });
-  try { return schema.parse(JSON.parse(record.resultJson)); } catch { throw httpError("Revisa la carpeta de Organización", 409); }
 }
 export async function organizationDriveState(user: CausaAccessUser, options: Options = {}, browse?: { parentId?: string; query?: string; pageToken?: string }) {
   const db = options.client || prisma; const current = await staff(user, db);
@@ -68,12 +63,7 @@ async function target(kind: "causa" | "site" | "user", id: string, user: CausaAc
   if (site.causaId) return cause(site.causaId);
   return { kind: "site" as const, id: site.id, name: site.name, clientId: site.clienteId, clientName: site.cliente?.razonSocial || "Sin cliente", folderId: null, caseRevision: null };
 }
-export function organizedDriveName(name: string, id?: string) {
-  const safe = name.normalize("NFC").replace(/[\/\\\p{Cc}\p{Cf}]/gu, " ").replace(/^\.+/, "").replace(/\s+/g, " ").trim() || "Carpeta";
-  let bounded = "";
-  for (const char of safe) { if (Buffer.byteLength(bounded + char) > 140) break; bounded += char; }
-  return bounded + (id ? ` · ${digest(id).slice(0, 10)}` : "");
-}
+export { organizedDriveName } from "./drive-organization-path";
 export async function configureOrganizationDrive(user: CausaAccessUser, raw: z.infer<typeof organizationDriveSchema>, options: Options = {}) {
   const input = organizationDriveSchema.parse(raw), db = options.client || prisma;
   options.signal?.throwIfAborted(); await options.authorizeContext?.();
@@ -94,7 +84,7 @@ export async function configureOrganizationDrive(user: CausaAccessUser, raw: z.i
       options.signal?.throwIfAborted(); await options.authorizeContext?.();
       if (!isAdmin(await staff(user, tx))) throw httpError("Sólo la administración puede cambiar la Organización", 403); await account.assertActive(tx);
       if ((await rootFor(tx))?.revision !== (input.revision || undefined)) throw httpError("La Organización cambió. Vuelve a cargarla", 409);
-      await tx.commandExecution.upsert({ where: { key: rootKey() }, create: { key: rootKey(), ownerId: user.id, inputHash: digest(canonicalJson(root)), status: "completed", resultJson: canonicalJson(root) }, update: { ownerId: user.id, inputHash: digest(canonicalJson(root)), resultJson: canonicalJson(root), status: "completed" } });
+      await tx.commandExecution.upsert({ where: { key: STUDY_ORGANIZATION_KEY }, create: { key: STUDY_ORGANIZATION_KEY, ownerId: user.id, inputHash: digest(canonicalJson(root)), status: "completed", resultJson: canonicalJson(root) }, update: { ownerId: user.id, inputHash: digest(canonicalJson(root)), resultJson: canonicalJson(root), status: "completed" } });
       await writeAuditStrict({ actorId: user.id, action: "drive.organization.root", entityType: "User", entityId: user.id, after: { folderId: folder.id, connectionId: account.connectionId } }, tx);
     });
     return { state: "completed", message: "Organización seleccionada. No se movieron archivos existentes.", folder: { ...folder, url: driveFolderUrl(folder.id) } };
@@ -123,10 +113,10 @@ export async function configureOrganizationDrive(user: CausaAccessUser, raw: z.i
   }
   const namespace = digest(canonicalJson({ owner: user.id, root, clientId: scope.clientId || `unassigned:${user.id}` }));
   let parent = root.folderId;
-  const steps = scope.kind === "user" ? [{ id: "users", name: "Usuarios" }, { id: `user:${user.id}`, name: organizedDriveName(scope.name, user.id) }] : [ { id: "clientes", name: "Clientes" }, { id: `client:${scope.clientId || user.id}`, name: organizedDriveName(scope.clientName, scope.clientId || user.id) }, { id: `group:${scope.kind}`, name: scope.kind === "causa" ? "Causas" : "Espacios de trabajo" }, { id: `${scope.kind}:${scope.id}`, name: organizedDriveName(scope.name, scope.id) } ];
+  const steps = organizationSteps(scope, user.id);
   for (const step of steps) {
     await guard();
-    const key = `drive-organization-node:${digest(canonicalJson({ root: root.folderId, parent, step: step.id }))}`;
+    const key = organizationNodeKey(root.folderId, parent, step.id);
     let record = await db.commandExecution.findUnique({ where: { key } });
     if (record?.status === "completed" && record.resultJson) { const savedId = JSON.parse(record.resultJson).folderId;
       const existing = await inspectChosenDriveFolder(savedId, null, { openTransport: account.openTransport });
@@ -160,7 +150,7 @@ export async function configureOrganizationDrive(user: CausaAccessUser, raw: z.i
     }
   }
   await guard();
-  if (scope.kind === "causa") await linkAltazorDriveFolder(scope.id, user, { folderRef: parent, connectionId: account.connectionId, bindingRevision: account.bindingRevision, caseRevision: scope.caseRevision! }, { client: db, account });
+  if (scope.kind === "causa") await linkAltazorDriveFolder(scope.id, user, { folderRef: parent, connectionId: account.connectionId, bindingRevision: account.bindingRevision, caseRevision: scope.caseRevision! }, { ...options, client: db, account });
   await writeAuditStrict({ actorId: user.id, action: "drive.organization.prepare", entityType: scope.kind === "causa" ? "Causa" : scope.kind === "site" ? "Site" : "User", entityId: scope.id, after: { rootId: root.folderId, folderId: parent, connectionId: account.connectionId } }, db);
   return { state: "completed", message: scope.kind === "user" ? "Tu carpeta está preparada en Organización → Usuarios. No se copiaron documentos automáticamente." : "Carpeta preparada en Organización → Clientes → Cliente. No se copiaron documentos automáticamente.", folder: { id: parent, name: steps.at(-1)!.name, url: driveFolderUrl(parent) } };
 }

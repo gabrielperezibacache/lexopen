@@ -1,3 +1,5 @@
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import { documentDownloadOptions } from "@/lib/sites/document-download-options";
 import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
 import { CaseStatusPanel } from "./CaseStatusPanel";
@@ -10,6 +12,7 @@ import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
 import { ConflictReviewPanel } from "@/components/ConflictReviewPanel";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
+import { studyDriveMode } from "@/lib/integrations/google-study-drive";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
@@ -68,7 +71,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
   const canUseKnowledge = canSome(user, "assistant.use");
   const backHref = connected ? "/pjud" : "/causas";
   const backLabel = connected ? "Volver a PJUD" : "Volver a mis causas";
-  const [causa, responsables, totalAccionesAbiertas, textStatus, preparation, caseStatus] = await Promise.all([
+  const [causa, responsables, totalAccionesAbiertas, preparation, caseStatus] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: {
@@ -139,14 +142,6 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
         estado: { in: [...ACCIONES_ABIERTAS] },
       },
     }),
-    // ⚡ Bolt: Move textStatus query into Promise.all to fetch concurrently with the causa, saving a round-trip
-    prisma.$queryRaw<{id: string, has_text: boolean, has_markdown: boolean}[]>`
-      SELECT id,
-             (length(trim(coalesce("extractedMarkdown", ''))) + length(trim(coalesce("contenido", '')))) > 0 as has_text,
-             length(trim(coalesce("extractedMarkdown", ''))) > 0 as has_markdown
-      FROM "Documento"
-      WHERE "causaId" = ${id}
-    `,
     canUseKnowledge ? Promise.all([
       // A hearing desk belongs to its professional, even within a shared cause.
       prisma.hearingWorkspace.count({ where: { causaId: id, ownerId: user.id } }),
@@ -161,16 +156,10 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
   ]);
   if (!causa) notFound();
 
-  const statusMap = new Map(textStatus.map((s) => [s.id, s]));
-
-  const documentos = causa.documentos.map(
-    ({ storageKey, ...rest }) => ({
-      ...rest,
-      hasText: statusMap.get(rest.id)?.has_text ?? false,
-      hasMarkdown: statusMap.get(rest.id)?.has_markdown ?? false,
-      hasBinary: Boolean(storageKey),
-    })
-  );
+  const downloads = await documentDownloadOptions(causa.documentos.map(document => document.id));
+  const documentos = causa.documentos.map(({ storageKey, ...document }) => ({
+    ...document, downloads: downloads.get(document.id), hasBinary: Boolean(storageKey),
+  }));
   const audioDocuments = new Map(causa.documentos.map(document => [document.id, document.storageKey]));
   // Match the audio listing's source binding without exposing a hidden document.
   const visibleAudios = preparation.audios.slice(0, 200).filter(audio => audioDocuments.get(audio.sourceDocumentId) === audio.storageKey);
@@ -253,6 +242,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
         </div>
 
         <DriveFolderPanel
+          sharedOrganization={await studyDriveMode()}
           canImport={can(user, "causa.write", { causaRol: access.causaRol })}
           causaId={causa.id}
           folderId={causa.googleDriveFolderId}
@@ -455,24 +445,11 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
                   >
                     Preguntar IA
                   </Link>
-                  <a
-                    href={`/api/documentos/${d.id}/content`}
-                    className="text-xs text-[var(--sea)]"
-                  >
-                    Descargar
-                  </a>
-                  {d.extractionStatus === "completed" && d.hasMarkdown && (
-                    <a
-                      href={`/api/documentos/${d.id}/markdown`}
-                      className="text-xs text-[var(--sea)]"
-                    >
-                      Texto preparado
-                    </a>
-                  )}
+                  <DocumentDownloads id={d.id} options={d.downloads} className="text-xs text-[var(--sea)]" />
                   <DocumentDriveAction
                     documentId={d.id}
                     googleDriveId={d.googleDriveId}
-                    hasText={d.hasText}
+                    hasText={d.downloads?.hasText ?? false}
                     hasBinary={d.hasBinary}
                   />
                 </div>

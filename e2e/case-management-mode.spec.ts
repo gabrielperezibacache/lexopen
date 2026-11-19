@@ -141,3 +141,46 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
   expect(forbidden.status()).toBe(404);
   expect(JSON.stringify(await forbidden.json())).not.toContain(finalReference);
 });
+
+test("el expediente retoma el progreso PJUD al volver y se recupera de una interrupción de red", async ({ page }) => {
+  test.setTimeout(90_000);
+  await db.firmSettings.update({ where: { id: setting!.id }, data: { caseManagementMode: "pjud_cl" } });
+  const abogado = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" }, select: { id: true } });
+  const causa = await db.causa.create({ data: {
+    abogadoId: abogado.id, titulo: `Descarga ficticia ${randomUUID()}`, tribunal: "1º Juzgado Civil de Santiago",
+    materia: "Civil", rit: `C-${randomInt(600_000, 900_000)}-2026`, pjudMonitoreoActivo: false,
+  } });
+  createdIds.push(causa.id);
+  let phase: "idle" | "running" | "done" = "idle";
+  let dropNextRead = false;
+  let starts = 0;
+  await page.route(`**/api/causas/${causa.id}/documentos/import`, async (route) => {
+    if (route.request().method() === "POST") {
+      starts++;
+      phase = "running";
+    } else if (dropNextRead) {
+      dropNextRead = false;
+      await route.abort();
+      return;
+    }
+    await route.fulfill({ json: { status: {
+      causaId: causa.id, status: phase, phase: phase === "running" ? "download" : phase,
+      total: 2, completed: phase === "done" ? 2 : 0, saved: phase === "done" ? 2 : 0,
+      skipped: 0, failed: 0, delayMs: 2500, maxPerRun: 20, currentLabel: null,
+      note: phase === "done" ? "Dos originales disponibles." : null,
+    } } });
+  });
+  await loginAs(page, "abogado@estudio.cl");
+  await page.goto(`/causas/${causa.id}/expediente#incorporar-documentos`);
+  const action = page.getByRole("button", { name: "Importar documentos PJUD", exact: true });
+  await action.click();
+  await expect(page.getByRole("button", { name: "Importando 0/2…" })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Importando 0/2…" })).toBeDisabled();
+  dropNextRead = true;
+  await expect(page.getByText("No se pudo consultar la descarga. Volviendo a conectar…")).toBeVisible({ timeout: 10_000 });
+  phase = "done";
+  await expect(action).toBeEnabled({ timeout: 15_000 });
+  await expect(page.getByText("Dos originales disponibles.", { exact: false })).toBeVisible();
+  expect(starts).toBe(1);
+});
