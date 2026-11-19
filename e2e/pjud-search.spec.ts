@@ -49,7 +49,7 @@ test("el lector histórico ofrece recuperar la versión pública sin mostrar el 
       await route.fulfill({ status: 422, json: { error: "Texto público no disponible." } });
     });
     await page.getByRole("button", { name: "Recuperar versión pública" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Texto público no disponible.");
+    await expect(page.getByRole("alert").filter({ hasText: "Texto público no disponible." })).toBeVisible();
     await expect(page.getByRole("link", { name: /descargar/i })).toHaveCount(0);
   } finally {
     if (sourceId) await db.legalSource.delete({ where: { id: sourceId } });

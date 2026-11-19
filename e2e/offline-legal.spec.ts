@@ -77,6 +77,50 @@ test("causa y plazo nuevos: dependencia local, respuesta perdida y cambios poste
     const deadlines = await prisma.plazo.findMany({ where: { titulo: `Nuevo plazo ${f.tag}` } }); expect(deadlines).toHaveLength(1); expect(deadlines[0].causaId).toBe(cases[0].id);
   } finally { network.setOffline(false); await f.cleanup(); }
 });
+test("cambiar o deshacer la causa de un plazo civil exige revisar la fecha para ese destino", async ({ page, network }) => {
+  test.setTimeout(120000);
+  const f = await fixture(page);
+  try {
+    const destination = await prisma.causa.create({ data: { titulo: `Destino ${f.tag}`, tribunal: "Órgano ficticio", materia: "civil", acceso: "equipo", abogadoId: f.a.id } });
+    const basis = { profile: "cl_cpc_individual_days_v1", causaId: f.cause.id, confirmedById: f.a.id };
+    await prisma.plazo.update({ where: { id: f.deadline.id }, data: { calculationRegime: basis.profile, civilCalculationBasis: basis } });
+    await prepare(page, f.url("plazo"), "plazo");
+    const reviewed = page.getByLabel("He revisado la fecha límite", { exact: false });
+    const cause = page.getByLabel("Causa del plazo", { exact: true });
+    await expect(page.locator("#deadline-source-note")).toContainText("Si cambia la causa");
+    await page.locator("#binding-panel > summary").click();
+    await page.getByText("Preparar opciones con conexión", { exact: true }).click();
+    await page.getByLabel("Tipo de opción").selectOption("cause");
+    await page.getByLabel("Buscar opciones", { exact: true }).fill(destination.titulo);
+    await page.getByRole("button", { name: "Buscar opciones con conexión" }).click();
+    await page.getByRole("button", { name: new RegExp(`Preparar opción: .*Destino ${f.tag}`) }).click();
+    await expect(cause.locator("option", { hasText: destination.titulo })).toHaveCount(1);
+    network.setOffline(true);
+    await reviewed.check();
+    await cause.selectOption(destination.id);
+    await expect(reviewed).not.toBeChecked();
+    await reviewed.check();
+    await page.getByRole("button", { name: "Deshacer elecciones de vínculos" }).click();
+    await expect(cause).toHaveValue(f.cause.id);
+    await expect(reviewed).not.toBeChecked();
+    await reviewed.check();
+    await cause.selectOption(destination.id);
+    await saved(page);
+    await page.reload();
+    await unlock(page);
+    await expect(reviewed).not.toBeChecked();
+    network.setOffline(false);
+    await sync(page);
+    await expect(page.locator("#message")).toContainText("Revise expresamente la fecha límite");
+    await reviewed.check();
+    await sync(page);
+    await expect(page.locator("#message")).toContainText("Registro sincronizado");
+    const row = await prisma.plazo.findUniqueOrThrow({ where: { id: f.deadline.id } });
+    expect(row.causaId).toBe(destination.id);
+    expect(row.calculationRegime).toBeNull();
+    expect(row.civilCalculationBasis).toEqual(basis);
+  } finally { network.setOffline(false); await f.cleanup(); }
+});
 test("la ficha en línea no sobrescribe un cambio sincronizado después de abrir el formulario", async ({ page }) => {
   test.setTimeout(120000); const f = await fixture(page);
   try {

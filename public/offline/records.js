@@ -1,7 +1,7 @@
 import { renderDeadlineSupport } from "/offline/deadline-support.js";
 import { operationConfigs, normalizeOperation, eventInputValue, setEventTime, toggleEventDay, renderOperation } from "/offline/operations.js";
 import { memoConfigs, setupMemoActions } from "/offline/memos.js";
-import { setupBindings } from "/offline/bindings.js";
+import { hasCivilDeadlineCalculation, setupBindings } from "/offline/bindings.js";
 import { setupFiles } from "/offline/files.js";
 const $ = id => document.getElementById(id);
 const copy = value => structuredClone(value);
@@ -106,7 +106,10 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
     if(item.kind === "plazo" && item.fields.estado === "cumplido" && item.baseFields?.estado !== "cumplido") renderDeadlineSupport({item,data:getData(),parent:$("record-fields"),value:item.completion,id:"deadline-support",onChange:v=>{item.completion=v;markDirty();}});
     renderOperation(item);
     $("cause-parties").hidden = kind !== "causa"; $("deadline-review").hidden = kind !== "plazo";
-    $("deadline-reviewed").checked = Boolean(item.dateReviewed); $("deadline-source-note").textContent = item.baseRelations?.sourceLocked ? "Los datos están fijados por tareas o minutas de origen. Puede actualizar su estado con los permisos correspondientes." : item.baseRelations?.calculationRegime ? "Esta fecha tiene un cálculo registrado. Cambiar las fechas o el tipo de cómputo lo sustituye por una fecha revisada manualmente." : "No se calcula un vencimiento sin conexión. Revise país, procedimiento y fecha antes de confirmar.";
+    $("deadline-reviewed").checked = Boolean(item.dateReviewed);
+    $("deadline-source-note").textContent = item.baseRelations?.sourceLocked ? "Los datos están fijados por tareas o minutas de origen. Puede actualizar su estado con los permisos correspondientes."
+      : hasCivilDeadlineCalculation(item) ? "Si cambia la causa, las fechas o el tipo de cómputo, revise la fecha límite para el nuevo contexto. Se conservará el cálculo civil de origen en el historial."
+      : item.baseRelations?.calculationRegime ? "Esta fecha tiene un cálculo registrado. Cambiar las fechas o el tipo de cómputo lo sustituye por una fecha revisada manualmente." : "No se calcula un vencimiento sin conexión. Revise país, procedimiento y fecha antes de confirmar.";
     $("party-list").replaceChildren();
     if (kind === "causa") for (const [index, party] of item.fields.partes.entries()) {
       const group = document.createElement("fieldset"), legend = document.createElement("legend"); legend.textContent = `Parte ${index + 1}`; group.append(legend);
@@ -200,6 +203,7 @@ export function setupRecords({ getData, auth, flush, write, run, message, markDi
     if (dirty(item) && !confirm("Esta acción reemplaza los cambios locales. Descargue una copia antes de continuar. ¿Descargar la versión del servidor?")) return;
     const remote = await getRemote(kind, item.remoteId); await auth();
     item.fields = remote.fields; item.baseFields = normalize(kind, remote.fields); item.version = remote.version; bindings.accept(item, remote); delete item.relationChoices; delete item.referenceFailure; delete item.pending; delete item.conflict; delete item.conflictReason;
+    if (kind === "plazo") delete item.dateReviewed;
     await write(); render(); message("Copia local actualizada desde el servidor.");
   });
   $("record-download").onclick = () => {

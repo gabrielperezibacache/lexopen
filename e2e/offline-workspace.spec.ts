@@ -51,7 +51,7 @@ test("copia cifrada, recarga sin red, shell público y sincronización manual si
     await expect(page.getByLabel("Clave del espacio local")).toBeVisible(); await expect(page.locator("#body")).toHaveValue("");
     await page.getByLabel("Clave del espacio local").fill("wrong-key-at-least-twelve"); await page.getByRole("button", { name: "Desbloquear", exact: true }).click(); await expect(page.locator("#message")).toContainText("La clave no permite abrir");
     await unlock(page); await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveValue("Texto redactado sin red y recuperable tras recargar");
-    const cached = await page.evaluate(async () => { const cache = await caches.open("lexopen-offline-shell-v12"); return (await cache.keys()).map(r => new URL(r.url).pathname); });
+    const cached = await page.evaluate(async () => { const cache = await caches.open("lexopen-offline-shell-v13"); return (await cache.keys()).map(r => new URL(r.url).pathname); });
     expect(cached.sort()).toEqual(["/offline.html", "/offline/vault.js", "/offline/workspace.css", "/offline/workspace.js", "/offline/records.js", "/offline/bindings.js", "/offline/memos.js", "/offline/deadline-support.js", "/offline/files.js", "/offline/operations.js"].sort());
     expect(await page.evaluate(async api => { try { await fetch(api); return "unexpected network/cache"; } catch { return "offline"; } }, f.api)).toBe("offline");
     for (const viewport of [{ width: 360, height: 800 }, { width: 1440, height: 1000 }]) { await page.setViewportSize(viewport); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.screenshot({ path: info.outputPath(`offline-${viewport.width}.png`), animations: "disabled" }); }
@@ -145,8 +145,18 @@ test("una cuota agotada conserva el texto visible y permite descargarlo", async 
 
 test("la activación elimina el antiguo cache de páginas autenticadas", async ({ page }) => {
   await page.goto("/offline/workspace.css");
-  await page.evaluate(async () => { const old = await caches.open("lexopen-shell-v1"); await old.put("/", new Response("private-legacy-fixture")); const shell = await caches.open("lexopen-offline-shell-v10"); await shell.put("/offline.html", new Response("stale-public-shell-fixture")); const previous = await caches.open("lexopen-offline-shell-v11"); await previous.put("/offline.html", new Response("previous-public-shell-fixture")); const other = await caches.open("unrelated-cache"); await other.put("/fixture", new Response("other")); });
+  await page.evaluate(async () => {
+    const old = await caches.open("lexopen-shell-v1"); await old.put("/", new Response("private-legacy-fixture"));
+    for (const version of [10, 11, 12]) {
+      const shell = await caches.open(`lexopen-offline-shell-v${version}`);
+      await shell.put("/offline.html", new Response("stale-public-shell-fixture"));
+    }
+    const other = await caches.open("unrelated-cache"); await other.put("/fixture", new Response("other"));
+  });
   await page.goto("/offline.html"); await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
-  const keys = await page.evaluate(() => caches.keys()); expect(keys).not.toContain("lexopen-shell-v1"); expect(keys).not.toContain("lexopen-offline-shell-v10"); expect(keys).not.toContain("lexopen-offline-shell-v11"); expect(keys).toContain("lexopen-offline-shell-v12"); expect(keys).toContain("unrelated-cache");
+  const keys = await page.evaluate(() => caches.keys());
+  expect(keys).not.toContain("lexopen-shell-v1");
+  for (const version of [10, 11, 12]) expect(keys).not.toContain(`lexopen-offline-shell-v${version}`);
+  expect(keys).toContain("lexopen-offline-shell-v13"); expect(keys).toContain("unrelated-cache");
 });
