@@ -39,13 +39,28 @@ export function AltazorCaseJob({ id }: { id: string }) {
   const keys = useRef(
     createSubmissionKeys(operationKey, `lexopen:case-job:${id}`),
   );
+  function clearLocalEdits() {
+    setDrafts({});
+    setAnswer("");
+    pendingSave.current = null;
+    setUncertain(false);
+    initialized.current = -1;
+  }
+  function hideUnverifiedJob(accessLost: boolean) {
+    if (!mounted.current) return;
+    state.current = null;
+    setJob(null);
+    if (accessLost) clearLocalEdits();
+    setError(accessLost
+      ? "El encargo ya no está disponible con tu acceso actual."
+      : "No se pudo comprobar el encargo. Vuelve a intentarlo para continuar.");
+  }
   function accept(value: CaseJobView) {
     if (!mounted.current) return;
     state.current = value;
     setJob(value);
     if (!value.available) {
-      setDrafts({});
-      initialized.current = -1;
+      clearLocalEdits();
       return;
     }
     if (
@@ -72,6 +87,11 @@ export function AltazorCaseJob({ id }: { id: string }) {
             selected: true,
           },
         ]);
+      if (initialized.current !== -1) {
+        pendingSave.current = null;
+        setUncertain(false);
+        setError("Las propuestas cambiaron. Revisa la versión actual antes de confirmar.");
+      }
       setDrafts(Object.fromEntries(rows));
       initialized.current = value.revision;
     }
@@ -85,15 +105,11 @@ export function AltazorCaseJob({ id }: { id: string }) {
         { cache: "no-store" },
       );
       if (!response.ok) {
-        if (mounted.current) {
-          setJob(null);
-          state.current = null;
-          setDrafts({});
-          setError("No se pudo comprobar el acceso al encargo.");
-        }
+        hideUnverifiedJob([401, 403, 404, 409, 410].includes(response.status));
         return;
       }
       const value = (await response.json()) as CaseJobView;
+      if (mounted.current && !state.current) setError("");
       accept(value);
       if (advance && value.available && working.has(value.status)) {
         const result = await apiMutation<CaseJobView>(
@@ -112,10 +128,7 @@ export function AltazorCaseJob({ id }: { id: string }) {
           setError(result.error);
       }
     } catch {
-      if (mounted.current)
-        setError(
-          "No se pudo comprobar el encargo. Conservamos tus propuestas editadas.",
-        );
+      hideUnverifiedJob(false);
     } finally {
       inFlight.current = false;
     }

@@ -15,7 +15,10 @@ const name = z.string().trim().min(1).max(180).refine(value => !value.startsWith
 const binding = { connectionId: id, bindingRevision: hex, caseRevision: hex };
 const file = { ...binding, documentoId: id, documentVersion: z.number().int().positive(), sourceSha256: hex, nombre: name, folderId: id, folderName: z.string().min(1).max(700), bytes: z.number().int().positive().max(4 * 1024 * 1024), mime: z.string().min(1).max(200) };
 export const driveEstadoSchema = z.object({}).strict();
-export const driveCrearCarpetaSchema = z.object({ ...binding, nombre: name, parentFolderId: z.literal("root") }).strict();
+export const driveCrearCarpetaSchema = z.union([
+  z.object({ ...binding, nombre: name, parentFolderId: z.literal("root") }).strict(),
+  z.object({ ...binding, nombre: name, destinationRevision: hex }).strict(),
+]);
 export const driveGuardarDocumentoSchema = z.discriminatedUnion("action", [
   z.object({ ...file, action: z.literal("upload-document") }).strict(),
   z.object({ ...file, action: z.literal("save-version"), fileId: id, expectedVersion: z.string().regex(/^\d{1,30}$/) }).strict(),
@@ -41,6 +44,7 @@ export function createDriveTools(deps: Dependencies = {}) {
     if (toolId === "drive.crearCarpeta") {
       const { state, proof } = await ready(ctx);
       if (state.folder) throw httpError("Esta causa ya tiene una carpeta vinculada. Revisa su destino en Mis Causas antes de cambiarla.", 409);
+      if ("organizedTarget" in state && state.organizedTarget) return { ...proof, nombre: state.organizedTarget.name, destinationRevision: state.organizedTarget.revision };
       if (!name.safeParse(raw.nombre).success) throw httpError("Indica el nombre de la carpeta que quieres crear para esta causa.", 409);
       return { ...proof, nombre: name.parse(raw.nombre), parentFolderId: "root" };
     }
@@ -69,6 +73,7 @@ export function createDriveTools(deps: Dependencies = {}) {
     await assertDriveToolInputAccess(toolId, input, ctx, true, db);
     const current = await resolveInput(toolId, toolId === "drive.crearCarpeta" ? { nombre: input.nombre } : { documentoId: (input as FileInput).documentoId }, ctx);
     if (canonicalJson(current) !== canonicalJson(input)) throw httpError("El documento, la cuenta o la carpeta cambió. Prepara y revisa un plan nuevo.", 409);
+    if (toolId === "drive.crearCarpeta" && "destinationRevision" in input) return `Preparar «${input.nombre}» en Organización → Clientes → Cliente → Causas, con la cuenta compartida del estudio.`;
     if (toolId === "drive.crearCarpeta") return `Crear la carpeta «${input.nombre}» en tu Google Drive y vincularla a esta causa. La actualización automática seguirá en pausa. Se usará tu cuenta de Google de Altazor; no se compartirán archivos con terceros.`;
     const value = input as FileInput;
     return `${value.action === "save-version" ? "Guardar una versión nueva como copia" : "Guardar una copia exacta"} de «${value.nombre}» (versión ${value.documentVersion}, ${value.bytes} bytes) en la carpeta «${value.folderName}» de tu Google Drive, vinculada a esta causa.${value.action === "save-version" ? ` Se conserva el archivo anterior y su revisión ${value.expectedVersion}.` : ""} El original de LexOpen y sus citas se conservan. Revisa y confirma este envío de archivo.`;
@@ -97,7 +102,9 @@ export function createDriveTools(deps: Dependencies = {}) {
   async function send(toolId: "drive.guardarDocumento" | "drive.crearCarpeta", input: FileInput | FolderInput, ctx: ToolContext): Promise<ToolResult> {
     const { scope, requestId, authorizeContext } = await confirmed(toolId, input, ctx);
     const payload: CaseDriveCommand = toolId === "drive.crearCarpeta"
-      ? { ...(input as FolderInput), action: "create-folder", requestId, confirmed: true }
+      ? "destinationRevision" in input
+        ? { connectionId: input.connectionId, bindingRevision: input.bindingRevision, caseRevision: input.caseRevision, action: "prepare-organized-folder", destinationRevision: input.destinationRevision, requestId, confirmed: true }
+        : { ...(input as Extract<FolderInput, { parentFolderId: "root" }>), action: "create-folder", requestId, confirmed: true }
       : (() => { const value = input as FileInput; return { connectionId: value.connectionId, bindingRevision: value.bindingRevision, caseRevision: value.caseRevision, documentoId: value.documentoId, documentVersion: value.documentVersion, sourceSha256: value.sourceSha256, nombre: value.nombre, action: value.action, ...(value.action === "save-version" ? { fileId: value.fileId, expectedVersion: value.expectedVersion } : {}), requestId, confirmed: true as const } as CaseDriveCommand; })();
     // The CaseDrive and native ledgers own one-use egress. Never wrap this in a
     // serializable retry or promise that an unknown outcome can be resent.

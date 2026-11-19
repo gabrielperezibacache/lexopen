@@ -4,6 +4,7 @@ import { runScheduledAcademicCallRefresh } from "@/lib/altazor/academic-calls";
 import { runDueTeachingReminders } from "@/lib/altazor/teaching-reminders";
 import { processDueDailyBriefs } from "@/lib/altazor/daily-brief";
 import { processDueDriveSyncSubscriptions } from "@/lib/integrations/drive-sync";
+import { processManualDocumentImport } from "@/lib/pjud/import-causa-documents";
 import { processPendingPjudDocumentJobs } from "@/lib/pjud/document-queue";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { processQueuedIcaroJobs } from "@/lib/altazor/icaros/service";
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
     ["academicCalls", () => runScheduledAcademicCallRefresh()],
     ["teachingReminders", () => runDueTeachingReminders()],
     ["drive", () => processDueDriveSyncSubscriptions({ limit: 2 })],
+    ["pjudManual", () => processManualDocumentImport()],
     ["pjud", () => processPendingPjudDocumentJobs({ limit: 4 })],
   ] as const;
   const outcomes = await Promise.allSettled(tasks.map(([, run]) => run()));

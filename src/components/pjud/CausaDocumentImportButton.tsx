@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 
@@ -26,80 +26,77 @@ type Props = {
   className?: string;
 };
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function CausaDocumentImportButton(props: Props) {
+  return <ImportButton key={props.causaId} {...props} />;
 }
 
-export function CausaDocumentImportButton({ causaId, className }: Props) {
+function ImportButton({ causaId, className }: Props) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const endpoint = `/api/causas/${causaId}/documentos/import`;
+  const [starting, setStarting] = useState(false);
   const [status, setStatus] = useState<ImportStatus | null>(null);
-  const [error, setError] = useState("");
+  const [readError, setReadError] = useState("");
+  const [startError, setStartError] = useState("");
+  const observedRunning = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      void fetch(`/api/causas/${causaId}/documentos/import`)
-        .then((r) => r.json())
-        .then((body) => {
-          if (!cancelled && body?.status) setStatus(body.status);
-        })
-        .catch(() => undefined);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [causaId]);
-
-  async function pollUntilDone() {
-    for (let i = 0; i < 180; i += 1) {
-      await sleep(2000);
-      const res = await fetch(`/api/causas/${causaId}/documentos/import`);
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) continue;
-      const st = body.status as ImportStatus | undefined;
-      if (st) setStatus(st);
-      if (st && st.status !== "running") return st;
+    if (starting) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function readStatus() {
+      try {
+        const response = await fetch(endpoint, { signal: controller.signal, cache: "no-store" });
+        const body = await response.json().catch(() => null);
+        if (controller.signal.aborted) return;
+        if (response.redirected || [401, 403, 404, 409].includes(response.status)) {
+          setStatus(null);
+          setReadError(body?.error || "El estado de la descarga ya no está disponible.");
+          return;
+        }
+        if (!response.ok || body?.status?.causaId !== causaId) throw new Error();
+        const next: ImportStatus = body.status;
+        setReadError("");
+        setStatus(next);
+        if (next.status === "running") {
+          setStartError("");
+          observedRunning.current = true;
+          timer = setTimeout(readStatus, 2000);
+        } else if (observedRunning.current) {
+          observedRunning.current = false;
+          router.refresh();
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+        setReadError("No se pudo consultar la descarga. Volviendo a conectar…");
+        timer = setTimeout(readStatus, 5000);
+      }
     }
-    return null;
-  }
+    void readStatus();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [causaId, endpoint, router, starting]);
 
   async function startImport() {
-    setBusy(true);
-    setError("");
-    const result = await apiMutation<{
-      status?: ImportStatus;
-      started?: boolean;
-      alreadyRunning?: boolean;
-      error?: string;
-    }>(`/api/causas/${causaId}/documentos/import`, {
+    setStarting(true);
+    setStartError("");
+    const result = await apiMutation<{ status: ImportStatus }>(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",
     });
-    if (!result.ok) {
-      setBusy(false);
-      setError(result.error || "No se pudo iniciar la descarga.");
-      if (result.status === 409) {
-        const st = await fetch(`/api/causas/${causaId}/documentos/import`)
-          .then((r) => r.json())
-          .catch(() => null);
-        if (st?.status) setStatus(st.status);
-      }
-      return;
+    if (result.ok) {
+      setStatus(result.data.status);
+      observedRunning.current = result.data.status.status === "running";
+    } else {
+      setStartError(result.error || "No se pudo iniciar la descarga.");
     }
-    if (result.data.status) setStatus(result.data.status);
-
-    if (result.data.status?.status === "running" || result.data.started) {
-      const final = await pollUntilDone();
-      if (final) setStatus(final);
-      router.refresh();
-    }
-    setBusy(false);
+    setStarting(false);
   }
 
-  const running = busy || status?.status === "running";
+  const error = readError || startError;
+  const running = starting || status?.status === "running";
   const progress =
     status && status.total > 0
       ? `${Math.min(status.completed, status.total)}/${status.total}`
@@ -110,7 +107,7 @@ export function CausaDocumentImportButton({ causaId, className }: Props) {
       <button
         type="button"
         className="btn btn-secondary"
-        disabled={running}
+        disabled={running || !status}
         onClick={() => void startImport()}
         title="Descarga secuencial desde OJV e importa cada PDF a LexOpen de inmediato (expediente + timeline)"
       >

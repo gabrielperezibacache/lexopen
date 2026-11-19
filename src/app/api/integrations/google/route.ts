@@ -1,4 +1,5 @@
 import { studyDriveMode } from "@/lib/integrations/google-study-drive";
+import { caseDriveRevision, linkAltazorDriveFolder } from "@/lib/integrations/case-drive";
 import { configureOrganizationDrive, organizationDriveState } from "@/lib/integrations/drive-organization";
 import { assertCsrf, canReadFlagged, handleRouteError, httpError, requireStaff } from "@/lib/api";
 import { assertCausaAccess, assertCausaCapability, documentReadWhere, plazoAccessWhere, requiredCausaWhere } from "@/lib/auth/causa-access";
@@ -221,6 +222,11 @@ export async function POST(req: Request) {
       }
     }
     if (body.action === "link-causa-folder" && body.causaId && body.folderRef) {
+      if (await studyDriveMode()) {
+        const state = await organizationDriveState(user);
+        const caseRevision = await caseDriveRevision(body.causaId);
+        return NextResponse.json(await linkAltazorDriveFolder(body.causaId, user, { folderRef: body.folderRef, caseRevision, connectionId: state.connectionId, bindingRevision: state.bindingRevision }));
+      }
       try {
         const result = await linkCausaDriveFolder(body.causaId, body.folderRef);
         return NextResponse.json(result);

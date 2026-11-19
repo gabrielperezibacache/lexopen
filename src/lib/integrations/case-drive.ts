@@ -1,4 +1,5 @@
-import { resolveStudyDriveAccount, studyDriveMode } from "./google-study-drive";
+import { organizedCaseDestination, verifyOrganizedCaseFolder } from "./drive-organization-path";
+import { resolveStudyDriveAccount, studyDriveMode, STUDY_ORGANIZATION_KEY } from "./google-study-drive";
 /** Case folders and deliberate outgoing copies, using the professional's existing Altazor account. */
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -22,6 +23,7 @@ const common = { requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/), connec
 const writeCommon = { ...common, caseRevision: hex };
 const documentFields = { documentoId: identifier, documentVersion: z.number().int().positive(), sourceSha256: hex, nombre: name.optional() };
 export const caseDriveCommandSchema = z.discriminatedUnion("action", [
+  z.object({ ...writeCommon, action: z.literal("prepare-organized-folder"), destinationRevision: hex }).strict(),
   z.object({ ...writeCommon, action: z.literal("create-folder"), nombre: name, parentFolderId: z.string().regex(/^(?:root|[A-Za-z0-9_-]{10,200})$/).optional() }).strict(),
   z.object({ ...writeCommon, ...documentFields, action: z.literal("upload-document") }).strict(),
   z.object({ ...writeCommon, ...documentFields, action: z.literal("save-version"), fileId: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/), expectedVersion: z.string().regex(/^\d{1,30}$/) }).strict(),
@@ -91,8 +93,19 @@ export async function linkAltazorDriveFolder(causaId: string, user: CausaAccessU
   if (account.connectionId !== input.connectionId || account.bindingRevision !== input.bindingRevision) throw httpError("La cuenta cambió. Abre de nuevo el selector de carpetas.", 409);
   if (input.caseRevision !== await caseDriveRevision(causaId, db)) throw httpError("La carpeta de la causa cambió. Abre de nuevo el selector.", 409);
   const chosen = parseGoogleDriveFolderRef(input.folderRef); if (!chosen || !isRealDriveFolderId(chosen.folderId)) throw httpError("Selecciona una carpeta real de Drive.", 400);
+  const destination = account.source === "study" ? await verifyOrganizedCaseFolder(causaId, user.id, account, chosen.folderId, db) : null;
   const folder = await inspectChosenDriveFolder(chosen.folderId, null, { openTransport: account.openTransport });
-  await db.$transaction(async tx => { await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`; if (input.caseRevision !== await caseDriveRevision(causaId, tx)) throw httpError("La carpeta de la causa cambió. Abre de nuevo el selector.", 409); await storeFolder(causaId, user, account, folder, tx); });
+  await db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
+    if (destination) {
+      await tx.$queryRaw`SELECT id FROM "CommandExecution" WHERE key = ${STUDY_ORGANIZATION_KEY} FOR SHARE`;
+      const current = await organizedCaseDestination(causaId, user.id, account, tx);
+      if (current.revision !== destination) throw httpError("El destino de Organización cambió. Revisa la carpeta de la causa.", 409);
+    }
+    if (input.caseRevision !== await caseDriveRevision(causaId, tx)) throw httpError("La carpeta de la causa cambió. Abre de nuevo el selector.", 409);
+    await assertCommandAuthorization(options);
+    await storeFolder(causaId, user, account, folder, tx);
+  });
   return { status: "linked", message: "Carpeta vinculada con tu cuenta de Google de Altazor.", folder, account: "altazor" as const };
 }
 async function documentSnapshot(causaId: string, documentoId: string, user: CausaAccessUser, db: Db): Promise<Snapshot> {
@@ -120,6 +133,10 @@ export async function caseDriveState(causaId: string, user: CausaAccessUser, opt
   try { account = options.account || (await studyDriveMode(options.client) ? await resolveStudyDriveAccount(user, options.client) : await resolveAltazorDriveAccount(user, options)); } catch { reason = "No pudimos comprobar tu cuenta de Google de Altazor. Revisa su conexión."; }
   const pendingOperation = pending[0] ? (() => { let action = "upload-document", documentoId: string | undefined; try { const saved = JSON.parse(pending[0].resultJson || "{}"); action = saved.command?.action === "create_folder" ? "create-folder" : saved.command?.action === "save_version" ? "save-version" : "upload-document"; documentoId = saved.source?.documentoId; } catch { /* Incomplete records remain unknown. */ } return { requestId: pending[0].key.slice(operationPrefix(user.id, causaId).length), action, ...(documentoId ? { documentoId } : {}), state: pending[0].status === "running" && Date.now() - pending[0].createdAt.getTime() < 60_000 ? "pending" : "unknown", message: "Comprueba el resultado anterior antes de realizar otra operación." }; })() : undefined;
   const base = { causaId, caseRevision: await caseDriveRevision(causaId, db), account: account ? account.source || "altazor" as const : null, connected: Boolean(account), canRead: account?.canRead || false, canManage: account?.canManage || false, connectionId: account?.connectionId || null, bindingRevision: account?.bindingRevision || null, canConfigure, reason, folder: isRealDriveFolderId(causa.googleDriveFolderId) ? { id: causa.googleDriveFolderId!, name: causa.googleDriveFolderName || "Carpeta de la causa", url: driveFolderUrl(causa.googleDriveFolderId!) } : null, ...(pendingOperation ? { pendingOperation } : {}) };
+  if (!documentoId && !base.folder && account?.source === "study" && canConfigure) {
+    const target = await organizedCaseDestination(causaId, user.id, account, db);
+    return { ...base, organizedTarget: { name: target.name, revision: target.revision } };
+  }
   if (!documentoId) return base;
   const snapshot = await documentSnapshot(causaId, documentoId, user, db);
   const doc = await db.documento.findUniqueOrThrow({ where: { id: documentoId }, select: { googleDriveId: true } });
@@ -165,6 +182,18 @@ export async function runCaseDriveCommand(causaId: string, user: CausaAccessUser
   const account = await availableAccount(user, options);
   if (!account.canManage) throw httpError("Autoriza la gestión de archivos en Google Drive desde Altazor.", 403);
   if (account.connectionId !== input.connectionId || account.bindingRevision !== input.bindingRevision) throw httpError("La autorización de Drive cambió. Abre de nuevo esta acción.", 409);
+  if (input.action === "prepare-organized-folder") {
+    if (account.source !== "study") throw httpError("La cuenta de esta causa cambió.", 409);
+    const target = await organizedCaseDestination(causaId, user.id, account, db);
+    const request = input;
+    const authorize = async () => {
+      await assertCommandAuthorization(options);
+      if (request.caseRevision !== await caseDriveRevision(causaId, db) || request.destinationRevision !== (await organizedCaseDestination(causaId, user.id, account, db)).revision) throw httpError("El destino de la causa cambió. Revisa de nuevo la carpeta.", 409);
+    };
+    const { configureOrganizationDrive } = await import("./drive-organization");
+    const prepared = await configureOrganizationDrive(user, { action: "organize", kind: "causa", id: causaId, confirmed: true, revision: target.root.revision }, { ...options, account, authorizeContext: authorize });
+    return { operationId: request.requestId, state: prepared.state === "completed" ? "completed" : "unknown", message: prepared.message, ...(prepared.folder ? { folder: prepared.folder } : {}) };
+  }
   const key = operationPrefix(user.id, causaId) + input.requestId, inputHash = digest(canonicalJson({ causaId, input }));
   const previous = await db.commandExecution.findUnique({ where: { key } });
   if (previous && input.action !== "reconcile") {
@@ -190,8 +219,10 @@ export async function runCaseDriveCommand(causaId: string, user: CausaAccessUser
     if (saved.binding) await assertAltazorDriveFolderBinding(causaId, user, saved.binding, account, db);
     await assertSource(causaId, user, saved, db);
     await assertCaseState(causaId, saved, db);
+    if (account.source === "study" && receipt.action === "create_folder") await verifyOrganizedCaseFolder(causaId, user.id, account, receipt.file_id, db);
     return commitVerified(previous.id, saved, receipt);
   }
+  if (input.action === "create-folder" && account.source === "study") throw httpError("Prepara la carpeta de esta causa en Organización.", 409);
   const unresolved = await db.commandExecution.count({ where: { ownerId: user.id, key: { startsWith: operationPrefix(user.id, causaId) }, status: { in: ["running", "unknown"] } } });
   if (unresolved) throw httpError("Hay una operación de Drive pendiente de comprobar en esta causa.", 409);
   if (input.caseRevision !== await caseDriveRevision(causaId, db)) throw httpError("La carpeta de la causa cambió. Revisa el destino antes de continuar.", 409);

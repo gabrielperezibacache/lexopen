@@ -38,6 +38,21 @@ export async function getDriveSyncSettings(causaId: string, user: CausaAccessUse
   const [row, accounts] = await Promise.all([client.driveSyncSubscription.findUnique({ where: { causaId } }), choices(user.id, client)]);
   return { ...publicState(row, user.id), ...await publicAltazorBinding(row, user.id, client), accounts: publicAccounts(accounts) };
 }
+export async function requestImmediateDriveSync(causaId: string, user: CausaAccessUser, client = prisma) {
+  return client.$transaction(async tx => {
+    const actor = await tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+    await assertCausaCapability(causaId, actor, "causa.write", tx);
+    await tx.$queryRaw`SELECT id FROM "DriveSyncSubscription" WHERE "causaId" = ${causaId} FOR UPDATE`;
+    const row = await tx.driveSyncSubscription.findUnique({ where: { causaId } });
+    if (!row?.enabled) throw error("Activa la recepción de esta carpeta antes de solicitar una actualización.");
+    if (row.ownerId !== user.id) throw error("La recepción la gestiona el profesional que la activó.", 403);
+    const now = new Date();
+    if (row.leaseExpiresAt && row.leaseExpiresAt > now) return { running: true };
+    if (!row.nextRunAt || row.nextRunAt > now) await tx.driveSyncSubscription.update({ where: { id: row.id }, data: { nextRunAt: now } });
+    return { running: false };
+  });
+}
+
 export async function configureDriveSync(causaId: string, user: CausaAccessUser, input: { enabled: boolean; intervalMinutes: number; account: AccountChoice; connectionId?: string; bindingRevision?: string; folderId?: string; generation?: number }, client = prisma) {
   if (!["study", "personal", "altazor"].includes(input.account) || ![15, 30, 60, 180, 360, 1440].includes(input.intervalMinutes)) throw error("Seleccione una frecuencia y una cuenta disponible.", 400);
   const accounts = await choices(user.id, client);
@@ -51,6 +66,7 @@ export async function configureDriveSync(causaId: string, user: CausaAccessUser,
     const causa = await tx.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } });
     if (!isRealDriveFolderId(causa.googleDriveFolderId)) throw error("Primero elija una carpeta de Drive para esta causa.");
     const prior = await tx.driveSyncSubscription.findUnique({ where: { causaId } });
+    if (await studyDriveMode(tx) && input.account !== (prior?.account || "study")) throw error("Esta carpeta conserva su conexión. Prepara el destino del estudio desde Organización.");
     if (prior && prior.ownerId !== user.id && prior.enabled) throw error("La sincronización fue activada por otro profesional. Solicite que la desactive antes de reemplazarla.", 403);
     if (input.account === "altazor") {
       const binding = await readAltazorDriveFolderBinding(causaId, tx);
@@ -127,6 +143,7 @@ export async function linkPersonalDriveFolder(causaId: string, user: CausaAccess
   const client = options.client || prisma;
   const actor = await client.user.findUniqueOrThrow({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
   await assertCausaCapability(causaId, actor, "causa.write", client);
+  if (await studyDriveMode(client)) throw error("Prepara las nuevas carpetas de esta causa desde Organización.");
   const folder = parseGoogleDriveFolderRef(folderRef);
   if (!folder || !isRealDriveFolderId(folder.folderId)) throw error("Pegue el enlace de una carpeta de Google Drive.", 400);
   const { requirePersonalDriveSession, assertPersonalDriveConnection } = await import("@/lib/personal-connectors/google-drive/service");
@@ -139,6 +156,7 @@ export async function linkPersonalDriveFolder(causaId: string, user: CausaAccess
     await assertCausaCapability(causaId, current, "causa.write", tx);
     const prior = await tx.driveSyncSubscription.findUnique({ where: { causaId } });
     if (prior?.enabled && prior.ownerId !== user.id) throw error("La sincronización fue activada por otro profesional. Debe pausarla antes de transferir la carpeta.", 403);
+    if (await studyDriveMode(tx)) throw error("La Organización cambió. Revisa el destino de esta causa.");
     await assertPersonalDriveConnection(user.id, session.connectionId, tx);
     await tx.causa.update({ where: { id: causaId }, data: { googleDriveFolderId: metadata.id, googleDriveFolderName: metadata.name, googleDriveFolderUrl: folder.folderUrl } });
     await tx.driveSyncSubscription.upsert({ where: { causaId }, create: { causaId, ownerId: user.id, folderId: metadata.id, account: "personal", connectionId: session.connectionId, enabled: false, status: "paused" }, update: { ownerId: user.id, folderId: metadata.id, enabled: false, generation: { increment: 1 }, account: "personal", connectionId: session.connectionId, status: "paused", nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null, note: "Carpeta personal elegida. Active su actualización cuando esté listo." } });
@@ -171,7 +189,7 @@ export async function processDueDriveSyncSubscriptions(options: DriveImportDepen
   const receipts = [];
   for (const selected of due) {
     const leaseToken = randomUUID();
-    const claimed = await client.driveSyncSubscription.updateMany({ where: { id: selected.id, enabled: true, generation: selected.generation, OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lte: now } }] }, data: { leaseToken, leaseExpiresAt: new Date(now.getTime() + LEASE_MS), status: "running" } });
+    const claimed = await client.driveSyncSubscription.updateMany({ where: { id: selected.id, enabled: true, generation: selected.generation, nextRunAt: { lte: now }, OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lte: now } }] }, data: { leaseToken, leaseExpiresAt: new Date(now.getTime() + LEASE_MS), status: "running" } });
     if (!claimed.count) continue;
     let imported = 0, unchanged = 0, unavailable = 0, removed = 0, inspected = 0;
     const position = cursor(selected.scanCursor, selected.folderId); let complete = false;

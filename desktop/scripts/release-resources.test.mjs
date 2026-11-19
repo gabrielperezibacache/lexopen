@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { releaseNotes } from "./release-notes.mjs";
 import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, LINUX_PRISMA_BINARY_TARGETS, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, stageDistributedOAuthProfile, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 import { copyTrackedRuntimeResources, preparePrismaRuntimeEngines } from "./prepare-resources.mjs";
 const require = createRequire(import.meta.url), yaml = require("js-yaml");
@@ -221,13 +222,21 @@ try {
   assert.equal(publishingAssembly.run.includes("--verification-only"), false);
   assert.equal(workflow.jobs.assemble.if, "${{ !startsWith(github.ref, 'refs/tags/') }}");
   const publishCommand = workflow.jobs.publish.steps.find(step => step.name === "Publish only after all native and application checks pass").run;
-  const publishGuard = publishCommand.match(/if\(m\.publishable!==true\|\|m\.version!==p\.version\|\|m\.sourceRevision!==process\.env\.GITHUB_SHA\)process\.exit\(1\);/)?.[0];
-  assert.ok(publishGuard, "publication must reject verification-only manifests");
-  for (const publishable of [undefined, false, "true", true]) {
-    const script = `const p={version:'fixture'},m=${JSON.stringify({ version: "fixture", sourceRevision: "fixture-revision", publishable })};${publishGuard}`;
-    const result = spawnSync(process.execPath, ["-e", script], { env: { GITHUB_SHA: "fixture-revision", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) } });
-    assert.equal(result.status, publishable === true ? 0 : 1);
+  assert.ok(publishCommand.indexOf("node desktop/scripts/release-notes.mjs") >= 0);
+  assert.ok(publishCommand.indexOf("node desktop/scripts/release-notes.mjs") < publishCommand.indexOf("gh release create"));
+  const releaseManifest = { version: "fixture", sourceRevision: "rev", publishable: true, signatures: [{ platform: "win32", publisherAuthenticated: false }] };
+  const signedMacApp = { codeSignatureValid: true, publisherAuthenticated: true, notarized: true, gatekeeperAccepted: true };
+  for (const arch of ["x64", "arm64"]) releaseManifest.signatures.push({
+    platform: "darwin", arch, artifacts: { dmg: { ...signedMacApp }, zip: { ...signedMacApp } },
+  });
+  for (const invalid of [{ publishable: undefined }, { publishable: false }, { publishable: "true" }, { version: "older" }, { sourceRevision: "other" }]) {
+    assert.throws(() => releaseNotes("Notas", { ...releaseManifest, ...invalid }, "fixture", "rev"), /publishable manifest/);
   }
+  assert.match(releaseNotes("Notas", releaseManifest, "fixture", "rev"), /Windows se distribuye sin firma/);
+  releaseManifest.signatures[0].publisherAuthenticated = true;
+  assert.match(releaseNotes("Notas", releaseManifest, "fixture", "rev"), /Windows tiene una firma de editor válida/);
+  releaseManifest.signatures[2].artifacts.zip.notarized = false;
+  assert.throws(() => releaseNotes("Notas", releaseManifest, "fixture", "rev"), /arm64\/zip/);
   const ciRejected = invokeProfileStep("ci-invalid-public-profile", JSON.stringify({ schemaVersion: 1, google: { ...publicOAuth.google, type: "web", client_secret: "PRIVATE_WEB_CANARY_VALUE" } }));
   assert.notEqual(ciRejected.result.status, 0);
   assert.equal((ciRejected.result.stdout + ciRejected.result.stderr).includes("PRIVATE_WEB_CANARY_VALUE"), false);

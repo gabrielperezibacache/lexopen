@@ -20,6 +20,7 @@ type Props = {
   folderName?: string | null;
   folderUrl?: string | null;
   canImport?: boolean;
+  sharedOrganization: boolean;
 };
 
 export function DriveFolderPanel({
@@ -28,6 +29,7 @@ export function DriveFolderPanel({
   folderName,
   folderUrl,
   canImport = false,
+  sharedOrganization,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -57,10 +59,10 @@ export function DriveFolderPanel({
       error?: string;
       message?: string;
       status?: string;
-    }>(action === "link-causa-folder" && folderAccount === "personal" ? `/api/integrations/google/drive/${encodeURIComponent(causaId)}/sync` : "/api/integrations/google", {
+    }>(action === "link-causa-folder" && !sharedOrganization && folderAccount === "personal" ? `/api/integrations/google/drive/${encodeURIComponent(causaId)}/sync` : "/api/integrations/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action === "link-causa-folder" && folderAccount === "personal" ? { action: "link-personal-folder", folderRef: extra.folderRef } : { action, causaId, ...extra }),
+      body: JSON.stringify(action === "link-causa-folder" && !sharedOrganization && folderAccount === "personal" ? { action: "link-personal-folder", folderRef: extra.folderRef } : { action, causaId, ...extra }),
     });
     if (!result.ok) {
       setError(result.error || "Error");
@@ -120,7 +122,7 @@ export function DriveFolderPanel({
         <FolderOpen className="text-[var(--copper)]" size={20} />
       </div>
 
-      {canImport && <div className="mt-4"><PersonalDriveFolderPicker causaId={causaId} /></div>}
+      {canImport && !sharedOrganization && <div className="mt-4"><PersonalDriveFolderPicker causaId={causaId} /></div>}
       {folderId ? (
         <div className="mt-4 rounded-2xl border border-[var(--line)] px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -186,7 +188,7 @@ export function DriveFolderPanel({
               Desvincular
             </button>}
           </div>
-          {isReal && <DriveAutoSyncPanel causaId={causaId} canConfigure={canImport} />}
+          {isReal && <DriveAutoSyncPanel sharedOrganization={sharedOrganization} causaId={causaId} canConfigure={canImport} />}
           {files && listedFolderId === folderId && (
             <div className="mt-4 min-w-0 border-t border-[var(--line)] pt-4">
               <p className="mb-3 text-sm text-[var(--ink-soft)]/80">Sólo se muestran los archivos de esta carpeta visibles para la cuenta conectada a LexOpen. Cada página contiene hasta 50 archivos.</p>
@@ -235,8 +237,8 @@ export function DriveFolderPanel({
           )}
         </div>
       ) : (
-        canImport ? <details className="mt-4 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)] underline underline-offset-4">Otras conexiones y enlaces</summary><div className="mt-2 space-y-3">
-          <button
+        canImport ? <details className="mt-4 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)] underline underline-offset-4">{sharedOrganization ? "Vincular carpeta ya preparada" : "Otras conexiones y enlaces"}</summary><div className="mt-2 space-y-3">
+          {!sharedOrganization && <button
             type="button"
             className="btn btn-primary"
             disabled={pending}
@@ -245,15 +247,15 @@ export function DriveFolderPanel({
             }
           >
             Crear carpeta en el Drive del estudio
-          </button>
+          </button>}
           <details className="rounded-2xl border border-[var(--line)] p-3">
             <summary className="cursor-pointer text-sm font-medium">
               Usar un enlace de carpeta
             </summary>
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
-              Pegue el enlace de la carpeta que desea usar para este expediente. La cuenta conectada debe tener acceso a sus archivos.
+              {sharedOrganization ? "Pega el enlace de la carpeta preparada para esta causa dentro de Organización." : "Pegue el enlace de la carpeta que desea usar para este expediente. La cuenta conectada debe tener acceso a sus archivos."}
             </p>
-            <label className="mt-3 block text-sm">Cuenta de Google<select className="input mt-1" value={folderAccount} onChange={event => setFolderAccount(event.target.value as "study" | "personal")}><option value="personal">Mi Google Drive personal</option><option value="study">Google del estudio</option></select></label>
+            {!sharedOrganization && <label className="mt-3 block text-sm">Cuenta de Google<select className="input mt-1" value={folderAccount} onChange={event => setFolderAccount(event.target.value as "study" | "personal")}><option value="personal">Mi Google Drive personal</option><option value="study">Google del estudio</option></select></label>}
             <label className="mt-3 block text-sm">
               <span className="mb-1 block text-[var(--ink-soft)]/70">
                 Enlace de la carpeta

@@ -94,6 +94,17 @@ export async function assembleRelease({ input, output, version, revision, withTo
   }
   const digests = new Map();
   for (const [name, file] of byName) digests.set(name, await hashes(file));
+  for (const signature of signatures.filter(report => report.platform === "darwin")) {
+    for (const format of ["dmg", "zip"]) {
+      const name = `LexOpen-${version}-mac-${signature.arch}.${format}`;
+      const artifact = signature.artifacts?.[format];
+      if (artifact?.name !== name || artifact.sha256 !== digests.get(name).sha256) throw new Error(`Artifact receipt mismatch: ${name}`);
+      for (const field of ["codeSignatureValid", "publisherAuthenticated", "notarized", "gatekeeperAccepted"]) {
+        if (typeof artifact[field] !== "boolean") throw new Error(`Incomplete artifact receipt: ${name}/${field}`);
+        if (!verificationOnly && !artifact[field]) throw new Error(`Public macOS release failed: ${name}/${field}`);
+      }
+    }
+  }
   const verifiedToolpacks = [];
   for (const toolpack of toolpacks) verifiedToolpacks.push(await verifyToolpack({ ...toolpack, byName, digests, version, revision }));
   const mergedFeeds = new Map();

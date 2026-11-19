@@ -107,6 +107,11 @@ export async function ingestPjudDocumentBuffer(opts: {
   expectedSourceRefHash?: string;
   receiptLeaseToken?: string;
   requireReceipt?: boolean;
+  /** Fence a manual batch inside the same transaction that links the original. */
+  manualBatch?: {
+    guard: (tx: Prisma.TransactionClient) => Promise<void>;
+    saved: (tx: Prisma.TransactionClient) => Promise<void>;
+  };
   enqueue?: typeof enqueueDocumentProcessing;
 }) {
   const buf = opts.bytes;
@@ -138,6 +143,7 @@ export async function ingestPjudDocumentBuffer(opts: {
   const key = `pjud/intake-attempt/${randomUUID()}`;
   let staged: ReturnType<typeof putObject> | undefined;
   const result = await serializable(async tx => {
+    await opts.manualBatch?.guard(tx);
     await assertPjudManagementEnabled(tx);
     await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${opts.causaId} FOR UPDATE`;
     const movement = await tx.causaMovimiento.findUniqueOrThrow({ where: { id: opts.movimientoId } });
@@ -187,7 +193,19 @@ export async function ingestPjudDocumentBuffer(opts: {
     } });
     await tx.causaMovimiento.update({ where: { id: movement.id }, data: { documentoRef: `doc:${doc.id}` } });
     if (prior) await tx.pjudDocumentJob.update({ where: { id: prior.id }, data: { status: "saved", documentoId: doc.id, sourceSha256, lastError: null, lastErrorCode: null, leaseToken: null, leaseExpiresAt: null } });
+    await opts.manualBatch?.saved(tx);
     return { id: doc.id, created: !reusable };
+  }).catch(async error => {
+    if (staged) {
+      // Serialize with the original transaction in case the Host lost the commit acknowledgement.
+      // If storage or Postgres cannot confirm ownership, retain the bytes.
+      await prisma.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${opts.causaId} FOR UPDATE`;
+        const receipt = await tx.caseDocumentIntake.findFirst({ where: { storageKey: key }, select: { id: true } });
+        if (!receipt) await discardCaseUploadAttempt(key);
+      }).catch(() => undefined);
+    }
+    throw error;
   });
   if (!result.created && staged) await discardCaseUploadAttempt(key).catch(() => undefined);
   if (result.id && result.created) (opts.enqueue || enqueueDocumentProcessing)({ id: result.id, name: filename, bytes: buf });
@@ -294,7 +312,7 @@ export async function backupMovimientoDocuments(
 }
 
 /** Avanza por todo el expediente; los documentos importados no consumen cupo. */
-export async function listPendingPjudDocumentMovimientos(causaId: string, max: number) {
+export async function listPendingPjudDocumentMovimientos(causaId: string, max: number, excludeIds: string[] = []) {
   const batchSize = Math.max(max * 2, 40);
   const pending = [];
   let cursor: string | undefined;
@@ -302,6 +320,7 @@ export async function listPendingPjudDocumentMovimientos(causaId: string, max: n
     const rows = await prisma.causaMovimiento.findMany({
       where: {
         causaId,
+        ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
         OR: [
           { documentoRef: { startsWith: "https://", mode: "insensitive" } },
           { documentoRef: { startsWith: "http://", mode: "insensitive" } },

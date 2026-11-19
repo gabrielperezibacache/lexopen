@@ -32,8 +32,38 @@ export function ClienteEditForm({
   const [busy, setBusy] = useState(false);
   const dirty = useRef(false), saving = useRef(false);
   useEffect(() => {
-    const guard = (event: BeforeUnloadEvent) => { if (dirty.current || saving.current) { event.preventDefault(); event.returnValue = ""; } };
-    window.addEventListener("beforeunload", guard); return () => window.removeEventListener("beforeunload", guard);
+    function allowLeaving() {
+      if (saving.current) {
+        setMsg("Espere a que termine de guardarse la ficha antes de salir.");
+        return false;
+      }
+      return !dirty.current || window.confirm("Hay cambios sin guardar en la ficha del cliente. ¿Salir y descartarlos?");
+    }
+    function unload(event: BeforeUnloadEvent) {
+      if (dirty.current || saving.current) { event.preventDefault(); event.returnValue = ""; }
+    }
+    function followLink(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+      const destination = new URL(link.href, location.href);
+      if (destination.origin !== location.origin || destination.pathname.startsWith("/api/") ||
+          (destination.pathname === location.pathname && destination.search === location.search)) return;
+      if (!allowLeaving()) { event.preventDefault(); event.stopPropagation(); }
+    }
+    function traverse(event: Event) {
+      const move = event as Event & { navigationType?: string; hashChange?: boolean; destination?: { sameDocument?: boolean } };
+      if (event.cancelable && move.navigationType === "traverse" && move.destination?.sameDocument && !move.hashChange && !allowLeaving()) event.preventDefault();
+    }
+    const navigation = (window as unknown as { navigation?: EventTarget }).navigation;
+    window.addEventListener("beforeunload", unload);
+    document.addEventListener("click", followLink, true);
+    navigation?.addEventListener("navigate", traverse);
+    return () => {
+      window.removeEventListener("beforeunload", unload);
+      document.removeEventListener("click", followLink, true);
+      navigation?.removeEventListener("navigate", traverse);
+    };
   }, []);
 
   function openOffline() {
@@ -149,7 +179,7 @@ export function ClienteEditForm({
           {busy ? "Guardando…" : "Guardar datos"}
         </button>
         <button className="btn btn-secondary" type="submit" data-offline="true" disabled={!ready || busy}>Trabajar sin conexión</button>
-        {msg && <span className="text-sm text-[var(--muted)]">{msg}</span>}
+        {msg && <span role="status" className="text-sm text-[var(--muted)]">{msg}</span>}
       </div>
     </form>
   );

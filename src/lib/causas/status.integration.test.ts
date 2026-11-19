@@ -23,6 +23,11 @@ async function main() {
       { causaId: causa.id, title: "Cliente debe aportar respaldo", status: "waiting_client", waitingOn: "cliente", creatorId: owner.id },
       { causaId: causa.id, title: "Tarea terminada", status: "done", creatorId: owner.id },
     ] });
+    assert.equal(initial.status.waitingTaskCount, 0);
+    assert.equal(initial.status.submittedCount, 0);
+    await prisma.task.createMany({ data: Array.from({ length: 40 }, (_, i) => ({ causaId: causa.id, title: `Gestión ${i}`, dueDate: new Date(), creatorId: owner.id })) });
+    await prisma.fiscaliaRequest.createMany({ data: Array.from({ length: 20 }, (_, i) => ({ causaId: causa.id, title: `Borrador ${i}`, followUpDate: new Date(), creatorId: owner.id })) });
+    const submitted = await prisma.fiscaliaRequest.create({ data: { causaId: causa.id, title: "Presentada sin fecha", status: "submitted", creatorId: owner.id } });
     const changed = await readCaseStatus(causa.id, owner);
     assert.notEqual(initial.fingerprint, changed.fingerprint);
     assert.equal(changed.status.counts.plazos, 106);
@@ -31,7 +36,10 @@ async function main() {
     assert.ok(!changed.status.deadlines.some(p => p.title === "Ya cumplido"));
     assert.equal(changed.status.waiting[0].id, writing.id);
     assert.equal(changed.status.waitingTasks[0].title, "Cliente debe aportar respaldo");
-    assert.equal(changed.status.taskCount, 1);
+    assert.equal(changed.status.taskCount, 41);
+    assert.equal(changed.status.submittedCount, 1);
+    assert.equal(changed.status.waitingTaskCount, 1);
+    assert.ok(changed.status.fiscaliaRequests.some(r => r.id === submitted.id));
     assert.ok(!changed.status.needs.some(n => n.title.includes("Tarea terminada")));
     const context = JSON.parse(await buildActionContext({ action: "causa.estado", causaId: causa.id, user: owner, userRole: owner.role, extra: { forged: "ignored" } }));
     assert.equal(context.caseStatus.fingerprint, changed.fingerprint);

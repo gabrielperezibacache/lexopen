@@ -2,6 +2,12 @@
 
 ## 1.1.0-preview.11 — en preparación (no publicada)
 
+- Las esperas de la causa incluyen las tareas bloqueadas y las solicitudes presentadas a Mi Fiscalía aunque haya gestiones anteriores. La ficha y la lectura de Altazor utilizan los mismos datos visibles.
+- Documentos distingue el original de su transcripción. La importación manual de OJV comprueba cuaderno y folio y permite recuperar el progreso del lote después de un reinicio del Host.
+- Drive organiza los nuevos destinos compartidos por cliente y causa. «Recibir ahora» continúa desde la posición guardada de la carpeta.
+- Los encargos de Altazor conservan la revisión editada durante un fallo temporal de conexión. La consulta de respuestas ntfy respeta el modo local. Clientes avisa al salir de la ficha con cambios y Tareas permite corregir el formulario tras un rechazo.
+- El ensamblado de Mac comprueba la aplicación extraída tanto del DMG de instalación como del ZIP del actualizador.
+
 - Clientes: la edición y el guardado se habilitan cuando el formulario está activo en el navegador, evitando escribir sobre controles todavía pendientes de hidratación.
 - Trabajo sin conexión: el desbloqueo espera la apertura de IndexedDB aunque el navegador restablezca un botón habilitado. Una salida de página cancela la apertura pendiente y borra la clave visible. Un fallo al preparar la caché de navegación se distingue de un fallo del almacenamiento cifrado.
 

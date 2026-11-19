@@ -1,3 +1,5 @@
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import { documentDownloadOptions } from "@/lib/sites/document-download-options";
 import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import { listCursorWhere, listWindow } from "@/lib/api/list-window";
 import { ListPagination } from "@/components/ui/ListPagination";
@@ -46,24 +48,10 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
   ]);
 
   const { items: rawDocumentos, next } = listWindow(documentRows, LIST_TAKE, "updatedAt");
-  const docIds = rawDocumentos.map(d => d.id);
-  const textStatus = docIds.length > 0 ? await prisma.$queryRaw<{id: string, has_text: boolean, has_markdown: boolean}[]>`
-    SELECT id,
-           (length(trim(coalesce("extractedMarkdown", ''))) + length(trim(coalesce("contenido", '')))) > 0 as has_text,
-           length(trim(coalesce("extractedMarkdown", ''))) > 0 as has_markdown
-    FROM "Documento"
-    WHERE id = ANY(${docIds})
-  ` : [];
-  const statusMap = new Map(textStatus.map(s => [s.id, s]));
-
-  const documentos = rawDocumentos.map(
-    ({ storageKey, ...rest }) => ({
-      ...rest,
-      hasText: statusMap.get(rest.id)?.has_text ?? false,
-      hasMarkdown: statusMap.get(rest.id)?.has_markdown ?? false,
-      hasBinary: Boolean(storageKey),
-    })
-  );
+  const downloads = await documentDownloadOptions(rawDocumentos.map(document => document.id));
+  const documentos = rawDocumentos.map(({ storageKey, ...document }) => ({
+    ...document, downloads: downloads.get(document.id), hasBinary: Boolean(storageKey),
+  }));
 
   return (
     <div className="space-y-6">
@@ -106,13 +94,8 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
                     <Link href={`/documentos/${d.id}/fuentes`} className="font-medium text-[var(--sea)]">{d.nombre}</Link>
                     {["pending", "processing"].includes(d.extractionStatus || "") && <p className="mt-1 text-xs text-[var(--ink-soft)]">Preparando texto…</p>}
                     {["needs_ocr", "failed", "unsupported"].includes(d.extractionStatus || "") && <p className="mt-1 text-xs text-[var(--danger)]">{d.extractionStatus === "needs_ocr" ? "Texto pendiente de reconocer" : d.extractionStatus === "unsupported" ? "Formato pendiente de preparación" : "No se pudo preparar el texto"}</p>}
-                    <div className="document-row-actions">                      <a
-                        href={`/api/documentos/${d.id}/content`}
-                        className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
-                      >
-                        Descargar
-                      </a>
-
+                    <div className="document-row-actions">
+                      <DocumentDownloads id={d.id} options={d.downloads} className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline" />
                     <details className="mt-1 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Detalles y descargas</summary>
                     <p className="text-xs text-[var(--ink-soft)]">{d.tipo} · {d.autor?.name || "Sin autor indicado"}</p>
                     {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Procedencia: Google Drive</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Esta copia conserva la revisión {d.driveImport.driveVersion} del archivo.</p><Link className="underline" href="/sincronizacion">Revisar actualizaciones de mis archivos</Link><details className="mt-2"><summary className="cursor-pointer">Identidad del archivo conservado</summary><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details></details>}
@@ -132,12 +115,11 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
                       <DocumentDriveAction
                         documentId={d.id}
                         googleDriveId={d.googleDriveId}
-                        hasText={d.hasText}
+                        hasText={d.downloads?.hasText ?? false}
                         hasBinary={d.hasBinary}
                       />
                     </div>
                     {(d.obsidianPath || d.googleDriveId) && <details className="mt-2 text-xs text-[var(--muted)]"><summary className="cursor-pointer">Ubicaciones vinculadas</summary>{d.obsidianPath && <p className="break-all">Obsidian: {d.obsidianPath}</p>}{d.googleDriveId && <p className="break-all">{isRealDriveFolderId(d.googleDriveId) ? `Google Drive: ${d.googleDriveId}` : "La ubicación de Google Drive todavía necesita configurarse."}</p>}</details>}
-                    {d.extractionStatus === "completed" && d.hasMarkdown && <a className="inline-flex min-h-11 items-center text-[var(--sea)]" href={`/api/documentos/${d.id}/markdown`}>Descargar texto preparado</a>}
                     {["needs_ocr", "unsupported", "failed"].includes(d.extractionStatus || "") && <DocumentProcessingAction documentId={d.id} />}
                     </details></div>
                   </td>

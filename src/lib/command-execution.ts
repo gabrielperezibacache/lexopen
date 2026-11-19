@@ -2,6 +2,7 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
+import { commandInProgressMessage } from "@/lib/command-status";
 
 /** Stable JSON is also used for optimistic undo snapshots. Dates stay ISO. */
 export function canonicalJson(value: unknown): string {
@@ -55,7 +56,7 @@ export async function executeCommand<T>(opts: {
     if (row.ownerId !== opts.ownerId || row.inputHash !== inputHash) {
       throw httpError("La clave de operación ya se usó con otros datos", 409);
     }
-    if (row.status !== "completed" || !row.resultJson) throw httpError("Operación en curso; reintente con la misma clave", 409);
+    if (row.status !== "completed" || !row.resultJson) throw httpError(commandInProgressMessage, 409);
     return JSON.parse(row.resultJson) as T;
   };
   try {

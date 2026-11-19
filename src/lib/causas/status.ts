@@ -9,6 +9,9 @@ export type CaseStatusInput = {
   plazos: Deadline[]; tramites: Step[]; movimientos: Movement[]; pendientes: Movement[];
   _count: { plazos: number; tramites: number; movimientos: number };
   tasks?: { id: string; title: string; status: string; waitingOn: string | null; assignee: { name: string } | null }[];
+  waitingTasks?: CaseStatusInput["tasks"];
+  waitingTaskCount?: number;
+  submittedCount?: number;
   taskCount?: number;
   fiscaliaRequests?: { id: string; title: string; status: string; folio: string | null; followUpDate: Date | null }[];
   fiscaliaCount?: number;
@@ -24,8 +27,10 @@ export function buildCaseStatus(row: CaseStatusInput, now = new Date()) {
     date: t.fechaLimite ? civilDateKey(t.fechaLimite) : null, owner: t.responsable?.name ?? null,
   }));
   const waiting = row.pendientes.map(m => ({ id: m.id, title: m.titulo, date: civilDateKey(m.fecha), source: m.fuente }));
-  const waitingTasks = (row.tasks ?? []).filter(t => t.waitingOn || ["waiting_client", "blocked"].includes(t.status)).map(t => ({ id: t.id, title: t.title, state: t.status, waitingOn: t.waitingOn }));
+  const waitingTasks = (row.waitingTasks ?? (row.tasks ?? []).filter(t => t.waitingOn || ["waiting_client", "blocked"].includes(t.status))).map(t => ({ id: t.id, title: t.title, state: t.status, waitingOn: t.waitingOn }));
   const fiscaliaRequests = (row.fiscaliaRequests ?? []).map(r => ({ id: r.id, title: r.title, status: r.status, folio: r.folio, followUpDate: r.followUpDate ? civilDateKey(r.followUpDate) : null, source: "manual" as const }));
+  const waitingTaskCount = Math.max(row.waitingTaskCount ?? 0, waitingTasks.length);
+  const submittedCount = Math.max(row.submittedCount ?? 0, fiscaliaRequests.filter(r => r.status === "submitted").length);
   const latest = row.movimientos[0];
   const missing = [
     ...(!row.fechaNotificacion ? ["No consta fecha de notificación: comprobarla antes de computar nuevos plazos."] : []),
@@ -33,7 +38,7 @@ export function buildCaseStatus(row: CaseStatusInput, now = new Date()) {
     ...(!latest ? ["No hay movimientos registrados para confirmar el último avance."] : []),
     ...(!row.pjudMonitoreoActivo ? ["Monitoreo judicial no activo: contrastar el expediente antes de concluir que no hubo novedades."] : []),
     ...(row.pjudMonitoreoActivo && (row.pjudLastSyncStatus !== "ok" || !row.pjudLastSyncAt) ? ["La última sincronización judicial no está confirmada como completa."] : []),
-    ...(row._count.plazos > deadlines.length || row._count.tramites > steps.length || row._count.movimientos > waiting.length || (row.taskCount ?? 0) > (row.tasks?.length ?? 0) || (row.fiscaliaCount ?? 0) > fiscaliaRequests.length ? ["Se muestra una selección de pendientes; revisar las secciones completas de la causa."] : []),
+    ...(row._count.plazos > deadlines.length || row._count.tramites > steps.length || row._count.movimientos > waiting.length || waitingTaskCount > waitingTasks.length || (row.taskCount ?? 0) > (row.tasks?.length ?? 0) || (row.fiscaliaCount ?? 0) > fiscaliaRequests.length ? ["Se muestra una selección de pendientes; revisar las secciones completas de la causa."] : []),
   ];
   const urgent = deadlines.filter(p => p.days <= 7 || p.recordedState === "vencido");
   const priorities = [...new Map([
@@ -48,7 +53,7 @@ export function buildCaseStatus(row: CaseStatusInput, now = new Date()) {
     ...fiscaliaRequests.filter(r => r.status !== "submitted" || r.followUpDate && r.followUpDate <= today).slice(0, 3).map(r => ({ title: `Mi Fiscalía: ${r.title} · ${r.status === "draft" ? "completar borrador" : r.status === "ready" ? "presentar en el portal" : r.status === "answered" ? "revisar respuesta registrada" : "revisar seguimiento"}`, source: `fiscalia:${r.id}`, href: `/mi-fiscalia?causaId=${row.id}` })),
   ];
   return { causaId: row.id, today, state: row.estado, stage: row.etapa, deadlines, steps, waiting, waitingTasks, fiscaliaRequests, needs, missing,
-    counts: row._count, taskCount: row.taskCount ?? 0, fiscaliaCount: row.fiscaliaCount ?? 0,
+    counts: row._count, waitingTaskCount, submittedCount, taskCount: row.taskCount ?? 0, fiscaliaCount: row.fiscaliaCount ?? 0,
     latest: latest ? { id: latest.id, title: latest.titulo, date: civilDateKey(latest.fecha), source: latest.fuente } : null,
     judicialSync: { at: row.pjudLastSyncAt?.toISOString() ?? null, status: row.pjudLastSyncStatus, enabled: row.pjudMonitoreoActivo },
   };

@@ -6,6 +6,7 @@ import { assertCausaAccess } from "@/lib/auth/causa-access";
 import { altazorActor } from "../access";
 import type { ComputerSessionView } from "../computer/types";
 import { computerHelpIdentity } from "../computer/help-identity";
+import { remoteHelpAllowed } from "./config";
 import { claimHelpResponse, completeHelpResponse, createHelpRequest, helpWorkerQueue, notifyHelpRequest, pollHelpReplies } from "./service";
 
 type Resume = (user: CausaAccessUser, sessionId: string, input: { requestId: string; turnIndex: number; response: string }) => Promise<unknown>;
@@ -26,8 +27,7 @@ export async function reconcileComputerHelp(options: { limit?: number; ownerId?:
   const notify = dependencies.notify ?? notifyHelpRequest, poll = dependencies.poll ?? pollHelpReplies;
   const result = { inspected: 0, waiting: 0, answered: 0, resumed: 0, stale: 0, skipped: 0 };
   await helpWorkerQueue(client, options.limit);
-  const policy = await client.firmSettings.findFirst({ select: { assistantLlmMode: true } });
-  if (policy?.assistantLlmMode === "local_only") return result;
+  if (!await remoteHelpAllowed(client)) return result;
   const sessions = await client.altazorComputerSession.findMany({
     where: { ...(options.ownerId ? { ownerId: options.ownerId } : {}), state: { in: ["ready", "starting"] }, ...activeComputerSessionWhere(), workspace: { enabled: true } },
     include: { workspace: true, owner: { select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true, altazorCompanion: { select: { backgroundEnabled: true } } } } },

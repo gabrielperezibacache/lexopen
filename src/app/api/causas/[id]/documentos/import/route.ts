@@ -1,13 +1,14 @@
 import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
 import { assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import {
   getCausaDocImportStatus,
   startCausaDocImport,
+  processManualDocumentImport,
 } from "@/lib/pjud/import-causa-documents";
-import { NextRequest, NextResponse } from "next/server";
+import { privatePjudJson, privatePjudResponse } from "@/lib/pjud/private-response";
+import { after, NextRequest } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,11 +23,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
       select: { id: true },
     });
     if (!causa) {
-      return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+      return privatePjudJson({ error: "Causa no encontrada" }, { status: 404 });
     }
-    return NextResponse.json({ status: getCausaDocImportStatus(id) });
+    return privatePjudJson({ status: await getCausaDocImportStatus(id) });
   } catch (e) {
-    return handleRouteError(e);
+    return privatePjudResponse(handleRouteError(e));
   }
 }
 
@@ -39,15 +40,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     await mutateCausa(id, user, "causa.write");
     const causa = await prisma.causa.findFirst({
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
-      select: { id: true, rit: true },
+      select: { id: true },
     });
     if (!causa) {
-      return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+      return privatePjudJson({ error: "Causa no encontrada" }, { status: 404 });
     }
 
-    const result = startCausaDocImport(id, user.id);
+    const result = await startCausaDocImport(id, user.id);
     if (result.globalBusy) {
-      return NextResponse.json(
+      return privatePjudJson(
         {
           error:
             result.status.note ||
@@ -58,21 +59,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    await writeAuditStrict({
-      actorId: user.id,
-      action: result.started
-        ? "pjud.docs.import.start"
-        : "pjud.docs.import.poll",
-      entityType: "Causa",
-      entityId: id,
-      after: {
-        started: result.started,
-        alreadyRunning: result.alreadyRunning,
-        rit: causa.rit,
-      },
-    });
-
-    return NextResponse.json(
+    after(() => processManualDocumentImport({ causaId: id }));
+    return privatePjudJson(
       {
         ok: true,
         started: result.started,
@@ -82,6 +70,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: result.started ? 202 : 200 }
     );
   } catch (e) {
-    return handleRouteError(e);
+    return privatePjudResponse(handleRouteError(e));
   }
 }

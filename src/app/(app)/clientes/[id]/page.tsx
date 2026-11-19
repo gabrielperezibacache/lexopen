@@ -1,3 +1,5 @@
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import { documentDownloadOptions } from "@/lib/sites/document-download-options";
 import { clienteDocumentsWhere } from "@/lib/clientes/documents";
 import { listCursorWhere, listWindow } from "@/lib/api/list-window";
 import { ListPagination } from "@/components/ui/ListPagination";
@@ -118,6 +120,8 @@ export default async function ClienteDetailPage({
     50,
     "updatedAt",
   );
+
+  const downloads = await documentDownloadOptions(documentos.map(document => document.id));
 
   // ⚡ Bolt: Calculate multiple counts in a single O(N) pass to avoid redundant iteration and memory overhead.
   let tramitesPendientes = 0;
@@ -334,12 +338,9 @@ export default async function ClienteDetailPage({
                     {d.autor ? ` · ${d.autor.name}` : ""}
                   </div>
                 </div>
-                <Link
-                  href={`/api/documentos/${d.id}/content`}
-                  className="btn btn-ghost text-xs"
-                >
-                  Descargar
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <DocumentDownloads id={d.id} options={downloads.get(d.id)} className="btn btn-ghost text-xs" />
+                </div>
               </div>
               <DocumentoAiActions documentoId={d.id} causaId={d.causa?.id} />
             </div>

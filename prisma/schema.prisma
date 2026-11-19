@@ -67,6 +67,7 @@ model User {
   altazorHelpRequests AltazorHelpRequest[]
   altazorCompanion AltazorCompanion?
   driveSyncSubscriptions DriveSyncSubscription[]
+  pjudManualImports PjudManualImport[]
   pjudDocumentJobs PjudDocumentJob[]
   pjudDownloadAuthorizations Causa[] @relation("PjudDownloadAuthorization")
   altazorSecrets AltazorSecret[]
@@ -328,6 +329,7 @@ model Causa {
   pjudDocumentDownloadOwner User? @relation("PjudDownloadAuthorization", fields: [pjudDocumentDownloadOwnerId], references: [id], onDelete: Restrict)
   pjudSyncIntervalMinutes Int?
   driveSyncSubscription DriveSyncSubscription?
+  pjudManualImports PjudManualImport[]
   pjudDocumentJobs PjudDocumentJob[]
   computerWorkspaces AltazorComputerWorkspace[]
   altazorConversations AltazorConversation[]
@@ -2947,6 +2949,31 @@ model DriveSyncSubscription {
   updatedAt DateTime @updatedAt
   @@index([enabled,nextRunAt])
   @@index([ownerId])
+}
+
+/// A single manual OJV batch owns the global slot until it finishes. Checkpoints contain only movement IDs.
+model PjudManualImport {
+  id String @id @default(cuid())
+  causaId String
+  causa Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  actorId String
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  activeSlot String? @unique
+  status String @default("running")
+  phase String @default("scrape")
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  savedIds String[] @default([])
+  skippedIds String[] @default([])
+  failedIds String[] @default([])
+  total Int @default(0)
+  maxPerRun Int
+  delayMs Int
+  currentLabel String?
+  note String?
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  @@index([causaId, startedAt])
 }
 
 model PjudDocumentJob {

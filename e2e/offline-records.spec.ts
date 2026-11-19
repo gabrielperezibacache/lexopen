@@ -174,6 +174,31 @@ test("el formulario de Clientes conserva sus datos ante una sincronización post
   } finally { await f.cleanup(); }
 });
 
+test("Clientes permite conservar o descartar notas al seguir un enlace interno", async ({ page }) => {
+  const f = await fixture(page);
+  try {
+    await page.goto(`/clientes/${f.client.id}`);
+    const notes = page.getByRole("textbox", { name: "Notas", exact: true });
+    const back = page.getByRole("link", { name: "← Clientes", exact: true });
+    const draft = "Nota pendiente de revisión";
+    await notes.fill(draft);
+    page.once("dialog", dialog => dialog.dismiss());
+    await back.click();
+    await expect(notes).toHaveValue(draft);
+    page.once("dialog", dialog => dialog.accept());
+    await back.click();
+    await expect(page).toHaveURL(/\/clientes$/);
+    expect((await prisma.cliente.findUniqueOrThrow({ where: { id: f.client.id } })).notas).toBe("Nota original");
+    await page.goto(`/clientes/${f.client.id}`);
+    await notes.fill(draft);
+    await page.getByRole("button", { name: "Guardar datos", exact: true }).click();
+    await expect(page.getByText("Guardado", { exact: true })).toBeVisible();
+    await back.click();
+    await expect(page).toHaveURL(/\/clientes$/);
+    expect((await prisma.cliente.findUniqueOrThrow({ where: { id: f.client.id } })).notas).toBe(draft);
+  } finally { await f.cleanup(); }
+});
+
 test("Clientes espera a estar listo antes de admitir edición y conserva el texto tras hidratar", async ({ page, browser }) => {
   const f = await fixture(page);
   const context = await browser.newContext({

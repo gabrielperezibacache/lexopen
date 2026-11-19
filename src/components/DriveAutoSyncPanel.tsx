@@ -10,7 +10,7 @@ type State = {
   connectionId?: string | null; bindingRevision?: string | null; folderId?: string; generation?: number;
   accounts: { study: { configured: boolean }; personal: { connected: boolean; label: string; reason: string | null }; altazor?: { connected: boolean; canManage: boolean; reason: string | null } };
 };
-export function DriveAutoSyncPanel({ causaId, canConfigure }: { causaId: string; canConfigure: boolean }) {
+export function DriveAutoSyncPanel({ causaId, canConfigure, sharedOrganization }: { causaId: string; canConfigure: boolean; sharedOrganization: boolean }) {
   const endpoint = `/api/integrations/google/drive/${encodeURIComponent(causaId)}/sync`;
   const [state, setState] = useState<State | null>(null), [minutes, setMinutes] = useState(60), [account, setAccount] = useState<Account>("study"), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   useEffect(() => {
@@ -32,6 +32,13 @@ export function DriveAutoSyncPanel({ causaId, canConfigure }: { causaId: string;
   }, [endpoint, state?.enabled]);
   const activeAccount = state?.account === "altazor" ? "altazor" : state?.enabled ? state.account : account;
   const connected = Boolean(state?.accounts && (activeAccount === "altazor" ? state.accounts.altazor?.connected : activeAccount === "personal" ? state.accounts.personal.connected : state.accounts.study.configured));
+  async function receiveNow() {
+    if (busy) return;
+    setBusy(true); setMessage("");
+    const result = await apiMutation<{ running: boolean }>(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "receive-now" }) });
+    setBusy(false);
+    setMessage(result.ok ? (result.data.running ? "La recepción está en curso." : "Recepción solicitada.") : result.error);
+  }
   async function save(enabled: boolean, useDraft = true) {
     if (!state || busy) return;
     setBusy(true); setMessage("");
@@ -46,9 +53,9 @@ export function DriveAutoSyncPanel({ causaId, canConfigure }: { causaId: string;
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-semibold">Recibir novedades de Drive</h3><p className="mt-1 text-sm text-[var(--ink-soft)]">{activeAccount === "altazor" ? "La cuenta de Google conectada a Altazor" : activeAccount === "personal" ? "Mi Google Drive (conexión anterior)" : "Google Drive del estudio"}</p></div><span className="badge">{state ? state.enabled ? ["attention", "partial"].includes(state.status) ? "Por revisar" : "Activa" : "En pausa" : "Comprobando…"}</span></div>
     <p className="mt-2 text-sm text-[var(--ink-soft)]">Recibe archivos y versiones nuevas en el expediente. Los cambios que prepares se guardan en Drive desde cada documento.</p>
     {canConfigure && state?.canConfigure && <>
-      <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={busy || !connected} onClick={() => void save(true, !state.enabled)}><RefreshCw size={15} aria-hidden="true" />{busy ? "Guardando…" : state.enabled ? "Recibir ahora" : "Activar recepción automática"}</button>{state.enabled && <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void save(false, false)}>Pausar</button>}</div>
+      <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={busy || !connected} onClick={() => void (state.enabled ? receiveNow() : save(true))}><RefreshCw size={15} aria-hidden="true" />{busy ? "Guardando…" : state.enabled ? "Recibir ahora" : "Activar recepción automática"}</button>{state.enabled && <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void save(false, false)}>Pausar</button>}</div>
       <details className="mt-3 text-sm"><summary className="flex min-h-11 cursor-pointer items-center text-[var(--ink-soft)] underline underline-offset-4">Frecuencia y opciones</summary><div className="mt-2 grid gap-3">
-        {activeAccount !== "altazor" && <label>Conexión anterior<select className="input mt-1" value={account} disabled={busy} onChange={event => setAccount(event.target.value as Account)}><option value="study">Google del estudio</option><option value="personal">Mi Google Drive personal</option></select></label>}
+        {!sharedOrganization && activeAccount !== "altazor" && <label>Conexión anterior<select className="input mt-1" value={account} disabled={busy} onChange={event => setAccount(event.target.value as Account)}><option value="study">Google del estudio</option><option value="personal">Mi Google Drive personal</option></select></label>}
         <label>Revisar<select className="input mt-1" value={minutes} disabled={busy} onChange={event => setMinutes(Number(event.target.value))}>{[[15, "Cada 15 minutos"], [30, "Cada 30 minutos"], [60, "Cada hora"], [180, "Cada 3 horas"], [360, "Cada 6 horas"], [1440, "Una vez al día"]].map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
         <p className="text-sm text-[var(--ink-soft)]">Incluye subcarpetas. Las revisiones se conservan por separado para mantener las fuentes y citas.</p>
         {state.enabled && <button type="button" className="btn btn-secondary justify-self-start" disabled={busy || !connected} onClick={() => void save(true)}>Guardar frecuencia</button>}

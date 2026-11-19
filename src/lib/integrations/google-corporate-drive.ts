@@ -1,3 +1,4 @@
+import { studyDriveMode } from "./google-study-drive";
 import { createHash, randomBytes } from "crypto";
 
 import { writeAuditStrict } from "@/lib/audit";
@@ -421,6 +422,7 @@ export async function pushDocumentoToDrive(
 async function updateLinkedDriveFolder(causaId: string, data: { googleDriveFolderId: string | null; googleDriveFolderUrl: string | null; googleDriveFolderName: string | null }) {
   return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
+    if (data.googleDriveFolderId && await studyDriveMode(tx)) throw new Error("Prepara el destino de esta causa desde Organización.");
     const prior = await tx.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } });
     if (prior.googleDriveFolderId !== data.googleDriveFolderId) await tx.driveSyncSubscription.updateMany({ where: { causaId }, data: { enabled: false, status: "paused", generation: { increment: 1 }, nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null, note: "La carpeta cambió. Active la actualización para usar la nueva selección." } });
     return tx.causa.update({ where: { id: causaId }, data });
