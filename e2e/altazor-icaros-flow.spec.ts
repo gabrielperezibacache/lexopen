@@ -72,7 +72,9 @@ test("un Ícaro usa su modelo, recuerda sólo lo confirmado y conserva su aislam
   await expect(memory.getByText("Estructura ficticia confirmada", { exact: true })).toBeVisible();
   expect(await db.altazorIcaroMemory.count({ where: { ownerId: owners[0] } })).toBe(1);
   await detail.getByLabel("Instrucción del encargo", { exact: true }).fill("Reutiliza la estructura previamente confirmada");
-  await detail.getByRole("checkbox", { name: "Usar la memoria propia de este Ícaro en el encargo", exact: true }).check();
+  const selectedMemory = detail.getByRole("checkbox", { name: "Estructura ficticia confirmada", exact: true });
+  await expect(selectedMemory).not.toBeChecked();
+  await selectedMemory.check();
   await detail.getByRole("button", { name: "Encargar a este Ícaro", exact: true }).click();
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1].model).toBe(selectedModel);

@@ -1,5 +1,8 @@
 /** Explicit disposable PostgreSQL + public fictitious bytes; no real provider. */
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
@@ -8,15 +11,21 @@ import { createAltazorAttachment, deleteAltazorAttachment, readAltazorAttachment
 import { sha256 } from "@/lib/evidence/fragments";
 import type { AltazorServiceOptions, AltazorDestination } from "./types";
 import type { AssistantTurnResult } from "@/lib/assistant/pipeline";
+import { importLegalSource } from "@/lib/research/service";
+import { automaticAltazorSources } from "./automatic-context";
 import { canonicalJson } from "@/lib/command-execution";
 
 const status = (value: number) => (error: unknown) => (error as { status?: number }).status === value;
 async function main() {
   const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL); assert.equal(url, new URL(process.env.DATABASE_URL!).toString());
+  if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw Error("Requires local fixture storage");
+  const previousStorage = process.env.STORAGE_PATH, storage = await mkdtemp(path.join(tmpdir(), "lexopen-conversation-test-"));
+  process.env.STORAGE_PATH = storage;
   const db = new PrismaClient({ datasources: { db: { url } } }), tag = randomUUID(), users: string[] = [], conversations: string[] = [], planIds: string[] = [];
   const originalFetch = globalThis.fetch; let network = 0; globalThis.fetch = (async () => { network++; throw Error("Unexpected external call in ALTAZOR fixture"); }) as typeof fetch;
   const destination: AltazorDestination = { provider: "fixture", model: "fixture", endpoint: "Local fictitious model", endpointHash: sha256("fixture"), remote: false, permitted: true, key: sha256("fixture-destination") };
   let executions = 0;
+  let legalSourceId: string | undefined;
   const answer = (): AssistantTurnResult => ({ planId: null, previewSteps: [], autoResults: [{ toolId: "respuesta.libre", result: { ok: true, message: "Respuesta ficticia conservada" } }], streamEvents: [], classification: { source: "rule", toolIds: ["respuesta.libre"], prompt: "fixture" } });
   const options: AltazorServiceOptions = { destination: async () => destination, execute: async input => { executions++; await input.authorizeContext?.(); assert.equal(input.scope?.causaId, null); return answer(); } };
   try {
@@ -66,15 +75,40 @@ async function main() {
     } });
     const confirmed = await confirmAltazorTurn(id, planned.turnId, true, owner, db, options); assert.equal(confirmed.turns.at(-1)?.status, "completed");
     await confirmAltazorTurn(id, planned.turnId, true, owner, db, options); assert.equal(await db.evento.count({ where: { titulo: `Evento ficticio ALTAZOR ${tag}` } }), 1);
+    // Persist a synthetic turn with a visible legal citation, then check every read after quarantine.
+    const linked = await createAltazorConversation({ requestId: `legal-chat-${tag}`, title: "Consulta judicial ficticia", causaId: null }, owner, db);
+    conversations.push(linked.conversation.id);
+    const needle = "Pasajehistorico" + tag.replaceAll("-", "");
+    const url = `https://www.bcn.cl/leychile/navegar?idNorma=${8_000_000_000 + Number.parseInt(tag.slice(0, 7), 16)}`;
+    const imported = await importLegalSource({ canonicalUrl: url, retrievalUrl: url, title: "Norma de prueba", organism: "Organismo ficticio",
+      kind: "legislation", text: needle, rawBytes: Buffer.from(needle), mimeType: "text/plain", retrievedAt: new Date(),
+      coverageWarnings: [], acquisitionMethod: "manual" }, owner, db);
+    legalSourceId = imported.sourceId;
+    const legalFragment = await db.legalSourceFragment.findFirstOrThrow({ where: { versionId: imported.id } });
+    const picked = { kind: "legal", fragmentId: legalFragment.id, versionId: imported.id, quote: needle };
+    const linkedInput = { requestId: `legal-turn-${tag}`, expectedRevision: 1, text: "Consulta del pasaje",
+      attachmentIds: [], sources: [picked], destinationKey: destination.key };
+    const turn = await createAltazorTurn(linked.conversation.id, linkedInput, owner, db, options);
+    assert.equal((await executeAltazorTurn(linked.conversation.id, turn.turnId, owner, db, options)).turns[0].status, "completed");
+    await db.legalSourceVersion.update({ where: { id: imported.id }, data: { reviewState: "quarantined" } });
+    assert.ok(!(await automaticAltazorSources(owner, { text: needle, causaId: null }, db)).some(source => source.kind === "legal" && source.versionId === imported.id));
+    const blocked = (await readAltazorConversation(linked.conversation.id, owner, db, {}, options)).turns[0];
+    assert.equal(blocked.status, "blocked");
+    assert.deepEqual(blocked.sourceRefs, []);
+    assert.ok(!JSON.stringify(blocked).includes(needle));
+    await assert.rejects(createAltazorTurn(linked.conversation.id, { ...linkedInput, requestId: `blocked-public-${tag}`, expectedRevision: 2 }, owner, db, options), status(404));
     assert.equal(network, 0);
     console.log("ALTAZOR disposable integration passed: ordered durable history, ownership, immutable scope, original hashes, dedupe/concurrency, cancellation/lease, derived-source revocation, real secure-tool confirmation replay; zero provider traffic.");
   } finally {
     globalThis.fetch = originalFetch;
+    if (legalSourceId) await db.legalSource.deleteMany({ where: { id: legalSourceId } });
     await db.evento.deleteMany({ where: { titulo: `Evento ficticio ALTAZOR ${tag}` } });
     await db.altazorConversation.deleteMany({ where: { id: { in: conversations } } });
     await db.assistantPlanRecord.deleteMany({ where: { id: { in: planIds } } });
     await db.commandExecution.deleteMany({ where: { ownerId: { in: users } } }); await db.assistantUndo.deleteMany({ where: { ownerId: { in: users } } });
     await db.activity.deleteMany({ where: { userId: { in: users } } }); await db.auditEvent.deleteMany({ where: { actorId: { in: users } } }); await db.user.deleteMany({ where: { id: { in: users } } }); await db.$disconnect();
+    await rm(storage, { recursive: true, force: true });
+    if (previousStorage === undefined) delete process.env.STORAGE_PATH; else process.env.STORAGE_PATH = previousStorage;
   }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

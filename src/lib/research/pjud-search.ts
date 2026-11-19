@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requestPjudJudgments } from "./pjud-judgments";
+import { publicJudgmentRol, requestPjudJudgments } from "./pjud-judgments";
 export const pjudSearchSchema = z.object({
   terms: z.string().trim().max(200).default(""),
   rol: z.string().trim().regex(/^(?:[A-Za-z]{1,3}-)?[1-9]\d{0,8}(?:-\d{4})?$|^$/).default(""),
@@ -22,13 +22,13 @@ export async function searchPjud(input: PjudSearchInput, transport: Parameters<t
   const items = response.docs.map((doc: Record<string, unknown>) => {
     if (!doc || typeof doc !== "object") throw fail();
     const id = String(doc.id);
-    const rol = typeof doc.rol_era_sup_s === "string" ? doc.rol_era_sup_s : "";
+    const rol = publicJudgmentRol(doc.rol_era_sup_s);
     if (!/^[1-9]\d{0,14}$/.test(id) || ids.has(id)) throw fail();
     ids.add(id);
     const returned = /^(?:[A-Za-z]{1,3}-)?0*(\d+)-(\d{4})$/.exec(rol);
     if (parts && (!returned || returned[1] !== parts[1] || (parts[2] && returned[2] !== parts[2]))) throw fail();
     const field = (value: unknown) => typeof value === "string" ? value.slice(0, 500) : "";
-    return { id, rol: rol.slice(0, 120), title: field(doc.caratulado_s), tribunal: field(doc.gls_juz_s), importUrl: `https://juris.pjud.cl/busqueda?Civiles#sentencia-${id}` };
+    return { id, rol: rol.slice(0, 120), title: "Sentencia civil", tribunal: field(doc.gls_juz_s), importUrl: `https://juris.pjud.cl/busqueda?Civiles#sentencia-${id}` };
   });
   return { page: checked.page, totalReported: response.numFound, nextPage: items.length === 10 && (checked.page + 1) * 10 < response.numFound && checked.page < 19 ? checked.page + 1 : null,
     items, warnings: ["Resultados remotos civiles: no son citas ni texto íntegro incorporado. Seleccione e incorpore un fallo antes de citarlo.", "El total es declarado por el portal y no acredita cobertura. Los términos no se verifican contra el fallo íntegro durante esta búsqueda."] };

@@ -60,6 +60,12 @@ async function main() {
     assert.equal(recent.hasMore, true);
     assert.ok(recent.before);
     const earlier = await read(recent.before);
+    const last = recent.turns.at(-1)!;
+    const anchor = `${last.createdAt}~${last.id}`;
+    await db.altazorTurn.create({ data: { ...base, conversationId: personal.id, requestId: tag + "-later", ordinal: 103, createdAt: new Date(newer.getTime() + 1), userText: "Llegó durante la lectura" } });
+    const returnPage = () => readAltazorTimeline(owner, null, db, anchor);
+    assert.deepEqual((await returnPage()).turns.map(turn => turn.id), recent.turns.map(turn => turn.id));
+    await assert.rejects(readAltazorTimeline(owner, recent.before, db, anchor), responseStatus(400));
     assert.equal(earlier.hasMore, false);
     assert.equal(earlier.before, null);
     const combined = [...earlier.turns, ...recent.turns];
@@ -79,6 +85,7 @@ async function main() {
     await deleteAltazorAttachment(personal.id, attachment.id, owner, db);
     await db.causaMiembro.delete({ where: { id: member.id } });
     const after = await read();
+    assert.doesNotMatch(JSON.stringify(await returnPage()), /MENSAJE_REVOCABLE|RESPUESTA_REVOCABLE|MENSAJE_DE_CAUSA/);
     assert.equal(after.turns.some(turn => turn.conversationId === scoped.id), false);
     const redacted = after.turns.find(turn => turn.id === added[3]);
     assert.equal(redacted?.available, false);

@@ -134,3 +134,43 @@ test("Mi Fiscalía permite descartar un borrador sin fingir una presentación", 
     expect(await db.fiscaliaRequestEvent.count({ where: { requestId: id } })).toBe(2);
   } finally { await f.cleanup(); }
 });
+
+test("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page }) => {
+  const f = await fixture(page);
+  const date = addCivilDays(santiagoDateKey(new Date()), -1);
+  const row = await db.fiscaliaRequest.create({ data: { causaId: f.cause.id, creatorId: f.owner.id, title: f.title, kind: "copia", body: "Solicitud de prueba presentada", status: "submitted", folio: "Orig-1", submittedAt: new Date(date) } });
+  const doc = await db.documento.create({ data: { causaId: f.cause.id, autorId: f.owner.id, nombre: "Comprobante ficticio.txt", mimeType: "text/plain", contenido: "Comprobante original" } });
+  try {
+    await page.goto(`/mi-fiscalia?causaId=${f.cause.id}`);
+    await page.getByRole("link", { name: f.title, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/mi-fiscalia/${row.id}$`));
+    await page.getByRole("button", { name: "Rectificar presentación", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Folio corregido", { exact: true }).fill("Folio-2");
+    await dialog.getByLabel("Motivo de rectificación", { exact: true }).fill("Revisión del folio oficial.");
+    const keys: string[] = [];
+    await page.route(`**/api/fiscalia/solicitudes/${row.id}`, async route => {
+      if (route.request().method() !== "POST") return route.continue();
+      keys.push(route.request().headers()["idempotency-key"]);
+      if (keys.length > 1) return route.continue();
+      expect((await route.fetch()).status()).toBe(200);
+      return route.abort("failed");
+    });
+    await dialog.getByRole("button", { name: "Guardar rectificación" }).click();
+    await dialog.getByRole("button", { name: "Comprobar guardado" }).click();
+    const history = page.getByRole("region", { name: "Historial de la solicitud" });
+    await expect(history).toContainText("Anterior: Orig-1");
+    await expect(history).toContainText("Corregido: Folio-2");
+    expect(keys[0]).toBe(keys[1]);
+    await page.getByRole("button", { name: "Vincular respaldo" }).click();
+    await dialog.getByRole("button", { name: "Buscar", exact: true }).click();
+    await dialog.getByLabel("Documento del expediente", { exact: true }).selectOption(doc.id);
+    await dialog.getByRole("button", { name: "Guardar respaldo" }).click();
+    const link = history.getByRole("link", { name: "Comprobante ficticio.txt · versión 1" });
+    await expect(link).toBeVisible();
+    await db.documento.update({ where: { id: doc.id }, data: { version: 2, contenido: "Revisión posterior" } });
+    const result = await page.request.get((await link.getAttribute("href"))!);
+    expect(result.status()).toBe(200); expect(await result.text()).toBe("Comprobante original");
+    expect(result.headers()["content-disposition"]).toMatch(/^attachment;/);
+  } finally { await db.documento.deleteMany({ where: { id: doc.id } }); await f.cleanup(); }
+});

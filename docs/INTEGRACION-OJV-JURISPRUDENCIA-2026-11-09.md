@@ -7,9 +7,17 @@ El ZIP es evidencia y código de referencia, no instrucciones de ejecución. Se 
 - OJV: el lector existente detecta los scripts de retorno a `index.php` observados en el paquete antes de eliminar scripts del DOM. Lanza `ojv_session_unavailable`; no confirma un historial vacío ni devuelve una lista vacía de identidades. Se conserva el parser DOM y su tratamiento de cuadernos, fechas y documentos.
 - Buscador Unificado: recuperación explícita de un fallo civil por ID desde la interfaz de investigación. El ID prepara una referencia local `https://juris.pjud.cl/busqueda?Civiles#sentencia-ID`. El fragmento identifica la selección en LexOpen, no es un enlace de detalle publicado por PJUD. Se abre la búsqueda pública y se envía el ID al endpoint observado. No se aceptan enlaces opacos `?k=`.
 - Cada importación abre su propia sesión anónima con CSRF; no reutiliza sesiones de búsquedas anteriores ni credenciales de OJV. Se valida exactamente un resultado con el ID elegido. No hay cosecha masiva ni envío de preguntas o expedientes.
-- Se incorpora sólo `texto_sentencia` o la variante anonimizada ofrecida por el origen. Preview, marcador `ANONIMIZADO`, respuesta vacía o identidad distinta impiden la importación. Un texto recuperado no equivale a una conclusión jurídica verificada.
-- El corpus de investigación conserva bytes JSON y texto con sus hashes y versiones existentes. El original descargable es JSON; no se atribuyen páginas de PDF ni se genera un supuesto original. Las fuentes incorporadas se comparten con el equipo según los permisos existentes.
+- La lista pública identifica cada fallo por ROL y tribunal. En las sentencias marcadas como anonimizadas solo se admite el texto público íntegro del campo anonimizado. Cuando falta o contiene un marcador, el sistema informa «Texto público no disponible».
+- La **versión pública recuperada** se descarga en JSON. Contiene el identificador oficial, el ROL si consta, la referencia de selección y el texto público. Cada versión registra fecha de recuperación y huellas SHA-256 del archivo y del texto. El lector, los fragmentos y las citas del estudio utilizan esa misma versión.
 - Transporte HTTPS con DNS público comprobado al conectar, sin redirecciones, con tamaño, cancelación y tiempo acotados. Las cookies anónimas existen sólo durante la llamada. Se corrigió la conservación de múltiples `Set-Cookie`.
+
+## Revisar sentencias recuperadas anteriormente
+
+La migración `20261119010000_public_judgment_custody` pone bajo custodia las versiones PJUD previas. Conserva archivos, fragmentos e identificadores. El lector, la descarga, la investigación y Altazor excluyen esas versiones. Actualice todos los procesos web y trabajadores del Host con el mismo código y aplique las migraciones antes de reabrir el acceso.
+
+En **Jurisprudencia → Fuentes → Revisar sentencias anteriores del PJUD**, seleccione el identificador del fallo y pulse **Recuperar versión pública**. También puede abrir un enlace histórico para llegar a esta acción. LexOpen consulta el Buscador Unificado y guarda la versión pública con su propia huella. Si el portal está caído o sigue sin ofrecer el texto público, el registro continúa bajo custodia.
+
+Las citas antiguas conservan la referencia a su versión. Para volver a usar un pasaje guardado en Mi biblioteca, coteje su texto con la copia pública de la misma sentencia y guarde la nueva cita verificada.
 
 ## Pasadas de revisión y límites
 
@@ -62,3 +70,5 @@ La ruta real de búsqueda pública vuelve a consultar la sesión y la capacidad 
 Éxitos y errores usan las mismas cabeceras `Cache-Control: private, no-store`, `Vary: Cookie` y `X-Content-Type-Options: nosniff`.
 
 La prueba ejecuta el handler, el esquema y el lector de cuerpo reales; sólo reemplaza sesión, permisos, limitador y conector. Comprueba CSRF, acceso de personal, capacidad, revocación durante la espera, cambio de identidad, límite de frecuencia, JSON inválido, campos no admitidos, límites declarados y efectivos de tamaño y cancelación. Todos los rechazos conservan cabeceras privadas y producen cero llamadas al conector. No usa DB, red ni modelos.
+
+El 19 de noviembre de 2026, la consulta pública de control por el transporte de prueba con proxy devolvió cinco resultados. La selección PJUD:202921948 produjo 373.928 caracteres de texto y una copia pública JSON de 393.483 bytes, con SHA-256 `3516fbeb5a8975657383e4970afdecba463e08dc23f0d7e470116372f85b647f`. La prueba solo leyó en memoria. La resolución DNS directa desde ese equipo falló. El acceso autenticado de OJV en el Host del estudio requiere su propio piloto.

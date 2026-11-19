@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import { randomInt } from "node:crypto";
+import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
 test("búsqueda PJUD: páginas remotas, invalidación y preparación explícita", async ({ page }) => {
   test.setTimeout(180_000);
@@ -21,4 +24,35 @@ test("búsqueda PJUD: páginas remotas, invalidación y preparación explícita"
   expect(queries).toEqual([{ terms: "", rol: "C-3630-2023", page: 0 }, { terms: "", rol: "C-3630-2023", page: 1 }]);
   await page.getByRole("textbox", { name: "Términos públicos", exact: true }).fill("contrato");
   await expect(page.getByText("Fallo página 2", { exact: false })).toHaveCount(0);
+});
+
+
+test("el lector histórico ofrece recuperar la versión pública sin mostrar el material en custodia", async ({ page }) => {
+  const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
+  const judgmentId = String(randomInt(1_000_000_000, 9_000_000_000));
+  const canonicalUrl = `https://juris.pjud.cl/busqueda?Civiles#sentencia-${judgmentId}`;
+  const marker = `Título reservado de prueba ${judgmentId}`;
+  let sourceId: string | undefined;
+  try {
+    const source = await db.legalSource.create({ data: { title: marker, organism: "PJUD", kind: "jurisprudence", canonicalUrl,
+      versions: { create: { title: marker, organism: "PJUD", kind: "jurisprudence", text: marker, sourceSha256: "fixture", textSha256: "fixture", retrievedAt: new Date() } } },
+      include: { versions: true } });
+    sourceId = source.id;
+    await loginAs(page, "abogado@estudio.cl");
+    const id = source.versions[0].id;
+    expect((await page.request.get(`/api/research/sources/${id}/original`)).status()).toBe(404);
+    await page.goto(`/jurisprudencia/fuentes/${id}`);
+    await expect(page.getByRole("heading", { name: "Sentencia pendiente de revisión" })).toBeVisible();
+    await expect(page.getByText(marker)).toHaveCount(0);
+    await page.route("**/api/research/sources", async route => {
+      expect(route.request().postDataJSON()).toEqual({ mode: "url", url: canonicalUrl });
+      await route.fulfill({ status: 422, json: { error: "Texto público no disponible." } });
+    });
+    await page.getByRole("button", { name: "Recuperar versión pública" }).click();
+    await expect(page.getByRole("alert")).toHaveText("Texto público no disponible.");
+    await expect(page.getByRole("link", { name: /descargar/i })).toHaveCount(0);
+  } finally {
+    if (sourceId) await db.legalSource.delete({ where: { id: sourceId } });
+    await db.$disconnect();
+  }
 });

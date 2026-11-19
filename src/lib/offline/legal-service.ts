@@ -53,7 +53,10 @@ export async function readLegalEntity(kind: Kind, id: string, actor: Actor, tx: 
   const locked = Boolean(row.tasks.length || row.minutaAcciones.length);
   let responsible = null;
   if (row.responsableId) { try { responsible = await userReference(row.responsableId, tx); } catch (e) { if ((e as { status?: number }).status !== 403) throw e; responsible = { id: row.responsableId, label: "Responsable no disponible", version: "" }; } }
-  return { kind, id, version: hashReference(row), fields, relations: { self, responsible, cause: row.causaId ? await causeReference(row.causaId, actor, tx) : null,
+  // Retain the version embedded in encrypted copies prepared before civil provenance existed.
+  const { civilCalculationBasis, ...legacyDeadline } = row;
+  const version = hashReference(civilCalculationBasis === null ? legacyDeadline : row);
+  return { kind, id, version, fields, relations: { self, responsible, cause: row.causaId ? await causeReference(row.causaId, actor, tx) : null,
     causeLocked: locked, sourceLocked: locked, canAssignOthers: true,
     calculationCountry: row.calculationCountry, calculationRegime: row.calculationRegime, diasPlazo: row.diasPlazo } };
 }
@@ -129,7 +132,8 @@ async function prepareDeadline(input: Extract<LegalInput, { kind: "plazo" }>, ac
   await authorize(authority, actor, tx);
   if (input.fields.estado === "cumplido" && !causeId) await deadlinePermission({ causaId: causeId, responsableId: responsibleId }, actor, "plazo.close", tx);
   const date = dateValue(input.fields.fechaLimite)!;
-  const dateChanged = !before || date.getTime() !== before.fechaLimite.getTime() || input.fields.tipoComputo !== before.tipoComputo || dateValue(input.fields.fechaNotificacion)?.getTime() !== before.fechaNotificacion?.getTime();
+  const civilCauseChanged = before?.calculationRegime?.startsWith("cl_cpc_individual_days_v") && causeId !== before.causaId;
+  const dateChanged = !before || civilCauseChanged || date.getTime() !== before.fechaLimite.getTime() || input.fields.tipoComputo !== before.tipoComputo || dateValue(input.fields.fechaNotificacion)?.getTime() !== before.fechaNotificacion?.getTime();
   if (dateChanged && !input.dateReviewed) throw httpError("Revise expresamente la fecha límite antes de sincronizar. No se calcula un vencimiento sin conexión.", 422);
   return { before, authority, date, dateChanged, causeId, responsibleId };
 }

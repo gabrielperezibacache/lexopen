@@ -25,7 +25,7 @@ export async function fiscaliaWorkspace(user: CausaAccessUser, filters: { causaI
     prisma.fiscaliaRequest.findMany({
       where: { AND: [fiscaliaCursorWhere(filters.after)], causa: causaAccessWhere(actor), ...(filters.causaId ? { causaId: filters.causaId } : {}),
         ...(filters.status === "all" ? {} : filters.status && filters.status !== "open" ? { status: filters.status } : { status: { notIn: ["closed", "cancelled"] } }) },
-      include: { causa: { select: causeSelect(actor.id) }, events: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15, include: { actor: { select: { name: true } } } } },
+      include: { causa: { select: causeSelect(actor.id) }, events: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15, select: { id: true, createdAt: true, action: true, status: true, actor: { select: { name: true } } } } },
       orderBy: [{ followUpDate: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }, { id: "asc" }], take: 101,
     }),
   ]);
@@ -54,6 +54,8 @@ export async function saveFiscaliaRequest(user: CausaAccessUser, raw: unknown, k
       if (error) throw httpError(error, 400);
       if (previous && ["submitted", "answered", "closed"].includes(previous.status) &&
           ["title", "kind", "body", "ruc"].some(field => (previous[field as "title" | "kind" | "body" | "ruc"] || "") !== (input[field as "title" | "kind" | "body" | "ruc"] || ""))) throw httpError("El contenido presentado se conserva. Cree otra solicitud para una nueva gestión.", 409);
+      if (previous && ["submitted", "answered", "closed"].includes(previous.status) &&
+          (input.folio !== previous.folio || input.submittedAt !== (previous.submittedAt ? civilDateKey(previous.submittedAt) : null))) throw httpError("Rectifique el folio o la fecha en la ficha de la solicitud e indique el motivo.", 409);
       if (previous && ["answered", "closed"].includes(previous.status) && (input.responseText !== previous.responseText || input.answeredAt !== (previous.answeredAt ? civilDateKey(previous.answeredAt) : null))) throw httpError("La respuesta registrada se conserva en su historial.", 409);
       const record = previous ? await tx.fiscaliaRequest.update({ where: { id: previous.id }, data: { ...fields(input), updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) } })
         : await tx.fiscaliaRequest.create({ data: { causaId: input.causaId, creatorId: user.id, ...fields(input) } });

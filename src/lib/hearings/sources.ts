@@ -21,7 +21,7 @@ export async function sourceOption(causaId: string, kind: HearingSourceKind, ref
     const row = await client.libraryBook.findFirst({ where: { AND: [{ id: refId }, bookAccessWhere(actor)] }, select: { title: true, author: true, ownerId: true, sourceType: true } });
     if (row) return { kind, refId, title: row.title, detail: row.sourceType === "judgment" ? "Sentencia de la biblioteca" : row.sourceType === "ruling" ? "Resolución de la biblioteca" : row.ownerId === actor.id ? "Mi biblioteca" : "Colección compartida", href: `/biblioteca/${refId}` };
   } else if (kind === "legal") {
-    const row = await client.legalSourceVersion.findUnique({ where: { id: refId }, select: { title: true, organism: true } });
+    const row = await client.legalSourceVersion.findFirst({ where: { id: refId, reviewState: "available" }, select: { title: true, organism: true } });
     if (row) return { kind, refId, title: row.title, detail: row.organism || "Fuente jurídica preparada", href: `/jurisprudencia/fuentes/${refId}` };
   }
   throw unavailable();
@@ -41,7 +41,7 @@ export async function listSourceOptions(causaId: string, user: CausaAccessUser, 
     client.documento.findMany({ where: { AND: [{ causaId }, documentReadWhere(actor), { OR: [{ caseAudioSource: null }, { caseAudioSource: { liveSessionId: null } }] }, { OR: [{ audioPublication: null }, { audioPublication: { audio: { liveSessionId: null } } }] }] }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, nombre: true } }),
     client.siteFile.findMany({ where: { AND: [{ site: { causaId } }, siteFileReadWhere(actor)] }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, name: true, siteId: true } }),
     client.libraryBook.findMany({ where: bookAccessWhere(actor), orderBy: [{ favorite: "desc" }, { createdAt: "desc" }, { id: "asc" }], take: 201, select: { id: true, title: true, ownerId: true, sourceType: true } }),
-    client.legalSourceVersion.findMany({ orderBy: [{ retrievedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, title: true, organism: true } }),
+    client.legalSourceVersion.findMany({ where: { reviewState: "available" }, orderBy: [{ retrievedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, title: true, organism: true } }),
   ]);
   const options: HearingSourceOption[] = [
     ...documents.slice(0,100).map(row => ({ kind: "document" as const, refId: row.id, title: row.nombre, detail: "Documento de la causa", href: `/documentos/${row.id}/fuentes` })),
@@ -65,7 +65,7 @@ export async function readHearingSource(causaId: string, workspaceId: string, so
   } else if (option.kind === "legal") {
     if (location.page || location.versionId && location.versionId !== row.refId) throw unavailable();
     const result = await readLegalSourceVersion(row.refId, actor, { after: location.after }, client);
-    reading = { source, title: result.title, locatorKind: "text-offset", page: null, pageCount: null, pages: [], versions: [], versionId: row.refId, fragments: result.fragments.map(f => ({ ...f, locator: `Fragmento ${f.ordinal}`, pageNumber: null })), nextAfter: result.nextAfter, originalHref: result.originalHref, imageHref: null, prepareHref: null, warnings: result.warnings };
+    reading = { source, title: result.title, locatorKind: "text-offset", page: null, pageCount: null, pages: [], versions: [], versionId: row.refId, fragments: result.fragments.map(f => ({ ...f, locator: `Fragmento ${f.ordinal}`, pageNumber: null })), nextAfter: result.nextAfter, originalHref: result.originalHref, ...(result.acquisitionMethod === "pjud_public" ? { downloadLabel: "Versión pública recuperada" } : {}), imageHref: null, prepareHref: null, warnings: result.warnings };
   } else {
     const file = option.kind === "site_file" ? await client.siteFile.findUnique({ where: { id: row.refId }, select: { siteId: true } }) : null;
     const result = option.kind === "document" ? await readDocumentEvidence(row.refId, actor, location, client) : file ? await readSiteFileEvidence(file.siteId, row.refId, actor, location, client) : null;

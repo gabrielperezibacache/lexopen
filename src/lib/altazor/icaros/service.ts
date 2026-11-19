@@ -10,12 +10,13 @@ import { askLlm, type LlmMessage } from "@/lib/integrations/llm";
 import { altazorActor, altazorScopeKey, altazorTransaction } from "../access";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "../resources";
 import { icaroDestination } from "./destination";
-import { createIcaroSchema, updateIcaroSchema, createIcaroJobSchema, saveIcaroMemorySchema, forgetIcaroMemorySchema, icaroId } from "./schemas";
-import { ICARO_LIMITS, type IcaroDestination, type IcaroJobView, type IcaroMemoryView, type IcaroView } from "./types";
+import { createIcaroSchema, updateIcaroSchema, createIcaroJobSchema, saveIcaroMemorySchema, forgetIcaroMemorySchema, icaroId, icaroMemorySelectionSchema, icaroTurnSelectionsSchema } from "./schemas";
+import { ICARO_LIMITS, type IcaroDestination, type IcaroJobView, type IcaroMemoryRef, type IcaroMemoryView, type IcaroView } from "./types";
 
 type Db = Prisma.TransactionClient;
-type MemoryRef = { id: string; revision: number };
-type Sources = { version: 1; refs: AltazorSourceSnapshot[]; memory: MemoryRef[]; sourceResultHash?: string };
+// Historical jobs already recorded exact IDs and revisions before content hashes were introduced.
+type MemoryRef = { id: string; revision: number; hash?: string };
+type Sources = { version: 1 | 2; refs: AltazorSourceSnapshot[]; memory: MemoryRef[]; sourceResultHash?: string };
 type ValidationBudget = { remaining: number };
 type JobOrigin = { conversationId: string; turnId: string; caseJobId?: string; caseStepId?: string };
 type JobContext = Sources & { useMemory: boolean; allowRemote: boolean; profileInstructions: string; origin?: JobOrigin };
@@ -46,7 +47,8 @@ async function lockOwner(ownerId: string, db: Db) { await db.$queryRaw(Prisma.sq
 function sources(raw: string): Sources {
   let value: Sources;
   try { value = JSON.parse(raw); } catch { throw changed(); }
-  if (value?.version !== 1 || !Array.isArray(value.refs) || value.refs.length > 8 || !Array.isArray(value.memory) || value.memory.length > ICARO_LIMITS.memoryEntriesInContext || value.memory.some(ref => !ref || typeof ref.id !== "string" || !Number.isSafeInteger(ref.revision))) throw changed();
+  if (![1, 2].includes(value?.version) || !Array.isArray(value.refs) || value.refs.length > 8 || !Array.isArray(value.memory) || value.memory.length > ICARO_LIMITS.memoryEntriesInContext || value.memory.some(ref => !ref || typeof ref.id !== "string" || !Number.isSafeInteger(ref.revision))) throw changed();
+  if (value.version === 2 && !icaroMemorySelectionSchema.safeParse(value.memory).success) throw changed();
   return value;
 }
 function contextFor(job: AltazorIcaroJob): JobContext {
@@ -55,18 +57,26 @@ function contextFor(job: AltazorIcaroJob): JobContext {
   if (value.origin && (!icaroId.safeParse(value.origin.conversationId).success || !icaroId.safeParse(value.origin.turnId).success)) throw changed();
   return value;
 }
-async function assertOrigin(origin: JobOrigin | undefined, profile: AltazorIcaro, actor: CausaAccessUser, db: Db, active=false) {
+async function assertOrigin(origin: JobOrigin | undefined, profile: AltazorIcaro, actor: CausaAccessUser, db: Db, snapshot: JobContext, active = false) {
   if (!origin) return;
   if (origin.caseJobId || origin.caseStepId) {
     if (!origin.caseJobId || !origin.caseStepId) throw changed();
     const { job, plan } = await (await import("../case-jobs/service")).caseJobAccess(origin.caseJobId, actor, db);
     const step = await db.altazorCaseJobStep.findFirst({where:{id:origin.caseStepId,jobId:job.id,kind:"analyze"}});
     if (!step || job.conversationId !== origin.conversationId || job.originTurnId !== origin.turnId || job.cancelledAt || ["cancelled","blocked","interrupted","awaiting_plan"].includes(job.status) || !plan.team.some(m=>m.id===profile.id && m.revision===profile.revision)) throw changed();
+    const member = plan.team.find(item => item.id === profile.id);
+    const plannedMemory = (member?.memorySelection || []).map(({ id, revision, hash }) => ({ id, revision, hash }));
+    if (canonicalJson(snapshot.memory) !== canonicalJson(plannedMemory)) throw changed();
     if(active&&(job.status!=="running"||!["running","waiting"].includes(step.status)))throw changed();
   }
   const turn = await db.altazorTurn.findFirst({ where: { id: origin.turnId, conversationId: origin.conversationId, ownerId: actor.id, conversation: { ownerId: actor.id, scopeKey: profile.scopeKey, causaId: profile.causaId } } });
   const current = await altazorActor(actor, db);
   if (!turn || turn.cancelRequestedAt || !["running", "queued", "awaiting_confirmation", "partial", "completed"].includes(turn.status) || !origin.caseJobId && turn.actorSessionVersion !== null && turn.actorSessionVersion !== current.sessionVersion) throw changed();
+  if (!origin.caseJobId && snapshot.version === 2 && snapshot.memory.length) {
+    const selections = icaroTurnSelectionsSchema.parse(JSON.parse(turn.contextJson).icaroMemorySelections ?? []);
+    const planned = selections.find(item => item.icaroId === profile.id)?.entries;
+    if (canonicalJson(snapshot.memory) !== canonicalJson(planned || [])) throw changed();
+  }
 }
 function destinationFor(job: AltazorIcaroJob): IcaroDestination {
   let value: IcaroDestination;
@@ -76,6 +86,9 @@ function destinationFor(job: AltazorIcaroJob): IcaroDestination {
 }
 async function profileView(profile: AltazorIcaro): Promise<IcaroView> {
   return { id: profile.id, name: profile.name, instructions: profile.instructions, causaId: profile.causaId, scopeKey: profile.scopeKey, provider: profile.provider as IcaroView["provider"], model: profile.model, memoryEnabled: profile.memoryEnabled, enabled: profile.enabled, revision: profile.revision, destination: await icaroDestination(profile.ownerId, profile), createdAt: profile.createdAt.toISOString(), updatedAt: profile.updatedAt.toISOString() };
+}
+function memoryHash(row: AltazorIcaroMemory) {
+  return sha256(canonicalJson([row.id, row.icaroId, row.ownerId, row.revision, row.label, row.body, row.sourceJobId, row.sourcesJson]));
 }
 async function checkedMemory(row: AltazorIcaroMemory, profile: AltazorIcaro, actor: CausaAccessUser, db: Db, visited = new Set<string>(), budget: ValidationBudget = { remaining: 128 }): Promise<void> {
   if (--budget.remaining < 0 || row.ownerId !== actor.id || row.icaroId !== profile.id || row.status !== "confirmed" || row.forgottenAt || visited.has(row.id) || visited.size >= 16) throw changed();
@@ -89,7 +102,7 @@ async function checkedMemory(row: AltazorIcaroMemory, profile: AltazorIcaro, act
   }
   for (const ref of snapshot.memory) {
     const dependency = await db.altazorIcaroMemory.findFirst({ where: { id: ref.id, ownerId: actor.id, icaroId: profile.id, revision: ref.revision } });
-    if (!dependency) throw changed();
+    if (!dependency || (ref.hash !== undefined && ref.hash !== memoryHash(dependency))) throw changed();
     await checkedMemory(dependency, profile, actor, db, new Set(visited), budget);
   }
 }
@@ -97,11 +110,23 @@ async function memoryForContext(profile: AltazorIcaro, actor: CausaAccessUser, r
   const rows: AltazorIcaroMemory[] = [];
   for (const ref of refs) {
     const row = await db.altazorIcaroMemory.findFirst({ where: { id: ref.id, ownerId: actor.id, icaroId: profile.id, revision: ref.revision } });
-    if (!row) throw changed();
+    if (!row || (ref.hash !== undefined && ref.hash !== memoryHash(row))) throw changed();
     await checkedMemory(row, profile, actor, db, new Set(), budget); rows.push(row);
+  }
+  if (rows.reduce((total, row) => total + row.label.length + row.body.length, 0) > ICARO_LIMITS.memoryCharacters) {
+    throw httpError("Los recuerdos elegidos superan los 6.000 caracteres. Elige menos recuerdos.", 413);
   }
   return rows;
 }
+
+export async function readSelectedIcaroMemory(id: string, user: CausaAccessUser, selection: IcaroMemoryRef[], db: Db = prisma) {
+  const refs = icaroMemorySelectionSchema.parse(selection);
+  const { actor, profile } = await profileFor(id, user, db);
+  if (refs.length && (!profile.enabled || !profile.memoryEnabled)) throw changed();
+  const rows = await memoryForContext(profile, actor, refs, db);
+  return rows.map(row => ({ id: row.id, revision: row.revision, hash: memoryHash(row), label: row.label }));
+}
+
 async function validateJobContext(job: AltazorIcaroJob, profile: AltazorIcaro, actor: CausaAccessUser, db: Db = prisma, budget: ValidationBudget = { remaining: 128 }) {
   if (--budget.remaining < 0) throw changed();
   if (job.parentJobId) {
@@ -110,7 +135,7 @@ async function validateJobContext(job: AltazorIcaroJob, profile: AltazorIcaro, a
     await validateJobContext(parent, parent.icaro, actor, db, budget);
   }
   const snapshot = contextFor(job);
-  await assertOrigin(snapshot.origin, profile, actor, db, job.status!=="completed");
+  await assertOrigin(snapshot.origin, profile, actor, db, snapshot, job.status!=="completed");
   if(snapshot.origin?.caseJobId){
     const step=await db.altazorCaseJobStep.findUniqueOrThrow({where:{id:snapshot.origin.caseStepId!}});
     const data=JSON.parse(step.dataJson) as {operationKey?:string;refs?:{id:string;source:AltazorSourceSnapshot}[];text?:string};
@@ -176,22 +201,14 @@ export async function createIcaroJob(id: string, raw: unknown, user: CausaAccess
   await verifyAltazorSources(initial.actor, refs, { causaId: initial.profile.causaId });
   const destination = await icaroDestination(initial.actor.id, initial.profile);
   checkDestination(destination, input.destinationKey, input.allowRemote);
-  const memories: MemoryRef[] = [];
-  if (input.useMemory) {
-    const rows = await prisma.altazorIcaroMemory.findMany({ where: { icaroId: id, ownerId: initial.actor.id, status: "confirmed" }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: ICARO_LIMITS.memories });
-    let characters = 0;
-    for (const row of rows) {
-      if (memories.length >= ICARO_LIMITS.memoryEntriesInContext || characters + row.body.length + row.label.length > ICARO_LIMITS.memoryCharacters) break;
-      try { await checkedMemory(row, initial.profile, initial.actor, prisma); } catch (error) { if (!sourceFailure(error)) throw error; continue; }
-      memories.push({ id: row.id, revision: row.revision }); characters += row.body.length + row.label.length;
-    }
-  }
-  const snapshot: JobContext = { version: 1, refs, memory: memories, useMemory: input.useMemory, allowRemote: input.allowRemote, profileInstructions: initial.profile.instructions, ...(options.origin ? { origin: options.origin } : {}) };
+  const memories = input.memorySelection || [];
+  if (input.useMemory !== (memories.length > 0)) throw httpError("Elige los recuerdos de este Ícaro y confirma la selección.", 409);
+  const snapshot: JobContext = { version: 2, refs, memory: memories, useMemory: input.useMemory, allowRemote: input.allowRemote, profileInstructions: initial.profile.instructions, ...(options.origin ? { origin: options.origin } : {}) };
   const hash = sha256(canonicalJson({ id, input, refs: refs.map(ref => ref.fingerprint), memory: memories, origin: options.origin || null }));
   const result = await altazorTransaction(prisma, async db => {
     const { actor, profile } = await profileFor(id, user, db); await lockOwner(actor.id, db);
     if (profile.revision !== initial.profile.revision || !profile.enabled) throw changed();
-    await assertOrigin(options.origin, profile, actor, db, true);
+    await assertOrigin(options.origin, profile, actor, db, snapshot, true);
     await verifyAltazorSources(actor, refs, { causaId: profile.causaId, client: db }); await memoryForContext(profile, actor, memories, db);
     const prior = await db.altazorIcaroJob.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
     if (prior) { if (prior.inputSha256 !== hash || prior.icaroId !== id) throw changed(); return { job: prior, profile, reused: true }; }
@@ -288,7 +305,7 @@ export async function listIcaroMemory(id: string, user: CausaAccessUser) {
   for (const row of rows) {
     let available = true;
     try { await checkedMemory(row, profile, actor, prisma); } catch (error) { if (!sourceFailure(error)) throw error; available = false; }
-    memory.push({ id: row.id, label: available ? row.label : "Recuerdo no disponible", body: available ? row.body : "", sourceJobId: available ? row.sourceJobId : null, revision: row.revision, available, createdAt: row.createdAt.toISOString() });
+    memory.push({ id: row.id, hash: available ? memoryHash(row) : "", label: available ? row.label : "Recuerdo no disponible", body: available ? row.body : "", sourceJobId: available ? row.sourceJobId : null, revision: row.revision, available, createdAt: row.createdAt.toISOString() });
   }
   return { memory };
 }
@@ -302,7 +319,7 @@ export async function saveIcaroMemory(id: string, raw: unknown, user: CausaAcces
     await validateJobContext(origin.job, profile, actor);
     const context = contextFor(origin.job);
     body = origin.job.result.slice(0, 2000); sourceJobId = origin.job.id;
-    snapshot = { version: 1, refs: context.refs, memory: context.memory, sourceResultHash: sha256(origin.job.result) };
+    snapshot = { version: context.version, refs: context.refs, memory: context.memory, sourceResultHash: sha256(origin.job.result) };
   } else { body = input.body; snapshot = { version: 1, refs: (await resolveAltazorSources(actor, input.sources, { causaId: profile.causaId })).refs, memory: [] }; }
   const hash = sha256(canonicalJson({ id, input, snapshot }));
   const saved = await altazorTransaction(prisma, async db => {
@@ -315,7 +332,7 @@ export async function saveIcaroMemory(id: string, raw: unknown, user: CausaAcces
     const row = await db.altazorIcaroMemory.create({ data: { ownerId: live.actor.id, icaroId: id, requestId: input.requestId, inputSha256: hash, label: input.label, body, sourceJobId, sourcesJson: canonicalJson(snapshot) } });
     return { row, reused: false };
   });
-  return { memory: { id: saved.row.id, label: saved.row.label, body: saved.row.body, revision: saved.row.revision, sourceJobId: saved.row.sourceJobId, available: true, createdAt: saved.row.createdAt.toISOString() } satisfies IcaroMemoryView, reused: saved.reused };
+  return { memory: { id: saved.row.id, hash: memoryHash(saved.row), label: saved.row.label, body: saved.row.body, revision: saved.row.revision, sourceJobId: saved.row.sourceJobId, available: true, createdAt: saved.row.createdAt.toISOString() } satisfies IcaroMemoryView, reused: saved.reused };
 }
 export async function forgetIcaroMemory(id: string, memoryId: string, raw: unknown, user: CausaAccessUser) {
   icaroId.parse(memoryId); const input = forgetIcaroMemorySchema.parse(raw);

@@ -21,6 +21,9 @@ async function main() {
     const manual = await createPlazoCommand(user, { ...input, fechaLimite: "2026-12-01" }, randomUUID());
     assert.equal(manual.calculationCountry, null);
     await prisma.firmSettings.update({ where: { organizationId: orgId }, data: { workCountry: "CL" } });
+    await assert.rejects(createPlazoCommand(user, { ...input, calculationProfile: "civil", civilScopeConfirmed: true, notificationConfirmed: true }, randomUUID()), /pendiente de validación/);
+    await assert.rejects(createPlazoCommand(user, { ...input, calculationProfile: "manual" }, randomUUID()), /fecha límite revisada/);
+    await assert.rejects(createPlazoCommand(user, { ...input, calculationProfile: "civil", fechaLimite: "2026-12-01" }, randomUUID()), /seleccione registro manual/);
     const calculated = await createPlazoCommand(user, input, randomUUID());
     assert.equal(calculated.calculationCountry, "CL"); assert.equal(calculated.calculationRegime, "internal_weekdays_cl_v1");
     assert.equal(await prisma.plazo.count({ where: { responsableId: userId } }), 2);

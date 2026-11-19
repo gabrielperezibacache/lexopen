@@ -556,7 +556,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
                   {p.titulo}
                 </div>
                 <div className="text-xs text-[var(--muted)]">
-                  {p.causa?.rit || "Sin causa"} · {labelTipoComputo(p.tipoComputo)} ·{" "}
+                  {p.causa?.rit || "Sin causa"} · {labelTipoComputo(p.tipoComputo, p.calculationRegime)} ·{" "}
                   {formatCivilDate(p.fechaLimite)}
                 </div>
               </div>

@@ -7,7 +7,7 @@ import { canSome } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
 import { writeAuditStrict } from "@/lib/audit";
 import { sha256 } from "@/lib/evidence/fragments";
-import { resolveCitation, verifyStoredCitation, toStoredCitation, type StoredCitation, type ResolvedCitation } from "./citations";
+import { hasStoredCitationIdentity, resolveCitation, verifyStoredCitation, toStoredCitation, type StoredCitation, type ResolvedCitation } from "./citations";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 export const LIBRARY_LIMITS = { collections: 100, items: 200, selectedCollections: 10, selectedItems: 200 } as const;
@@ -74,12 +74,63 @@ export async function readLibraryCollection(collectionId: string, user: CausaAcc
     const actor = await actorFor(user, tx), collection = await readCollectionRow(collectionId, actor, tx);
     const cache = new Map<string, unknown>();
     const rows = await tx.knowledgeCollectionItem.findMany({ where: { collectionId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: LIBRARY_LIMITS.items + 1, select: { id: true, citationJson: true, createdAt: true } });
-    const items: ({ id: string; available: true; citation: ResolvedCitation; createdAt: Date } | { id: string; available: false; createdAt: Date })[] = [];
+    const items: ({ id: string; available: true; citation: ResolvedCitation; createdAt: Date } | { id: string; available: false; createdAt: Date; canCheckPublicVersion: boolean })[] = [];
     for (const row of rows.slice(0, LIBRARY_LIMITS.items)) {
-      try { const citation = await verifyStoredCitation(JSON.parse(row.citationJson) as StoredCitation, actor, citationScope(collection, tx, cache)); items.push({ id: row.id, available: true, citation, createdAt: row.createdAt }); }
-      catch (error) { if (!unavailable(error)) throw error; items.push({ id: row.id, available: false, createdAt: row.createdAt }); }
+      let pinned: StoredCitation | undefined;
+      try {
+        pinned = JSON.parse(row.citationJson) as StoredCitation;
+        const citation = await verifyStoredCitation(pinned, actor, citationScope(collection, tx, cache));
+        items.push({ id: row.id, available: true, citation, createdAt: row.createdAt });
+      }
+      catch (error) {
+        if (!unavailable(error)) throw error;
+        const canCheckPublicVersion = pinned?.kind === "legal" && hasStoredCitationIdentity(pinned) && await tx.legalSourceVersion.count({
+          where: { id: pinned.versionId, reviewState: "quarantined" },
+        }) > 0;
+        items.push({ id: row.id, available: false, createdAt: row.createdAt, canCheckPublicVersion });
+      }
     }
     return { ...summary(collection), items, limited: rows.length > LIBRARY_LIMITS.items };
+  });
+}
+/** Review one pinned quotation against the public version; the historical reference remains immutable. */
+export async function checkLibraryPublicCitation(collectionId: string, itemId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+  return transaction(client, async tx => {
+    const actor = await actorFor(user, tx);
+    const collection = await readCollectionRow(collectionId, actor, tx);
+    const item = await tx.knowledgeCollectionItem.findFirst({
+      where: { id: itemId, collectionId }, select: { versionKey: true, citationJson: true },
+    });
+    if (!item) throw httpError("La referencia no está disponible para cotejo.", 404);
+    let previous: StoredCitation;
+    try { previous = JSON.parse(item.citationJson) as StoredCitation; }
+    catch { throw httpError("La referencia no está disponible para cotejo.", 404); }
+    if (!previous || previous.kind !== "legal" || item.versionKey !== `legal:${previous.versionId}` ||
+        previous.pageNumber !== null || !hasStoredCitationIdentity(previous)) {
+      throw httpError("La referencia no está disponible para cotejo.", 404);
+    }
+    const historical = await tx.legalSourceFragment.findFirst({
+      where: { id: previous.fragmentId, versionId: previous.versionId, textSha256: previous.textSha256,
+        version: { reviewState: "quarantined", sourceSha256: previous.sourceSha256 } },
+      select: { version: { select: { sourceId: true } } },
+    });
+    if (!historical) throw httpError("La referencia no está disponible para cotejo.", 404);
+    const updated = await tx.legalSourceVersion.findFirst({
+      where: { sourceId: historical.version.sourceId, reviewState: "available", acquisitionMethod: "pjud_public" },
+      orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], select: { id: true },
+    });
+    if (!updated) return { href: `/jurisprudencia/fuentes/${previous.versionId}`, citation: null, needsRecovery: true };
+    // strpos compares literal text: a stored percent sign is never a search wildcard.
+    const matches = await tx.$queryRaw<{ id: string; text: string }[]>`
+      SELECT "id", "text" FROM "LegalSourceFragment" WHERE "versionId" = ${updated.id}
+      AND strpos("text", ${previous.quote}) > 0 ORDER BY "ordinal" LIMIT 2`;
+    const href = `/jurisprudencia/fuentes/${updated.id}`;
+    if (matches.length !== 1) return { href, citation: null };
+    const text = matches[0].text;
+    if (text.includes(previous.quote, text.indexOf(previous.quote) + 1)) return { href, citation: null };
+    const citation = await resolveCitation({ kind: "legal", fragmentId: matches[0].id, quote: previous.quote },
+      actor, citationScope(collection, tx));
+    return { href: citation.href, citation };
   });
 }
 export async function updateLibraryCollection(collectionId: string, raw: z.input<typeof libraryUpdateSchema>, user: CausaAccessUser, client: PrismaClient = prisma) {

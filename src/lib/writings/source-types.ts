@@ -10,6 +10,12 @@ export type WritingSourceInput =
   | { kind: "note"; workspaceId: string; noteId: string; revision: number }
   | { kind: "book"; bookId: string; fragmentId: string; quote: string };
 
+export const writingVerificationLabels = {
+  original: "Original conservado",
+  retained_text: "Texto conservado",
+  public_version: "Versión pública recuperada",
+} as const;
+
 export type WritingCitation = {
   kind: "knowledge" | "book" | "hearing";
   snapshot: StoredCitation | BookCitation | HearingCitationStored;
@@ -17,7 +23,7 @@ export type WritingCitation = {
   title: string; reference: string; locator: string; href: string; quote: string;
   sourceKey: string; sourceSha256: string; textSha256: string; quoteSha256: string;
   pageNumber: number | null;
-  verificationBasis: "original" | "retained_text";
+  verificationBasis: keyof typeof writingVerificationLabels;
   retainedSha256: string | null;
   warnings: string[];
 };

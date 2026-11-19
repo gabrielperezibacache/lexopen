@@ -61,7 +61,7 @@ export async function resolveAltazorSources(user: CausaAccessUser, raw: AltazorS
     } else if (input.kind === "legal") {
       const value = await resolveCitation(input, actor, { client, publicOnly: true, cache });
       if (value.versionId !== input.versionId) throw changed();
-      refs.push(finish({ version: 1, scopeKey: scopeKey(options.causaId), input, title: value.title, text: value.quote, href: value.href, warnings: value.warnings, citations: [{ title: value.title, quote: value.quote, href: value.href, locator: value.pageNumber ? `Página ${value.pageNumber}` : "Pasaje de la versión conservada", sourceKey: value.sourceKey, sourceSha256: value.sourceSha256, verificationBasis: "original" }], proofJson: JSON.stringify({ kind: "legal", value: toStoredCitation(value) } satisfies Proof) }));
+      refs.push(finish({ version: 1, scopeKey: scopeKey(options.causaId), input, title: value.title, text: value.quote, href: value.href, warnings: value.warnings, citations: [{ title: value.title, quote: value.quote, href: value.href, locator: value.pageNumber ? `Página ${value.pageNumber}` : "Pasaje de la versión conservada", sourceKey: value.sourceKey, sourceSha256: value.sourceSha256, verificationBasis: value.acquisitionMethod === "pjud_public" ? "public_version" : "original" }], proofJson: JSON.stringify({ kind: "legal", value: toStoredCitation(value) } satisfies Proof) }));
     } else throw httpError("Seleccione una conversación de la causa para utilizar sus documentos, hechos o notas", 400);
   }
   if (context(refs).length > 32000) throw httpError("La selección excede el contexto permitido; reduzca los pasajes", 413);

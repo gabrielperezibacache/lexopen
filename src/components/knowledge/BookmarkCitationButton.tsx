@@ -4,10 +4,10 @@ import { useId, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import type { CitationInput } from "@/lib/knowledge/citations";
 type Collection = { id: string; name: string; revision: number; causaId: string | null; siteId: string | null; scopeLabel: string };
-export function BookmarkCitationButton({ citation, causaId, siteId }: { citation: CitationInput; causaId?: string | null; siteId?: string | null }) {
+export function BookmarkCitationButton({ citation, causaId, siteId, initialCollectionId }: { citation: CitationInput; initialCollectionId?: string; causaId?: string | null; siteId?: string | null }) {
   const id = useId();
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [error, setError] = useState("");
-  const [collections, setCollections] = useState<Collection[]>([]), [selected, setSelected] = useState("");
+  const [collections, setCollections] = useState<Collection[]>([]), [selected, setSelected] = useState(initialCollectionId || "");
   async function load() {
     setOpen(true); setBusy(true); setError(""); setMessage("");
     try { const verified = await apiMutation<{causaId: string | null; siteId: string | null}>("/api/knowledge/citations/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ citation, ...(causaId ? { causaId } : {}) }) }); if (!verified.ok) throw new Error(verified.error); const sourceCase = verified.data.causaId || causaId, sourceSite = verified.data.siteId || siteId; const response = await fetch("/api/knowledge/collections", { cache: "no-store" }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo abrir la biblioteca"); const choices = (data.collections as Collection[]).filter(c => citation.kind === "legal" || Boolean(sourceCase && c.causaId === sourceCase) || Boolean(sourceSite && c.siteId === sourceSite)); setCollections(choices); setSelected(previous => choices.some(c => c.id === previous) ? previous : choices[0]?.id || ""); }

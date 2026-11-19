@@ -15,7 +15,7 @@ assert.deepEqual(parts.filter(p => p.href).map(p => p.href), ["#plazos", "#trami
 assert.equal(parts.filter(p => p.unverified).length, 1);
 assert.equal(parts.find(p => p.unverified)?.href, undefined);
 assert.ok(parts.find(p => p.href === "#plazos")?.label?.includes("Presentar escrito"));
-assert.equal(caseStatusReferences("[fiscalia:request]", status)[0].href, "/mi-fiscalia?causaId=visible-case");
+assert.equal(caseStatusReferences("[fiscalia:request]", status)[0].href, "/mi-fiscalia/request");
 assert.equal(caseStatusReferences("[fiscalia:ajena]", status)[0].unverified, true);
 for (const text of ["[Abrir](https://malicioso.invalid)", "[plazo:javascript:alert(1)]", "<img src=x onerror=alert(1)>"]) {
   const parsed = caseStatusReferences(text, status);

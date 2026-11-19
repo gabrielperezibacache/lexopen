@@ -9,7 +9,8 @@ import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { storeEvidenceSnapshot } from "@/lib/evidence/service";
 import { putObject, getObject } from "@/lib/storage";
 import { sha256 } from "@/lib/evidence/fragments";
-import { importLegalSource, listLegalSources, listResearchRuns, readLegalSourceOriginal, readLegalSourceVersion, readResearchRun, searchResearch, verifyResearchCitation, type LegalSourceImport } from "./service";
+import { fetchPublicLegalSource } from "./sources";
+import { importLegalSource, listLegalSources, listJudgmentsAwaitingRecovery, quarantinedJudgmentSelection, listResearchRuns, readLegalSourceOriginal, readLegalSourceVersion, readResearchRun, searchResearch, verifyResearchCitation, type LegalSourceImport } from "./service";
 
 async function main() {
   const connection = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
@@ -59,6 +60,59 @@ async function main() {
     assert.equal(firstRun.results.some(row => row.versionId === versions[0].id && row.quote === input.text), true);
     assert.deepEqual(await readResearchRun(firstRun.id, owner, client), firstRun);
     await assert.rejects(readResearchRun(firstRun.id, outsider, client), error => (error as { status?: number }).status === 404);
+    // An older Host may submit a full response containing protected fields. The migration
+    // guard also isolates these writes during rollout, without deleting the custody object.
+    const judgmentUrl = `https://juris.pjud.cl/busqueda?Civiles#sentencia-${numericId}`;
+    canonicalUrls.push(judgmentUrl);
+    const marker = `reservado${tag.replaceAll("-", "")}`;
+    const custodyKey = `research-fixture/${tag}/custody.json`;
+    const custodyBytes = Buffer.from(JSON.stringify({ texto_sentencia: marker }));
+    const legacySource = await client.legalSource.create({ data: {
+      canonicalUrl: judgmentUrl, title: marker, organism: "PJUD", kind: "jurisprudence", externalId: `PJUD:${numericId}`,
+    } });
+    await putObject({ key: custodyKey, body: custodyBytes });
+    const legacy = await client.legalSourceVersion.create({ data: {
+      sourceId: legacySource.id, sourceSha256: sha256(custodyBytes), textSha256: sha256(marker), text: marker,
+      sourceStorageKey: custodyKey, title: marker, organism: "PJUD", kind: "jurisprudence", retrievedAt: new Date(),
+      fragments: { create: { ordinal: 1, text: marker, textSha256: sha256(marker), startOffset: 0, endOffset: marker.length } },
+    }, include: { fragments: true } });
+    assert.equal(legacy.reviewState, "quarantined");
+    const legacyCitation = { ...firstRun.results[0], fragmentId: legacy.fragments[0].id, versionId: legacy.id, quote: marker };
+    const legacyRun = await client.researchRun.create({ data: { ownerId, scopeJson: JSON.stringify({ documentIds: [], sourceKinds: ["jurisprudence"] }), resultJson: "{}", query: "Consulta anterior", status: "completed" } });
+    await client.researchRun.update({ where: { id: legacyRun.id }, data: { resultJson: JSON.stringify({ ...firstRun, id: legacyRun.id, query: legacyRun.query, results: [legacyCitation] }) } });
+    assert.deepEqual(await quarantinedJudgmentSelection(legacy.id, owner, client), { judgmentId: String(numericId) });
+    const pending = await listJudgmentsAwaitingRecovery(owner, "", client);
+    assert.ok(pending.items.some(row => row.judgmentId === String(numericId)) && !JSON.stringify(pending).includes(marker));
+    const hidden = (e: unknown) => (e as { status?: number }).status === 404;
+    await assert.rejects(readLegalSourceOriginal(legacy.id, owner, client), hidden);
+    await assert.rejects(readLegalSourceVersion(legacy.id, owner, {}, client), hidden);
+    await assert.rejects(verifyResearchCitation(legacyCitation, owner, client), hidden);
+    await assert.rejects(readResearchRun(legacyRun.id, owner, client), hidden);
+    assert.ok(!(await listLegalSources(owner, client)).some(row => row.id === legacySource.id));
+    assert.equal((await searchResearch(owner, { query: marker, sourceKinds: ["jurisprudence"] }, client)).results.length, 0);
+    await assert.rejects(importLegalSource({ ...input, canonicalUrl: judgmentUrl }, owner, client), e => (e as {status?: number}).status === 422);
+    const publicText = `Sentencia ficticia con pasaje público fundado ${tag}`;
+    const judgment = await fetchPublicLegalSource(judgmentUrl, { fetch: async url =>
+      String(url).endsWith("?Civiles") ? new Response('<input name="_token" value="fixture"><script>id_buscador_activo=1</script>', { headers: { "Set-Cookie": "fixture=anonymous" } })
+        : Response.json({ response: { docs: [{ id: numericId, sit_fallo_anonimizado_i: 1, texto_sentencia: marker, caratulado_s: marker, texto_sentencia_anon: publicText }] } })
+    });
+    await assert.rejects(importLegalSource({ ...judgment, rawBytes: custodyBytes }, owner, client), e => (e as {status?: number}).status === 422);
+    const recovered = await importLegalSource(judgment, owner, client);
+    assert.notEqual(recovered.id, legacy.id);
+    assert.equal(recovered.acquisitionMethod, "pjud_public");
+    assert.ok(!(await listJudgmentsAwaitingRecovery(owner, "", client)).items.some(row => row.judgmentId === String(numericId)));
+    assert.equal((await importLegalSource(judgment, owner, client)).id, recovered.id);
+    const publicDownload = await readLegalSourceOriginal(recovered.id, owner, client);
+    const publicView = await readLegalSourceVersion(recovered.id, owner, {}, client);
+    assert.ok(!publicDownload.bytes.includes(marker));
+    assert.equal(JSON.parse(publicDownload.bytes.toString()).text, publicText);
+    assert.equal(sha256(publicDownload.bytes), publicView.sourceSha256);
+    assert.equal(publicView.fragments[0].text, publicText);
+    assert.ok(!(JSON.stringify(await listLegalSources(owner, client))).includes(marker));
+    assert.equal((await verifyResearchCitation({ kind: "legal", fragmentId: publicView.fragments[0].id, quote: publicText }, owner, client)).verified, true);
+    assert.equal((await searchResearch(owner, { query: "pasaje público fundado", sourceKinds: ["jurisprudence"] }, client)).results[0].versionId, recovered.id);
+    await assert.rejects(readResearchRun(legacyRun.id, owner, client), hidden);
+    assert.deepEqual(await getObject(custodyKey), custodyBytes, "the Host retains the quarantined original");
     const newer = await importLegalSource({ ...input, text: `Texto posterior distinto ${tag}`, rawBytes: Buffer.from(`Original posterior ${tag}`), title: "Título posterior", retrievedAt: new Date("2026-01-01T00:00:00Z") }, owner, client);
     assert.notEqual(newer.id, versions[0].id);
     await assert.rejects(importLegalSource({ ...input, title: "Metadatos incompatibles" }, owner, client), error => (error as { status?: number }).status === 409);

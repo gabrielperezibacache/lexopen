@@ -12,7 +12,9 @@ export type AltazorContext = {
   attachmentIds: string[];
   refs: AltazorSourceSnapshot[];
   historyTurnIds: string[];
+  icaroMemorySelections?: import("./icaros/types").IcaroTurnSelection[];
   memoryDependencies: unknown[];
+  continueFrom?: { id: string; hash: string };
   caseJobResults?: {id:string;hash:string}[];
   recalledTurns?: { id: string; conversationId: string; fingerprint: string }[];
 };

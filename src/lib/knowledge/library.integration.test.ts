@@ -10,7 +10,7 @@ import { captureDocumentEvidence, captureSiteFileEvidence, readDocumentEvidence,
 import { sha256 } from "@/lib/evidence/fragments";
 import { getObject, putObject } from "@/lib/storage";
 import { importLegalSource, searchResearch, readResearchRun } from "@/lib/research/service";
-import { addLibraryItem, createLibraryCollection, deleteLibraryCollection, listLibraryCollections, readLibraryCollection, removeLibraryItem, updateLibraryCollection, resolveLibraryScope } from "./library";
+import { checkLibraryPublicCitation, addLibraryItem, createLibraryCollection, deleteLibraryCollection, listLibraryCollections, readLibraryCollection, removeLibraryItem, updateLibraryCollection, resolveLibraryScope } from "./library";
 
 const code = (status: number) => (error: unknown) => Boolean(error && typeof error === "object" && "status" in error && error.status === status);
 async function main() {
@@ -139,6 +139,35 @@ async function main() {
     const forged = { ...beforeDamage, results: beforeDamage.results.map(citation => ({ ...citation, quote: damaged, textSha256: sha256(damaged) })) };
     await client.researchRun.update({ where: { id: beforeDamage.id }, data: { resultJson: JSON.stringify(forged) } });
     await assert.rejects(readResearchRun(beforeDamage.id, owner, client), code(409));
+    // A historical bookmark can only be reviewed against a separately retrieved, public version.
+    const archivedId = restoredPin.item.id;
+    await client.legalSourceVersion.update({ where: { id: legal.id }, data: { reviewState: "quarantined" } });
+    const blockedItem = (await readLibraryCollection(generalId, owner, client)).items[0];
+    assert.ok(!blockedItem.available && blockedItem.canCheckPublicVersion);
+    assert.ok(!JSON.stringify(blockedItem).includes(oldFragment.text));
+    await assert.rejects(checkLibraryPublicCitation(generalId, archivedId, other, client), code(404));
+    assert.deepEqual(await checkLibraryPublicCitation(generalId, archivedId, owner, client), {
+      href: `/jurisprudencia/fuentes/${legal.id}`, citation: null, needsRecovery: true,
+    });
+    // An unrelated or only partially matching passage cannot be used as a replacement.
+    await client.legalSourceVersion.update({ where: { id: newer.id }, data: { acquisitionMethod: "pjud_public" } });
+    const noMatch = await checkLibraryPublicCitation(generalId, archivedId, owner, client);
+    assert.deepEqual(noMatch, { href: `/jurisprudencia/fuentes/${newer.id}`, citation: null });
+    const ambiguous = `${oldFragment.text} ${oldFragment.text}`;
+    const duplicateVersion = await importLegalSource({ ...legalInput, text: ambiguous, rawBytes: Buffer.from(ambiguous) }, owner, client);
+    await client.legalSourceVersion.update({ where: { id: duplicateVersion.id }, data: { acquisitionMethod: "pjud_public", retrievedAt: new Date("2026-12-01T00:00:00Z") } });
+    assert.deepEqual(await checkLibraryPublicCitation(generalId, archivedId, owner, client),
+      { href: `/jurisprudencia/fuentes/${duplicateVersion.id}`, citation: null });
+    const restoredText = `Versión pública recuperada. ${oldFragment.text}`;
+    const restoredVersion = await importLegalSource({ ...legalInput, text: restoredText, rawBytes: Buffer.from(restoredText) }, owner, client);
+    await client.legalSourceVersion.update({ where: { id: restoredVersion.id }, data: { acquisitionMethod: "pjud_public", retrievedAt: new Date("2027-01-01T00:00:00Z") } });
+    const rechecked = await checkLibraryPublicCitation(generalId, archivedId, owner, client);
+    assert.equal(rechecked.citation?.quote, oldFragment.text);
+    assert.equal(rechecked.citation?.versionId, restoredVersion.id);
+    assert.ok(!rechecked.href.includes(legal.id));
+    assert.equal((await readLibraryCollection(generalId, owner, client)).items[0].available, false);
+    assert.equal(await client.knowledgeCollectionItem.count({ where: { collectionId: generalId } }), 1,
+      "checking a public replacement must not alter the private collection or enable its historical pin");
     const quota = await createLibraryCollection({ requestId: randomUUID(), name: "Synthetic quota collection" }, owner, client);
     await client.knowledgeCollectionItem.createMany({ data: Array.from({ length: 201 }, (_, i) => ({ collectionId: quota.collection.id, versionKey: `fixture-${i}`, citationJson: "{}" })) });
     await assert.rejects(resolveLibraryScope([quota.collection.id], owner, {}, client), code(413));

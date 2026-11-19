@@ -47,6 +47,7 @@ export type CaseTeamMember = {
   name: string;
   revision: number;
   useMemory: boolean;
+  memorySelection?: (import("../icaros/types").IcaroMemoryRef & { label: string })[];
   destination: IcaroDestination;
 };
 export type CaseJobPlan = {
@@ -129,6 +130,7 @@ export const selectionSchema = z
   .strict();
 export type CaseSelection = z.infer<typeof selectionSchema>;
 export type CaseJobView = {
+  continuationHash?: string | null;
   id: string;
   causaId: string;
   available: boolean;
@@ -159,7 +161,8 @@ export type CaseJobView = {
   receipts: { entityId: string; href: string; title: string }[];
   help: { id: string; question: string; status: string; notificationStatus:string } | null;
   savedSelection: CaseSelection | null;
-  coordinator:{provider:string;model:string}|null; team:{name:string;provider:string;model:string}[];
+  coordinator: { provider: string; model: string } | null;
+  team: { name: string; provider: string; model: string; memoryLabels: string[] }[];
   pendingPlan: { preview: string; hash: string } | null;
 };
 export const emptyReport = (): CaseReport => ({

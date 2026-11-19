@@ -34,7 +34,7 @@ async function requestPjudJudgmentsOnce(filters: Record<string, unknown>, transp
   const rawBytes = await read(response, signal, maxBytes);
   let payload;
   try { payload = JSON.parse(rawBytes.toString("utf8")); } catch { throw fail(); }
-  return { payload, rawBytes };
+  return { payload };
 }
 /** A single CSRF retry starts over: no old cookies/token or old request body survive. */
 export async function requestPjudJudgments(filters: Record<string, unknown>, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader, offset = 0) {
@@ -47,25 +47,49 @@ export async function requestPjudJudgments(filters: Record<string, unknown>, tra
     }
   }
 }
+// Keep names and other unexpected free text out of the case identifier displayed in search.
+export function publicJudgmentRol(value: unknown) {
+  return typeof value === "string" && /^(?:[A-Za-z]{1,3}-)?\d{1,9}-\d{4}$/.test(value.trim()) ? value.trim() : "";
+}
+
+/** A deterministic public record. Repeated retrieval preserves the same file hash. */
+export function publicJudgmentFile(source: string, id: string, rol: string, text: string) {
+  return Buffer.from(JSON.stringify({ format: "lexopen.pjud.public.v1", id, rol, source, text }), "utf8");
+}
+
 export async function fetchPjudJudgment(canonicalUrl: string, id: string, transport: Transport, signal: AbortSignal, maxBytes: number, read: Reader): Promise<FetchedLegalSource> {
-  const { payload, rawBytes } = await requestPjudJudgments({ id: Number(id) }, transport, signal, maxBytes, read);
+  const { payload } = await requestPjudJudgments({ id: Number(id) }, transport, signal, maxBytes, read);
   const docs = payload?.response?.docs;
   if (!Array.isArray(docs) || docs.length !== 1 || String(docs[0]?.id) !== id) throw fail();
   const doc = docs[0];
-  // A preview or a literal anonymization placeholder cannot substantiate a citation.
-  const anonymized = Number(doc.sit_fallo_anonimizado_i) === 1;
-  const suppliedText = anonymized && typeof doc.texto_sentencia_anon === "string" ? doc.texto_sentencia_anon : doc.texto_sentencia;
+  const flag = doc.sit_fallo_anonimizado_i;
+  const publicVariant = doc.texto_sentencia_anon;
+  // A supplied public variant wins even when the flag says otherwise. Only an
+  // explicitly unmarked row may treat an empty variant as an unused field.
+  const explicitlyUnmarked = [0, "0", false].includes(flag);
+  const hasPublicVariant = publicVariant != null && (typeof publicVariant !== "string" || Boolean(publicVariant.trim()));
+  const anonymized = hasPublicVariant || (!explicitlyUnmarked && (flag != null || Object.hasOwn(doc, "texto_sentencia_anon")));
+  const suppliedText = anonymized ? publicVariant : doc.texto_sentencia;
   const rawText = typeof suppliedText === "string" ? suppliedText : "";
   const textDom = parseDocument(rawText);
-  DomUtils.findAll(node => ["script", "style"].includes(node.name), textDom.children).forEach(node => DomUtils.removeElement(node));
+  DomUtils.findAll(node => ["script", "style", "template", "noscript"].includes(node.name)
+    || Object.hasOwn(node.attribs, "hidden") || node.attribs["aria-hidden"] === "true"
+    || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\b/i.test(node.attribs.style || ""), textDom.children)
+    .forEach(node => DomUtils.removeElement(node));
   const text = textDom.children.map(node => DomUtils.innerText(node)).join("\n").trim();
-  if (!text || /^ANONIMIZAD[OA]$/i.test(text) || text.length > 2_000_000) throw fail();
-  const rol = typeof doc.rol_era_sup_s === "string" ? doc.rol_era_sup_s : "";
+  const placeholder = /^(?:(?:texto|fallo|sentencia)\s+)?(?:anonimizad[oa]s?|reservad[oa]s?|no\s+disponible|sin\s+texto)$/i;
+  if (!text || placeholder.test(text.replace(/[\[\]().!]/g, "").trim())) {
+    throw Object.assign(new Error("Texto público no disponible."), { status: 422, code: "pjud_public_text_unavailable" });
+  }
+  if (text.length > 2_000_000) throw fail();
+  const rol = publicJudgmentRol(doc.rol_era_sup_s);
+  // A stable derivative for the same public text. No portal envelopes, hidden HTML, previews or session values.
+  const rawBytes = publicJudgmentFile(canonicalUrl, id, rol, text);
   return { canonicalUrl, retrievalUrl: `${BASE}/busqueda/buscar_sentencias`, title: `Sentencia PJUD ${rol || id}`,
     organism: "Poder Judicial de Chile", kind: "jurisprudence", externalId: `PJUD:${id}`, text, rawBytes,
-    mimeType: "application/json", retrievedAt: new Date(), coverageWarnings: [
+    pjudPublicCopy: { rol }, mimeType: "application/json", retrievedAt: new Date(), coverageWarnings: [
       "Fuente pública experimental: no acredita cobertura exhaustiva ni vigencia del criterio judicial.",
-      "Se conserva la respuesta JSON recibida, no un PDF original. Las citas no tienen página física.",
+      "La copia conserva el texto público recuperado. Las citas se identifican por fragmento.",
       ...(anonymized ? ["La fuente informa anonimización: revise las omisiones en el texto conservado."] : []),
     ] };
 }

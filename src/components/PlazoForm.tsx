@@ -23,13 +23,18 @@ export function PlazoForm({
   causas,
   responsables,
   defaults,
+  civilAvailable,
+  chile,
 }: {
   causas: Option[];
   responsables: Option[];
   defaults?: PlazoFormDefaults;
+  civilAvailable: boolean;
+  chile: boolean;
 }) {
   const router = useRouter();
   const fieldId = useId();
+  const [profile, setProfile] = useState<"manual" | "internal" | "civil">("manual");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const submission = useRef(createSubmissionKeys(undefined, `lexopen:deadline:${defaults?.causaId || "global"}`));
@@ -54,7 +59,7 @@ export function PlazoForm({
   useEffect(() => {
     let cancelled = false;
     const t = window.setTimeout(async () => {
-      if (!fechaNotificacion || !diasPlazo || Number(diasPlazo) < 1) {
+      if (profile !== "internal" || !fechaNotificacion || !diasPlazo || Number(diasPlazo) < 1) {
         if (!cancelled) setEstimate(null);
         return;
       }
@@ -82,7 +87,7 @@ export function PlazoForm({
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [fechaNotificacion, diasPlazo, tipoComputo]);
+  }, [profile, fechaNotificacion, diasPlazo, tipoComputo]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -93,10 +98,14 @@ export function PlazoForm({
     const payload = {
       titulo: String(fd.get("titulo") || ""),
       descripcion: String(fd.get("descripcion") || ""),
-      fechaLimite: fechaLimite || null,
+      calculationProfile: profile,
+      fechaLimite: profile === "manual" ? fechaLimite : null,
       fechaNotificacion: fechaNotificacion || null,
-      diasPlazo: diasPlazo ? Number(diasPlazo) : null,
-      tipoComputo,
+      diasPlazo: profile !== "manual" && diasPlazo ? Number(diasPlazo) : null,
+      ...(profile === "civil" ? {
+        civilScopeConfirmed: fd.get("civilScopeConfirmed") === "on",
+        notificationConfirmed: fd.get("notificationConfirmed") === "on",
+      } : { tipoComputo }),
       esFatal: fd.get("esFatal") === "on",
       tipo: String(fd.get("tipo") || "procesal"),
       causaId: causaId || null,
@@ -114,6 +123,7 @@ export function PlazoForm({
     }
     submission.current.complete(payload);
     form.reset();
+    setProfile("manual");
     setCausaId("");
     setFechaNotificacion("");
     setDiasPlazo("");
@@ -128,7 +138,6 @@ export function PlazoForm({
       onSubmit={onSubmit}
       className="panel grid grid-cols-1 gap-4 rounded-[var(--radius-lg)] p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <p className="text-sm text-[var(--muted)] sm:col-span-2 lg:col-span-4">El cálculo automático estima fechas internas para Chile y requiere revisar el régimen del procedimiento. Para otros países, indique una fecha límite revisada manualmente.</p>
       <div className="sm:col-span-2">
         <label htmlFor={`${fieldId}-titulo`} className="mb-2 block text-sm font-medium">Título</label>
         <input id={`${fieldId}-titulo`}
@@ -153,46 +162,70 @@ export function PlazoForm({
           ))}
         </select>
       </div>
+      <div className="sm:col-span-2">
+        <label htmlFor={`${fieldId}-profile`} className="mb-2 block text-sm font-medium">Cómo fijar el vencimiento</label>
+        <select id={`${fieldId}-profile`} className="select" value={profile} onChange={e => {
+          const next = e.target.value;
+          if (next !== "manual" && next !== "internal" && next !== "civil") return;
+          setProfile(next);
+          setEstimate(null);
+          setError("");
+        }}>
+          <option value="manual">Fecha revisada por el estudio</option>
+          {chile && <option value="internal">Estimación interna de Chile</option>}
+          {chile && <option value="civil">CPC chileno · término individual en días</option>}
+        </select>
+      </div>
+      {profile === "civil" && (civilAvailable ? (
+        <fieldset className="space-y-2 text-sm sm:col-span-2 lg:col-span-4">
+          <legend className="font-medium">Ámbito del perfil civil</legend>
+          <label className="flex gap-2"><input type="checkbox" name="notificationConfirmed" required />Verifiqué la fecha efectiva de notificación para esta parte.</label>
+          <label className="flex gap-2"><input type="checkbox" name="civilScopeConfirmed" required />Es un término legal individual del CPC en días. Descarté procedimiento especial, suspensión, ampliación territorial, habilitación judicial y feriados regionales aplicables.</label>
+        </fieldset>
+      ) : (
+        <p role="status" className="text-sm sm:col-span-2">El perfil espera revisión profesional. Para registrar el plazo, elija «Fecha revisada por el estudio».</p>
+      ))}
       <div>
         <label htmlFor={`${fieldId}-fechaNotificacion`} className="mb-2 block text-sm font-medium">Notificación</label>
         <input id={`${fieldId}-fechaNotificacion`}
           className="input"
           type="date"
+          required={profile !== "manual"}
           name="fechaNotificacion"
           value={fechaNotificacion}
-          onChange={(e) => setFechaNotificacion(e.target.value)}
+          onChange={(e) => { setEstimate(null); setFechaNotificacion(e.target.value); }}
         />
       </div>
-      <div>
+      {profile !== "manual" && <div>
         <label htmlFor={`${fieldId}-diasPlazo`} className="mb-2 block text-sm font-medium">Días plazo</label>
         <input id={`${fieldId}-diasPlazo`}
           className="input"
           type="number"
           min="1"
           max={MAX_DIAS_PLAZO}
+          required
           name="diasPlazo"
           placeholder="5"
           value={diasPlazo}
-          onChange={(e) => setDiasPlazo(e.target.value)}
+          onChange={(e) => { setEstimate(null); setDiasPlazo(e.target.value); }}
         />
-      </div>
-      <div>
+      </div>}
+      {profile === "internal" && <div>
         <label htmlFor={`${fieldId}-tipoComputo`} className="mb-2 block text-sm font-medium">Cómputo</label>
         <select id={`${fieldId}-tipoComputo`}
           className="select"
           name="tipoComputo"
           value={tipoComputo}
-          onChange={(e) =>
-            setTipoComputo(
-              e.target.value === "corridos" ? "corridos" : "habiles"
-            )
-          }
+          onChange={(e) => {
+            setEstimate(null);
+            setTipoComputo(e.target.value === "corridos" ? "corridos" : "habiles");
+          }}
         >
           <option value="habiles">Hábiles (lun–vie)</option>
           <option value="corridos">Corridos</option>
         </select>
-      </div>
-      <div>
+      </div>}
+      {profile === "manual" && <div>
         <label htmlFor={`${fieldId}-fechaLimite`} className="mb-2 block text-sm font-medium">
           Fecha límite directa
         </label>
@@ -200,13 +233,14 @@ export function PlazoForm({
           className="input"
           type="date"
           name="fechaLimite"
+          required
           value={fechaLimite}
           onChange={(e) => setFechaLimite(e.target.value)}
         />
-      </div>
+      </div>}
       <div>
         <label htmlFor={`${fieldId}-tipo`} className="mb-2 block text-sm font-medium">Tipo</label>
-        <select id={`${fieldId}-tipo`} className="select" name="tipo" defaultValue="procesal">
+        <select id={`${fieldId}-tipo`} className="select" key={profile === "civil" ? "civil" : "other"} name="tipo" defaultValue="procesal" disabled={profile === "civil"}>
           <option value="procesal">Procesal</option>
           <option value="interno">Interno</option>
           <option value="audiencia">Audiencia</option>
@@ -224,17 +258,14 @@ export function PlazoForm({
         />
       </div>
       <div className="flex items-end">
-        <button className="btn btn-primary w-full" disabled={busy} type="submit">
+        <button className="btn btn-primary w-full" disabled={busy || (profile === "civil" && !civilAvailable)} type="submit">
           {busy ? "Guardando..." : "Crear plazo"}
         </button>
       </div>
-      <p className="text-xs leading-relaxed text-[var(--muted)] sm:col-span-2 lg:col-span-4">
-        Hábiles: lunes a viernes, sin feriados nacionales (el sábado no se
-        cuenta). Corridos: todos los días; si el último cae en sábado, domingo
-        o feriado, el vencimiento pasa al día hábil siguiente. No descuenta la
-        feria judicial de febrero.
-      </p>
-      {estimate && !estimate.error && estimate.vencimiento && (
+      {profile === "internal" && <p className="text-xs leading-relaxed text-[var(--muted)] sm:col-span-2 lg:col-span-4">
+        La estimación interna usa días hábiles de lunes a viernes y feriados nacionales. En días corridos, traslada el vencimiento al siguiente hábil si corresponde.
+      </p>}
+      {profile === "internal" && estimate && !estimate.error && estimate.vencimiento && (
         <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 text-sm sm:col-span-2 lg:col-span-4">
           <p>
             Estimación LexOpen: <strong>{estimate.vencimiento}</strong>
@@ -261,13 +292,13 @@ export function PlazoForm({
           <button
             type="button"
             className="btn btn-ghost mt-2"
-            onClick={() => setFechaLimite(estimate.vencimiento || "")}
+            onClick={() => { setFechaLimite(estimate.vencimiento || ""); setProfile("manual"); }}
           >
             Usar esta fecha
           </button>
         </div>
       )}
-      {estimate?.error && (
+      {profile === "internal" && estimate?.error && (
         <p className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4">
           {estimate.error}
         </p>

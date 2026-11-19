@@ -134,7 +134,7 @@ Puedes pedir «Delega al Ícaro Revisor: compara estas fuentes». Altazor prepar
 
 ## Encargos persistentes de una causa
 
-Pide «Revisa esta causa, organiza los pendientes y prepara un borrador» desde una conversación vinculada al expediente. **Confirmar equipo e iniciar encargo** autoriza el alcance y los modelos indicados. Altazor utiliza hasta dos Ícaros habilitados de esa causa, o realiza el análisis solo cuando no hay perfiles disponibles. En esta modalidad no se incorpora memoria de los Ícaros ni se guardan recuerdos automáticamente; los encargos manuales de Ícaros conservan sus opciones de memoria propias.
+Pide «Revisa esta causa, organiza los pendientes y prepara un borrador» desde una conversación vinculada al expediente. **Confirmar equipo e iniciar encargo** autoriza el alcance y los modelos indicados. Altazor utiliza hasta dos Ícaros habilitados de esa causa, o realiza el análisis solo cuando no hay perfiles disponibles. Antes de enviar, elige los recuerdos que necesita cada Ícaro. La confirmación muestra sus títulos y el modelo de destino. Cada recuerdo queda vinculado a su revisión y a las fuentes accesibles del perfil.
 
 El encargo tiene etapas y recibos persistentes, distintos de un turno ordinario del chat: no caduca al superar las 24 horas de cola de mensajes. Cada llamada mantiene sus límites de recursos y controles de acceso. El Host y su worker de jornada deben continuar activos para trabajar con la ventana cerrada. Cancelar detiene las etapas y delegaciones pendientes; no deshace registros ya guardados.
 

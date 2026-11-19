@@ -6,6 +6,8 @@ import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import type { TimelineTurn } from "../src/components/altazor/useAltazorTimeline";
 import { loginAs } from "./helpers";
 
+test.use({ serviceWorkers: "block" });
+
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 const owners: string[] = [];
 const tag = randomUUID();
@@ -51,6 +53,47 @@ test.afterAll(async () => {
     await db.auditEvent.deleteMany({ where: { actorId: { in: owners } } });
     await db.user.deleteMany({ where: { id: { in: owners } } });
   } finally { await db.$disconnect(); }
+});
+
+test("el historial retrocede y avanza por páginas revalidadas con su posición original", async ({ page }) => {
+  const initiallyNewest = turn(3);
+  const tallAnswer = "Contenido extenso para desplazar la lectura. ".repeat(170);
+  const firstPage = [turn(2, { assistantText: tallAnswer }), initiallyNewest];
+  const anchor = `${initiallyNewest.createdAt}~${initiallyNewest.id}`;
+  const queries: string[] = [];
+  let visits = 0;
+  await page.route("**/api/altazor/updates", route => route.fulfill({ json: { updates: [] } }));
+  await page.route(url => url.pathname === "/api/altazor/timeline", route => {
+    const query = new URL(route.request().url()).searchParams;
+    const before = query.get("before"), pinned = query.get("through");
+    queries.push(before || pinned || "latest");
+    if (before === "page-two") return route.fulfill({ json: { turns: [turn(1)], before: null } });
+    if (before === "page-one") return route.fulfill({ json: { turns: [turn(2, { assistantText: ++visits === 1 ? "Mensaje de la página intermedia" : "Acceso revisado" })], before: "page-two" } });
+    return route.fulfill({ json: { turns: !pinned && queries.includes(anchor) ? [turn(4)] : firstPage, before: "page-one" } });
+  });
+  await loginAs(page, await fixtureUser());
+  const history = page.getByRole("region", { name: "Historial con Altazor" });
+  const older = history.getByRole("button", { name: "Ver mensajes anteriores" });
+  const newer = history.getByRole("button", { name: "Ver mensajes posteriores" });
+  await expect(history).toContainText("Pregunta ficticia 3");
+  // A keyboard activation should return the reader to the same passage.
+  await history.evaluate(element => { element.scrollTop = 130; });
+  const originalOffset = await history.locator("[data-history-id]").first().evaluate(item => item.getBoundingClientRect().top - item.closest("section")!.getBoundingClientRect().top);
+  await older.evaluate(button => (button as HTMLButtonElement).click());
+  await expect(history).toContainText("Mensaje de la página intermedia");
+  await older.click();
+  await expect(history).toContainText("Pregunta ficticia 1");
+  await newer.click();
+  await expect(history).toContainText("Acceso revisado");
+  await expect(history).not.toContainText("Mensaje de la página intermedia");
+  await newer.click();
+  await expect(history).toContainText("Pregunta ficticia 3");
+  await expect.poll(() => history.locator("[data-history-id]").first().evaluate(item =>
+    Math.round(item.getBoundingClientRect().top - item.closest("section")!.getBoundingClientRect().top))
+  ).toBe(Math.round(originalOffset));
+  expect(queries).toContain(anchor);
+  await history.getByRole("button", { name: "Volver a lo reciente" }).click();
+  await expect(history).toContainText("Pregunta ficticia 4");
 });
 
 test("el chat presenta Markdown legible sin ejecutar HTML ni enlaces inseguros", async ({ page }) => {

@@ -5,7 +5,8 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
-import type { ResearchResult } from "../src/lib/research/service";
+import { fetchPublicLegalSource } from "../src/lib/research/sources";
+import { importLegalSource, type ResearchResult } from "../src/lib/research/service";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 const tag = randomUUID(), token = `biblioteca${tag.replaceAll("-", "")}`;
@@ -96,4 +97,35 @@ test("biblioteca: guardar cita, fijar versión, consultar y restaurar alcance, r
   const portalContext = await browser.newContext({ locale: "es-CL" });
   try { const portal = await portalContext.newPage(); await loginAs(portal, "cliente@andes.cl"); expect((await portal.request.get("/api/knowledge/collections")).status()).toBe(403); expect((await portal.request.get(`/api/knowledge/collections/${collectionId}`)).status()).toBe(403); }
   finally { await portalContext.close(); }
+
+  const collection = await db.knowledgeCollection.findUniqueOrThrow({ where: { id: collectionId } });
+  const pinned = await page.request.post(`/api/knowledge/collections/${collectionId}/items`, { data: {
+    expectedRevision: collection.revision, citation: { kind: "legal", fragmentId: result.results[0].fragmentId, quote: sourceText },
+  } });
+  expect(pinned.status(), await pinned.text()).toBe(201);
+  const judgmentId = String(9_000_000_000 + Number.parseInt(tag.slice(0, 7), 16));
+  const judgmentUrl = `https://juris.pjud.cl/busqueda?Civiles#sentencia-${judgmentId}`;
+  await db.legalSource.update({ where: { id: sourceId }, data: { canonicalUrl: judgmentUrl } });
+  await db.legalSourceVersion.updateMany({ where: { sourceId }, data: { reviewState: "quarantined" } });
+  await library.getByRole("button", { name: "Actualizar biblioteca", exact: true }).click();
+  const check = library.getByRole("button", { name: "Cotejar con la versión pública" });
+  await expect(check).toBeVisible();
+  await expect(library.getByText(sourceText, { exact: true })).toHaveCount(0);
+  await check.click();
+  await expect(library.getByRole("link", { name: /Recuperar la versión pública del fallo/ })).toHaveAttribute("href", `/jurisprudencia/fuentes/${original.id}`);
+
+  const publicCopy = await fetchPublicLegalSource(judgmentUrl, { fetch: async url => String(url).endsWith("?Civiles")
+    ? new Response('<input name="_token" value="fixture"><script>id_buscador_activo=1</script>', { headers: { "Set-Cookie": "fixture=anonymous" } })
+    : Response.json({ response: { docs: [{ id: Number(judgmentId), sit_fallo_anonimizado_i: 1, texto_sentencia_anon: `Fundamentos públicos. ${sourceText}` }] } }) });
+  const owner = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" } });
+  const recovered = await importLegalSource(publicCopy, owner, db);
+  await check.click();
+  await expect(library.locator("blockquote")).toHaveText(sourceText);
+  await expect(library.getByRole("link", { name: "Abrir versión pública recuperada" })).toHaveAttribute("href", new RegExp(recovered.id));
+  await library.getByRole("button", { name: "Guardar en biblioteca" }).click();
+  await expect(library.getByLabel("Colección de destino")).toHaveValue(collectionId);
+  await library.getByRole("button", { name: "Conservar esta versión" }).click();
+  await expect(library.getByRole("link", { name: "Abrir cita y versión" })).toHaveAttribute("href", new RegExp(recovered.id));
+  await expect(check).toBeVisible();
+  expect(await db.knowledgeCollectionItem.count({ where: { collectionId } })).toBe(2);
 });

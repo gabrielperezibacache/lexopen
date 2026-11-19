@@ -54,8 +54,9 @@ async function body(kind: CitationInput["kind"], versionId: string, expected: st
   if (typeof value !== "string" && !(value instanceof Promise)) {
     const table = kind === "legal" ? Prisma.sql`"LegalSourceVersion"` : Prisma.sql`"DocumentEvidenceVersion"`;
     const column = kind === "legal" ? Prisma.sql`"text"` : Prisma.sql`"extractedText"`;
+    const availability = kind === "legal" ? Prisma.sql`AND "reviewState" = 'available'` : Prisma.empty;
     const pending = (async () => {
-      const rows = await client.$queryRaw<{ whole: string }[]>(Prisma.sql`SELECT CASE WHEN octet_length(${column}) <= 8_000_000 THEN ${column} ELSE NULL END AS whole FROM ${table} WHERE "id" = ${versionId}`);
+      const rows = await client.$queryRaw<{ whole: string }[]>(Prisma.sql`SELECT CASE WHEN octet_length(${column}) <= 8_000_000 THEN ${column} ELSE NULL END AS whole FROM ${table} WHERE "id" = ${versionId} ${availability}`);
       const text = rows[0]?.whole;
       if (typeof text !== "string" || text.length > 2_000_000 || sha256(text) !== expected) throw invalid();
       const used = Number(cache.get("body:cachedChars") || 0);
@@ -73,6 +74,12 @@ function stored(input: CitationInput, versionId: string, textSha256: string, sou
   const quoteSha256 = sha256(input.quote);
   return { ...input, versionId, quoteSha256, textSha256, sourceSha256, pageNumber, sourceKey: sha256(JSON.stringify([input.kind, input.fragmentId, versionId, quoteSha256, textSha256, sourceSha256, pageNumber])) };
 }
+export function hasStoredCitationIdentity(value: StoredCitation) {
+  if (!value || typeof value.fragmentId !== "string" || !value.fragmentId || typeof value.versionId !== "string" || !value.versionId ||
+      typeof value.quote !== "string" || !value.quote.trim() || value.quote.length > 10_000) return false;
+  const expected = stored(value, value.versionId, value.textSha256, value.sourceSha256, value.pageNumber);
+  return expected.sourceKey === value.sourceKey && expected.quoteSha256 === value.quoteSha256;
+}
 function isPartial(json: string, status: string) {
   try { return Boolean(JSON.parse(json).partial) || ["needs_ocr", "partial", "failed"].includes(status); } catch { return true; }
 }
@@ -80,6 +87,7 @@ function isPartial(json: string, status: string) {
 function legalWarnings(json: string, method: string) {
   let warnings: string[] = [];
   try { const values = JSON.parse(json).coverageWarnings; if (Array.isArray(values)) warnings = values.filter((v: unknown): v is string => typeof v === "string").slice(0, 20); } catch { warnings.push("Metadatos de procedencia incompletos"); }
+  if (method === "pjud_public") warnings.push("Versión pública recuperada del Buscador Unificado.");
   if (method === "manual") warnings.push("Aporte manual sin cotejo oficial");
   return [...new Set(warnings)];
 }
@@ -88,7 +96,7 @@ export async function resolveCitation(input: CitationInput, user: CausaAccessUse
   const client = options.client || prisma, cache = options.cache || new Map<string, unknown>();
   const actor = await actorFor(user, client); await scopeFor(options, actor, client);
   if (input.kind === "legal") {
-    const row = await client.legalSourceFragment.findUnique({ where: { id: input.fragmentId }, select: { id: true, ordinal: true, versionId: true, text: true, textSha256: true, startOffset: true, endOffset: true, version: { select: { title: true, kind: true, acquisitionMethod: true, metadataJson: true, textSha256: true, sourceSha256: true, sourceStorageKey: true, source: { select: { versions: { orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } } } } } });
+    const row = await client.legalSourceFragment.findFirst({ where: { id: input.fragmentId, version: { reviewState: "available" } }, select: { id: true, ordinal: true, versionId: true, text: true, textSha256: true, startOffset: true, endOffset: true, version: { select: { title: true, kind: true, acquisitionMethod: true, metadataJson: true, textSha256: true, sourceSha256: true, sourceStorageKey: true, source: { select: { versions: { where: { reviewState: "available" }, orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } } } } } });
     if (!row) throw missing();
     if (!verifyEvidenceQuote(row, input.quote)) throw invalid();
     await body(input.kind, row.versionId, row.version.textSha256, row, client, cache);

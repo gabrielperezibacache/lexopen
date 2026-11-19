@@ -278,6 +278,12 @@ test("plazos: causas fuera de las primeras 100, roles internos y páginas de ven
     await page.goto("/plazos?mes=2088-11");
     await page.waitForLoadState("networkidle");
     await page.getByRole("link", { name: "Registrar un plazo", exact: true }).click();
+    const method = page.getByLabel("Cómo fijar el vencimiento");
+    await expect(method).toHaveValue("manual");
+    await method.selectOption("civil");
+    await expect(page.getByRole("status").filter({ hasText: "espera revisión profesional" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Crear plazo" })).toBeDisabled();
+    await method.selectOption("manual");
     const select = page.getByLabel("Causa", { exact: true });
     await expect(select.locator(`option[value="${old.id}"]`)).toHaveCount(0);
     const query = page.getByLabel("Buscar causa", { exact: true });

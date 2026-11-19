@@ -16,7 +16,9 @@ async function main() {
     return new Response(JSON.stringify({ response: { docs, numFound: 30, start: returnedStart } }), { headers: { "Content-Type": "application/json" } });
   };
   const input = { rol: "C-3630-2023", terms: "", page: 0 };
-  assert.equal((await searchPublicPjudJudgments(input, { fetch: fetchMock })).items[0].id, "123");
+  const search = await searchPublicPjudJudgments(input, { fetch: fetchMock });
+  assert.equal(search.items[0].id, "123");
+  assert.doesNotMatch(JSON.stringify(search), /Caso de prueba/, "public result cards omit carátulas and keep only court and ROL");
   docs = Array.from({ length: 10 }, (_, i) => ({ ...docs[0], id: 123 + i }));
   assert.equal((await searchPublicPjudJudgments(input, { fetch: fetchMock })).nextPage, 1);
   assert.equal((await searchPublicPjudJudgments({ ...input, page: 1 }, { fetch: fetchMock })).page, 1);

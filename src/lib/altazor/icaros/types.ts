@@ -1,6 +1,7 @@
 import type { AltazorDestination } from "../types";
 
 export const ICARO_LIMITS = { profiles: 20, queuedPerOwner: 10, concurrentPerOwner: 2, depth: 1, memories: 32, memoryEntriesInContext: 6, memoryCharacters: 6000, contextCharacters: 32000, deadlineMs: 45000, leaseMs: 60000 } as const;
+export type IcaroTurnSelection = { icaroId: string; entries: IcaroMemoryRef[] };
 export type IcaroProvider = "inherit" | "study" | "codex";
 export type IcaroJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "blocked" | "interrupted";
 export type IcaroDestination = AltazorDestination & { routeProvider: "study" | "codex" };
@@ -15,4 +16,5 @@ export type IcaroJobView = {
   useMemory: boolean; depth: number; parentJobId: string | null; errorCode: string | null;
   createdAt: string; startedAt: string | null; finishedAt: string | null;
 };
-export type IcaroMemoryView = { id: string; label: string; body: string; revision: number; sourceJobId: string | null; available: boolean; createdAt: string };
+export type IcaroMemoryRef = { id: string; revision: number; hash: string };
+export type IcaroMemoryView = { hash: string; id: string; label: string; body: string; revision: number; sourceJobId: string | null; available: boolean; createdAt: string };

@@ -21,14 +21,15 @@ function timelineCursor(raw: string | null | undefined) {
 }
 
 /** Unified display only. Turn creation, context recall and execution keep their original scopes. */
-export async function readAltazorTimeline(user: CausaAccessUser, before?: string | null, client: PrismaClient = prisma) {
-  const cursor = timelineCursor(before);
+export async function readAltazorTimeline(user: CausaAccessUser, before?: string | null, client: PrismaClient = prisma, through?: string | null) {
+  if (before && through) throw httpError("Use una sola posición del historial.", 400);
+  const cursor = timelineCursor(before || through);
   const actor = await altazorActor(user, client);
   const rows = await client.altazorTurn.findMany({
     where: {
       ownerId: actor.id,
       conversation: conversationAccessWhere(actor),
-      ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}),
+      ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: through ? { lte: cursor.id } : { lt: cursor.id } }] } : {}),
     },
     include: { conversation: { select: scopeIdentitySelect } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: ALTAZOR_LIMITS.turnsPerPage + 1,
