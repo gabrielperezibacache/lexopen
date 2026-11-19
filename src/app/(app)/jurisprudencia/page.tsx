@@ -14,17 +14,20 @@ import { getI18n } from "@/lib/i18n/server";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import { LibraryPanel } from "@/components/LibraryPanel";
 import { LegalResearchWorkbench } from "@/components/LegalResearchWorkbench";
+import { researchWorkspaceView } from "@/lib/research/workspace-navigation";
+import { ResearchWorkspaceNavigation } from "@/components/ResearchWorkspaceNavigation";
 
 const LIST_TAKE = 80;
 
 export default async function JurisprudenciaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; materia?: string; investigacion?: string }>;
+  searchParams: Promise<{ q?: string; materia?: string; investigacion?: string; vista?: string }>;
 }) {
   const user = await requireStaff();
   const { dict } = await getI18n();
   const h = dict.hubs.jurisprudencia;
+  const operations = dict.judicialOperations;
   const sp = await searchParams;
   const q = (sp.q || "").trim();
   const materia = sp.materia;
@@ -72,10 +75,14 @@ export default async function JurisprudenciaPage({
     <div className="space-y-6">
       <PageHeader artwork="research" eyebrow={h.eyebrow} title={h.title} />
 
-      <Link href="/biblioteca?fuentes=judicial" className="btn btn-secondary">Mis sentencias y resoluciones · archivo, lectura y citas</Link>
-      <LegalResearchWorkbench initialCases={cases} initialRunId={sp.investigacion} />
+      <ResearchWorkspaceNavigation />
+      <p className="max-w-prose text-sm text-[var(--ink-soft)]">{operations.researchScope}</p>
+      <Link href="/biblioteca?fuentes=judicial" className="btn btn-secondary">{operations.personalLibrary}</Link>
+      <LegalResearchWorkbench initialCases={cases} initialRunId={sp.investigacion} initialView={researchWorkspaceView(sp.vista)} />
       <LibraryPanel initialCases={cases} />
 
+      <section className="space-y-5" aria-labelledby="legacy-catalogue-title">
+      <h2 id="legacy-catalogue-title" className="display text-2xl">{operations.legacyCatalogue}</h2>
       <JurisprudenciaSearch materias={[...MATERIAS]} />
       <JurisprudenciaBrief />
       {isAdmin(user) && <JurisprudenciaIngestForm />}
@@ -127,6 +134,7 @@ export default async function JurisprudenciaPage({
           />
         )}
       </div>
+      </section>
     </div>
   );
 }

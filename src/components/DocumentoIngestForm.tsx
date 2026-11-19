@@ -11,7 +11,8 @@ import {
 } from "@/lib/document-ingest";
 import { apiMutation } from "@/lib/api-mutation";
 
-type CausaOption = { id: string; label: string };
+import type { uploadDestination } from "@/lib/causas/upload-destination";
+type CausaOption = ReturnType<typeof uploadDestination>;
 
 type FileRow = {
   key: string;
@@ -29,6 +30,7 @@ type Props = {
   lockedCausaId?: string | null;
   /** Associate uploads with a CRM client folder. */
   lockedClienteId?: string | null;
+  clientName?: string;
   compact?: boolean;
   allowDriveCopy?: boolean;
   destinationFolder?: { id: string; name: string };
@@ -82,6 +84,7 @@ export function DocumentoIngestForm({
   causas = [],
   lockedCausaId = null,
   lockedClienteId = null,
+  clientName,
   allowDriveCopy = true,
   destinationFolder,
   onComplete,
@@ -99,6 +102,8 @@ export function DocumentoIngestForm({
   const [confidencial, setConfidencial] = useState(false);
   const [privilegio, setPrivilegio] = useState(false);
   const [pushDrive, setPushDrive] = useState(false);
+  const destination = causas.find(c => c.id === (lockedCausaId || causaId));
+  const drive = allowDriveCopy && !confidencial && !privilegio ? destination?.drive : null;
 
   // ⚡ Bolt: Avoid allocating new arrays with filter().length by using reduce() for counts
   const pendingCount = useMemo(
@@ -135,7 +140,10 @@ export function DocumentoIngestForm({
     fd.set("tipo", resolvedTipo === "auto" ? "auto" : resolvedTipo);
     if (row.ruta) fd.set("ruta", row.ruta);
     fd.set("relativePath", row.relativePath);
-    if (resolvedCausaId) fd.set("causaId", resolvedCausaId);
+    if (resolvedCausaId) {
+      fd.set("causaId", resolvedCausaId);
+      if (destination) fd.set("expectedClienteId", destination.clientId || "");
+    }
     if (lockedClienteId) fd.set("clienteId", lockedClienteId);
     if (confidencial) fd.set("confidencial", "on");
     if (privilegio) fd.set("privilegio", "on");
@@ -158,7 +166,7 @@ export function DocumentoIngestForm({
       if (!placement.ok) return { warning: `Guardado en la raíz del expediente. ${placement.error}` };
     }
 
-    if (allowDriveCopy && pushDrive && body.id && resolvedCausaId) {
+    if (drive && pushDrive && body.id && resolvedCausaId) {
       const driveResult = await apiMutation<{
         error?: string;
         status?: string;
@@ -166,7 +174,7 @@ export function DocumentoIngestForm({
       }>("/api/integrations/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "push-documento", documentoId: body.id }),
+        body: JSON.stringify({ action: "push-documento", documentoId: body.id, studyFolderId: drive.id }),
       });
       if (!driveResult.ok && driveResult.error) {
         return { warning: `Subido localmente; Drive: ${driveResult.error}` };
@@ -290,15 +298,21 @@ export function DocumentoIngestForm({
         }}
       />
 
-      {!lockedCausaId && rows.length > 0 && (
+      {!lockedCausaId && (
         <label className="block max-w-lg text-sm font-medium" htmlFor={`${fieldId}-causa`}>
           Causa
-          <select id={`${fieldId}-causa`} className="select mt-2 w-full" value={causaId} disabled={busy} onChange={event => setCausaId(event.target.value)}>
+          <select id={`${fieldId}-causa`} className="select mt-2 w-full" value={causaId} disabled={busy} onChange={event => { setCausaId(event.target.value); setPushDrive(false); }}>
             <option value="">Sin causa</option>
             {causas.map(causa => <option key={causa.id} value={causa.id}>{causa.label}</option>)}
           </select>
         </label>
       )}
+      {rows.length > 0 && <dl aria-label="Destino de los documentos" className="grid gap-x-4 gap-y-1 rounded-[var(--radius-md)] border border-[var(--line)] p-3 text-sm sm:grid-cols-[auto_1fr]">
+        <dt>Cliente</dt><dd>{destination?.clientName || clientName || "Sin cliente asociado"}</dd>
+        <dt>Causa</dt><dd>{destination?.label || "Sin causa asociada"}</dd>
+        <dt>Carpeta del estudio</dt><dd>{destinationFolder?.name || (destination ? "Raíz del expediente" : "Documentos")}</dd>
+        <dt>Google Drive</dt><dd>{pushDrive && drive ? drive.name : "Sin copia en Drive"}</dd>
+      </dl>}
       {rows.length > 0 && <details className="text-sm">
         <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Opciones de importación{confidencial ? " · Confidencial" : ""}{privilegio ? " · Privilegio" : ""}{pushDrive ? " · Copia en Drive" : ""}</summary>
         <fieldset disabled={busy} className="grid min-w-0 gap-3 pt-2 sm:grid-cols-2">
@@ -323,7 +337,7 @@ export function DocumentoIngestForm({
           <input
             type="checkbox"
             checked={confidencial}
-            onChange={(e) => setConfidencial(e.target.checked)}
+            onChange={(e) => { setConfidencial(e.target.checked); if (e.target.checked) setPushDrive(false); }}
           />
           Confidencial
         </label>
@@ -331,17 +345,17 @@ export function DocumentoIngestForm({
           <input
             type="checkbox"
             checked={privilegio}
-            onChange={(e) => setPrivilegio(e.target.checked)}
+            onChange={(e) => { setPrivilegio(e.target.checked); if (e.target.checked) setPushDrive(false); }}
           />
           Privilegio
         </label>
-      {allowDriveCopy && <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed sm:col-span-2">
+      {drive && <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed sm:col-span-2">
         <input
           type="checkbox"
           checked={pushDrive}
           onChange={(e) => setPushDrive(e.target.checked)}
         />
-        Guardar también una copia en Google Drive de la causa
+        Guardar también una copia en Google Drive · {drive.name}
       </label>}
         </fieldset>
       </details>}

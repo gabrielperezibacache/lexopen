@@ -6,6 +6,7 @@ import { validarRut } from "@/lib/chile";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { apiMutation } from "@/lib/api-mutation";
 import { PjudManualSessionPanel } from "@/components/pjud/PjudManualSessionPanel";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import "@/components/pjud/pjud-lookup.css";
 
 type Status = {
@@ -52,6 +53,7 @@ function formatWhen(value: string | null | undefined) {
     return date.toLocaleString("es-CL", {
       dateStyle: "short",
       timeStyle: "short",
+      timeZone: "America/Santiago",
     });
   } catch {
     return null;
@@ -93,6 +95,7 @@ type Operation = "save" | "sync" | "clear" | "toggle" | "messages";
 type Capabilities = { sync?: boolean; credentials?: boolean };
 
 export default function MisCausasPage() {
+  const { dict } = useI18n(), operations = dict.judicialOperations;
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState<Operation | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
@@ -327,6 +330,13 @@ export default function MisCausasPage() {
         subtitle="Ingrese con ClaveÚnica, revise las causas y elija cuáles incorporar a su cartera con sus cuadernos."
       />
 
+      <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5" aria-label={operations.operationState}>
+        <dl className="grid gap-5 md:grid-cols-3">
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.connection}</dt><dd className="mt-2 text-sm font-medium">{status ? ready ? operations.channelConfigured : operations.channelPending : operations.notVerified}</dd><dd className="mt-1 text-xs text-[var(--muted)]">{operations.connectionScope}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.consultation}</dt><dd className="mt-2 text-sm font-medium">{syncTitle || operations.noAttempt}{when && <span className="block font-normal">{when}</span>}</dd><dd className="mt-1 text-xs text-[var(--muted)]">{operations.caseCoverage}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.tracking}</dt><dd className="mt-2 text-sm font-medium">{linkedCount === null ? operations.notVerified : `${linkedCount} ${operations.loadedCases}`}</dd><dd className="mt-1"><Link className="text-sm text-[var(--sea)] underline" href="/causas/monitoreo">{operations.openPortfolio}</Link></dd></div>
+        </dl>
+      </section>
       <PjudManualSessionPanel />
 
       <details className="pjud-cu-advanced">

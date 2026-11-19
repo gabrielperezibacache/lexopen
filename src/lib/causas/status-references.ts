@@ -1,11 +1,12 @@
+import { deadlineHref } from "@/lib/deadlines/navigation";
 import type { CaseStatus } from "./status";
 
 export type StatusReference = { text: string; href?: string; label?: string; unverified?: boolean };
 
 /** Only references present in this actor's visible snapshot become links. Model URLs stay plain text. */
-export function caseStatusReferences(text: string, status: CaseStatus): StatusReference[] {
+export function caseStatusReferences(text: string, status: CaseStatus, casePath = `/causas/${encodeURIComponent(status.causaId)}`): StatusReference[] {
   const known = new Map<string, { href: string; label: string }>();
-  for (const p of status.deadlines) known.set(`plazo:${p.id}`, { href: "#plazos", label: `Plazo: ${p.title} · ${p.date}` });
+  for (const p of status.deadlines) known.set(`plazo:${p.id}`, { href: deadlineHref(p.id, `${casePath}#plazo-${p.id}`), label: `Plazo: ${p.title} · ${p.date}` });
   for (const t of status.steps) known.set(`tramite:${t.id}`, { href: "#tramites", label: `Trámite: ${t.title}` });
   for (const m of [...status.waiting, ...(status.latest ? [status.latest] : [])]) known.set(`movimiento:${m.id}`, { href: "#actividad", label: `Movimiento: ${m.title} · ${m.date}` });
   const taskHref = `/tareas?causaId=${encodeURIComponent(status.causaId)}`;

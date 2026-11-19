@@ -55,6 +55,17 @@ export function causaAccessWhere(user: CausaAccessUser): Prisma.CausaWhereInput 
   return { OR: [{ acceso: "estudio" }, memberOf, isAbogado] };
 }
 
+/** Destinations where an upload would pass both the case wall and causa.write. */
+export function writableCausaWhere(user: CausaAccessUser): Prisma.CausaWhereInput {
+  const readable = causaAccessWhere(user);
+  if (can(user, "causa.write")) return readable;
+  if (!canSome(user, "causa.write")) return { id: "__none__" };
+  return { AND: [readable, { OR: [
+    { abogadoId: user.id },
+    { miembros: { some: { ...activeMembershipFilter(user.id), rol: { in: CAUSA_MIEMBRO_ROLES.filter(rol => can(user, "causa.write", { causaRol: rol })) } } } },
+  ] }] };
+}
+
 export async function getCausaMembership(causaId: string, userId: string) {
   return prisma.causaMiembro.findFirst({
     where: { causaId, ...activeMembershipFilter(userId) },

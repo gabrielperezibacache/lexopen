@@ -59,6 +59,7 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
     const additional = `Expediente UE #${tag}-${suffix}`;
     const tribunal = `Sede arbitral ficticia ${tag}`;
     await page.getByRole("textbox", { name: "Título", exact: true }).fill(`Asunto general ficticio ${tag} ${suffix}`);
+    await page.getByText("Datos procesales y partes", { exact: true }).click();
     await page.getByRole("textbox", { name: "Referencia", exact: true }).fill(reference);
     await page.getByRole("textbox", { name: "Identificador adicional", exact: true }).fill(additional);
     await page.getByRole("textbox", { name: "Tribunal u órgano", exact: true }).fill(tribunal);

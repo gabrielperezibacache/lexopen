@@ -70,6 +70,25 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/api/pjud/manual-session", route => route.fulfill({ json: { capabilities: { available: false, allowed: true, hostLocal: true, reason: "Ingreso manual no habilitado en esta prueba ficticia del acceso guardado.", importLimit: 20 }, session: null } }));
 });
 
+test("cartera distingue error de consulta de una lista vacía y permite volver a consultar", async ({ page }) => {
+  let unavailable = true;
+  const methods: string[] = [];
+  await interceptLookup(page, async () => { throw new Error("This reading test must not mutate or query OJV"); });
+  await page.route("**/api/causas/monitoreo", route => {
+    methods.push(route.request().method());
+    return unavailable ? route.fulfill({ status: 503, json: { error: "fixture unavailable" } }) : route.fulfill({ json: { items: [], fallidos: [], resumen: { total: 0, monitoreadas: 0 }, scheduler: { configured: false, intervalMinutes: 720, runtime: "unverified", note: "Fixture local" } } });
+  });
+  await page.goto("/causas/monitoreo");
+  await expect(page.getByRole("alert").filter({ hasText: "No se pudo leer el estado actual" })).toBeVisible();
+  await expect(page.getByText("No hay causas con este filtro.", { exact: false })).toHaveCount(0);
+  unavailable = false;
+  await page.getByRole("button", { name: "Volver a consultar", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "No se pudo leer el estado actual" })).toHaveCount(0);
+  await expect(page.getByText("No hay causas con este filtro.", { exact: false })).toBeVisible();
+  expect(methods.length).toBeGreaterThanOrEqual(2);
+  expect(methods.every(method => method === "GET")).toBe(true);
+});
+
 test("la consulta es de sólo lectura y el registro se confirma por separado", async ({ page }, info) => {
   const payloads: Payload[] = [];
   await interceptLookup(page, async (route, body) => {

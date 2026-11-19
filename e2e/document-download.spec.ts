@@ -86,7 +86,9 @@ test("Documentos, causa y cliente descargan archivos y texto con su nombre y byt
     await expectDownload(page, link(3, "content?download=1"), "original.pdf", original);
     await expectDownload(page, link(5, "content?download=1"), "vacio.txt", Buffer.alloc(0));
     await expectDownload(page, link(6, "content?download=1"), "redacción.docx", docx);
-    await expectDownload(page, link(6, "markdown?download=1"), "redacción.docx.md", Buffer.from("# Texto preparado"));
+    if (!url.startsWith("/documentos?")) await expectDownload(page, link(6, "markdown?download=1"), "redacción.docx.md", Buffer.from("# Texto preparado"));
     await expectDownload(page, link(7, "content?format=text"), "legado.docx.txt", Buffer.from("Texto de archivo antiguo"));
   }
+  await page.goto(`/documentos/${ids[6]}/fuentes`);
+  await expectDownload(page, page.getByRole("link", { name: "Descargar texto preparado", exact: true }), "redacción.docx.md", Buffer.from("# Texto preparado"));
 });

@@ -8,6 +8,7 @@ import { clienteVersion } from "@/lib/offline/version";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   causaAccessWhere,
+  writableCausaWhere,
   documentReadWhere,
   plazoAccessWhere,
   siteAccessWhere,
@@ -22,6 +23,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ClienteEditForm } from "@/components/clientes/ClienteEditForm";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ClienteAiChat } from "@/components/clientes/ClienteAiChat";
+import { uploadDestination } from "@/lib/causas/upload-destination";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
@@ -41,7 +43,7 @@ export default async function ClienteDetailPage({
   const sp = await searchParams;
   const focusCausaId = sp.causa || null;
 
-  const [cliente, abogados, documentRows, documentCount] = await Promise.all([
+  const [cliente, abogados, documentRows, documentCount, writableCases] = await Promise.all([
     prisma.cliente.findUnique({
       where: { id },
       include: {
@@ -50,6 +52,7 @@ export default async function ClienteDetailPage({
           where: causaAccessWhere(user),
           orderBy: { updatedAt: "desc" },
           include: {
+            driveSyncSubscription: { select: { account: true } },
             abogado: { select: { id: true, name: true } },
             tramites: {
               where: {
@@ -112,9 +115,11 @@ export default async function ClienteDetailPage({
       },
     }),
     prisma.documento.count({ where: clienteDocumentsWhere(id, user) }),
+    prisma.causa.findMany({ where: { AND: [{ clienteId: id }, writableCausaWhere(user)] }, select: { id: true } }),
   ]);
 
   if (!cliente) notFound();
+  const uploadCaseIds = new Set(writableCases.map(cause => cause.id));
   const { items: documentos, next: documentsNext } = listWindow(
     documentRows,
     50,
@@ -314,10 +319,8 @@ export default async function ClienteDetailPage({
         </div>
         <DocumentoIngestForm
           lockedClienteId={cliente.id}
-          causas={cliente.causas.map((c) => ({
-            id: c.id,
-            label: c.rit || c.titulo,
-          }))}
+          clientName={cliente.razonSocial}
+          causas={cliente.causas.filter(c => uploadCaseIds.has(c.id)).map(c => uploadDestination(c, cliente.razonSocial))}
         />
         <div className="space-y-2">
           {documentos.map((d) => (

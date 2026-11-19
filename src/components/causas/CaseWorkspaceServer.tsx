@@ -19,6 +19,9 @@ import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
 import { CausaEquipoPanel } from "@/components/causas/CausaEquipoPanel";
 import { CasePreparation, CasePreparationIndex } from "@/components/causas/CasePreparation";
+import { uploadDestination } from "@/lib/causas/upload-destination";
+import { deadlineHref } from "@/lib/deadlines/navigation";
+import { caseViewHref, caseViewParams, type CaseViewContext } from "@/lib/causas/portfolio-navigation";
 import { CaseWorkflowNav } from "@/components/causas/CaseWorkflowNav";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
@@ -56,10 +59,10 @@ import { notFound } from "next/navigation";
 
 export type CaseWorkspaceParams = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<CaseViewContext & { from?: string }>;
 };
 
-export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams & { mode: CaseManagementMode }) {
+export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWorkspaceParams & { mode: CaseManagementMode }) {
   const user = await requireStaff();
   if (mode === "pjud_cl" && await getCaseManagementMode() !== "pjud_cl") return <PjudManagementNotice canConfigure={isAdmin(user)} />;
   const connected = mode === "pjud_cl";
@@ -69,13 +72,20 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
   const access = await assertCausaAccess(id, user).catch(() => null);
   if (!access) notFound();
   const canUseKnowledge = canSome(user, "assistant.use");
-  const backHref = connected ? "/pjud" : "/causas";
-  const backLabel = connected ? "Volver a PJUD" : "Volver a mis causas";
+  const context = caseViewParams(id, await searchParams);
+  const backHref = context.get("volver") || (connected ? "/pjud" : "/mis-causas");
+  const backPath = backHref.split(/[?#]/)[0];
+  const backLabel = backPath === "/pjud" ? "Volver a PJUD" : backPath === "/causas" ? "Volver a causas" : "Volver a mis causas";
+  if (connected && !context.has("volver")) context.set("volver", `/pjud#causa-${encodeURIComponent(id)}`);
+  const casePath = caseViewHref(`/${connected ? "pjud" : "causas"}/${encodeURIComponent(id)}`, context);
+  const archiveHref = caseViewHref(`/causas/${encodeURIComponent(id)}/expediente`, context);
+
   const [causa, responsables, totalAccionesAbiertas, preparation, caseStatus] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: {
         cliente: true,
+        driveSyncSubscription: { select: { account: true } },
         abogado: { select: publicUserSelect },
         partes: true,
         documentos: {
@@ -194,14 +204,14 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
         </>}/>}
 
       />
-      {canUseKnowledge && <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" mode={mode} />}
+      <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" mode={mode} canUseKnowledge={canUseKnowledge} />
       <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
         <span>{labelMateria(causa.materia)}</span>
         {connected&&origen&&<span>· {h.origin.replace("{label}",origen)}</span>}
-        {isPlaceholderDriveFolderId(causa.googleDriveFolderId)&&causa.googleDriveFolderId&&<Link className="text-[var(--sea)] underline" href={`/causas/${causa.id}/expediente#drive-del-expediente`}>Drive por vincular</Link>}
+        {isPlaceholderDriveFolderId(causa.googleDriveFolderId)&&causa.googleDriveFolderId&&<Link className="text-[var(--sea)] underline" href={`${archiveHref}#drive-del-expediente`}>Drive por vincular</Link>}
       </div>
       {["warning", "blocked"].includes(causa.conflictStatus) && <ConflictReviewPanel causaId={causa.id} status={causa.conflictStatus} notes={causa.conflictNotes} />}
-      <CaseStatusPanel key={caseStatus.fingerprint} initial={caseStatus} canUseAi={canUseKnowledge} />
+      <CaseStatusPanel key={caseStatus.fingerprint} initial={caseStatus} casePath={casePath} canUseAi={canUseKnowledge} />
       <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
       <ContextDisclosure id="preparacion-resumen" title="Preparación de la causa">
       <CasePreparation
@@ -376,11 +386,11 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
           <h2 className="text-lg font-semibold">Plazos</h2>
           <div className="mt-4 space-y-3">
             {causa.plazos.map((p) => (
-              <div key={p.id} className="flex min-w-0 items-start justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2 sm:items-center">
+              <div key={p.id} id={`plazo-${p.id}`} className="scroll-mt-28 flex min-w-0 items-start justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2 sm:items-center">
                 <div className="min-w-0">
                   <div className="break-words text-sm font-medium">
                     {p.esFatal ? "Fatal · " : ""}
-                    {p.titulo}
+                    <Link className="text-[var(--sea)] hover:underline" href={deadlineHref(p.id, `${casePath}#plazo-${p.id}`)}>{p.titulo}</Link>
                   </div>
                   <div className="text-xs text-[var(--muted)]">
                     {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo, p.calculationRegime)}
@@ -413,7 +423,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
             <h2 className="text-lg font-semibold">Documentos del expediente</h2>
             <div className="flex flex-wrap items-center gap-3">
               {connected && <CausaDocumentImportButton causaId={causa.id} />}
-              <Link href={`/causas/${encodeURIComponent(causa.id)}/expediente`} className="btn btn-secondary">
+              <Link href={archiveHref} className="btn btn-secondary">
                 Organizar expediente
               </Link>
               <Link
@@ -468,7 +478,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
 
       {canUseKnowledge && <div id="audios" className="case-destination"><CaseAudioManager causaId={id} /></div>}
 
-      <DocumentoIngestForm lockedCausaId={causa.id} compact />
+      {can(user, "causa.write", { causaRol: access.causaRol }) && <DocumentoIngestForm lockedCausaId={causa.id} causas={[uploadDestination(causa, causa.cliente?.razonSocial ?? null)]} compact />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {causa.notas.length > 0 && <section className="panel rounded-[var(--radius-lg)] p-5">

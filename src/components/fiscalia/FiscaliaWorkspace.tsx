@@ -2,12 +2,13 @@
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { Dialog } from "@/components/ui/Dialog";
 import { apiMutation } from "@/lib/api-mutation";
 import { hasUnconfirmedOutcome } from "@/lib/command-status";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { civilDateKey, formatCivilDate } from "@/lib/chile-time";
-import { FISCALIA_PORTAL, FISCALIA_STATUSES, FISCALIA_KINDS, type FiscaliaState } from "@/lib/fiscalia/contract";
+import { FISCALIA_PORTAL, FISCALIA_STATUSES, FISCALIA_KINDS, fiscaliaNextAction, type FiscaliaState } from "@/lib/fiscalia/contract";
 
 type Cause = { id: string; titulo: string; ruc: string | null; canEdit: boolean };
 export type FiscaliaItem = { id: string; causaId: string; title: string; kind: keyof typeof FISCALIA_KINDS; body: string; ruc: string | null; status: FiscaliaState; folio: string | null; submittedAt: string | null; responseText: string; answeredAt: string | null; followUpDate: string | null; updatedAt: string; canEdit: boolean; causa: { id: string; titulo: string }; events: { id: string; action: string; status: FiscaliaState; createdAt: string; actor: { name: string } | null }[] };
@@ -77,9 +78,17 @@ export function FiscaliaEditor({ item, causes, initialCaseId, userId, onSaved, o
 }
 
 export function FiscaliaWorkspace({ rows, causes, truncated, userId, causaId = "", status = "open" }: { rows: FiscaliaItem[]; causes: Cause[]; truncated: boolean; userId: string; causaId?: string; status?: string }) {
+  const { dict } = useI18n(), operations = dict.judicialOperations;
   const router = useRouter(); const [editor, setEditor] = useState<FiscaliaItem | "new" | null>(null), [notice, setNotice] = useState("");
   return <div className="space-y-5 break-words" data-testid="fiscalia-workspace">
-    <section className="panel space-y-3 rounded-[var(--radius-lg)] p-5"><h2 className="font-semibold">Ingresar con tu misma ClaveÚnica</h2><p className="max-w-prose text-sm">Usa tu identidad del Registro Civil, como en OJV. El ingreso se completa en Mi Fiscalía; cada portal mantiene su propia sesión y verifica tu calidad de interviniente o representante.</p><a className="btn btn-secondary" href={FISCALIA_PORTAL} target="_blank" rel="noopener noreferrer">Abrir Mi Fiscalía con ClaveÚnica</a><p className="text-xs text-[var(--muted)]">LexOpen no solicita otra contraseña ni confirma la disponibilidad del portal. Si no responde, tus borradores permanecen guardados.</p></section>
+    <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5" aria-label={operations.operationState}>
+      <dl className="grid gap-5 md:grid-cols-3">
+        {([[operations.connection, operations.fiscaliaConnection], [operations.consultation, operations.fiscaliaQuery], [operations.tracking, operations.fiscaliaTracking]] as const).map(([label, value]) => <div key={label}><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{label}</dt><dd className="mt-2 text-sm font-medium">{value}</dd></div>)}
+      </dl>
+      <p className="max-w-prose text-sm text-[var(--ink-soft)]">{operations.fiscaliaScope}</p>
+      <a className="btn btn-secondary" href={FISCALIA_PORTAL} target="_blank" rel="noopener noreferrer">Abrir Mi Fiscalía con ClaveÚnica</a>
+      <details className="text-sm"><summary className="cursor-pointer py-2 font-medium">Ingresar con tu misma ClaveÚnica</summary><p className="mt-2 max-w-prose">Usa tu identidad del Registro Civil, como en OJV. Cada portal mantiene su sesión y verifica tu calidad de interviniente o representante. LexOpen no solicita otra contraseña; si el portal no responde, tus borradores permanecen guardados.</p></details>
+    </section>
     <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[var(--muted)]">Preparar → presentar en el portal → registrar folio → seguir respuesta.</p>{causes.some(c => c.canEdit) && <button className="btn btn-primary" onClick={() => setEditor("new")}>Nueva solicitud</button>}</div>
     <form method="GET" className="panel flex flex-wrap items-end gap-3 rounded-[var(--radius-lg)] p-4" aria-label="Filtros de solicitudes">
       <label className="min-w-0 flex-1 text-sm">Causa<select aria-label="Causa" className="select mt-1" name="causaId" defaultValue={causaId}><option value="">Todas las causas accesibles</option>{causes.map(c => <option key={c.id} value={c.id}>{c.titulo}</option>)}</select></label>
@@ -87,11 +96,19 @@ export function FiscaliaWorkspace({ rows, causes, truncated, userId, causaId = "
     </form>
     {notice && <p role="status" className="text-sm text-[var(--sea)]">{notice}</p>}{truncated && <p className="text-sm">Hay más solicitudes. Puedes avanzar a la siguiente página.</p>}
     {!rows.length && <div className="panel rounded-[var(--radius-lg)] p-5"><h2 className="font-semibold">Sin solicitudes con estos filtros</h2><p className="mt-2 text-sm">Prepara una solicitud y vincúlala con su causa para conservar su seguimiento.</p></div>}
-    <ul className="space-y-3" aria-label="Solicitudes a Mi Fiscalía">{rows.map(row => <li key={row.id} className="panel min-w-0 space-y-3 rounded-[var(--radius-lg)] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-semibold"><Link className="text-[var(--sea)] underline-offset-4 hover:underline" href={`/mi-fiscalia/${encodeURIComponent(row.id)}`}>{row.title}</Link></h2><p className="mt-1 text-sm">{FISCALIA_STATUSES[row.status]} · {FISCALIA_KINDS[row.kind]}</p><Link className="break-words text-sm text-[var(--sea)]" href={`/causas/${row.causaId}`}>{row.causa.titulo}</Link><p className="text-sm">RUC: {row.ruc || "Por confirmar"}{row.folio ? ` · Folio registrado: ${row.folio}` : ""}</p></div><div className="flex flex-wrap gap-2"><a className="btn btn-secondary" href={`/api/fiscalia/solicitudes/${row.id}/export`} download>Descargar preparación</a>{row.canEdit && !["closed", "cancelled"].includes(row.status) && <button className="btn btn-ghost" onClick={() => setEditor(row)} aria-label={`Editar ${row.title}`}>Editar seguimiento</button>}</div></div>
-      {row.followUpDate && <p className="text-sm font-medium">Revisar seguimiento: {formatCivilDate(row.followUpDate)}</p>}
-      {row.submittedAt && <p className="text-xs text-[var(--muted)]">Presentación registrada por el usuario: {formatCivilDate(row.submittedAt)}. No sincronizada con el portal.</p>}
-      <details><summary className="cursor-pointer py-2 text-sm font-medium">Contenido e historial</summary><p className="whitespace-pre-wrap break-words text-sm">{row.body || "Borrador sin contenido."}</p>{row.responseText && <div className="mt-3"><h3 className="text-sm font-medium">Respuesta registrada</h3><p className="whitespace-pre-wrap break-words text-sm">{row.responseText}</p></div>}<ol className="mt-3 space-y-1 text-xs text-[var(--muted)]">{row.events.map(e => <li key={e.id}>{formatCivilDate(e.createdAt)} · {e.actor?.name || "Usuario anterior"} · {FISCALIA_STATUSES[e.status]}</li>)}</ol><p className="mt-1 text-xs">Últimos 15 cambios registrados.</p></details>
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-semibold">{operations.inbox}</h2><p className="text-xs text-[var(--muted)]">{rows.length} · {operations.pageScope}</p></div>
+    <ul className="space-y-3" aria-label="Solicitudes a Mi Fiscalía">{rows.map(row => <li key={row.id} className="panel min-w-0 space-y-4 rounded-[var(--radius-lg)] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0"><h3 className="break-words font-semibold"><Link className="text-[var(--sea)] underline-offset-4 hover:underline" href={`/mi-fiscalia/${encodeURIComponent(row.id)}`}>{row.title}</Link></h3><p className="mt-1 text-sm">{FISCALIA_STATUSES[row.status]} · {FISCALIA_KINDS[row.kind]}</p><Link className="break-words text-sm text-[var(--sea)]" href={`/causas/${row.causaId}`}>{row.causa.titulo}</Link></div>
+        <span className="badge badge-sea">{FISCALIA_STATUSES[row.status]}</span>
+      </div>
+      <dl className="grid gap-4 border-y border-[var(--line)] py-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div><dt className="text-xs text-[var(--muted)]">RUC · Folio</dt><dd className="mt-1 break-words text-sm">{row.ruc || "Por confirmar"}<span className="block font-medium">{row.folio || operations.noFolio}</span></dd></div>
+        <div><dt className="text-xs text-[var(--muted)]">{operations.recordedState}</dt><dd className="mt-1 text-sm">{FISCALIA_STATUSES[row.status]}{row.submittedAt && <span className="block text-xs text-[var(--muted)]">Presentación registrada por el usuario: {formatCivilDate(row.submittedAt)}. No sincronizada con el portal.</span>}</dd></div>
+        <div><dt className="text-xs text-[var(--muted)]">{operations.nextManagement}</dt><dd className="mt-1 text-sm font-medium">{operations[fiscaliaNextAction(row.status)]}<span className="mt-1 block text-xs font-normal text-[var(--muted)]">{row.followUpDate ? `Revisar seguimiento: ${formatCivilDate(row.followUpDate)}` : operations.noFollowup}</span></dd></div>
+      </dl>
+      <div className="flex flex-wrap gap-2"><Link className="btn btn-secondary" href={`/mi-fiscalia/${encodeURIComponent(row.id)}`}>{operations.fullHistory}</Link><a className="btn btn-ghost" href={`/api/fiscalia/solicitudes/${row.id}/export`} download>Descargar preparación</a>{row.canEdit && !["closed", "cancelled"].includes(row.status) && <button className="btn btn-ghost" onClick={() => setEditor(row)} aria-label={`Editar ${row.title}`}>Editar seguimiento</button>}</div>
+      <details><summary className="cursor-pointer py-2 text-sm font-medium">Contenido e historial</summary><p className="whitespace-pre-wrap break-words text-sm">{row.body || "Borrador sin contenido."}</p>{row.responseText && <div className="mt-3"><h4 className="text-sm font-medium">Respuesta registrada</h4><p className="whitespace-pre-wrap break-words text-sm">{row.responseText}</p></div>}<ol className="mt-3 space-y-1 text-xs text-[var(--muted)]">{row.events.map(e => <li key={e.id}>{formatCivilDate(e.createdAt)} · {e.actor?.name || "Usuario anterior"} · {FISCALIA_STATUSES[e.status]}</li>)}</ol><p className="mt-1 text-xs">Últimos 15 cambios registrados.</p><Link className="mt-2 inline-block text-sm text-[var(--sea)] underline" href={`/mi-fiscalia/${encodeURIComponent(row.id)}#historial`}>{operations.fullHistoryLink}</Link></details>
     </li>)}</ul>
     <Dialog open={editor !== null} title={editor === "new" ? "Nueva solicitud a Mi Fiscalía" : "Seguimiento de solicitud"} onClose={() => setEditor(null)} className="w-[min(44rem,calc(100vw-1.5rem))]">{editor && <FiscaliaEditor key={editor === "new" ? "new" : editor.id} item={editor === "new" ? null : editor} causes={causes} initialCaseId={causaId} userId={userId} onClose={() => setEditor(null)} onSaved={savedStatus => { setEditor(null); setNotice(savedStatus === "cancelled" ? "Borrador descartado. Se conserva su historial." : savedStatus === "submitted" ? "Presentación registrada por el usuario. Conserva el comprobante oficial." : savedStatus === "ready" ? "Solicitud lista para presentar en el portal oficial." : "Solicitud guardada en LexOpen."); router.refresh(); }} />}</Dialog>
   </div>;

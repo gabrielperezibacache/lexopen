@@ -50,6 +50,7 @@ retryTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y con
   try {
     await page.goto(`/mi-fiscalia?causaId=${f.cause.id}`);
     const portal = page.getByRole("link", { name: "Abrir Mi Fiscalía con ClaveÚnica", exact: true });
+    await expect(page.getByRole("region", { name: "Estado de la operación", exact: true })).toContainText("Estado registrado por el estudio");
     await expect(portal).toHaveAttribute("href", "https://agenda.minpublico.cl/app/fiscalia-en-linea/#/login");
     await expect(page.locator('input[type="password"]')).toHaveCount(0);
     await page.getByRole("button", { name: "Nueva solicitud", exact: true }).click();
@@ -65,6 +66,8 @@ retryTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y con
     await dialog.getByRole("button", { name: "Reintentar guardado", exact: true }).click();
     await expect(page.getByRole("heading", { name: f.title, exact: true })).toBeVisible();
     expectSameRetry(attempts, 201); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
+    await expect(page.getByText("Completar y revisar la preparación", { exact: false })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Abrir ficha e historial detallado", exact: true })).toBeVisible();
     await page.getByRole("button", { name: `Editar ${f.title}`, exact: true }).click();
     await dialog.getByLabel("Estado", { exact: true }).selectOption("ready");
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
@@ -166,6 +169,8 @@ retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión 
     await page.goto(`/mi-fiscalia?causaId=${f.cause.id}`);
     await page.getByRole("link", { name: f.title, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/mi-fiscalia/${row.id}$`));
+    await expect(page.getByRole("region", { name: "Acciones y comprobantes", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Próxima gestión", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Rectificar presentación", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Folio corregido", { exact: true }).fill("Folio-2");

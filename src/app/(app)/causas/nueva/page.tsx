@@ -1,5 +1,6 @@
 import { NuevaCausaForm } from "@/components/NuevaCausaForm";
 import { requireStaffPage } from "@/lib/auth/access";
+import { canSome } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 export default async function NuevaCausaPage({
@@ -8,6 +9,7 @@ export default async function NuevaCausaPage({
   searchParams: Promise<{ clienteId?: string }>;
 }) {
   const user = await requireStaffPage();
+  if (!canSome(user, "causa.create")) notFound();
   const query = await searchParams;
   if (
     query.clienteId &&
@@ -30,6 +32,7 @@ export default async function NuevaCausaPage({
     <NuevaCausaForm
       key={query.clienteId || "new"}
       userId={user.id}
+      canUseAssistant={canSome(user, "assistant.use")}
       clientes={
         selected && !clientes.some((c) => c.id === selected.id)
           ? [selected, ...clientes]

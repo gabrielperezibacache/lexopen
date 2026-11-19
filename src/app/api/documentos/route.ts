@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
     let clienteId = body?.clienteId || null;
+    let expectedClienteId: string | null | undefined;
     if (causaId) await assertCausaCapability(causaId, user, "causa.write");
     let ruta = body?.ruta?.trim() || null;
     if (ruta && ruta.length > 1000) {
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
       causaId = String(form.get("causaId") || "") || null;
       if (causaId) await assertCausaCapability(causaId, user, "causa.write");
       clienteId = String(form.get("clienteId") || "") || null;
+      if (form.has("expectedClienteId")) expectedClienteId = String(form.get("expectedClienteId") || "") || null;
       const rutaField = String(form.get("ruta") || "").trim();
       const relativeHint = String(form.get("relativePath") || "").trim();
       if (rutaField) {
@@ -175,7 +177,7 @@ export async function POST(req: NextRequest) {
     const original = processingBytes || (contenido ? Buffer.from(contenido, "utf8") : null);
     if (causaId) {
       const { doc, reused } = await ingestManualCaseDocument({
-        nombre, tipo, contenido, mimeType, ruta, extractionStatus, confidencial, privilegio, causaId, clienteId,
+        nombre, tipo, contenido, mimeType, ruta, extractionStatus, confidencial, privilegio, causaId, clienteId, expectedClienteId,
       }, original, user);
       if (processingBytes && !reused) enqueueDocumentProcessing({ id: doc.id, name: doc.nombre, bytes: processingBytes });
       return NextResponse.json({ ...doc, reused }, { status: reused ? 200 : 201 });

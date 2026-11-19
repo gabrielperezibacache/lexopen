@@ -1,3 +1,5 @@
+import { deadlineSpan } from "@/lib/deadlines/pagination";
+import { deadlineHref } from "@/lib/deadlines/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   CalendarioBoard,
@@ -20,7 +22,7 @@ import {
 } from "@/lib/calendario/week";
 import { teachingCalendarSessions } from "@/lib/altazor/teaching-sessions";
 import { congressCalendarActions } from "@/lib/altazor/congress-actions";
-import { civilDateKey, civilMonthQueryRange, civilSpanQueryRange, formatCivilDate, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
+import { civilDateKey, isValidYmd, civilMonthQueryRange, civilSpanQueryRange, formatCivilDate, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { clasificarUrgencia, labelTipoComputo } from "@/lib/plazos";
 import Link from "next/link";
@@ -44,7 +46,7 @@ function monthMatrix(year: number, monthIndex: number) {
 function parseYm(ym?: string) {
   const today = civilDateKey(new Date());
   const [todayYear, todayMonth] = today.split("-").map(Number);
-  const match = ym?.match(/^(\d{4})-(\d{2})$/);
+  const match = typeof ym === "string" ? ym.match(/^(\d{4})-(\d{2})$/) : null;
   const year = match ? Number(match[1]) : todayYear;
   const month = match ? Number(match[2]) : todayMonth;
   const anchor = new Date(Date.UTC(year, (month >= 1 && month <= 12 ? month : todayMonth) - 1, 1));
@@ -99,14 +101,15 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const sp = await searchParams;
   const vista = parseVista(sp.vista);
   const { year, monthIndex } = parseYm(sp.ym);
-  const filterTipo = (sp.tipo || "todos").toLowerCase();
+  const requestedType = typeof sp.tipo === "string" ? sp.tipo.toLowerCase() : "";
+  const filterTipo = ["plazo", "tarea", "audiencia", "evento"].includes(requestedType) ? requestedType : "todos";
   const todayKey = civilDateKey(new Date());
   const currentYm = ymKey(year, monthIndex);
 
   const weekMonday =
     vista === "semana"
       ? mondayOfWeek(
-          sp.semana && /^\d{4}-\d{2}-\d{2}$/.test(sp.semana)
+          typeof sp.semana === "string" && isValidYmd(sp.semana)
             ? sp.semana
             : todayKey
         )
@@ -118,16 +121,18 @@ export default async function CalendarioPage({ searchParams }: Props) {
       : civilMonthQueryRange(year, monthIndex);
   const teachingRange = vista === "semana" ? civilSpanQueryRange(weekMonday, weekDays(weekMonday)[6]) : range;
 
+  const deadlinePeriod = vista === "semana"
+    ? deadlineSpan(weekMonday, weekDays(weekMonday)[6])
+    : deadlineSpan(`${currentYm}-01`, `${currentYm}-${new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()}`);
   const showsEvents = filterTipo === "todos" || filterTipo === "evento";
   const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions, teaching, committeeActions] =
     await Promise.all([
       prisma.plazo.findMany({
         where: { AND: [plazoAccessWhere(user), {
           estado: { in: ["pendiente", "vencido"] },
-          fechaLimite: { gte: range.start, lte: range.end },
-        }] },
-        include: { causa: true },
-        orderBy: { fechaLimite: "asc" },
+        }, deadlinePeriod] },
+        select: { id: true, titulo: true, fechaLimite: true, causaId: true, esFatal: true, responsable: { select: { name: true } } },
+        orderBy: [{ fechaLimite: "asc" }, { id: "asc" }],
       }),
       prisma.task.findMany({
         where: { AND: [scopedtaskAccessWhere(user), {
@@ -202,8 +207,8 @@ export default async function CalendarioPage({ searchParams }: Props) {
 
   const upcomingPlazos = await prisma.plazo.findMany({
     where: { AND: [plazoAccessWhere(user), { estado: { in: ["pendiente", "vencido"] } }] },
-    include: { causa: true },
-    orderBy: { fechaLimite: "asc" },
+    include: { causa: { select: { rit: true, titulo: true } }, responsable: { select: { name: true } } },
+    orderBy: [{ fechaLimite: "asc" }, { id: "asc" }],
     take: 12,
   });
 
@@ -327,6 +332,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
         titulo: x.titulo,
         causaId: x.causaId,
         esFatal: x.esFatal,
+        responsable: x.responsable?.name ?? null,
         fechaLimite: x.fechaLimite.toISOString(),
       })),
       t: t.map((x) => ({
@@ -355,6 +361,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
 
   const weekLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   const heading = vista === "semana" ? weekLabel : monthLabel;
+  const calendarView = qs({});
 
   return (
     <div className="space-y-6">
@@ -421,8 +428,10 @@ export default async function CalendarioPage({ searchParams }: Props) {
                 {p.map((x) => (
                   <Link
                     key={x.id}
-                    href={x.causaId ? `/causas/${x.causaId}` : "/plazos"}
-                    className={`block rounded-lg px-2 py-1.5 text-sm ${
+                    prefetch={false}
+                    id={`movil-plazo-${x.id}`}
+                    href={deadlineHref(x.id, `${calendarView}#movil-plazo-${x.id}`)}
+                    className={`block scroll-mt-24 target:outline rounded-lg px-2 py-1.5 text-sm ${
                       x.esFatal ||
                       clasificarUrgencia(x.fechaLimite) === "critico" ||
                       clasificarUrgencia(x.fechaLimite) === "vencido"
@@ -432,6 +441,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
                   >
                     {x.esFatal ? "Fatal · " : "Plazo · "}
                     {x.titulo}
+                    <span className="block text-xs">{x.responsable?.name || "Sin responsable"}</span>
                   </Link>
                 ))}
                 {t.map((x) => (
@@ -478,6 +488,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
               {agendaDays.map(({ ymd, p, t, a, ev }) => (
                 <div
                   key={ymd}
+                  id={`agenda-dia-${ymd}`}
                   className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-3"
                 >
                   <div className="text-sm font-semibold">{dayLabel(ymd)}</div>
@@ -485,11 +496,14 @@ export default async function CalendarioPage({ searchParams }: Props) {
                     {p.map((x) => (
                       <Link
                         key={x.id}
-                        href={x.causaId ? `/causas/${x.causaId}` : "/plazos"}
-                        className="block text-[var(--ink)]"
+                        prefetch={false}
+                        id={`agenda-plazo-${x.id}`}
+                        href={deadlineHref(x.id, `${calendarView}#agenda-plazo-${x.id}`)}
+                        className="block scroll-mt-24 target:outline text-[var(--ink)]"
                       >
                         {x.esFatal ? "Fatal · " : "Plazo · "}
                         {x.titulo}
+                        <span className="text-xs text-[var(--muted)]"> · {x.responsable?.name || "Sin responsable"}</span>
                       </Link>
                     ))}
                     {t.map((x) => (
@@ -528,6 +542,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
             <CalendarioBoard
               mode={vista === "semana" ? "semana" : "mes"}
               days={boardDays}
+              calendarView={calendarView}
               todayKey={todayKey}
               weekLabels={weekLabels}
             />
@@ -551,12 +566,13 @@ export default async function CalendarioPage({ searchParams }: Props) {
               className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2 text-sm"
             >
               <div className="min-w-0">
-                <div className="font-medium break-words">
+                <Link prefetch={false} id={`proximos-plazo-${p.id}`} className="scroll-mt-24 target:outline font-medium break-words text-[var(--sea)] hover:underline"
+                  href={deadlineHref(p.id, `${calendarView}#proximos-plazo-${p.id}`)}>
                   {p.esFatal ? "Fatal · " : ""}
                   {p.titulo}
-                </div>
+                </Link>
                 <div className="text-xs text-[var(--muted)]">
-                  {p.causa?.rit || "Sin causa"} · {labelTipoComputo(p.tipoComputo, p.calculationRegime)} ·{" "}
+                  {p.causa?.rit || p.causa?.titulo || "Sin causa"} · {p.responsable?.name || "Sin responsable"} · {labelTipoComputo(p.tipoComputo, p.calculationRegime)} ·{" "}
                   {formatCivilDate(p.fechaLimite)}
                 </div>
               </div>

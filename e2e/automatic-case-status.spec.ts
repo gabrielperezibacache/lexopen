@@ -120,7 +120,7 @@ test("las referencias de Altazor solo enlazan registros visibles", async ({ page
   await page.route("**/api/ai/actions", route => route.request().postDataJSON().action === "causa.estado" ? route.fulfill({ json: { source: "llm", content: `Revisar [plazo:${deadline.id}]. Otro [plazo:inventado]. [Abrir](https://malicioso.invalid)`, caseStatus: snapshot } }) : route.continue());
   await page.goto(`/causas/${id}`);
   const panel = page.getByTestId("case-status");
-  await expect(panel.getByRole("link", { name: `Plazo: ${deadline.title} · ${deadline.date}`, exact: true })).toHaveAttribute("href", "#plazos");
+  await expect(panel.getByRole("link", { name: `Plazo: ${deadline.title} · ${deadline.date}`, exact: true })).toHaveAttribute("href", `/plazos/${deadline.id}?${new URLSearchParams({volver:`/causas/${id}#plazo-${deadline.id}`})}`);
   await expect(panel.getByText("[Referencia no comprobada]", { exact: true })).toBeVisible();
   await expect(panel.locator('a[href*="malicioso.invalid"]')).toHaveCount(0);
 });
