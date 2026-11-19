@@ -5,21 +5,31 @@ import { hash } from "bcryptjs";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs, apiRequest } from "./helpers";
 import { addCivilDays, santiagoDateKey } from "../src/lib/chile-time";
-import { networkGateway } from "./fixtures/network-gateway";
 
-type Gateway = Awaited<ReturnType<typeof networkGateway>>;
-const networkTest = test.extend<{ network: Gateway }>({
-  network: async ({}, provide, info) => {
-    const network = await networkGateway(String(info.project.use.baseURL));
-    try { await provide(network); } finally { await network.close(); }
-  },
-  baseURL: async ({ network }, provide) => provide(network.origin),
-});
-function expectSameRetry(network: Gateway, path: string) {
-  const attempts = network.requests.filter(request => request.method === "POST" && request.path === path);
+const retryTest = test.extend({ serviceWorkers: "block" });
+type Attempt = { key?: string; body: string | null; status?: number };
+async function loseFirstReceipt(page: Page, path: string, successStatus: number) {
+  const origin = new URL(page.url()).origin;
+  const attempts: Attempt[] = [];
+  await page.route(url => url.origin === origin && url.pathname === path, async route => {
+    const request = route.request();
+    if (request.method() !== "POST") return route.continue();
+    const attempt: Attempt = { key: request.headers()["idempotency-key"], body: request.postData() };
+    attempts.push(attempt);
+    if (attempts.length > 1) return route.continue();
+    const response = await route.fetch();
+    attempt.status = response.status();
+    if (attempt.status !== successStatus) return route.fulfill({ response });
+    await route.abort("failed");
+  });
+  return attempts;
+}
+function expectSameRetry(attempts: Attempt[], successStatus: number) {
   expect(attempts).toHaveLength(2);
-  expect(attempts[0].idempotencyKey).toBeTruthy();
-  expect(attempts[1].idempotencyKey).toBe(attempts[0].idempotencyKey);
+  expect(attempts[0].status).toBe(successStatus);
+  expect(attempts[0].key).toBeTruthy();
+  expect(attempts[1].key).toBe(attempts[0].key);
+  expect(attempts[0].body).toBeTruthy();
   expect(attempts[1].body).toBe(attempts[0].body);
 }
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
@@ -34,7 +44,7 @@ async function fixture(page: Page) {
   } };
 }
 
-networkTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva su seguimiento", async ({ page, network }, info) => {
+retryTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y conserva su seguimiento", async ({ page }, info) => {
   test.setTimeout(90_000);
   const f = await fixture(page), path = "/api/fiscalia/solicitudes";
   try {
@@ -47,13 +57,14 @@ networkTest("Mi Fiscalía guarda una sola solicitud tras perder la respuesta y c
     await dialog.getByLabel("Asunto", { exact: true }).fill(f.title);
     await dialog.getByLabel("Tipo", { exact: true }).selectOption("copia");
     await dialog.getByLabel("Contenido", { exact: true }).fill("Solicito copia de los antecedentes para revisar la causa.");
-    network.dropNextPost(path);
+    const attempts = await loseFirstReceipt(page, path, 201);
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
+    await expect.poll(() => attempts[0]?.status).toBe(201);
     await expect(dialog.getByRole("alert")).toContainText("sin duplicar");
     await expect(dialog.getByLabel("Asunto", { exact: true })).toBeDisabled();
     await dialog.getByRole("button", { name: "Reintentar guardado", exact: true }).click();
     await expect(page.getByRole("heading", { name: f.title, exact: true })).toBeVisible();
-    expectSameRetry(network, path); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
+    expectSameRetry(attempts, 201); expect(await db.fiscaliaRequest.count({ where: { causaId: f.cause.id } })).toBe(1);
     await page.getByRole("button", { name: `Editar ${f.title}`, exact: true }).click();
     await dialog.getByLabel("Estado", { exact: true }).selectOption("ready");
     await dialog.getByRole("button", { name: "Guardar solicitud", exact: true }).click();
@@ -146,7 +157,7 @@ test("Mi Fiscalía permite descartar un borrador sin fingir una presentación", 
   } finally { await f.cleanup(); }
 });
 
-networkTest("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page, network }) => {
+retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page }) => {
   const f = await fixture(page);
   const date = addCivilDays(santiagoDateKey(new Date()), -1);
   const row = await db.fiscaliaRequest.create({ data: { causaId: f.cause.id, creatorId: f.owner.id, title: f.title, kind: "copia", body: "Solicitud de prueba presentada", status: "submitted", folio: "Orig-1", submittedAt: new Date(date) } });
@@ -160,13 +171,14 @@ networkTest("ficha de Fiscalía conserva la rectificación y descarga la versió
     await dialog.getByLabel("Folio corregido", { exact: true }).fill("Folio-2");
     await dialog.getByLabel("Motivo de rectificación", { exact: true }).fill("Revisión del folio oficial.");
     const path = `/api/fiscalia/solicitudes/${row.id}`;
-    network.dropNextPost(path);
+    const attempts = await loseFirstReceipt(page, path, 200);
     await dialog.getByRole("button", { name: "Guardar rectificación" }).click();
+    await expect.poll(() => attempts[0]?.status).toBe(200);
     await dialog.getByRole("button", { name: "Comprobar guardado" }).click();
     const history = page.getByRole("region", { name: "Historial de la solicitud" });
     await expect(history).toContainText("Anterior: Orig-1");
     await expect(history).toContainText("Corregido: Folio-2");
-    expectSameRetry(network, path);
+    expectSameRetry(attempts, 200);
     expect(await db.fiscaliaRequestEvent.count({ where: { requestId: row.id, correctionReason: "Revisión del folio oficial." } })).toBe(1);
     await page.getByRole("button", { name: "Vincular respaldo" }).click();
     await dialog.getByRole("button", { name: "Buscar", exact: true }).click();
