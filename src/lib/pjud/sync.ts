@@ -135,7 +135,7 @@ export async function syncCausaPjud(
     force?: boolean;
     automatic?: boolean;
     trigger?: "manual" | "manual-session" | "cron" | "retry" | "webhook" | "import";
-    existingJobId?: string | null;
+    existingJob?: { id: string; attempts: number };
     /** Internal session callback; the ordinary provider remains the default. */
     fetchMovimientos?: PjudMovimientosFetcher;
     /** Internal session guards; HTTP handlers must never accept these options. */
@@ -192,19 +192,14 @@ export async function syncCausaPjud(
   const slot = automatic ? await claimAutomaticRefresh(`case:${causaId}`) : null;
   if (automatic && !slot) {
     return { causaId, inserted: 0, skipped: 0, provider: "none", demo: false,
-      note: SCHEDULED_REFRESH_NOTE, status: "disabled", jobId: opts?.existingJobId ?? null, ...baseMeta() };
+      note: SCHEDULED_REFRESH_NOTE, status: "disabled", jobId: opts?.existingJob?.id ?? null, ...baseMeta() };
   }
   const assertSchedule = () => { if (slot) assertRefreshCycleActive(slot); };
   assertSchedule();
 
-  const job = opts?.existingJobId
-    ? await prisma.pjudSyncJob.update({
-        where: { id: opts.existingJobId },
-        data: {
-          status: "running",
-          trigger,
-          startedAt: new Date(),
-        },
+  const job = opts?.existingJob
+    ? await prisma.pjudSyncJob.findUnique({
+        where: { id: opts.existingJob.id, attempts: opts.existingJob.attempts, causaId, status: "running", trigger },
       })
     : await prisma.pjudSyncJob.create({
         data: {
@@ -215,6 +210,31 @@ export async function syncCausaPjud(
           startedAt: new Date(),
         },
       });
+
+  const reservationEnded = "La reserva de esta consulta ya terminó. Inicie una nueva consulta para reintentar.";
+  if (!job) throw httpError(reservationEnded, 409);
+  const runningJob = { id: job.id, status: "running", attempts: job.attempts };
+  const finishJob = async (tx: Prisma.TransactionClient, data: Prisma.PjudSyncJobUpdateManyMutationInput) => {
+    const result = await tx.pjudSyncJob.updateMany({ where: runningJob, data });
+    if (!result.count) throw httpError(reservationEnded, 409);
+  };
+  const recordFailure = async (status: "failed" | "error", note: string) => {
+    const at = new Date();
+    const next = nextSyncAtFrom(at);
+    const coverage = unknownCuadernosCoverage() as Prisma.InputJsonValue;
+    await prisma.$transaction(async tx => {
+      await finishJob(tx, { status: "failed", lastError: note, note, pjudCuadernosCoverage: coverage, finishedAt: at });
+      // A webhook or another check may already have published a newer outcome.
+      await tx.causa.updateMany({
+        where: { id: causaId, pjudLastSyncAt: causa.pjudLastSyncAt, pjudLastSyncStatus: causa.pjudLastSyncStatus },
+        data: {
+          pjudLastSyncAt: at, pjudNextSyncAt: next, pjudLastSyncStatus: status, pjudLastSyncNote: note,
+          pjudCuadernosCoverage: coverage, pjudFailCount: { increment: 1 }, pjudExternalKey: externalKey(causa.rit, causa.tribunal),
+        },
+      });
+    });
+    return next;
+  };
 
   let fetchResult: PjudFetchResult;
   try {
@@ -241,61 +261,16 @@ export async function syncCausaPjud(
     await opts?.assertActive?.();
   } catch (e) {
     if (await getCaseManagementMode() !== "pjud_cl") { await pausePjudManagementJobs(); throw httpError("Actualización judicial pausada por la modalidad manual.", 409); }
-    const note = e instanceof Error ? e.message : "Error de sync";
-    const next = nextSyncAtFrom(new Date());
-    await prisma.$transaction([
-      prisma.causa.update({
-        where: { id: causaId },
-        data: {
-          pjudLastSyncAt: new Date(),
-          pjudNextSyncAt: next,
-          pjudLastSyncStatus: "failed",
-          pjudLastSyncNote: note,
-          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
-          pjudFailCount: { increment: 1 },
-          pjudExternalKey: externalKey(causa.rit, causa.tribunal),
-        },
-      }),
-      prisma.pjudSyncJob.update({
-        where: { id: job.id },
-        data: {
-          status: "failed",
-          lastError: note,
-          note,
-          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
-          finishedAt: new Date(),
-        },
-      }),
-    ]);
+    // Browser errors may echo private OIDC URLs or field values.
+    const note = trigger === "manual-session"
+      ? "No se completó la consulta OJV de esta sesión. Compruebe la sesión y vuelva a intentarlo."
+      : e instanceof Error ? e.message : "No se completó la consulta judicial.";
+    await recordFailure("failed", note);
     throw httpError(note, 502);
   }
 
   if (fetchResult.provider === "none") {
-    const next = nextSyncAtFrom(new Date());
-    await prisma.$transaction([
-      prisma.causa.update({
-        where: { id: causaId },
-        data: {
-          pjudLastSyncAt: new Date(),
-          pjudNextSyncAt: next,
-          pjudLastSyncStatus: "error",
-          pjudLastSyncNote: fetchResult.note,
-          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
-          pjudFailCount: { increment: 1 },
-          pjudExternalKey: externalKey(causa.rit, causa.tribunal),
-        },
-      }),
-      prisma.pjudSyncJob.update({
-        where: { id: job.id },
-        data: {
-          status: "failed",
-          lastError: fetchResult.note,
-          note: fetchResult.note,
-          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
-          finishedAt: new Date(),
-        },
-      }),
-    ]);
+    const next = await recordFailure("error", fetchResult.note);
     return {
       causaId,
       inserted: 0,
@@ -331,6 +306,12 @@ export async function syncCausaPjud(
     skipped = persisted.skipped;
     newRelevant.push(...persisted.newRelevant);
 
+    await finishJob(tx, {
+      status: partial ? "partial" : "ok", inserted, skipped, note: fetchResult.note,
+      lastError: partial ? fetchResult.note : null, pjudCuadernosCoverage: cuadernosCoverage as Prisma.InputJsonValue,
+      finishedAt: new Date(),
+    });
+
     // No reactivar monitoreo si el estudio lo pausó mientras el job estaba en cola
     // (force=true en worker no debe encender pjudMonitoreoActivo de nuevo).
     await tx.causa.update({
@@ -350,19 +331,6 @@ export async function syncCausaPjud(
           fetchResult.resolvedTribunal.length > causa.tribunal.length)
           ? { tribunal: fetchResult.resolvedTribunal.slice(0, 180) }
           : {}),
-      },
-    });
-
-    await tx.pjudSyncJob.update({
-      where: { id: job.id },
-      data: {
-        status: partial ? "partial" : "ok",
-        inserted,
-        skipped,
-        note: fetchResult.note,
-        lastError: partial ? fetchResult.note : null,
-        pjudCuadernosCoverage: cuadernosCoverage as Prisma.InputJsonValue,
-        finishedAt: new Date(),
       },
     });
 

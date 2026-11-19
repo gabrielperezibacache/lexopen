@@ -85,13 +85,15 @@ async function main() {
     queueBatches.push(where.id.in);
     return where.id.in.map((id) => ({ id }));
   });
-  overrideMethod(prisma.pjudSyncJob, "updateMany", async ({ where, data }: { where: { id?: { in: string[] } }; data: { status?: string } }) => {
+  overrideMethod(prisma, "$queryRaw", async (query: { sql: string; values: unknown[] }) => {
+    assert.match(query.sql, /UPDATE "PjudSyncJob"/);
     if (failQueue) throw new Error("fixture-queue-failure");
-    if (where.id && data.status === "failed") {
-      for (const job of createdJobs) if (where.id.in.includes(job.id)) job.status = "failed";
-    }
-    return { count: 0 };
+    // The fixture has no expired reservations. Batch cleanup binds the exact IDs it observed.
+    const failed = createdJobs.filter(job => job.status === "pending" && query.values.includes(job.id));
+    for (const job of failed) job.status = "failed";
+    return [{ count: failed.length }];
   });
+  overrideMethod(prisma.pjudSyncJob, "updateMany", async () => ({ count: 0 }));
   overrideMethod(prisma.pjudSyncJob, "findMany", async () => []);
   overrideMethod(prisma.pjudSyncJob, "create", async ({ data }: { data: { causaId: string; trigger: string; status: string } }) => {
     if (++jobCreateCount === failJobCreateAt) throw new Error("fixture-second-job-create-failure");

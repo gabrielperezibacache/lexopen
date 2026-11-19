@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { syncMisCausas, type MisCausasSessionSource } from "@/lib/pjud/claveunica";
-import { getPjudQueueStatus, processPendingSyncJobs, requeueFailedJobs, reclaimStuckRunningJobs, enqueueDueSyncJobs, PJUD_MANUAL_SESSION_TRIGGER, PJUD_MANUAL_SESSION_JOB_TTL_MS } from "@/lib/pjud/queue";
+import { expireManualSessionSyncJobs, getPjudQueueStatus, processPendingSyncJobs, requeueFailedJobs, reclaimStuckRunningJobs, enqueueDueSyncJobs, PJUD_MANUAL_SESSION_TRIGGER, PJUD_MANUAL_SESSION_JOB_TTL_MS } from "@/lib/pjud/queue";
 import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { scrapeMovimientoIdentity, type MisCausasItem } from "@/lib/pjud/types";
 
@@ -267,6 +267,14 @@ async function main() {
       assert.equal(await prisma.pjudSyncJob.count({ where: { causaId: { in: ownIds }, status: { in: ["pending", "running"] } } }), 0);
 
       const expiredCreatedAt = new Date(Date.now() - PJUD_MANUAL_SESSION_JOB_TTL_MS - 1000);
+      // One case still shows an older complete query; the other has since genuinely recovered.
+      const oldQuery = new Date(expiredCreatedAt.getTime() - 60_000);
+      const moreRecentQuery = new Date();
+      for (const [index, at] of [oldQuery, moreRecentQuery].entries()) {
+        await prisma.causa.update({ where: { id: ownIds[index] }, data: {
+          pjudLastSyncStatus: "ok", pjudLastSyncAt: at, pjudFailCount: 0, pjudCuadernosCoverage: completeCoverage,
+        } });
+      }
       const expiredPending = await originalJobCreate({ data: {
         causaId: ownIds[0], status: "pending", trigger: PJUD_MANUAL_SESSION_TRIGGER, createdAt: expiredCreatedAt,
       } });
@@ -278,6 +286,16 @@ async function main() {
       assert.deepEqual(await processPendingSyncJobs({ jobIds: expiredIds }), []);
       const expired = await prisma.pjudSyncJob.findMany({ where: { id: { in: expiredIds } } });
       assert.ok(expired.every(job => job.status === "failed" && job.trigger === PJUD_MANUAL_SESSION_TRIGGER && job.attempts === 0));
+      const expiredCause = await prisma.causa.findUniqueOrThrow({ where: { id: ownIds[0] } });
+      assert.equal(expiredCause.pjudLastSyncStatus, "failed", "an expired session cannot leave the matter looking current");
+      assert.equal(expiredCause.pjudFailCount, 1);
+      assert.ok(expiredCause.pjudLastSyncAt! > oldQuery);
+      assert.equal(normalizeCuadernosCoverage(expiredCause.pjudCuadernosCoverage).status, "unknown");
+      assert.equal(await prisma.causaMovimiento.count({ where: { causaId: ownIds[0] } }), 1, "last known movements survive");
+      const newerCause = await prisma.causa.findUniqueOrThrow({ where: { id: ownIds[1] } });
+      assert.equal(newerCause.pjudLastSyncStatus, "ok", "a later successful query wins over an older reservation");
+      assert.equal(newerCause.pjudLastSyncAt?.toISOString(), moreRecentQuery.toISOString());
+      await prisma.pjudSyncJob.create({ data: { causaId: ownIds[0], status: "ok", trigger: "import" } });
       assert.equal((await requeueFailedJobs({ causaIds: ownIds })).length, 0, "expired session jobs must not acquire a generic provider on retry");
       assert.equal((await scheduledEnqueue({ causaIds: ownIds, trigger: "cron" })).length, 0,
         "an incomplete manual reservation must also prevent a new cron job from silently switching provider");
@@ -300,6 +318,37 @@ async function main() {
       assert.equal(scheduledAfterRecovery.length, 2, "a successful manual refresh permits subsequent scheduled monitoring");
       assert.ok(scheduledAfterRecovery.every(job => job.trigger === "cron"));
       await prisma.pjudSyncJob.deleteMany({ where: { id: { in: scheduledAfterRecovery.map(job => job.id) } } });
+      const late = await originalJobCreate({ data: { causaId: ownIds[0], trigger: PJUD_MANUAL_SESSION_TRIGGER } });
+      const lateResults = await processPendingSyncJobs({
+        jobIds: [late.id], downloadDocuments: false,
+        fetchMovimientos: async causa => {
+          const result = await recoveredSource.fetchMovimientos(causa);
+          const expiredAt = new Date(late.createdAt.getTime() + PJUD_MANUAL_SESSION_JOB_TTL_MS + 1000);
+          assert.equal(await expireManualSessionSyncJobs({ jobIds: [late.id], now: expiredAt }), 1);
+          return { ...result, movimientos: result.movimientos.map(m => ({ ...m, externalId: "late-session-result" })) };
+        },
+      });
+      assert.equal(lateResults[0].status, "failed", "a result arriving after session expiry cannot overwrite it");
+      assert.match(lateResults[0].note, /reserva de esta consulta ya terminó/);
+      assert.equal((await prisma.causa.findUniqueOrThrow({ where: { id: ownIds[0] } })).pjudLastSyncStatus, "failed");
+      assert.equal(await prisma.causaMovimiento.count({ where: { causaId: ownIds[0], externalId: "late-session-result" } }), 0);
+      const priorToWebhook = await originalJobCreate({ data: { causaId: ownIds[1], trigger: PJUD_MANUAL_SESSION_TRIGGER } });
+      const webhookAt = new Date(priorToWebhook.createdAt.getTime() + 1);
+      const superseded = await processPendingSyncJobs({
+        jobIds: [priorToWebhook.id], fetchMovimientos: async () => {
+          await prisma.causa.update({ where: { id: ownIds[1] }, data: {
+            pjudLastSyncAt: webhookAt, pjudLastSyncStatus: "ok", pjudFailCount: 0, pjudCuadernosCoverage: completeCoverage,
+          } });
+          throw new Error("Fallo de la consulta anterior https://example.invalid/?code=PRIVATE_SESSION");
+        },
+      });
+      assert.equal(superseded[0].status, "failed");
+      assert.doesNotMatch(JSON.stringify(superseded), /PRIVATE_SESSION/);
+      const failedReceipt = await prisma.pjudSyncJob.findUniqueOrThrow({ where: { id: priorToWebhook.id } });
+      assert.doesNotMatch(JSON.stringify(failedReceipt), /PRIVATE_SESSION/);
+      const latestOutcome = await prisma.causa.findUniqueOrThrow({ where: { id: ownIds[1] } });
+      assert.equal(latestOutcome.pjudLastSyncStatus, "ok", "a late failure cannot replace a more recent recorded result");
+      assert.equal(latestOutcome.pjudLastSyncAt?.toISOString(), webhookAt.toISOString());
       const stateBeforeRevocation = await prisma.firmSettings.findUniqueOrThrow({ where: { organizationId: orgId } });
       await assert.rejects(syncMisCausas({ sessionSource: { ...recoveredSource, assertActive: async () => { throw new Error("Synthetic revoked session"); } }, processJobsInline: true }), /revoked/);
       assert.deepEqual(await prisma.firmSettings.findUniqueOrThrow({ where: { organizationId: orgId } }), stateBeforeRevocation, "revocation before entry must not acquire a global import claim");

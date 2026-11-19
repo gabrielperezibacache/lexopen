@@ -123,18 +123,22 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
   if (Buffer.byteLength(responseText, "utf8") > PJUD_MAX_TRANSPORT_BYTES) {
     throw new Error("La respuesta PJUD supera el límite permitido");
   }
-  const data = z
-    .object({
-      sala: z.string().max(200).optional().nullable(),
-      movimientos: z.array(partnerMovementSchema).max(PJUD_MAX_CAUSA_MOVIMIENTOS).optional(),
-      cuadernos: z.unknown().optional(),
-    })
-    .passthrough()
-    .parse(JSON.parse(responseText));
-
-  const movimientos = (data.movimientos || []).map((m) =>
-    mapPartnerMovement(m, "pjud")
-  );
+  let body: unknown;
+  try { body = JSON.parse(responseText); } catch { body = null; }
+  const payload = z.object({
+    sala: z.string().max(200).nullish(),
+    movimientos: z.array(partnerMovementSchema).max(PJUD_MAX_CAUSA_MOVIMIENTOS),
+    cuadernos: z.unknown().optional(),
+    ok: z.literal(true).optional(),
+    status: z.enum(["ok", "success", "partial"]).optional(),
+    error: z.unknown().optional(),
+  }).safeParse(body);
+  if (!payload.success || payload.data.error) {
+    throw new Error("El proveedor PJUD no confirmó una lectura del historial de movimientos.");
+  }
+  const data = payload.data;
+  const movimientos = data.movimientos.map(m => mapPartnerMovement(m, "pjud"));
+  const coverage = normalizeCuadernosCoverage(data.cuadernos);
 
   return {
     provider: "api",
@@ -142,7 +146,7 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
     note: `Sincronizado vía proveedor PJUD (${movimientos.length} ítems).`,
     demo: false,
     sala: data.sala || null,
-    cuadernos: normalizeCuadernosCoverage(data.cuadernos),
+    cuadernos: data.status === "partial" ? { ...coverage, status: "partial" } : coverage,
   };
 }
 

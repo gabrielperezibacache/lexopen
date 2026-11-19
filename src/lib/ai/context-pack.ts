@@ -1,3 +1,4 @@
+import { caseJudicialStatus } from "@/lib/causas/judicial-status";
 import { causaAccessWhere, documentReadWhere, plazoAccessWhere, siteFileReadWhere, siteAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { httpError } from "@/lib/auth/access";
 import type { Prisma } from "@prisma/client";
@@ -202,7 +203,7 @@ export async function buildAiContextPack(opts: {
             caratula: causa.caratula,
             resumen: causa.resumen,
             sala: causa.sala,
-            semaforo: causa.pjudLastSyncStatus,
+            judicialSync: caseJudicialStatus(causa),
             cliente: causa.cliente,
             partes: causa.partes,
           },

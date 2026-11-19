@@ -2,7 +2,7 @@ import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { classifyMovimiento } from "@/lib/pjud/classify";
-import { fingerprint } from "@/lib/pjud/provider";
+import { fingerprint } from "@/lib/pjud/types";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { prisma } from "@/lib/db";
 import { writeAuditStrict } from "@/lib/audit";
@@ -161,8 +161,8 @@ export async function POST(req: NextRequest) {
         })),
         skipDuplicates: true,
       });
-      const status = payload.status === "error" ? "error" : payload.status === "partial" ? "partial" : "ok";
-      const note = `Webhook PJUD${payload.operationId ? ` ${payload.operationId}` : ""}: ${created.count} movimiento(s) nuevo(s).`;
+      const status = payload.status;
+      const note = `Webhook PJUD: ${created.count} movimiento(s) nuevo(s).`;
       await tx.causa.update({
         where: { id: causa.id },
         data: {
@@ -170,7 +170,8 @@ export async function POST(req: NextRequest) {
           pjudLastSyncAt: new Date(),
           pjudLastSyncStatus: status,
           pjudLastSyncNote: note,
-          pjudFailCount: status === "error" ? { increment: 1 } : 0,
+          pjudCuadernosCoverage: Prisma.DbNull,
+          pjudFailCount: status === "ok" ? 0 : { increment: 1 },
           pjudExternalKey:
             causa.pjudExternalKey ||
             payload.externalKey ||
@@ -181,13 +182,13 @@ export async function POST(req: NextRequest) {
       await tx.pjudSyncJob.create({
         data: {
           causaId: causa.id,
-          status: status === "error" ? "failed" : "ok",
+          status: status === "error" ? "failed" : status,
           trigger: "webhook",
           attempts: 1,
           inserted: created.count,
           skipped: movimientos.length - created.count,
           note,
-          lastError: status === "error" ? note : null,
+          lastError: status === "ok" ? null : note,
           startedAt: new Date(),
           finishedAt: new Date(),
         },

@@ -173,7 +173,9 @@ export function duplicateCausaWhere(input: {
 export function labelPjudSyncStatus(status: string | null | undefined): string {
   switch (status) {
     case "ok":
-      return "Al día";
+      return "Consulta registrada";
+    case "unverified":
+      return "Consulta sin comprobar";
     case "demo":
       return "Demo";
     case "failed":
@@ -194,6 +196,6 @@ export function labelPjudSyncStatus(status: string | null | undefined): string {
     case "":
       return "—";
     default:
-      return status;
+      return "Requiere revisión";
   }
 }

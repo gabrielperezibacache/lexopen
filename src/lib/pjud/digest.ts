@@ -225,10 +225,10 @@ export function formatDigestText(items: DigestItem[], appUrl: string) {
                 .map(
                   (m) => `  - ${m.fecha.toISOString().slice(0, 10)} ${m.titulo}`
                 )
-            : ["  - Sin movimientos nuevos; semáforo rojo"])
+            : ["  - Sin movimientos nuevos registrados en el estudio"])
         );
       }
-      return `${item.rit || item.titulo} [${item.semaforo}]\n${item.tribunal}\n${appUrl}/causas/${item.causaId}\n${sections.join("\n")}`;
+      return `${item.rit || item.titulo} [semáforo ${item.semaforo}]\n${item.tribunal}\n${appUrl}/causas/${item.causaId}\n${sections.join("\n")}`;
     })
     .join("\n\n");
 }
@@ -263,18 +263,12 @@ function formatDigestHtml(
       const body =
         section("Receptor", receptor, "receptor") +
         section("Escritos por resolver", escritos, "escrito") +
-        section("Movimientos", otros.length ? otros : item.movimientos.length ? [] : [{
-          titulo: "Sin movimientos nuevos; semáforo rojo",
-          fecha: new Date(),
-          tipo: "otro",
-          esReceptor: false,
-          relevante: false,
-        }]);
+        section("Movimientos", otros);
       return `<h3><a href="${appUrl}/causas/${item.causaId}">${escapeHtml(
         item.rit || item.titulo
       )}</a> · ${escapeHtml(item.semaforo)}</h3>
       <p>${escapeHtml(item.tribunal)}</p>
-      ${body || "<p>Sin novedades listadas</p>"}`;
+      ${body || "<p>Sin novedades registradas en el estudio</p>"}`;
     })
     .join("\n");
   return `<p>Hola ${escapeHtml(recipientName)},</p>

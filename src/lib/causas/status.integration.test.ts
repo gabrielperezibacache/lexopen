@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
+import { caseSnapshot, snapshotHash } from "@/lib/altazor/case-jobs/snapshot";
 import { readCaseStatus } from "./status-service";
 import { buildActionContext } from "@/lib/ai/context";
 import { addCivilDays, santiagoDateKey } from "@/lib/chile-time";
@@ -44,6 +45,29 @@ async function main() {
     const context = JSON.parse(await buildActionContext({ action: "causa.estado", causaId: causa.id, user: owner, userRole: owner.role, extra: { forged: "ignored" } }));
     assert.equal(context.caseStatus.fingerprint, changed.fingerprint);
     assert.equal(JSON.stringify(context).includes("forged"), false);
+    // A CSV or an earlier partial run can leave the local records unchanged while judicial coverage changes.
+    const oldPlan = await caseSnapshot(causa.id, owner);
+    assert.equal(oldPlan.cause.judicialSync, undefined);
+    await prisma.causa.update({ where: { id: causa.id }, data: { pjudLastSyncAt: new Date(), pjudMonitoreoActivo: true,
+      pjudLastSyncStatus: "failed", pjudLastSyncNote: "private-provider-diagnostic",
+      pjudCuadernosCoverage: { status: "partial", read: 0, total: 1,
+        items: [{ key: "cuaderno:1", label: "private-cuaderno-label", status: "failed", count: 0, note: "private-note" }] } } });
+    const failed = await readCaseStatus(causa.id, owner);
+    assert.notEqual(failed.fingerprint, changed.fingerprint);
+    assert.deepEqual(failed.status.latest, changed.status.latest);
+    const failedContext = await buildActionContext({ action: "causa.estado", causaId: causa.id, user: owner, userRole: owner.role });
+    const manualContext = await buildActionContext({ action: "causa.resumen", causaId: causa.id, user: owner, userRole: owner.role });
+    const failedPlan = await caseSnapshot(causa.id, owner);
+    assert.notEqual(snapshotHash(failedPlan), snapshotHash(oldPlan));
+    for (const serialized of [failedContext, manualContext, JSON.stringify(failedPlan)]) {
+      assert.match(serialized, /Falló la última consulta al PJUD/);
+      assert.doesNotMatch(serialized, /private-provider-diagnostic|private-cuaderno-label|private-note/);
+    }
+    await prisma.causa.update({ where: { id: causa.id }, data: { pjudLastSyncStatus: "ok",
+      pjudCuadernosCoverage: { status: "complete", total: 1, read: 1, items: [{ key: "cuaderno:1", label: "Principal", status: "ok", count: 0 }] } } });
+    const recovered = await readCaseStatus(causa.id, owner);
+    assert.notEqual(recovered.fingerprint, failed.fingerprint);
+    assert.equal(recovered.status.judicialSync.notice, null);
     await prisma.causaMovimiento.update({ where: { id: writing.id }, data: { pendienteResolucion: false } });
     assert.equal((await readCaseStatus(causa.id, owner)).status.waiting.length, 0);
     await prisma.causa.update({ where: { id: causa.id }, data: { abogadoId: other.id } });

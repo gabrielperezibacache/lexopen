@@ -1,9 +1,10 @@
 "use client";
 
+import { labelPjudSyncStatus } from "@/lib/pjud/causa-origin";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { labelMovimientoTipo } from "@/lib/pjud/classify";
+import { labelMovimientoTipo, labelSemaforo } from "@/lib/pjud/classify";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { apiMutation } from "@/lib/api-mutation";
 import { PjudCuadernosCoverage } from "./PjudCuadernosCoverage";
@@ -48,12 +49,6 @@ const SEM: Record<string, string> = {
   gris: "bg-slate-300",
 };
 
-const SEM_LABEL: Record<string, string> = {
-  verde: "Al día",
-  amarillo: "Sin movimiento reciente",
-  rojo: "Atención: inactiva",
-  gris: "Sin datos",
-};
 const UNSCOPED_CUADERNO = "Sin cuaderno informado";
 
 type Tab = "historial" | "cuadernos" | "receptor" | "escritos";
@@ -277,7 +272,7 @@ export function PjudMonitorPanel({
         <div className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
           <span className={`h-3 w-3 rounded-full ${SEM[semaforo]}`} />
           <span>
-            {SEM_LABEL[semaforo]}
+            {labelSemaforo(semaforo)}
             {diasSinMovimiento !== null ? ` · ${diasSinMovimiento}d` : ""}
           </span>
         </div>
@@ -293,8 +288,8 @@ export function PjudMonitorPanel({
           </span>
         )}
         <span className="rounded-full border border-[var(--line)] px-2 py-1">
-          Último sync: {fmtDateTime(lastSyncAt)}
-          {lastSyncStatus ? ` · ${lastSyncStatus}` : ""}
+          Último intento: {fmtDateTime(lastSyncAt)}
+          {lastSyncStatus ? ` · ${labelPjudSyncStatus(lastSyncStatus)}` : ""}
         </span>
         <span className="rounded-full border border-[var(--line)] px-2 py-1">
           Próximo sync: {fmtDateTime(nextSyncAt)}
@@ -467,7 +462,7 @@ export function PjudMonitorPanel({
               ? "Sin notificaciones de receptor. Sincronice o importe CSV con columna receptor=1."
               : tab === "escritos"
                 ? "Sin escritos por resolver."
-                : "Sin movimientos. Sincronice o importe CSV desde la consulta oficial."}
+                : "Aún no hay movimientos guardados. Sincronice o importe un CSV de la consulta oficial."}
           </p>
         )}
       </div>

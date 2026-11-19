@@ -17,7 +17,7 @@ import {
   probeScraperSidecarHealth,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
-import { enqueueDueSyncJobs, processPendingSyncJobs, PJUD_MANUAL_SESSION_TRIGGER } from "@/lib/pjud/queue";
+import { enqueueDueSyncJobs, failPendingSessionSyncJobs, processPendingSyncJobs, PJUD_MANUAL_SESSION_TRIGGER } from "@/lib/pjud/queue";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import { misCausasClaimableWhere } from "@/lib/pjud/mis-causas-sync-state";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
@@ -754,14 +754,7 @@ export async function syncMisCausas(opts?: {
     if (opts?.sessionSource && enqueuedJobIds.length) {
       // These pending jobs require this ephemeral browser. Never leave them for
       // an unrelated cron/provider after cancellation, or take over running jobs.
-      await prisma.pjudSyncJob.updateMany({
-        where: { id: { in: enqueuedJobIds }, trigger: PJUD_MANUAL_SESSION_TRIGGER, status: "pending" },
-        data: {
-          status: "failed", finishedAt: new Date(),
-          note: "La actualización de esta sesión no se completó. Inicie sesión de nuevo para reintentar.",
-          lastError: "La actualización de esta sesión no se completó. Inicie sesión de nuevo para reintentar.",
-        },
-      });
+      await failPendingSessionSyncJobs(enqueuedJobIds);
     }
     const imported = created.length + linked.length;
     let note = "No se pudo consultar Mis Causas. Vuelva a intentarlo.";

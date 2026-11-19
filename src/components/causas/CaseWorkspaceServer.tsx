@@ -238,7 +238,7 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
           <p className="mt-4 text-sm leading-relaxed text-[var(--ink-soft)]/85">
             {causa.resumen || "Sin resumen."}
           </p>
-          <CausaResumenAi causaId={causa.id} titulo={causa.titulo} />
+          {canUseKnowledge && <CausaResumenAi causaId={causa.id} key={caseStatus.fingerprint} titulo={causa.titulo} />}
         </div>
 
         <DriveFolderPanel

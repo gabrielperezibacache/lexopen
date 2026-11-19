@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { minutaConfidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { buildClienteFolderContext } from "@/lib/integrations/client-folder-context";
+import { caseJudicialStatus } from "@/lib/causas/judicial-status";
 import { readCaseStatus } from "@/lib/causas/status-service";
 
 async function textFromDoc(doc: {
@@ -54,7 +55,11 @@ export async function buildActionContext(opts: {
   if (opts.causaId) {
     const causa = await prisma.causa.findFirst({
       where: { id: opts.causaId, ...causaAccessWhere(opts.user) },
-      include: {
+      select: {
+        id: true, titulo: true, rit: true, ruc: true, tribunal: true, sala: true, materia: true,
+        procedimiento: true, cuaderno: true, estado: true, etapa: true, caratula: true, resumen: true,
+        fechaIngreso: true, fechaNotificacion: true, abogadoContraparte: true,
+        pjudLastSyncAt: true, pjudLastSyncStatus: true, pjudMonitoreoActivo: true, pjudCuadernosCoverage: true,
         cliente: { select: { id: true, razonSocial: true, rut: true } },
         partes: true,
         tramites: { orderBy: { orden: "asc" }, take: 40 },
@@ -79,7 +84,9 @@ export async function buildActionContext(opts: {
       },
     });
     if (!causa) throw httpError("Causa no encontrada o sin acceso", 404);
-    parts.push({ causa });
+    const { pjudLastSyncAt, pjudLastSyncStatus, pjudMonitoreoActivo, pjudCuadernosCoverage, ...records } = causa;
+    const judicialSync = caseJudicialStatus({ pjudLastSyncAt, pjudLastSyncStatus, pjudMonitoreoActivo, pjudCuadernosCoverage });
+    parts.push({ causa: { judicialSync, ...records } });
   }
 
   if (opts.documentoId) {

@@ -75,22 +75,44 @@ export async function reclaimStuckRunningJobs(opts?: { olderThanMs?: number; job
   return result.count;
 }
 
+/** Finalize only the jobs still owned by this attempt. A later judicial query wins. */
+async function failUnfinishedPjudJobs(filter: Prisma.Sql, caseNote: string, at: Date, jobNote = caseNote) {
+  const [result] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+    WITH failed AS (
+      UPDATE "PjudSyncJob"
+      SET status = 'failed', note = ${jobNote}, "lastError" = ${jobNote}, "finishedAt" = ${at},
+          "pjudCuadernosCoverage" = NULL
+      WHERE status IN ('pending', 'running') AND (${filter})
+      RETURNING "causaId", "createdAt"
+    ), recorded AS (
+      UPDATE "Causa" c
+      SET "pjudLastSyncStatus" = 'failed', "pjudLastSyncAt" = ${at}, "pjudLastSyncNote" = ${caseNote},
+          "pjudCuadernosCoverage" = NULL, "pjudFailCount" = c."pjudFailCount" + 1, "updatedAt" = ${at}
+      FROM failed WHERE c.id = failed."causaId" AND c."pjudMonitoreoActivo"
+        AND (c."pjudLastSyncAt" IS NULL OR c."pjudLastSyncAt" <= failed."createdAt")
+    )
+    SELECT count(*)::int AS count FROM failed
+  `);
+  return result.count;
+}
+
+export async function failPendingSessionSyncJobs(jobIds: string[]) {
+  if (!jobIds.length) return 0;
+  return failUnfinishedPjudJobs(
+    Prisma.sql`trigger = ${PJUD_MANUAL_SESSION_TRIGGER} AND status = 'pending' AND id IN (${Prisma.join(jobIds)})`,
+    "La actualización de esta sesión no se completó. Inicie sesión de nuevo para reintentar.", new Date(),
+  );
+}
+
 /** An expired browser reservation fails in place; it must never become a generic pending job. */
 export async function expireManualSessionSyncJobs(opts?: { jobIds?: string[]; causaIds?: string[]; now?: Date }) {
   if (opts?.jobIds?.length === 0 || opts?.causaIds?.length === 0) return 0;
   const now = opts?.now ?? new Date();
-  const note = "La sesión temporal terminó antes de completar la actualización. Inicie sesión de nuevo para reintentar.";
-  const expired = await prisma.pjudSyncJob.updateMany({
-    where: {
-      trigger: PJUD_MANUAL_SESSION_TRIGGER,
-      status: { in: ["pending", "running"] },
-      createdAt: { lte: new Date(now.getTime() - PJUD_MANUAL_SESSION_JOB_TTL_MS) },
-      ...(opts?.jobIds ? { id: { in: opts.jobIds } } : {}),
-      ...(opts?.causaIds ? { causaId: { in: opts.causaIds } } : {}),
-    },
-    data: { status: "failed", note, lastError: note, finishedAt: now },
-  });
-  return expired.count;
+  return failUnfinishedPjudJobs(Prisma.sql`
+    trigger = ${PJUD_MANUAL_SESSION_TRIGGER} AND "createdAt" <= ${new Date(now.getTime() - PJUD_MANUAL_SESSION_JOB_TTL_MS)}
+    ${opts?.jobIds ? Prisma.sql`AND id IN (${Prisma.join(opts.jobIds)})` : Prisma.empty}
+    ${opts?.causaIds ? Prisma.sql`AND "causaId" IN (${Prisma.join(opts.causaIds)})` : Prisma.empty}
+  `, "La sesión temporal terminó antes de completar la actualización. Inicie sesión de nuevo para reintentar.", now);
 }
 
 async function causaIdsWithActiveJobs(causaIds: string[]) {
@@ -115,7 +137,7 @@ async function causaIdsAwaitingManualRecovery(causaIds?: string[]) {
     SELECT "causaId" FROM (
       SELECT DISTINCT ON ("causaId") "causaId", "trigger", "status"
       FROM "PjudSyncJob"
-      WHERE ("trigger" = ${PJUD_MANUAL_SESSION_TRIGGER} OR "status" = 'ok')
+      WHERE ("trigger" = ${PJUD_MANUAL_SESSION_TRIGGER} OR ("status" = 'ok' AND "trigger" <> 'import'))
       ${causaIds ? Prisma.sql`AND "causaId" IN (${Prisma.join(causaIds)})` : Prisma.empty}
       ORDER BY "causaId", "createdAt" DESC, "id" DESC
     ) AS latest
@@ -237,7 +259,7 @@ export async function processPendingSyncJobs(opts?: {
     await opts?.assertActive?.();
     const claimed = await prisma.pjudSyncJob.updateMany({
       where: {
-        id: job.id, status: "pending",
+        id: job.id, status: "pending", attempts: job.attempts,
         ...(!opts?.fetchMovimientos ? { trigger: { not: PJUD_MANUAL_SESSION_TRIGGER } } : {}),
       },
       data: {
@@ -253,7 +275,7 @@ export async function processPendingSyncJobs(opts?: {
         automatic: opts?.automatic,
         force: job.trigger !== "cron",
         trigger: (job.trigger as "cron" | "manual" | "retry" | typeof PJUD_MANUAL_SESSION_TRIGGER) || "cron",
-        existingJobId: job.id,
+        existingJob: { id: job.id, attempts: job.attempts + 1 },
         fetchMovimientos: opts?.fetchMovimientos,
         assertActive: opts?.assertActive,
         downloadDocuments: opts?.downloadDocuments,
@@ -262,16 +284,13 @@ export async function processPendingSyncJobs(opts?: {
       results.push(result);
     } catch (error) {
       if (await getCaseManagementMode() !== "pjud_cl") { await pausePjudManagementJobs(); return; }
-      const note = error instanceof Error ? error.message : "Error";
-      await prisma.pjudSyncJob.updateMany({
-        where: { id: job.id, status: "running" },
-        data: {
-          status: "failed",
-          lastError: note,
-          note,
-          finishedAt: new Date(),
-        },
-      });
+      const note = error instanceof Error && "status" in error
+        ? error.message
+        : "No se completó la consulta judicial. Vuelva a intentarlo.";
+      await failUnfinishedPjudJobs(
+        Prisma.sql`id = ${job.id} AND status = 'running' AND attempts = ${job.attempts + 1}`,
+        "No se completó la consulta judicial. Vuelva a intentarlo.", new Date(), note,
+      );
       results.push({
         causaId: job.causaId,
         inserted: 0,

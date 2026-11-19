@@ -38,6 +38,19 @@ async function main() {
    assert.equal(migratedJobs[0].id,jobs[0].id);
    assert.equal(migratedJobs[0].pjudCuadernosCoverage,null,'old jobs retain unknown coverage');
    assert.equal((await tx.$queryRawUnsafe<{id:string}[]>('SELECT id FROM "CausaMovimiento"')).length,moves.length);
+   await tx.$executeRawUnsafe(`ALTER TABLE "Causa" ADD "pjudLastSyncAt" timestamp, ADD "pjudLastSyncStatus" text, ADD "pjudLastSyncNote" text, ADD "pjudFailCount" int DEFAULT 0, ADD "pjudMonitoreoActivo" boolean DEFAULT true`);
+   await tx.$executeRawUnsafe(`ALTER TABLE "PjudSyncJob" ADD trigger text, ADD "finishedAt" timestamp`);
+   await tx.$executeRawUnsafe(`INSERT INTO "Causa" (id,"pjudLastSyncAt","pjudLastSyncStatus","pjudLastSyncNote") VALUES
+     ('csv','2026-11-01','ok','Import CSV: 1 nuevos, 0 repetidos.'),
+     ('expired','2026-11-01','ok','Consulta anterior'), ('later','2026-11-03','ok','Consulta posterior')`);
+   await tx.$executeRawUnsafe(`INSERT INTO "PjudSyncJob" (id,"causaId","createdAt","finishedAt",status,trigger) VALUES
+     ('expired-job','expired','2026-11-02','2026-11-02 00:01','failed','manual-session'),
+     ('superseded-job','later','2026-11-02','2026-11-02 00:01','failed','manual-session')`);
+   await statements(tx, 'prisma/migrations/20261119040000_pjud_last_attempt/migration.sql');
+   const repaired = await tx.$queryRawUnsafe<{ id:string; status:string; at:Date|null }[]>(`SELECT id, "pjudLastSyncStatus" AS status, "pjudLastSyncAt" AS at FROM "Causa" WHERE id <> 'case' ORDER BY id`);
+   assert.deepEqual(repaired.map(row => [row.id, row.status, row.at?.toISOString() ?? null]), [
+     ['csv', 'unverified', null], ['expired', 'failed', '2026-11-02T00:01:00.000Z'], ['later', 'ok', '2026-11-03T00:00:00.000Z'],
+   ]);
    console.log('PJUD preservation OK: divergent movements and pending/running job snapshots survive historical dedupe');
   },{timeout:30_000});
  } finally {await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await db.$disconnect();}
