@@ -118,6 +118,8 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     expect(origin.searchParams.get("after")).toBe(firstResponse.headers()["x-next-cursor"]);
     expect(origin.hash).toBe(`#plazo-${target.id}`);
     await back.click();
+    await expect(page).toHaveURL(origin.href);
+    await expect(card.getByRole("heading", { level: 2, name: target.titulo, exact: true })).toBeVisible();
     await expect(card).toBeInViewport();
     await card
       .getByRole("button", { name: "Registrar cumplimiento", exact: true })

@@ -168,11 +168,12 @@ test("ajustes: cambiar de categoría y usar atrás/adelante conserva campos y me
   await expect(page).toHaveURL(/#llm-settings$/);
   await expect(setting).toHaveValue("llm-settings");
   await expect(key).toHaveValue("clave-ficticia-no-enviada");
-  await expect(name).toHaveValue("Edición ficticia sin guardar");
-  await expect(page.locator("#estudio").getByRole("status")).toContainText("No se pudo guardar");
   await page.goForward();
   await expect(page).toHaveURL(/#idioma$/);
   await expect(setting).toHaveValue("idioma");
+  await setting.selectOption("estudio");
+  await expect(name).toHaveValue("Edición ficticia sin guardar");
+  await expect(page.locator("#estudio").getByRole("status")).toContainText("No se pudo guardar");
   expect(writes).toHaveLength(1);
   expect(writes[0]).toMatch(/\/api\/configuracion$/);
   await page.screenshot({ path: info.outputPath("settings-categories-desktop.png"), fullPage: false });

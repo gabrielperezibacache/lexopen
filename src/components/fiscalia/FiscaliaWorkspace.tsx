@@ -102,8 +102,8 @@ export function FiscaliaWorkspace({ rows, causes, truncated, userId, causaId = "
         <div className="min-w-0"><h3 className="break-words font-semibold"><Link className="text-[var(--sea)] underline-offset-4 hover:underline" href={`/mi-fiscalia/${encodeURIComponent(row.id)}`}>{row.title}</Link></h3><p className="mt-1 text-sm">{FISCALIA_STATUSES[row.status]} · {FISCALIA_KINDS[row.kind]}</p><Link className="break-words text-sm text-[var(--sea)]" href={`/causas/${row.causaId}`}>{row.causa.titulo}</Link></div>
         <span className="badge badge-sea">{FISCALIA_STATUSES[row.status]}</span>
       </div>
-      <dl className="grid gap-4 border-y border-[var(--line)] py-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div><dt className="text-xs text-[var(--muted)]">RUC · Folio</dt><dd className="mt-1 break-words text-sm">{row.ruc || "Por confirmar"}<span className="block font-medium">{row.folio || operations.noFolio}</span></dd></div>
+      <dl className="grid min-w-0 grid-cols-1 gap-4 border-y border-[var(--line)] py-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div><dt className="text-xs text-[var(--muted)]">RUC · Folio</dt><dd className="mt-1 break-words text-sm">{row.ruc || "Por confirmar"}<span className="block font-medium [overflow-wrap:anywhere]">{row.folio || operations.noFolio}</span></dd></div>
         <div><dt className="text-xs text-[var(--muted)]">{operations.recordedState}</dt><dd className="mt-1 text-sm">{FISCALIA_STATUSES[row.status]}{row.submittedAt && <span className="block text-xs text-[var(--muted)]">Presentación registrada por el usuario: {formatCivilDate(row.submittedAt)}. No sincronizada con el portal.</span>}</dd></div>
         <div><dt className="text-xs text-[var(--muted)]">{operations.nextManagement}</dt><dd className="mt-1 text-sm font-medium">{operations[fiscaliaNextAction(row.status)]}<span className="mt-1 block text-xs font-normal text-[var(--muted)]">{row.followUpDate ? `Revisar seguimiento: ${formatCivilDate(row.followUpDate)}` : operations.noFollowup}</span></dd></div>
       </dl>

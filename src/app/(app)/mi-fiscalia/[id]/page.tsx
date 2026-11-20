@@ -24,9 +24,9 @@ export default async function Page({ params, searchParams }: { params: Promise<{
     <nav className="flex flex-wrap gap-4 text-sm"><Link className="underline" href={`/mi-fiscalia?causaId=${row.causaId}`}>Solicitudes de la causa</Link><Link className="underline" href={`/causas/${row.causaId}`}>{row.causa.titulo}</Link></nav>
     <PageHeader title={row.title} subtitle={`${FISCALIA_KINDS[item.kind]} · ${status(row.status)}`} />
     <section className="panel space-y-3 rounded-2xl p-5" aria-label="Datos de la solicitud">
-      <dl className="grid gap-3 sm:grid-cols-2">
+      <dl className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <div><dt>RUC</dt><dd>{row.ruc || "Por confirmar"}</dd></div>
-        <div><dt>Folio registrado</dt><dd>{row.folio || operations.noFolio}</dd></div>
+        <div className="min-w-0"><dt>Folio registrado</dt><dd className="[overflow-wrap:anywhere]">{row.folio || operations.noFolio}</dd></div>
         {row.submittedAt && <div><dt>Presentación registrada por el estudio</dt><dd>{formatCivilDate(row.submittedAt)}</dd></div>}
         {row.followUpDate && <div><dt>Seguimiento del estudio</dt><dd>{formatCivilDate(row.followUpDate)}</dd></div>}
       </dl>
