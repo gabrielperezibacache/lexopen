@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { moveEventToDay } from "@/lib/calendario/form-dates";
+import { deadlineHref } from "@/lib/deadlines/navigation";
 import { clasificarUrgencia } from "@/lib/plazos";
 
 export type BoardEvento = {
@@ -24,6 +25,7 @@ export type BoardPlazo = {
   titulo: string;
   causaId: string | null;
   esFatal: boolean;
+  responsable: string | null;
   fechaLimite: string;
 };
 
@@ -52,11 +54,13 @@ export function CalendarioBoard({
   mode,
   days,
   todayKey,
+  calendarView,
   weekLabels,
 }: {
   mode: "mes" | "semana";
   days: BoardDay[];
   todayKey: string;
+  calendarView: string;
   /** Etiquetas de cabecera Lun…Dom (solo semana/mes). */
   weekLabels: string[];
 }) {
@@ -161,22 +165,31 @@ export function CalendarioBoard({
               <div className="mt-1 space-y-1">
                 {c.p.slice(0, mode === "semana" ? 6 : 2).map((x) => {
                   const urg = clasificarUrgencia(new Date(x.fechaLimite));
+                  const label = `${x.esFatal ? "Plazo fatal" : "Plazo"} · ${x.titulo} · ${c.ymd} · ${x.responsable || "Sin responsable"}`;
                   return (
                     <Link
                       key={x.id}
-                      href={x.causaId ? `/causas/${x.causaId}` : "/plazos"}
-                      className={`block truncate rounded px-1 text-[10px] ${
+                      prefetch={false}
+                      id={`tablero-plazo-${x.id}`}
+                      href={deadlineHref(x.id, `${calendarView}#tablero-plazo-${x.id}`)}
+                      className={`block scroll-mt-24 target:outline truncate rounded px-1 text-[10px] ${
                         x.esFatal || urg === "critico" || urg === "vencido"
                           ? "bg-red-100 text-red-800"
                           : "bg-[var(--copper)]/15 text-[var(--ink)]"
                       }`}
-                      title={x.titulo}
+                      title={label}
+                      aria-label={label}
                     >
-                      {x.esFatal ? "F · " : ""}
+                      {x.esFatal ? "Fatal · " : ""}
                       {x.titulo}
                     </Link>
                   );
                 })}
+                {c.p.length > (mode === "semana" ? 6 : 2) && <Link
+                  href={`/calendario?vista=agenda&ym=${c.ymd.slice(0, 7)}&tipo=plazo#agenda-dia-${c.ymd}`}
+                  className="block text-xs text-[var(--sea)] underline">
+                  Ver los {c.p.length} plazos
+                </Link>}
                 {c.t.slice(0, mode === "semana" ? 6 : 2).map((x) => (
                   <Link
                     key={x.id}

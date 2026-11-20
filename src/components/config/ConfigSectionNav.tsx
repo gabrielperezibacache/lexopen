@@ -1,113 +1,92 @@
 "use client";
 
-import { searchCommands } from "@/lib/navigation/command-search";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { searchCommands } from "@/lib/navigation/command-search";
 import { type configCategoriesForMode, configSectionFromHash } from "./config-sections";
 import styles from "./WorkspaceArea.module.css";
 
-export function ConfigSectionNav({ categories }: { categories: ReturnType<typeof configCategoriesForMode> }) {
-  const { locale } = useI18n();
-  const english = locale === "en";
+const keywords: Record<string, string> = {
+  "google-settings": "Drive carpetas Organización Gmail Calendar calendario",
+  "pjud-settings": "OJV ClaveÚnica tribunales courts",
+  "llm-settings": "modelo model inteligencia intelligence API",
+  "work-country": "país country Chile",
+  usuarios: "permisos roles usuarios permissions users",
+};
+
+function subscribe(listener: () => void) {
+  window.addEventListener("hashchange", listener);
+  window.addEventListener("popstate", listener);
+  return () => {
+    window.removeEventListener("hashchange", listener);
+    window.removeEventListener("popstate", listener);
+  };
+}
+
+export function ConfigSectionNav({ categories, sections, initialSection }: {
+  initialSection: string;
+  categories: ReturnType<typeof configCategoriesForMode>;
+  sections: Record<string, ReactNode>;
+}) {
+  const english = useI18n().locale === "en";
   const [query, setQuery] = useState("");
-  const [active, setActive] = useState<string>(categories[0].sections[0].id);
-  const navRef = useRef<HTMLElement>(null);
-  const category = categories.find(item => item.sections.some(section => section.id === active)) ?? categories[0];
-
-  useEffect(() => {
-    const nav = navRef.current;
-    const workspace = nav?.closest<HTMLElement>("[data-settings-workspace]");
-    if (!nav || !workspace) return;
-    let frame = 0;
-    let pendingHash: string | undefined;
-
-    const inspect = () => {
-      frame = 0;
-      if (pendingHash) {
-        const target = workspace.querySelector<HTMLElement>(`#${CSS.escape(pendingHash)}`);
-        if (!target) return; // Google/Obsidian can mount after their initial fetch.
-        const id = pendingHash;
-        pendingHash = undefined;
-        target.scrollIntoView({ block: "start", behavior: "instant" });
-        setActive(id);
-        return;
-      }
-      // A chosen section stays selected after the sticky navigation changes height.
-      if (configSectionFromHash(window.location.hash, categories)) return;
-      const edge = nav.getBoundingClientRect().bottom + 20;
-      const targets = categories.flatMap(category => category.sections).flatMap(section => {
-        const element = workspace.querySelector<HTMLElement>(`#${CSS.escape(section.id)}`);
-        return element ? [{ id: section.id, top: element.getBoundingClientRect().top }] : [];
-      });
-      const current = targets.findLast(target => target.top <= edge) || targets[0];
-      if (current) setActive(current.id);
-    };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(inspect); };
-    const syncHash = () => {
-      const section = configSectionFromHash(window.location.hash, categories);
-      pendingHash = section?.id;
-      if (section) setActive(section.id);
-      schedule();
-    };
-    const measure = () => {
-      workspace.style.setProperty("--settings-nav-height", `${Math.ceil(nav.getBoundingClientRect().height)}px`);
-      pendingHash ??= configSectionFromHash(window.location.hash, categories)?.id;
-      schedule();
-    };
-    const resize = new ResizeObserver(measure);
-    resize.observe(nav);
-    // Reconcile async panel roots without moving, hiding or remounting forms.
-    const mutations = new MutationObserver(records => {
-      if (records.some(record => !nav.contains(record.target))) schedule();
-    });
-    mutations.observe(workspace, { childList: true, subtree: true });
-    window.addEventListener("hashchange", syncHash);
-    window.addEventListener("popstate", syncHash);
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", measure);
-    measure();
-    syncHash();
-    return () => {
-      cancelAnimationFrame(frame);
-      resize.disconnect(); mutations.disconnect();
-      window.removeEventListener("hashchange", syncHash);
-      window.removeEventListener("popstate", syncHash);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", measure);
-      workspace.style.removeProperty("--settings-nav-height");
-    };
-  }, [categories]);
-
-  const aliases: Record<string, string> = { "google-settings": "Drive carpetas Organización Gmail Calendar calendario", "pjud-settings": "OJV ClaveÚnica tribunales courts", "llm-settings": "modelo model inteligencia intelligence API", "work-country": "país country Chile", "usuarios": "permisos roles usuarios permissions users" };
-  const results = searchCommands(categories.flatMap(item => item.sections.map(section => ({ ...section, label: english ? section.labelEn : section.label, group: english ? item.labelEn : item.label, keywords: aliases[section.id] || section.id }))), query);
-  return (
-    <nav ref={navRef} className={styles.sectionNav} aria-label={english ? "Settings sections" : "Secciones de configuración"}>
-      <label className={styles.settingsSearch}><span>{english ? "Find a setting" : "Buscar un ajuste"}</span><input className="input" type="search" value={query} maxLength={100} onChange={event => setQuery(event.target.value)} placeholder={english ? "Google, permissions, court mail…" : "Google, permisos, correo judicial…"} /></label>
-      {query.trim() ? <div className={styles.settingsResults}><p className="text-xs text-[var(--muted)]" role="status">{results.length} {english ? "available settings" : "ajustes disponibles"}</p>{results.map(section => <a key={section.id} href={`#${section.id}`} className={styles.sectionLink} onClick={() => setQuery("")}><span>{section.label}</span><small>{section.group}</small></a>)}</div> : <>
-      <label className={styles.mobileCategory} htmlFor="settings-category">
-        <span>{english ? "Settings category" : "Categoría de configuración"}</span>
-        <select id="settings-category" className="select" value={category.id} onChange={event => {
-          const selected = categories.find(item => item.id === event.target.value);
-          if (selected) window.location.hash = selected.sections[0].id;
-        }}>
-          {categories.map(item => <option key={item.id} value={item.id}>{english ? item.labelEn : item.label}</option>)}
-        </select>
-      </label>
-      <div className={styles.categoryLinks} role="group" aria-label={english ? "Categories" : "Categorías"}>
-        {categories.map(item => (
-          <a key={item.id} href={`#${item.sections[0].id}`} className={styles.categoryLink} data-active={item.id === category.id ? "true" : undefined}>
-            {english ? item.labelEn : item.label}
-          </a>
-        ))}
+  const select = useRef<HTMLSelectElement>(null);
+  const hash = useSyncExternalStore(subscribe, () => window.location.hash, () => "");
+  const active = configSectionFromHash(hash || initialSection, categories)?.id ?? categories[0].sections[0].id;
+  // Open a form on first visit. Keep it mounted afterwards to retain drafts and feedback.
+  const [visited, setVisited] = useState(() => new Set([active]));
+  if (!visited.has(active)) setVisited(new Set([...visited, active]));
+  const entries = categories.flatMap(category => category.sections.map(section => ({
+    id: section.id,
+    label: english ? section.labelEn : section.label,
+    group: english ? category.labelEn : category.label,
+    keywords: keywords[section.id] ?? section.id,
+  })));
+  const results = query.trim() ? searchCommands(entries, query) : [];
+  return <>
+    <nav className={styles.sectionNav} aria-label={english ? "Settings sections" : "Secciones de configuración"}>
+      <div className={styles.indexControls}>
+        <div>
+          <label htmlFor="settings-section">{english ? "Selected setting" : "Ajuste seleccionado"}</label>
+          <select id="settings-section" ref={select} className="select" value={active} onChange={event => {
+            setQuery("");
+            window.location.hash = event.target.value;
+          }}>
+            {categories.map(category => <optgroup key={category.id} label={english ? category.labelEn : category.label}>
+              {category.sections.map(section => <option key={section.id} value={section.id}>{english ? section.labelEn : section.label}</option>)}
+            </optgroup>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="settings-query">{english ? "Find a setting" : "Buscar un ajuste"}</label>
+          <input id="settings-query" className="input" type="search" value={query} maxLength={100}
+            placeholder={english ? "Google, permissions, court mail…" : "Google, permisos, correo judicial…"}
+            onChange={event => setQuery(event.target.value)}
+            onKeyDown={event => { if (event.key === "Escape") setQuery(""); }} />
+        </div>
       </div>
-      <div className={styles.sectionLinks} role="group" aria-label={english ? category.labelEn : category.label}>
-        {category.sections.map(section => (
-          <a key={section.id} href={`#${section.id}`} aria-current={active === section.id ? "location" : undefined} className={styles.sectionLink}>
-            {english ? section.labelEn : section.label}
-          </a>
-        ))}
-      </div>
-      </>}
+      {query.trim() && <div className={styles.settingsResults}>
+        <p role="status">{results.length === 0
+          ? (english ? "No settings match your search." : "Ningún ajuste coincide con la búsqueda.")
+          : (english ? `Matching settings: ${results.length}` : `Ajustes encontrados: ${results.length}`)}</p>
+        {results.map(section => <a key={section.id} href={`#${section.id}`} aria-current={section.id === active ? "location" : undefined}
+          onClick={event => {
+            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+            setQuery("");
+            select.current?.focus({ preventScroll: true });
+          }}><strong>{section.label}</strong><small>{section.group}</small></a>)}
+      </div>}
     </nav>
-  );
+    {entries.map(({ id }) => {
+      const scope = ["idioma", "apariencia"].includes(id) ? (english ? "This browser" : "Este navegador")
+        : ["cuenta-personal", "preferencias-altazor", "autorizaciones-escritorio", "comunicaciones"].includes(id) ? (english ? "Your account" : "Tu usuario")
+        : id === "cuentas-conectadas" ? (english ? "Scope shown on each account" : "Ámbito indicado en cada cuenta")
+        : (english ? "Whole firm" : "Todo el estudio");
+      if (!visited.has(id)) return <div key={id} id={id} hidden />;
+      return <div key={id} data-config-section={id} hidden={active !== id}>
+        <p className={styles.scopeLabel}>{scope}</p>
+        {sections[id]}
+      </div>;
+    })}
+  </>;
 }

@@ -15,7 +15,6 @@
 .unified-search-block-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
 .unified-search-block-heading > h2 { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.25rem; font-weight: 500; line-height: 1.6; }
 .unified-search-block-heading > span { font-size: .82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.unified-search-block[data-empty="true"] { border-top-color: var(--line); }
 .unified-search-result { min-height: 56px; padding: .85rem .75rem; border-bottom: 1px solid var(--line); border-radius: .5rem; transition: background-color 150ms ease; overflow-wrap: anywhere; }
 .unified-search-result:hover { background: var(--sea-soft); }
 .unified-search-result > div:first-child { font-size: 1rem; line-height: 1.7; color: var(--sea); }

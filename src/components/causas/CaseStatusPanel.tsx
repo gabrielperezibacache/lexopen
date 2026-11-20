@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import type { CaseStatus } from "@/lib/causas/status";
 import { labelEtapa } from "@/lib/chile";
+import { deadlineHref } from "@/lib/deadlines/navigation";
 import { caseStatusReferences } from "@/lib/causas/status-references";
 
 const chileDateTime = new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" });
@@ -22,7 +23,7 @@ function analyze(causaId: string, fingerprint: string) {
   return pending;
 }
 
-export function CaseStatusPanel({ initial, canUseAi }: { initial: Snapshot; canUseAi: boolean }) {
+export function CaseStatusPanel({ initial, canUseAi, casePath }: { initial: Snapshot; canUseAi: boolean; casePath: string }) {
   const [snapshot, setSnapshot] = useState(initial);
   const [analysis, setAnalysis] = useState<{ fingerprint: string; text: string; error: string } | null>(null);
   const [refresh, setRefresh] = useState(0);
@@ -109,7 +110,7 @@ export function CaseStatusPanel({ initial, canUseAi }: { initial: Snapshot; canU
       </div>}
       {status.latest && <p className="mt-1 text-sm">Último movimiento registrado: {status.latest.title} · {status.latest.date} · {status.latest.source}</p>}
       <div className="mt-4 grid gap-5 md:grid-cols-3">
-        <div><h3 className="font-semibold">Plazos próximos y vencidos</h3><ul className="mt-2 space-y-2 text-sm">{shownDeadlines.map(p => <li key={p.id}><a href="#plazos" className="break-words text-[var(--sea)]">{p.fatal ? "Fatal · " : ""}{p.title}</a><p>{p.date} · {deadlineLabel(p.days)}{p.recordedState === "vencido" ? " · marcado vencido" : ""}</p></li>)}</ul>{!status.deadlines.length && <p className="mt-2 text-sm">No hay plazos abiertos registrados.</p>}{status.counts.plazos > shownDeadlines.length && <a className="text-sm text-[var(--sea)]" href="#plazos">Ver los {status.counts.plazos} plazos abiertos</a>}</div>
+        <div><h3 className="font-semibold">Plazos próximos y vencidos</h3><ul className="mt-2 space-y-2 text-sm">{shownDeadlines.map(p => <li key={p.id}><a href={deadlineHref(p.id, `${casePath}#plazo-${p.id}`)} className="break-words text-[var(--sea)]">{p.fatal ? "Fatal · " : ""}{p.title}</a><p>{p.date} · {deadlineLabel(p.days)}{p.recordedState === "vencido" ? " · marcado vencido" : ""}</p></li>)}</ul>{!status.deadlines.length && <p className="mt-2 text-sm">No hay plazos abiertos registrados.</p>}{status.counts.plazos > shownDeadlines.length && <a className="text-sm text-[var(--sea)]" href="#plazos">Ver los {status.counts.plazos} plazos abiertos</a>}</div>
         <div>
           <h3 className="font-semibold">Qué se está esperando</h3>
           <ul className="mt-2 space-y-2 text-sm">{status.waiting.slice(0, 5).map(m => <li key={m.id}><a href="#actividad" className="break-words text-[var(--sea)]">Resolución pendiente: {m.title}</a><p>{m.date} · {m.source}</p></li>)}</ul>
@@ -120,10 +121,10 @@ export function CaseStatusPanel({ initial, canUseAi }: { initial: Snapshot; canU
           {status.submittedCount > 3 && <a className="mt-2 block text-sm text-[var(--sea)]" href={`/mi-fiscalia?causaId=${status.causaId}`}>Revisar las {status.submittedCount} solicitudes presentadas</a>}
           {status.counts.movimientos > 5 && <a className="text-sm text-[var(--sea)]" href="#actividad">Revisar los {status.counts.movimientos} movimientos pendientes</a>}
         </div>
-        <div><h3 className="font-semibold">Qué se necesita ahora</h3><ul className="mt-2 space-y-2 text-sm">{status.needs.map(item => <li key={item.source}><a href={item.href} className="break-words text-[var(--sea)]">{item.title}</a></li>)}</ul>{!status.needs.length && <p className="mt-2 text-sm">Revisar el último movimiento y registrar la siguiente gestión o espera.</p>}</div>
+        <div><h3 className="font-semibold">Qué se necesita ahora</h3><ul className="mt-2 space-y-2 text-sm">{status.needs.map(item => <li key={item.source}><a href={item.source.startsWith("plazo:") ? deadlineHref(item.source.slice(6), `${casePath}#plazo-${item.source.slice(6)}`) : item.href} className="break-words text-[var(--sea)]">{item.title}</a></li>)}</ul>{!status.needs.length && <p className="mt-2 text-sm">Revisar el último movimiento y registrar la siguiente gestión o espera.</p>}</div>
       </div>
       {status.missing.length > 0 && <details className="mt-4 text-sm"><summary className="cursor-pointer font-medium">Información por comprobar ({status.missing.length})</summary><ul className="mt-2 list-disc space-y-1 pl-5">{status.missing.map(text => <li key={text}>{text}</li>)}</ul></details>}
-      {canUseAi && <div className="mt-4 border-t border-[var(--line)] pt-4"><h3 className="font-semibold">Lectura de Altazor</h3><div role="status" className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{unavailable ? "El análisis se actualizará al recuperar la comprobación de los datos." : checking ? "Comprobando los registros de la causa…" : current?.text ? caseStatusReferences(current.text, status).map((part, index) => part.href ? <a key={index} href={part.href} className="text-[var(--sea)] underline underline-offset-2" title={part.label}>{part.label}</a> : part.unverified ? <span key={index} className="font-medium" title={part.text}>[Referencia no comprobada]</span> : part.text) : current?.error || "Altazor está preparando el estado de la causa…"}</div></div>}
+      {canUseAi && <div className="mt-4 border-t border-[var(--line)] pt-4"><h3 className="font-semibold">Lectura de Altazor</h3><div role="status" className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{unavailable ? "El análisis se actualizará al recuperar la comprobación de los datos." : checking ? "Comprobando los registros de la causa…" : current?.text ? caseStatusReferences(current.text, status, casePath).map((part, index) => part.href ? <a key={index} href={part.href} className="text-[var(--sea)] underline underline-offset-2" title={part.label}>{part.label}</a> : part.unverified ? <span key={index} className="font-medium" title={part.text}>[Referencia no comprobada]</span> : part.text) : current?.error || "Altazor está preparando el estado de la causa…"}</div></div>}
       <p className="mt-3 text-xs text-[var(--muted)]">Fechas y esperas registradas por el estudio; no acredita una consulta al tribunal.</p><details className="text-xs text-[var(--muted)]"><summary className="min-h-11 cursor-pointer py-3">Cómo se interpreta este estado</summary><p>La distancia indicada es de calendario y no recalcula términos legales. Las esperas y los datos pendientes pueden requerir actualización.</p></details>
     </>}
   </section>;

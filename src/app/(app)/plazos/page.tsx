@@ -3,30 +3,24 @@ import {
   personalDeadlineWhere,
   upcomingDeadlinePeriod,
 } from "@/lib/deadlines/views";
-import { DeadlineActions } from "@/components/DeadlineActions";
+import { DeadlineCard, deadlineCardRelations } from "@/components/DeadlineCard";
 import { DeadlineOptions } from "@/components/DeadlineOptions";
 import { ListPagination } from "@/components/ui/ListPagination";
-import { deadlineVersion } from "@/lib/deadlines/completion";
 import {
   deadlineCursorWhere,
   deadlineWindow,
   deadlineMonth,
 } from "@/lib/deadlines/pagination";
 import { STAFF_ROLES } from "@/lib/auth/roles";
-import { can } from "@/lib/auth/permissions";
-import { CivilDeadlineDetails } from "@/components/CivilDeadlineDetails";
 import { civilReviewReady } from "@/lib/deadlines/civil-profile";
 import { getWorkCountry } from "@/lib/config/work-country";
 import { PlazoForm } from "@/components/PlazoForm";
-import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
-import { StatusBadge, UrgenciaBadge } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   causaAccessWhere as scopedcausaAccessWhere,
   plazoAccessWhere,
 } from "@/lib/auth/causa-access";
-import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
 import {
   santiagoDateKey,
@@ -35,11 +29,6 @@ import {
 } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
-import {
-  diasRestantes,
-  labelDiasRestantes,
-  labelTipoComputo,
-} from "@/lib/plazos";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -128,21 +117,7 @@ export default async function PlazosPage({ searchParams }: Props) {
   const [plazosRaw, total, causas, responsables] = await Promise.all([
     prisma.plazo.findMany({
       where: { AND: [where, deadlineCursorWhere(sp.after)] },
-      include: {
-        causa: {
-          include: {
-            miembros: {
-              where: {
-                userId: user.id,
-                desde: { lte: new Date() },
-                OR: [{ hasta: null }, { hasta: { gt: new Date() } }],
-              },
-              select: { rol: true },
-            },
-          },
-        },
-        responsable: { select: publicUserSelect },
-      },
+      include: deadlineCardRelations(user.id),
       orderBy: [{ fechaLimite: "asc" }, { id: "asc" }],
       take: 101,
     }),
@@ -374,101 +349,10 @@ export default async function PlazosPage({ searchParams }: Props) {
             actionHref="/calendario"
           />
         )}
-        {plazos.map((p) => (
-          <div
-            key={p.id}
-            className="panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-xl)] px-5 py-4"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="break-words font-semibold">{p.titulo}</h2>
-                <StatusBadge estado={p.estado} />
-                {(p.estado !== "vencido" || diasRestantes(p.fechaLimite) >= 0) && <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />}
-                {p.esFatal && (
-                  <span className="badge badge-vencido">{h.fatal}</span>
-                )}
-              </div>
-              <p className="mt-1 break-words text-sm text-[var(--muted)]">
-                {formatCivilDate(p.fechaLimite)} ·{" "}
-                {labelTipoComputo(p.tipoComputo, p.calculationRegime)}
-                {p.estado === "pendiente"
-                  ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
-                  : ""}{" "}
-                ·{" "}
-                {p.causa ? (
-                  <Link
-                    href={`/causas/${p.causa.id}`}
-                    className="text-[var(--sea)]"
-                  >
-                    {p.causa.rit || p.causa.titulo}
-                  </Link>
-                ) : (
-                  h.noCause
-                )}{" "}
-                · {p.responsable?.name || h.noOwner}
-              </p>
-              {p.civilCalculationBasis != null && <CivilDeadlineDetails value={p.civilCalculationBasis} currentRegime={p.calculationRegime} />}
-              {p.descripcion && (
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  {p.descripcion}
-                </p>
-              )}
-            </div>
-            <DeadlineActions
-              id={p.id}
-              estado={p.estado}
-              version={deadlineVersion(p)}
-              causaId={p.causaId}
-              canEdit={
-                !(
-                  p.causa?.miembros[0]?.rol === "lectura" &&
-                  p.causa.abogadoId !== user.id &&
-                  !can(user, "causa.write")
-                ) &&
-                can(
-                  user,
-                  "plazo.edit",
-                  p.causa
-                    ? {
-                        causaRol:
-                          p.causa.abogadoId === user.id
-                            ? "responsable"
-                            : p.causa.miembros[0]?.rol,
-                      }
-                    : { own: p.responsableId === user.id },
-                )
-              }
-              canClose={
-                !(
-                  p.causa?.miembros[0]?.rol === "lectura" &&
-                  p.causa.abogadoId !== user.id &&
-                  !can(user, "causa.write")
-                ) &&
-                can(
-                  user,
-                  "plazo.close",
-                  p.causa
-                    ? {
-                        causaRol:
-                          p.causa.abogadoId === user.id
-                            ? "responsable"
-                            : p.causa.miembros[0]?.rol,
-                      }
-                    : { own: p.responsableId === user.id },
-                )
-              }
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href={`/offline.html?kind=plazo&record=${p.id}`}
-                className="btn btn-secondary"
-              >
-                Sin conexión
-              </Link>
-              <PlazoGoogleButton plazoId={p.id} />
-            </div>
-          </div>
-        ))}
+        {plazos.map((p) => <DeadlineCard
+          key={p.id} deadline={p} user={user} labels={h}
+          returnTo={`${scopeHref({ mes: monthKey, vista: personalView ? sp.vista : undefined, after: sp.after })}#plazo-${p.id}`}
+        />)}
       </div>
       <ListPagination
         path="/plazos"

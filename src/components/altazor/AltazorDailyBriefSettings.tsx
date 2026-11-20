@@ -45,8 +45,8 @@ export function AltazorDailyBriefSettings({ initial, locale }: { initial: DailyB
         "Get a brief of your deadline alerts and court mail already on file in your private conversation. The automatic brief requires your LexOpen Host to be running with scheduled work enabled.",
       )}</p>
       {state.enabled && !state.backgroundEnabled && <p className="mt-2 text-sm text-[var(--muted)]">{tr(
-        "Los encargos en segundo plano están en pausa en Mi asistente. Puedes preparar el resumen ahora.",
-        "Background work is paused in My Assistant. You can still prepare the brief now.",
+        "Los encargos en segundo plano están en pausa en Configuración de Altazor. Puedes preparar el resumen ahora.",
+        "Background work is paused in Altazor settings. You can still prepare the brief now.",
       )}</p>}
       {state.lastDay && <p className="mt-2 text-sm text-[var(--muted)]">
         {tr("Último resumen", "Latest brief")}{" "}

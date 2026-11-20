@@ -7,15 +7,24 @@ import { siteAccessWhere as scopedsiteAccessWhere, siteRelatedWhere as scopedsit
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isCliente } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
+import Link from "next/link";
+import { ListPagination } from "@/components/ui/ListPagination";
+import { listCursorWhere, listPageHref, listWindow } from "@/lib/api/list-window";
+import { getLocale } from "@/lib/i18n/server";
 import { notFound } from "next/navigation";
 
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ pregunta?: string; after?: string }> };
 
-export default async function SiteQaPage({ params }: Params) {
+export default async function SiteQaPage({ params, searchParams }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
-  const [site, threads] = await Promise.all([
+  const { pregunta, after: rawAfter } = await searchParams;
+  const after = typeof rawAfter === "string" ? rawAfter : undefined;
+  if (pregunta !== undefined && (typeof pregunta !== "string" || !/^[\w-]{1,128}$/.test(pregunta))) notFound();
+  const english = (await getLocale()) === "en";
+  const path = `/sites/${id}/qa`;
+  const [site, rows] = await Promise.all([
     prisma.site.findFirst({
       where: { AND: [scopedsiteAccessWhere(user), { id }] },
       select: { id: true, name: true, tipo: true, color: true },
@@ -23,18 +32,23 @@ export default async function SiteQaPage({ params }: Params) {
     prisma.qaThread.findMany({
       where: { AND: [scopedsiteRelatedWhere(user), {
         siteId: id,
+        ...(pregunta ? { id: pregunta } : listCursorWhere(after, "updatedAt")),
         ...(clientView ? { status: "open" } : {}),
       }] },
       include: {
+        _count: { select: { posts: true } },
         posts: {
+          take: pregunta ? undefined : 0,
           include: { author: { select: publicUserSelect } },
           orderBy: { createdAt: "asc" },
         },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: pregunta ? 1 : 26,
     }),
   ]);
-  if (!site) notFound();
+  if (!site || (pregunta && !rows.length)) notFound();
+  const { items: threads, next } = listWindow(rows, 25, "updatedAt");
 
   return (
     <div>
@@ -46,15 +60,16 @@ export default async function SiteQaPage({ params }: Params) {
         active="/qa"
         clientView={clientView}
       />
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      {pregunta && <Link className="btn btn-ghost mb-3" href={listPageHref(path, {}, after)}>{english ? "All questions" : "Todas las preguntas"}</Link>}
+      {!pregunta && <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           {clientView
             ? "Preguntas abiertas del espacio — puede abrir hilos y responder mientras estén abiertos."
             : "Preguntas del cliente y del equipo, con respuestas que el estudio marca como oficiales."}
         </p>
-        <QaActions siteId={site.id} canMarkAnswer={!clientView} />
-      </div>
-      {threads.length === 0 && (
+        {threads.length > 0 && <QaActions siteId={site.id} canMarkAnswer={!clientView} />}
+      </div>}
+      {threads.length === 0 && !after && (
         <EmptyState
           title="Todavía no hay preguntas"
           description={
@@ -69,7 +84,7 @@ export default async function SiteQaPage({ params }: Params) {
         {threads.map((t) => (
           <article key={t.id} className="panel rounded-3xl p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold">{t.subject}</h2>
+              <h2 className="text-lg font-semibold">{pregunta ? t.subject : <Link className="text-[var(--sea)] hover:underline" href={listPageHref(path, { pregunta: t.id }, after)}>{t.subject}</Link>}</h2>
               <StatusBadge
                 estado={
                   t.status === "answered"
@@ -81,7 +96,10 @@ export default async function SiteQaPage({ params }: Params) {
               />
               {t.category && <span className="badge badge-ink">{t.category}</span>}
             </div>
-            <div className="mt-4 space-y-3">
+            {!pregunta && <p className="mt-2 text-sm text-[var(--muted)]">
+              {t._count.posts} {english ? (t._count.posts === 1 ? "message" : "messages") : (t._count.posts === 1 ? "mensaje" : "mensajes")} · {formatDateTime(t.updatedAt)}
+            </p>}
+            {pregunta && <div className="mt-4 space-y-3">
               {t.posts.map((p) => (
                 <div
                   key={p.id}
@@ -98,8 +116,8 @@ export default async function SiteQaPage({ params }: Params) {
                   <p className="mt-1">{p.body}</p>
                 </div>
               ))}
-            </div>
-            {(!clientView || t.status === "open") && (
+            </div>}
+            {pregunta && (!clientView || t.status === "open") && (
               <QaActions
                 siteId={site.id}
                 threadId={t.id}
@@ -110,6 +128,7 @@ export default async function SiteQaPage({ params }: Params) {
           </article>
         ))}
       </div>
+      {!pregunta && (after || next) && <ListPagination path={path} after={after} next={next} count={threads.length} />}
     </div>
   );
 }

@@ -91,5 +91,6 @@ export function configCategoriesForMode(mode: "manual" | "pjud_cl", visibility: 
 export function configSectionFromHash(hash: string, categories: ReturnType<typeof configCategoriesForMode>) {
   let id;
   try { id = decodeURIComponent(hash.replace(/^#/, "")); } catch { return undefined; }
+  if (id === "pjud") id = "pjud-settings";
   return categories.flatMap(category => category.sections).find(section => section.id === id);
 }

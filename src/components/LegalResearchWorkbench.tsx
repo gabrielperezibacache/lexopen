@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PjudJudgmentSearch } from "./PjudJudgmentSearch";
 import { BookmarkCitationButton } from "@/components/knowledge/BookmarkCitationButton";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BookOpen, Copy, Search } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import type { ResearchCitation, ResearchResult } from "@/lib/research/service";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { researchWorkspaceView, type ResearchWorkspaceView } from "@/lib/research/workspace-navigation";
 import "./knowledge/knowledge.css";
 
 const labels = { legislation: "Legislación", jurisprudence: "Jurisprudencia", administrative: "Documentos administrativos", doctrine: "Doctrina", case_document: "Documentos del expediente", space_file: "Archivos del espacio" };
@@ -20,9 +23,18 @@ const readySnapshot = () => true;
 const initialSnapshot = () => false;
 const date = (value: string) => new Date(value).toLocaleDateString("es-CL", { timeZone: "UTC" });
 
-export function LegalResearchWorkbench({ initialCases, initialRunId }: { initialCases: Matter[]; initialRunId?: string }) {
+export function LegalResearchWorkbench({ initialCases, initialRunId, initialView = "query" }: { initialCases: Matter[]; initialRunId?: string; initialView?: ResearchWorkspaceView }) {
+  const { dict } = useI18n();
+  const operations = dict.judicialOperations;
   const ready = useSyncExternalStore(subscribeReady, readySnapshot, initialSnapshot);
-  const [view, setView] = useState<"query" | "sources" | "history">("query");
+  const params = useSearchParams();
+  const view = researchWorkspaceView(params.get("vista") ?? initialView);
+  function setView(value: ResearchWorkspaceView) {
+    const location = new URL(window.location.href);
+    location.searchParams.set("vista", value);
+    location.hash = value === "history" ? "investigaciones" : value === "sources" ? "fuentes-estudio" : "research-title";
+    window.history.replaceState(null, "", location);
+  }
   const [query, setQuery] = useState("");
   const [causaId, setCausaId] = useState("");
   const [caseFilter, setCaseFilter] = useState("");
@@ -179,7 +191,7 @@ export function LegalResearchWorkbench({ initialCases, initialRunId }: { initial
     {view === "sources" && <div className="space-y-6">
       <Link href="/jurisprudencia/revision" className="text-sm text-[var(--sea)]">Revisar sentencias anteriores del PJUD</Link>
       {importedVersion && <Link className="btn btn-secondary" href={`/jurisprudencia/fuentes/${encodeURIComponent(importedVersion)}`}>Abrir versión incorporada</Link>}
-      <PjudJudgmentSearch disabled={!ready || Boolean(busy)} onSelect={selected => { setUrl(selected); setManual(false); setStatus("Referencia preparada. Revise la URL y pulse Recuperar fuente oficial para incorporar el texto íntegro."); }} />
+      <div id="unificado" className="scroll-mt-24"><PjudJudgmentSearch disabled={!ready || Boolean(busy)} onSelect={selected => { setUrl(selected); setManual(false); setStatus("Referencia preparada. Revise la URL y pulse Recuperar fuente oficial para incorporar el texto íntegro."); }} /></div>
       <form method="post" className="research-source-form space-y-4" onSubmit={e => { e.preventDefault(); void importSource(); }}><fieldset className="min-w-0 space-y-4" disabled={!ready || Boolean(busy)}>
         <h3 className="text-lg font-semibold">Incorporar una fuente jurídica</h3><p className="max-w-[75ch] text-sm text-[var(--ink-soft)]">Se admiten dictámenes de la Dirección del Trabajo, normas de LeyChile, oficios de Renta o IVA del SII y fallos civiles del Buscador Unificado del Poder Judicial. Esta acción consulta únicamente la URL elegida; la pregunta y el expediente permanecen en LexOpen. Las fuentes incorporadas se comparten con el equipo del estudio.</p>
         <div><label htmlFor="research-source-url" className="mb-2 block text-sm font-medium">URL de la publicación oficial</label><input id="research-source-url" className="input w-full" type="url" maxLength={2000} required value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.dt.gob.cl/legislacion/…" /><p className="mt-2 text-sm">Para un fallo civil identificado use https://juris.pjud.cl/busqueda?Civiles#sentencia-ID, reemplazando ID por su identificador numérico. Es una referencia de selección de LexOpen: se recupera el texto por sesión pública, sin ClaveÚnica. No admite enlaces opacos con ?k= ni previews.</p></div>
@@ -188,8 +200,8 @@ export function LegalResearchWorkbench({ initialCases, initialRunId }: { initial
         {manual && !pjudSelected && <div className="space-y-4"><p className="text-sm">El texto se identificará como aporte manual. Su coincidencia con la publicación oficial requiere revisión.</p><div><label htmlFor="research-source-title" className="mb-2 block text-sm font-medium">Título o identificador</label><input id="research-source-title" className="input w-full" required minLength={3} maxLength={1000} value={sourceTitle} onChange={e => setSourceTitle(e.target.value)} /></div><div><label htmlFor="research-source-date" className="mb-2 block text-sm font-medium">Fecha del documento o publicación, si consta</label><input id="research-source-date" type="date" className="input" value={sourceDate} onChange={e => setSourceDate(e.target.value)} /></div><div><label htmlFor="research-source-text" className="mb-2 block text-sm font-medium">Texto de la fuente pública · hasta 500.000 caracteres</label><textarea id="research-source-text" className="textarea w-full" rows={8} required minLength={20} maxLength={500000} value={sourceText} onChange={e => setSourceText(e.target.value)} /></div></div>}
         </fieldset><div className="flex flex-wrap gap-2"><button className="btn btn-primary" disabled={!ready || Boolean(busy)} aria-busy={busy === "import"}>{busy === "import" ? "Incorporando…" : manual && !pjudSelected ? "Registrar aporte manual" : "Recuperar fuente oficial"}</button>{busy === "import" && <button type="button" className="btn btn-secondary" onClick={() => active.current?.abort()}>Cancelar recuperación</button>}</div>
       </form>
-      <div className="space-y-3"><h3 className="font-semibold">Fuentes disponibles · {sources.length}</h3>{!sources.length && <p className="text-sm text-[var(--ink-soft)]">Incorpore una publicación para comenzar.</p>}<ul className="research-source-list divide-y divide-[var(--line)]">{sources.map(s => <li key={s.id} className="py-3"><Link href={`/jurisprudencia/fuentes/${s.versions[0]?.id || ""}`} className="font-medium text-[var(--sea)]">{s.title}</Link><p className="mt-1 text-sm text-[var(--ink-soft)]">{s.organism}{s.versions[0]?.acquisitionMethod === "pjud_public" ? " · Versión pública recuperada" : s.versions[0]?.acquisitionMethod === "manual" ? " · Aporte manual" : " · Recuperada del sitio oficial"}</p></li>)}</ul><p className="text-sm text-[var(--ink-soft)]">Hasta 100 fuentes recientes. La fecha de consulta o publicación no acredita por sí sola la vigencia de una norma.</p></div>
+      <div id="fuentes-estudio" className="scroll-mt-24 space-y-3"><h3 className="font-semibold">{operations.studySources} · {sources.length}</h3><p className="text-sm text-[var(--ink-soft)]">{operations.studySourcesHint}</p>{!sources.length && <p className="text-sm text-[var(--ink-soft)]">Incorpore una publicación para comenzar.</p>}<ul className="research-source-list divide-y divide-[var(--line)]">{sources.map(s => <li key={s.id} className="py-3"><Link href={`/jurisprudencia/fuentes/${s.versions[0]?.id || ""}`} className="font-medium text-[var(--sea)]">{s.title}</Link><p className="mt-1 text-sm text-[var(--ink-soft)]">{s.organism}{s.versions[0]?.acquisitionMethod === "pjud_public" ? " · Versión pública recuperada" : s.versions[0]?.acquisitionMethod === "manual" ? " · Aporte manual" : " · Recuperada del sitio oficial"}</p></li>)}</ul><p className="text-sm text-[var(--ink-soft)]">Hasta 100 fuentes recientes. La fecha de consulta o publicación no acredita por sí sola la vigencia de una norma.</p></div>
     </div>}
-    {view === "history" && <div className="space-y-4"><h3 className="text-lg font-semibold">Mis consultas guardadas</h3><p className="text-sm text-[var(--ink-soft)]">Se comprueba de nuevo el acceso al expediente y a sus documentos al recuperar una consulta.</p>{!runs.length && <p className="text-sm">Aún no hay consultas accesibles. Comience en Consultar.</p>}<ul className="divide-y divide-[var(--line)]">{runs.map(run => <li key={run.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><span className="min-w-0 break-words text-sm">{run.query} · {date(run.createdAt)}</span><button type="button" className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => restore(run.id)}><BookOpen size={16} aria-hidden="true" />Retomar consulta</button></li>)}</ul></div>}
+    {view === "history" && <div id="investigaciones" className="scroll-mt-24 space-y-4"><h3 className="text-lg font-semibold">Mis consultas guardadas</h3><p className="text-sm text-[var(--ink-soft)]">Se comprueba de nuevo el acceso al expediente y a sus documentos al recuperar una consulta.</p>{!runs.length && <p className="text-sm">Aún no hay consultas accesibles. Comience en Consultar.</p>}<ul className="divide-y divide-[var(--line)]">{runs.map(run => <li key={run.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><span className="min-w-0 break-words text-sm">{run.query} · {date(run.createdAt)}</span><button type="button" className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => restore(run.id)}><BookOpen size={16} aria-hidden="true" />Retomar consulta</button></li>)}</ul></div>}
   </section>;
 }

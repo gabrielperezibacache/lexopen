@@ -91,7 +91,7 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
 
     await page.goto("/academico");
     const academic = page.getByRole("region", { name: "Desarrollo académico", exact: true });
-    await expect(academic.getByRole("button", { name: new RegExp(title) })).toBeVisible();
+    await expect(academic.getByRole("button", { name: new RegExp(title) })).toBeVisible({ timeout: 20_000 });
     const projectSearch = academic.getByRole("searchbox", { name: "Buscar por título", exact: true });
     await projectSearch.fill("MANUSCRITO ACADEMICO");
     await expect(academic.getByRole("button", { name: new RegExp(title) })).toBeVisible();
@@ -107,13 +107,25 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     const work = report.getByRole("combobox", { name: /Trabajo que quieres revisar/ });
     await expect(work).toBeVisible();
     await expect(work.locator(`option[value="${foreign.id}"]`)).toHaveCount(0);
+    await expect(page).toHaveURL(/vista=revision/);
+    await page.evaluate(() => window.history.back());
+    await expect(academic.getByRole("heading", { name: "Tus trabajos", exact: true })).toBeVisible();
+    await page.evaluate(() => window.history.forward());
+    await expect(report).toBeVisible();
+    await page.reload();
+    await expect(work).toBeVisible();
     await work.selectOption(blankId);
     await expect(report.getByText("Falta definir el objetivo", { exact: true })).toBeVisible();
     await report.getByRole("button", { name: "Definir objetivo", exact: true }).click();
     const objectiveInput = academic.getByRole("textbox", { name: "Tu objetivo o texto de trabajo", exact: true });
     await expect(objectiveInput).toBeVisible();
     const pendingObjective = "Objetivo ficticio escrito mientras el encargo anterior seguía guardado.";
+    const objectiveUrl = page.url();
     await objectiveInput.fill(pendingObjective);
+    await page.evaluate(() => window.history.back());
+    await expect(academic.getByText("Guarda los cambios antes de salir de esta vista.")).toBeVisible();
+    await expect(page).toHaveURL(objectiveUrl);
+    await expect(objectiveInput).toHaveValue(pendingObjective);
     await academic.getByRole("button", { name: "Detener", exact: true }).click();
     await expect(academic.getByText("Preparación detenida.", { exact: true })).toBeVisible();
     await expect(objectiveInput).toHaveValue(pendingObjective);

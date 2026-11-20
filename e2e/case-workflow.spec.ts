@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { apiRequest, authenticateApiRequests, loginAs } from "./helpers";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Workflow browser fixtures require local storage");
@@ -33,7 +33,8 @@ test.afterAll(async () => {
 test("recorrido de causa: biblioteca y lector conservan contexto, escrito recibe volumen y el muro ético protege la remisión", async ({ page }, info) => {
   test.setTimeout(120_000);
   await loginAs(page, email);
-  const imported = await page.request.post("/api/books", { multipart: { requestId: randomUUID(), title: "Lectura de trabajo · demostración", author: "Material ficticio", preserveOriginal: "true", file: { name: "lectura-demo.txt", mimeType: "text/plain", buffer: Buffer.from("Material de demostración. La lectura del contrato exige distinguir el pasaje conservado de la observación del profesional. No es una obra jurídica publicada.") } } });
+  await authenticateApiRequests(page);
+  const imported = await apiRequest(page).post("/api/books", { multipart: { requestId: randomUUID(), title: "Lectura de trabajo · demostración", author: "Material ficticio", preserveOriginal: "true", file: { name: "lectura-demo.txt", mimeType: "text/plain", buffer: Buffer.from("Material de demostración. La lectura del contrato exige distinguir el pasaje conservado de la observación del profesional. No es una obra jurídica publicada.") } } });
   expect(imported.status(), await imported.text()).toBe(201);
   bookId = (await imported.json()).book.id;
   storageKey = (await db.libraryBook.findUniqueOrThrow({ where: { id: bookId }, select: { storageKey: true } })).storageKey;
@@ -92,22 +93,42 @@ test("recorrido de causa: biblioteca y lector conservan contexto, escrito recibe
   await capture("writing", ".writing-paper");
   const draftId = new URL(page.url()).searchParams.get("draft");
   expect(draftId).toBeTruthy();
-  const newer = await page.request.post(`/api/causas/${causaId}/writings`, { data: { requestId: randomUUID(), title: "Otro escrito posterior", body: "Este escrito no debe sustituir el retorno al original." } });
+  const newer = await apiRequest(page).post(`/api/causas/${causaId}/writings`, { data: { requestId: randomUUID(), title: "Otro escrito posterior", body: "Este escrito no debe sustituir el retorno al original." } });
   expect(newer.status(), await newer.text()).toBe(201);
-  await expect(nav.getByRole("link", { name: "Biblioteca", exact: true })).toHaveAttribute("href", `/biblioteca?causa=${causaId}&escrito=${draftId}`);
-  await nav.getByRole("link", { name: "Biblioteca", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/biblioteca\\?causa=${causaId}&escrito=${draftId}$`));
+  const desk = await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title: "Mesa privada del recorrido" } });
+  expect(desk.status(), await desk.text()).toBe(201);
+  const deskId = (await desk.json()).id as string;
+  const returnTo = `/mis-causas?q=demostrativa&materia=civil#causa-${causaId}`;
+  const libraryQuery = new URLSearchParams({ causa: causaId, escrito: draftId!, mesa: deskId, volver: returnTo });
+  const hearingQuery = new URLSearchParams({ escrito: draftId!, volver: returnTo });
+  await page.goto(`/audiencias/${deskId}?${hearingQuery}`);
+  const library = nav.getByRole("link", { name: "Biblioteca", exact: true });
+  await expect(library).toHaveAttribute("href", `/biblioteca?${libraryQuery}`);
+  await library.click();
   await page.getByTestId("library-book").getByRole("link").first().click();
-  await expect(page).toHaveURL(new RegExp(`/biblioteca/${bookId}\\?causa=${causaId}&escrito=${draftId}$`));
+  await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe(`/biblioteca/${bookId}?${libraryQuery}`);
+  await expect(back).toHaveAttribute("href", `/biblioteca?${libraryQuery}`);
+  const overview = nav.getByRole("link", { name: "Resumen", exact: true });
+  await expect(overview).toHaveAttribute("href", `/causas/${causaId}?${new URLSearchParams({ escrito: draftId!, mesa: deskId, volver: returnTo })}#estado-causa`);
   await page.getByRole("link", { name: "Elegir pasajes para el escrito de la causa", exact: true }).click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("draft")).toBe(draftId);
+  const writingQuery = new URLSearchParams({ fuentes: "book", libro: bookId, draft: draftId!, mesa: deskId, volver: returnTo });
+  await expect.poll(() => new URL(page.url()).search).toBe(`?${writingQuery}`);
   await expect(page.getByLabel("Título del escrito", { exact: true })).toHaveValue("Observaciones · demostración");
+  const originLink = page.getByTestId("writing-source-candidate").getByRole("link", { name: "Abrir origen" });
+  await expect(originLink).toBeVisible();
+  const source = new URL((await originLink.getAttribute("href"))!, page.url());
+  for (const [key, value] of libraryQuery) expect(source.searchParams.get(key)).toBe(value);
+  expect(source.searchParams.get("fragment")).toBe("1");
   await nav.getByRole("link", { name: "Audiencias", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/causas/${causaId}/audiencias\\?escrito=${draftId}$`));
+  await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe(`/audiencias/${deskId}?${hearingQuery}`);
   await expect(nav.getByRole("link", { name: "Audiencias", exact: true })).toHaveAttribute("aria-current", "page");
   await capture("hearing");
   await nav.getByRole("link", { name: "Escritos", exact: true }).click();
   await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveValue(/Material de demostración/);
+  await nav.getByRole("link", { name: "Resumen", exact: true }).click();
+  await page.getByRole("link", { name: "Volver a mis causas", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search + new URL(page.url()).hash).toBe(returnTo);
+  await expect(page.locator(`#causa-${causaId}`)).toBeInViewport();
   expect((await page.request.get(`/api/causas/${hiddenId}`)).status()).toBe(404);
   for (const route of [`/biblioteca?causa=${hiddenId}`, `/biblioteca/${bookId}?causa=${hiddenId}`]) {
     // App Router may have sent the shell before the server resolves notFound().

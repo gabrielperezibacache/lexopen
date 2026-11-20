@@ -6,6 +6,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CircleAlert, ExternalLink, FileText, Maximize2, Minimize2, Monitor, MousePointer2, RefreshCw, Square } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
+import { AltazorPaneLink } from "./AltazorPaneLink";
+import type { Pane } from "./pane-location";
 import { AltazorSecretUse } from "./AltazorSecretUse";
 import { AltazorMessageContent } from "./AltazorMessageContent";
 import type { ComputerReading, ComputerReadRequest } from "@/lib/altazor/computer/reading";
@@ -22,9 +24,14 @@ import { COMPUTER_ATTACHMENT_FORMATS, computerTurnNeedsHelp, type ComputerFile, 
 import styles from "./AltazorComputer.module.css";
 
 const api = "/api/altazor/computer";
-const stateLabel: Record<string, string> = { disabled: "Desactivado", unconfigured: "Por preparar", configured: "Escritorio preparado", error: "Requiere comprobación", creating: "Creación pendiente", starting: "Escritorio iniciándose", ready: "Escritorio disponible", unknown: "Creación sin confirmar", closed: "Escritorio detenido", expired: "Acceso vencido", stopped: "Escritorio detenido" };
+const spanishStates: Record<string, string> = { disabled: "Desactivado", unconfigured: "Por preparar", configured: "Escritorio preparado", error: "Requiere comprobación", creating: "Creación pendiente", starting: "Escritorio iniciándose", ready: "Escritorio disponible", unknown: "Creación sin confirmar", closed: "Escritorio detenido", expired: "Acceso vencido", stopped: "Escritorio detenido" };
+const englishStates: Record<string, string> = {
+  disabled: "Disabled", unconfigured: "Setup required", configured: "Desktop configured", error: "Connection needs attention",
+  creating: "Creating desktop", starting: "Desktop starting", ready: "Desktop available", unknown: "Creation unconfirmed",
+  closed: "Desktop stopped", expired: "Access expired", stopped: "Desktop stopped",
+};
 type ActionReply = { action: { id: string; status: string; result: { held?: boolean; cancelled?: boolean; stopped?: boolean; continued?: boolean; continuationPending?: boolean; continuationUnknown?: boolean; authorizationPending?: boolean; metadataReady?: boolean; state?: string; failed?: boolean; verifiedFile?: { state: "desktop_verified"; name: string } } | null } };
-type PanelProps = { causaId?: string | null; active?: boolean; preferredSessionId?: string | null; review?: ComputerReview };
+type PanelProps = { openPane?: (pane: Pane) => void; causaId?: string | null; active?: boolean; preferredSessionId?: string | null; review?: ComputerReview };
 
 function ComputerReadingPanel({ sessionId, available }: { sessionId: string; available: boolean }) {
   const id = useId();
@@ -121,8 +128,11 @@ export function AltazorComputer(props: PanelProps) {
   return <ComputerPanel key={`${props.causaId || "personal"}:${props.preferredSessionId || "default"}`} {...props} />;
 }
 
-function ComputerPanel({ causaId, active = true, preferredSessionId, review }: PanelProps) {
-  const { t } = useI18n();
+function ComputerPanel({ causaId, active = true, preferredSessionId, review, openPane }: PanelProps) {
+  const { t, locale } = useI18n();
+  const english = locale === "en";
+  const stateLabel = english ? englishStates : spanishStates;
+  const taskInput = useRef<HTMLTextAreaElement>(null);
   const uid = useId(), tokenRef = useRef<HTMLInputElement>(null), openedFromLink = useRef(false), selectedRef = useRef(""), selectionEpoch = useRef(0);
   const statusVersion = useRef(0), statusRequest = useRef<AbortController | null>(null), sessionVersion = useRef(0), creationPending = useRef(false);
   const [status, setStatus] = useState<ComputerStatus | null>(null), [view, setView] = useState<ComputerSessionView | null>(null), [selected, setSelected] = useState("");
@@ -305,7 +315,11 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
   const canRenew = Boolean(selectedSummary?.canRenew && status?.policyAllowed);
   const canResume = Boolean(selected && view && ["closed", "stopped"].includes(selectedState || "") && status?.policyAllowed);
   const canAct = Boolean(selected && view && selectedState === "ready"), canWork = canAct && Boolean(status?.policyAllowed);
-  const canCleanup = Boolean(selected && selectedSummary && selectedState !== "closed");
+  const canStop = Boolean(selectedSummary && !["closed", "stopped"].includes(selectedState || ""));
+  const hasTask = Boolean(view?.working || view?.approvals?.length);
+  const stopButton = canStop && <button type="button" disabled={busy} onClick={() => action({ action: "close" })}>
+    <Square size={14} aria-hidden="true" />{english ? "Stop desktop" : "Detener escritorio"}
+  </button>;
   const needsStop = Boolean(status?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
   const lastTurn = view?.turns.at(-1);
   const readyConnections = inventory?.gateReady ? inventory.connections.filter(connection => {
@@ -313,7 +327,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     return connection.configured && !connection.needsSignIn && entry?.available && !entry.blockedReason;
   }) : [];
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="altazor-computer-panel">
-    <header className={styles.header}><div><h2 id={`${uid}-title`} ref={title} tabIndex={-1}>Escritorio de Altazor</h2></div><Monitor size={24} aria-hidden="true" /></header>
+    <header className={styles.header}><div><h2 id={`${uid}-title`} ref={title} tabIndex={-1}>{english ? "Altazor desktop" : "Escritorio de Altazor"}</h2></div><Monitor size={24} aria-hidden="true" /></header>
     {error && <p className={styles.error} role="alert">{error}{linkFailure && <> <a href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>Volver a los escritorios de este ámbito</a></>}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     <details className={styles.setupPanel} open={!selected || !status?.configured || !status.enabled || !status.policyAllowed || !["ready","configured"].includes(status.state)}>
       <summary>{selected?"Preparar otro escritorio":"Preparar escritorio"}</summary>
@@ -335,7 +349,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
           const label = shortLabel !== connection.name ? shortLabel : inventory?.catalog.find(entry => entry.id === connection.kind)?.label || connection.kind;
           return <label className={styles.check} key={connection.name}><input type="checkbox" checked={connections.includes(connection.name)} onChange={event => { setConnections(previous => event.target.checked ? [...previous, connection.name] : previous.filter(name => name !== connection.name)); setCreateKey(""); }} /><span>{label}{shortLabel === connection.name && <small>{connection.name}</small>}</span></label>;
         })}</div> : <p>{loading ? "Consultando aplicaciones…" : inventory ? "Puedes abrir el escritorio sin aplicaciones o conectar una cuenta." : "No pude comprobar las aplicaciones disponibles. Puedes abrir el escritorio sin conexiones."}</p>}
-        <a className={styles.preparationLink} href={`/inicio?altazor=connectors${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>Administrar aplicaciones</a>
+        <AltazorPaneLink className={styles.preparationLink} pane="connectors" openPane={openPane} href={`/inicio?altazor=connectors${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>{english ? "Manage applications" : "Administrar aplicaciones"}</AltazorPaneLink>
       </fieldset>}
       {status?.configured && <div className={styles.actions}>
         <button type="button" className={styles.primary} disabled={busy || !status.enabled || !status.policyAllowed || needsStop} onClick={start}>Iniciar escritorio privado</button>
@@ -345,16 +359,27 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     {needsStop && <p className={styles.expiry}>Antes de abrir otro escritorio o cambiar sus conexiones, seleccione la sesión anterior y pulse Detener escritorio. Detenerlo conserva los archivos y la conversación para reanudar el mismo escritorio.</p>}
     {status?.canConfigure && <details className={styles.setup}><summary>Configurar gateway local dedicado</summary><form onSubmit={configure}><label htmlFor={`${uid}-endpoint`}>Dirección local de esta instancia</label><input id={`${uid}-endpoint`} name="endpoint" type="url" required defaultValue="http://127.0.0.1:7488" disabled={busy} /><label htmlFor={`${uid}-provider`}>Nombre del proveedor configurado en el gateway</label><input id={`${uid}-provider`} name="provider" required maxLength={100} disabled={busy} /><label htmlFor={`${uid}-token`}>Autorización del gateway</label><input ref={tokenRef} id={`${uid}-token`} name="token" type="password" autoComplete="off" required minLength={16} maxLength={16000} disabled={busy} /><label className={styles.check}><input name="dedicated" type="checkbox" required disabled={busy} />Esta instancia y sus datos son exclusivos de este profesional y este espacio. Configuré el proveedor directamente en el gateway.</label><button type="submit" disabled={busy}>Comprobar y guardar autorización</button></form></details>}
     </details>
-    {status?.sessions.length ? <div className={styles.sessions}><label htmlFor={`${uid}-session`}>Sesión de este espacio</label><select id={`${uid}-session`} value={selected} disabled={busy} onChange={event => { selectSession(event.target.value); setText(""); setFiles([]); setApproved(false); setMessageKey(""); }}><option value="">Seleccione una sesión</option>{status.sessions.map(session => <option key={session.id} value={session.id}>{stateLabel[session.state] || session.state} · {new Date(session.createdAt).toLocaleString("es-CL")}</option>)}</select></div> : null}
+    {status?.sessions.length ? <div className={styles.sessions}><label htmlFor={`${uid}-session`}>{english ? "Workspace session" : "Sesión de este espacio"}</label><select id={`${uid}-session`} value={selected} disabled={busy} onChange={event => { selectSession(event.target.value); setText(""); setFiles([]); setApproved(false); setMessageKey(""); }}><option value="">{english ? "Select a session" : "Seleccione una sesión"}</option>{status.sessions.map(session => <option key={session.id} value={session.id}>{stateLabel[session.state] || session.state} · {new Date(session.createdAt).toLocaleString("es-CL")}</option>)}</select></div> : null}
     {selected && <div className={styles.work}>
-      <div className={styles.toolbar}><strong>{stateLabel[selectedState || ""] || "Comprobando escritorio…"}</strong><div className={styles.actions}>{canResume && <button type="button" disabled={busy} onClick={() => action({ action: "resume" })}>{t("computerPersistence.resume")}</button>}<button type="button" disabled={busy || !canWork} onClick={() => action({ action: "control", hold: !held })}><MousePointer2 size={15} aria-hidden="true" />{held ? "Devolver control" : "Tomar control"}</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "cancel" })}>Cancelar tarea</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "close" })}><Square size={14} aria-hidden="true" />Detener escritorio</button></div></div>
+      <div className={styles.toolbar}>
+        <strong>{stateLabel[selectedState || ""] || (english ? "Checking desktop…" : "Comprobando escritorio…")}</strong>
+        <div className={styles.actions}>
+          {canResume && <button type="button" className={styles.primary} disabled={busy} onClick={() => action({ action: "resume" })}>{t("computerPersistence.resume")}</button>}
+          {canWork && !held && !hasTask && <button type="button" className={styles.primary} disabled={busy} onClick={() => taskInput.current?.focus()}>{english ? "Write a task" : "Escribir una tarea"}</button>}
+          {canWork && <button type="button" disabled={busy} onClick={() => action({ action: "control", hold: !held })}><MousePointer2 size={15} aria-hidden="true" />{held ? (english ? "Return control" : "Devolver control") : (english ? "Take control" : "Tomar control")}</button>}
+          {canStop && hasTask && <button type="button" disabled={busy} onClick={() => action({ action: "cancel" })}>{english ? "Cancel task" : "Cancelar tarea"}</button>}
+          {selectedState === "ready" && view && status?.policyAllowed
+            ? <details className={styles.sessionOptions}><summary>{english ? "Session options" : "Opciones de sesión"}</summary>{stopButton}</details>
+            : stopButton}
+        </div>
+      </div>
       {view?.authorization && <section className={styles.authorization} aria-label="Autorizaciones del escritorio"><div><strong>{view.authorization.state === "applied" ? computerAuthorizationModePresentation(view.authorization.applied!.mode).label : "Autorizaciones pendientes de confirmar"}</strong>{(view.authorization.state !== "applied" || view.authorization.reason)&&<p>{view.authorization.reason || "El monitor y el control manual siguen disponibles. Elige los permisos en Configuración."}</p>}</div><a className={styles.preparationLink} href={`/configuracion?escritorioEspacio=${encodeURIComponent(view.authorization.workspaceId)}#autorizaciones-escritorio`}>Ver autorizaciones</a></section>}
-      {view?.approvals?.length ? <section className={styles.approvals} aria-label="Consultas de Altazor"><h3 ref={approvalHeading} tabIndex={-1}>Altazor espera tu decisión</h3><p>Revisa la acción y su destino. Autorizar la ejecuta una sola vez.</p>{view.approvals.map(approval => {
+      {view?.approvals?.length ? <section className={styles.approvals} aria-label="Consultas de Altazor"><h3 ref={approvalHeading} tabIndex={-1}>{english ? "Altazor needs your decision" : "Altazor espera tu decisión"}</h3><p>Revisa la acción y su destino. Autorizar la ejecuta una sola vez.</p>{view.approvals.map(approval => {
         const computer = approval.kind === "computer-use" ? approval : null;
         const decision = (approve: boolean) => action(computer ? { action: "computer_approval", approvalId: computer.id, approve, actionHash: computer.computerAction.actionHash, policyRevision: computer.computerAction.policyRevision } : { action: "connector_approval", approvalId: approval.id, approve });
         return <article key={approval.id}>{computer ? <><h4>Acción en el computador: {computer.summary}</h4><p>{computer.computerAction.reason}</p>{computer.computerAction.effectUnknown && <p>Esta acción puede tener efectos en la aplicación abierta. Revisa también la captura antes de autorizar.</p>}<details><summary>Acción exacta que se ejecutará</summary><pre>{JSON.stringify(computer.args, null, 2)}</pre><p>Consulta de una sola ejecución · revisión {computer.computerAction.policyRevision}.</p></details></> : approval.kind !== "computer-use" ? <ConnectorOperationPreview approval={approval} /> : null}{!approval.reviewable && <p>El detalle contiene datos ocultos o supera el límite de revisión. Puedes rechazarlo y realizarlo con el control manual.</p>}<div className={styles.actions}><button type="button" disabled={busy || !canWork || held || !approval.reviewable || Boolean(computer && view.authorization?.state !== "applied")} onClick={() => void decision(true)}>{computer ? "Autorizar esta acción" : "Autorizar esta operación"}</button><button type="button" disabled={busy || !canAct} onClick={() => void decision(false)}>Rechazar</button></div>{held && <p>Devuelve el control para ejecutar la acción autorizada.</p>}</article>;
       })}</section> : null}
-      {persistent && <p className={styles.expiry}>Escritorio persistente · Los archivos se conservan al detenerlo.</p>}
+      {persistent && <p className={styles.expiry}>{english ? "Persistent desktop · Files are kept when you stop it." : "Escritorio persistente · Los archivos se conservan al detenerlo."}</p>}
       {selectedExpiry && <p className={styles.expiry}>{t("computerPersistence.legacy")}</p>}
       {canRenew && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void renew(); }}><label className={styles.check}><input type="checkbox" checked={renewConfirmed} disabled={busy} onChange={event => setRenewConfirmed(event.target.checked)} />{t("computerPersistence.confirm")}</label><button type="submit" disabled={busy || !renewConfirmed}>{t("computerPersistence.adopt")}</button></form>}
       {canAct ? <>
@@ -390,12 +415,12 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
           <header><strong>{turn.from === "user" ? "Tú" : turn.from === "assistant" ? "Altazor AI" : "Sistema"}</strong>{(help || turn.working) && <span>{help ? "Necesita tu ayuda" : "Trabajando"}</span>}</header>
           {fileRead ? <><p><strong>{fileRead.title}</strong></p><p>{fileRead.summary}</p>{fileRead.entries && <><p>Origen: {fileRead.source}. Tipos y nombres devueltos por la conexión; el contenido no se ha abierto.</p><ul aria-label={`Elementos de esta página de ${fileRead.source}`}>{fileRead.entries.map((entry, index) => <li key={index}><p><span className={`badge ${entry.kind === "unknown" ? "badge-ink" : "badge-sea"}`}>{entry.label}</span>{" "}<strong>{entry.name}</strong></p>{entry.path && <small>{entry.path}</small>}</li>)}</ul></>}<details><summary>Detalles de la consulta</summary><p>{fileRead.receipt}</p></details></> : message.text && <AltazorMessageContent text={message.text} plain={turn.from !== "assistant"} />}
           {message.environment && <details><summary>Información del entorno</summary><p>{message.environment}</p></details>}
-          {help && turn.working && <div className={styles.helpHint}>{turn.help?.question && <AltazorMessageContent text={turn.help.question} plain />}<p><a href="/inicio?altazor=help">Responder en Ayuda a distancia</a>. Si necesitas actuar en la pantalla, toma el control y devuélveselo a Altazor cuando termines.</p></div>}
+          {help && turn.working && <div className={styles.helpHint}>{turn.help?.question && <AltazorMessageContent text={turn.help.question} plain />}<p><AltazorPaneLink pane="help" openPane={openPane} href="/inicio?altazor=help">{english ? "Reply in Remote help" : "Responder en Ayuda a distancia"}</AltazorPaneLink>. Si necesitas actuar en la pantalla, toma el control y devuélveselo a Altazor cuando termines.</p></div>}
           {actionCount > 0 && <details className={styles.stepDetails}><summary>{actionCount} {actionCount === 1 ? "acción realizada" : "acciones realizadas"} · Ver detalle</summary><ol>{turn.steps.map((step, index) => <li key={`${index}:${step.action}`}><span>{step.action}</span>{step.at && <small>{Number.isNaN(Date.parse(step.at)) ? step.at : new Date(step.at).toLocaleTimeString("es-CL")}</small>}</li>)}</ol></details>}
         </article>;
       }) : <p>Escriba una tarea y elija expresamente sus archivos. La conversación de ALTAZOR y los expedientes no se envían automáticamente.</p>}</div>
       {newMessages && <button className={styles.newMessages} type="button" onClick={() => { if (chat.current) chat.current.scrollTop = chat.current.scrollHeight; followChat.current = true; setNewMessages(false); }}>Ver mensajes nuevos</button>}
-      <form className={styles.composer} onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor={`${uid}-task`}>Tarea para este escritorio</label><textarea id={`${uid}-task`} rows={4} value={text} maxLength={16000} disabled={busy || !canWork || held} onChange={event => { setText(event.target.value); setApproved(false); setMessageKey(""); }} /><label htmlFor={`${uid}-files`}>Archivos elegidos para esta tarea</label><input key={files.length ? "selected" : "empty"} id={`${uid}-files`} type="file" multiple accept={COMPUTER_ATTACHMENT_FORMATS} disabled={busy || !canWork || held} onChange={event => { const chosen = Array.from(event.target.files || []); if (chosen.length > 5 || chosen.reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) { setError("Elija hasta cinco archivos y 20 MiB en total."); event.target.value = ""; setFiles([]); return; } setFiles(chosen); setApproved(false); setMessageKey(""); }} />{files.length > 0 && <ul>{files.map((file, index) => <li key={`${file.name}:${index}`}>{file.name} · {(file.size / 1024).toFixed(0)} KiB</li>)}</ul>}<label className={styles.check}><input type="checkbox" checked={approved} disabled={busy || !canWork || held} onChange={event => setApproved(event.target.checked)} />Autorizo enviar esta tarea y sólo estos archivos al gateway y a su proveedor configurado.</label><button type="submit" className={styles.primary} disabled={busy || !canWork || held || !approved || !text.trim()}>{busy ? "Enviando…" : "Enviar tarea al escritorio"}</button></form>
+      <form className={styles.composer} onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor={`${uid}-task`}>{english ? "Task for this desktop" : "Tarea para este escritorio"}</label><textarea ref={taskInput} id={`${uid}-task`} rows={4} value={text} maxLength={16000} disabled={busy || !canWork || held} onChange={event => { setText(event.target.value); setApproved(false); setMessageKey(""); }} /><label htmlFor={`${uid}-files`}>{english ? "Files for this task" : "Archivos elegidos para esta tarea"}</label><input key={files.length ? "selected" : "empty"} id={`${uid}-files`} type="file" multiple accept={COMPUTER_ATTACHMENT_FORMATS} disabled={busy || !canWork || held} onChange={event => { const chosen = Array.from(event.target.files || []); if (chosen.length > 5 || chosen.reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) { setError("Elija hasta cinco archivos y 20 MiB en total."); event.target.value = ""; setFiles([]); return; } setFiles(chosen); setApproved(false); setMessageKey(""); }} />{files.length > 0 && <ul>{files.map((file, index) => <li key={`${file.name}:${index}`}>{file.name} · {(file.size / 1024).toFixed(0)} KiB</li>)}</ul>}<label className={styles.check}><input type="checkbox" checked={approved} disabled={busy || !canWork || held} onChange={event => setApproved(event.target.checked)} />{english ? "I authorize sending this task and only the selected files to the gateway and its configured provider." : "Autorizo enviar esta tarea y sólo estos archivos al gateway y a su proveedor configurado."}</label><button type="submit" className={styles.primary} disabled={busy || !canWork || held || !approved || !text.trim()}>{busy ? (english ? "Sending…" : "Enviando…") : (english ? "Send task to desktop" : "Enviar tarea al escritorio")}</button></form>
     </div>}
     <AltazorFileHistory key={causaId || "personal"} causaId={causaId ?? null} />
   </section>;

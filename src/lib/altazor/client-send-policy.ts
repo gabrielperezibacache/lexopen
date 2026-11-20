@@ -6,7 +6,7 @@ export function prepareAssistantSubmission(
   expectedKey?: string,
 ) {
   if (!destination?.permitted || !destination.key) {
-    throw new Error("ALTAZOR necesita una conexión disponible. Revísala en Mi asistente.");
+    throw new Error("ALTAZOR necesita una conexión disponible. Revísala en Configuración de Altazor.");
   }
   if (expectedKey && destination.key !== expectedKey) {
     throw new Error("La conexión de ALTAZOR cambió. Tu mensaje se conserva; vuelve a enviarlo para continuar.");

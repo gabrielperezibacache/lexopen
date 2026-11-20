@@ -18,7 +18,7 @@ En macOS Intel el inspector PDF utilizado no publica un binding nativo para esta
 ## Primer uso y datos existentes
 
 1. Descargue el archivo correspondiente a su equipo y revise el estado de firma en `release-manifest.json`.
-2. Elija **Este PC es el servidor del estudio** o **Conectar a un servidor**. Sólo el Host conserva la base y los archivos.
+2. Elija **Guardar los datos del estudio** o **Conectar a un servidor**. Sólo el Host conserva la base y los archivos.
 3. Si ya tiene una instalación, seleccione su carpeta de datos existente antes de iniciar el Host. La instalación de paquetes y la de servicio pueden usar carpetas predeterminadas diferentes. No copie `pgdata` con PostgreSQL en marcha; conserve un respaldo y cierre el otro Host antes de abrir la misma carpeta.
 4. Una instalación nueva abre la creación del primer administrador; no carga expedientes de demostración automáticamente.
 5. Configure integraciones y herramientas opcionales desde el estudio. La [Mesa del asistente](WORKBENCH.md) necesita su ejecutor habilitado expresamente.

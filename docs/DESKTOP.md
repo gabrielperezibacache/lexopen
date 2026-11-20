@@ -51,7 +51,7 @@ No se sincronizan copias locales: **siempre** se trabaja contra la instalación 
 
    O, sin Electron, el camino recomendado del README: `npm run web:host` y abra
    `http://127.0.0.1:3000` en el navegador.
-2. En Desktop, elija **«Este PC es el servidor del estudio»**. El Host abre `/setup`
+2. En Desktop, elija **«Guardar los datos del estudio»**. El Host abre `/setup`
    para crear el primer administrador. Cargar datos demo es opcional. El
    `SESSION_SECRET` se genera solo en la carpeta de datos.
 3. Iniciar sesión y crear usuarios reales en LexOpen (People / configuración) — roles admin, abogado, asistente, cliente.

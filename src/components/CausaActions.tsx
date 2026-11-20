@@ -11,12 +11,14 @@ export function CausaActions({
   titulo,
   estado,
   isAdmin,
+  canUseAssistant,
   extraActions,
 }: {
   causaId: string;
   titulo: string;
   estado: string;
   isAdmin: boolean;
+  canUseAssistant: boolean;
   extraActions?: ReactNode;
 }) {
   const [msg, setMsg] = useState("");
@@ -66,7 +68,7 @@ export function CausaActions({
           {extraActions}
           <CausaManageActions causaId={causaId} titulo={titulo} estado={estado} isAdmin={isAdmin} compact />
           <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">{busy ? "Sincronizando…" : "Sincronizar notas"}</button>
-          <Link href={`/agente?causaId=${causaId}&utility=copilot`} className="btn btn-ghost">Hablar con ALTAZOR</Link>
+          {canUseAssistant && <Link href={`/agente?causaId=${causaId}&utility=copilot`} className="btn btn-ghost">Hablar con ALTAZOR</Link>}
         </div>
       </details>
     </div>

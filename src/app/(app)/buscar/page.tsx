@@ -54,27 +54,13 @@ type Results = {
 
 const EXAMPLES = ["tutela", "Andes", "audiencia", "C-4521", "plazo"];
 
-const EMPTY_RESULTS = (q: string): Results => ({
-  q,
-  sites: [],
-  causas: [],
-  clientes: [],
-  tramites: [],
-  files: [],
-  documentos: [],
-  tasks: [],
-  jurisprudencia: [],
-  wiki: [],
-  minutas: [],
-});
-
 export default function SearchPage() {
   const { dict, t } = useI18n();
   const h = dict.hubs.buscar;
   const [results, setResults] = useState<Results | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string; query: string } | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   useEffect(() => () => activeRequest.current?.abort(), []);
 
@@ -86,7 +72,8 @@ export default function SearchPage() {
     activeRequest.current = controller;
     setBusy(true);
     setQuery(trimmed);
-    setError("");
+    setError(null);
+    setResults(null);
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, {
         signal: controller.signal,
@@ -94,8 +81,7 @@ export default function SearchPage() {
       const data = await res.json();
       if (controller.signal.aborted) return;
       if (!res.ok) {
-        setResults(EMPTY_RESULTS(trimmed));
-        setError(data.error || "No se pudo completar la búsqueda");
+        setError({ message: typeof data?.error === "string" ? data.error : h.error, query: trimmed });
         return;
       }
       setResults({
@@ -113,8 +99,7 @@ export default function SearchPage() {
       });
     } catch {
       if (controller.signal.aborted) return;
-      setResults(EMPTY_RESULTS(trimmed));
-      setError("No se pudo completar la búsqueda");
+      setError({ message: h.error, query: trimmed });
     } finally {
       if (activeRequest.current === controller) setBusy(false);
     }
@@ -125,6 +110,8 @@ export default function SearchPage() {
     const q = String(new FormData(e.currentTarget).get("q") || "");
     await runSearch(q);
   }
+
+  const hasMatches = results && Object.values(results).some(value => Array.isArray(value) && value.length > 0);
 
   return (
     <div className="unified-search-page">
@@ -158,22 +145,25 @@ export default function SearchPage() {
       <p role="status" aria-live="polite" className="mb-4 text-sm text-[var(--ink-soft)]">
         {busy
           ? h.searching
-          : results && !error
-            ? h.resultsFor.replace("{q}", results.q)
+          : results
+            ? (hasMatches ? h.resultsFor.replace("{q}", results.q) : h.empty)
             : ""}
       </p>
 
       {error && (
-        <p className="unified-search-error mb-4 px-4 py-3 text-sm" role="alert">
-          {error}
-        </p>
+        <div className="unified-search-error mb-4 flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+          <p role="alert">{error.message}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => runSearch(error.query)}>
+            {t("common.retry")}
+          </button>
+        </div>
       )}
 
-      {!results && (
+      {!busy && !error && !results && (
         <section className="unified-search-intro">
-          <h2 className="font-semibold">Empiece a buscar</h2>
+          <h2 className="font-semibold">{h.start}</h2>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Pruebe con un RIT, cliente, palabra de minuta o término de jurisprudencia.
+            {h.hint}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {EXAMPLES.map((ex) => (
@@ -190,10 +180,10 @@ export default function SearchPage() {
         </section>
       )}
 
-      {results && (
+      {results && hasMatches && (
         <div className="unified-search-results grid gap-5 lg:grid-cols-2" aria-busy={busy}>
           <ResultBlock
-            title="Espacios"
+            title={t("nav.sites")}
             items={results.sites.map((s) => ({
               href: `/sites/${s.id}`,
               label: s.name,
@@ -201,29 +191,29 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Causas"
+            title={t("nav.cases")}
             items={results.causas.map((c) => ({
               href: `/causas/${c.id}`,
               label: c.titulo,
-              meta: [c.rit, c.site ? `Espacio: ${c.site.name}` : null].filter(Boolean).join(" · "),
+              meta: [c.rit, c.site ? `${h.spaceLabel}: ${c.site.name}` : null].filter(Boolean).join(" · "),
             }))}
           />
           <ResultBlock
-            title="Clientes"
+            title={t("nav.clients")}
             items={(results.clientes || []).map((c) => ({
               href: `/clientes/${c.id}`,
               label: c.razonSocial,
               meta: [
                 c.rut,
                 c.estado,
-                c._count?.sites ? `${c._count.sites} espacio(s)` : null,
+                c._count?.sites ? `${h.spacesCount}: ${c._count.sites}` : null,
               ]
                 .filter(Boolean)
                 .join(" · "),
             }))}
           />
           <ResultBlock
-            title="Trámites"
+            title={t("hubs.buscar.caseActions")}
             items={(results.tramites || []).map((t) => ({
               href: t.causa.clienteId
                 ? `/clientes/${t.causa.clienteId}?causa=${t.causa.id}`
@@ -239,7 +229,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Documentos"
+            title={t("nav.documents")}
             items={(results.documentos || []).map((d) => ({
               href: d.cliente
                 ? `/clientes/${d.cliente.id}`
@@ -258,7 +248,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Minutas"
+            title={t("nav.minutes")}
             items={(results.minutas || []).map((m) => ({
               href: `/causas/${m.causaId}/minutas/${m.id}`,
               label: m.titulo,
@@ -266,7 +256,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Archivos de espacios"
+            title={t("hubs.buscar.spaceFiles")}
             items={results.files.map((f) => ({
               href: `/sites/${f.site.id}/archivos`,
               label: f.name,
@@ -274,7 +264,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Tareas"
+            title={t("nav.tasks")}
             items={results.tasks.map((t) => ({
               href: t.site ? `/sites/${t.site.id}/tareas` : "/tareas",
               label: t.title,
@@ -290,7 +280,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Jurisprudencia"
+            title={t("nav.jurisprudence")}
             items={results.jurisprudencia.map((j) => ({
               href: `/jurisprudencia?q=${encodeURIComponent(j.rol)}`,
               label: j.caratula || j.rol,
@@ -310,11 +300,11 @@ function ResultBlock({
   title: string;
   items: Array<{ href: string; label: string; meta: string }>;
 }) {
+  if (!items.length) return null;
   return (
-    <section className="unified-search-block" data-empty={items.length === 0}>
+    <section className="unified-search-block">
       <div className="unified-search-block-heading"><h2 className="font-semibold">{title}</h2><span>{items.length}</span></div>
       <div className="mt-3 space-y-2">
-        {items.length === 0 && <p className="text-sm text-[var(--ink-soft)]">Sin resultados</p>}
         {items.map((i) => (
           <Link
             key={i.href + i.label}

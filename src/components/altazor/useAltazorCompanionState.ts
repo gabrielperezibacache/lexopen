@@ -153,6 +153,9 @@ export function useAltazorCompanionState() {
     const result = await request<{ conversation?: Conversation; reused?: boolean; clarify?: string }>("/api/altazor/conversations/prepare", { ...payload, requestId: conversationRequest.current.forPayload(payload) });
     if (result.clarify) { setClarification(result.clarify); return null; }
     if (!result.conversation) throw new Error("No se pudo recuperar la conversación. Tu mensaje se conserva.");
+    // Publish the prepared conversation before a render can observe the previous URL.
+    locationVersion.current++;
+    reflectConversationLocation(result.conversation.id);
     if (result.conversation.id !== liveId.current) {
       const newScope = !liveId.current && result.conversation.causaId === memoryCaseId
         ? JSON.stringify([result.conversation.id, result.conversation.causaId])
@@ -167,7 +170,6 @@ export function useAltazorCompanionState() {
       void savePreference({ activeConversationId: result.conversation.id });
     }
     await reload(result.conversation.id); await loadList();
-    reflectConversationLocation(result.conversation.id);
     return result.conversation.id;
   }
   async function send() {
@@ -218,6 +220,9 @@ export function useAltazorCompanionState() {
     finally { if (action !== "cancel") setBusy(false); }
   }
   function synchronizeLocation(pathname:string,search:string) {
+    // The router can deliver a previous search while catching up with replaceState.
+    const isCurrentLocation = () => pathname === location.pathname && search === new URLSearchParams(location.search).toString();
+    if (!isCurrentLocation()) return;
     const match = pathname.match(/^\/(?:causas|pjud)\/([^/]+)(?:\/|$)/);
     routeCausaId.current = match && !["nueva", "monitoreo", "mis-causas"].includes(match[1]) ? match[1] : "";
     if (loading||pathname!=="/inicio") return;
@@ -228,7 +233,7 @@ export function useAltazorCompanionState() {
     const read=async<T,>(url:string):Promise<T>=>{const response=await fetch(url,{signal:controller.signal,cache:"no-store"}),value=await response.json();if(!response.ok)throw Error(value.error||"La selección no está disponible");return value;};
     // Both the linked cause and any explicit conversation are checked before replacing a draft.
     void Promise.all([read<{causas:{id:string;titulo:string;rit:string|null}[]}>(`/api/altazor/resources${requestedCase?`?causaId=${encodeURIComponent(requestedCase)}`:""}`),requestedConversation?read<ConversationData>(`/api/altazor/conversations/${encodeURIComponent(requestedConversation)}`):Promise.resolve(null)]).then(([resources,selected])=>{
-      if(controller.signal.aborted || version !== locationVersion.current)return;
+      if(controller.signal.aborted || version !== locationVersion.current || !isCurrentLocation())return;
       if(selected&&requestedCase&&selected.conversation.causaId!==requestedCase)throw Error("La conversación no pertenece a la causa solicitada. Tu borrador se conserva.");
       if(controller.signal.aborted)return;setCausas(resources.causas || []);
       if(selected&&requestedConversation!==liveId.current)chooseConversation(selected.conversation.id, selected.conversation.status === "active");
@@ -238,7 +243,7 @@ export function useAltazorCompanionState() {
         const url = new URL(location.href); url.searchParams.delete("intencion"); url.searchParams.delete("run"); history.replaceState(null, "", url.pathname + url.search);
       }
       if (selectedPane && ["chat", "memory", "connectors", "computer", "icaros", "help"].includes(selectedPane)) choosePane(selectedPane as Pane, false);
-    }).catch(reason=>{if(!controller.signal.aborted && version === locationVersion.current)setError(reason.message);});
+    }).catch(reason=>{if(!controller.signal.aborted && version === locationVersion.current && isCurrentLocation())setError(reason.message);});
     return()=>controller.abort();
   }
   return { icaroMemorySelections, selectIcaroMemory, continuation, setContinuation, continueJob, linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };

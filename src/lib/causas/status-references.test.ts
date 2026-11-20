@@ -11,10 +11,10 @@ const status = buildCaseStatus({ id: "visible-case", estado: "activa", etapa: "p
   _count: { plazos: 1, tramites: 1, movimientos: 0 },
 });
 const parts = caseStatusReferences("Atender [plazo:due], [tramite:step], [movimiento:event] y [tarea:task]. También [plazo:otro-usuario].", status);
-assert.deepEqual(parts.filter(p => p.href).map(p => p.href), ["#plazos", "#tramites", "#actividad", "/tareas?causaId=visible-case"]);
+assert.deepEqual(parts.filter(p => p.href).map(p => p.href), ["/plazos/due?volver=%2Fcausas%2Fvisible-case%23plazo-due", "#tramites", "#actividad", "/tareas?causaId=visible-case"]);
 assert.equal(parts.filter(p => p.unverified).length, 1);
 assert.equal(parts.find(p => p.unverified)?.href, undefined);
-assert.ok(parts.find(p => p.href === "#plazos")?.label?.includes("Presentar escrito"));
+assert.ok(parts.find(p => p.href === "/plazos/due?volver=%2Fcausas%2Fvisible-case%23plazo-due")?.label?.includes("Presentar escrito"));
 assert.equal(caseStatusReferences("[fiscalia:request]", status)[0].href, "/mi-fiscalia/request");
 assert.equal(caseStatusReferences("[fiscalia:ajena]", status)[0].unverified, true);
 for (const text of ["[Abrir](https://malicioso.invalid)", "[plazo:javascript:alert(1)]", "<img src=x onerror=alert(1)>"]) {

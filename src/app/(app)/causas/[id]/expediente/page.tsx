@@ -1,4 +1,7 @@
 import { documentDownloadOptions } from "@/lib/sites/document-download-options";
+import { uploadDestinations } from "@/lib/causas/upload-destination";
+import { caseViewHref, caseViewParams, type CaseViewContext } from "@/lib/causas/portfolio-navigation";
+import { CaseWorkflowNav } from "@/components/causas/CaseWorkflowNav";
 import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -7,7 +10,6 @@ import type { Prisma } from "@prisma/client";
 import { CaseArchiveOrganizer } from "@/components/causas/CaseArchiveOrganizer";
 import { CaseDocumentNews } from "@/components/causas/CaseDocumentNews";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
-import { studyDriveMode } from "@/lib/integrations/google-study-drive";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -19,11 +21,10 @@ import { listCaseUpdates } from "@/lib/causas/updates";
 import { validarRit } from "@/lib/chile";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
-import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 type Params = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ carpeta?: string; q?: string; origen?: string; pagina?: string; vista?: string; antes?: string }>;
+  searchParams: Promise<CaseViewContext & { carpeta?: string; q?: string; origen?: string; pagina?: string; vista?: string; antes?: string }>;
 };
 
 const pageSize = 40;
@@ -39,14 +40,21 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const [causa, { locale }] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [{ id }, causaAccessWhere(user)] },
-      select: { titulo: true, rit: true, tribunal: true, googleDriveFolderId: true, googleDriveFolderName: true, googleDriveFolderUrl: true, driveSyncSubscription: { select: { account: true } } },
+      select: { id: true, clienteId: true, cliente: { select: { razonSocial: true } }, titulo: true, rit: true, tribunal: true, googleDriveFolderId: true, googleDriveFolderName: true, googleDriveFolderUrl: true, driveSyncSubscription: { select: { account: true, connectionId: true, folderId: true } } },
     }),
     getI18n(),
   ]);
   if (!causa) notFound();
   const tr = (es: string, en: string) => locale === "en" ? en : es;
   const base = `/causas/${encodeURIComponent(id)}/expediente`;
-  const newsHref = `${base}?vista=novedades`;
+  const context = caseViewParams(id, filters);
+  const backHref = context.get("volver") || "/mis-causas";
+  const backPath = backHref.split(/[?#]/)[0];
+  const overview = backPath === "/pjud" ? `/pjud/${encodeURIComponent(id)}` : `/causas/${encodeURIComponent(id)}`;
+  const archiveHref = caseViewHref(base, context);
+  const news = new URLSearchParams(context);
+  news.set("vista", "novedades");
+  const newsHref = caseViewHref(base, news);
   const isNews = filters.vista === "novedades";
   const assistant = (documentoId?: string) => `/inicio?${new URLSearchParams({
     causaId: id,
@@ -56,7 +64,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       : "Ayúdame a revisar este expediente y cita los pasajes que respaldan tus observaciones.",
   })}`;
   const heading = <PageHeader title={causa.titulo} subtitle={[causa.rit, causa.tribunal].filter(Boolean).join(" · ")} actions={<>
-    <Link href={`/causas/${encodeURIComponent(id)}#ficha`} className="btn btn-ghost" aria-label="Ficha de la causa">
+    <Link href={caseViewHref(overview, context, "#ficha")} className="btn btn-ghost" aria-label="Ficha de la causa">
       <span>Ficha<span className="hidden sm:inline"> de la causa</span></span>
     </Link>
     {canAsk && <Link href={assistant()} className="btn btn-secondary" aria-label="Consultar expediente"><FileSearch size={17} aria-hidden="true" />
@@ -64,17 +72,18 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
     </Link>}
   </>} />;
   const archiveViews = [
-    { url: base, label: tr("Carpetas y documentos", "Folders and documents"), current: !isNews },
+    { url: archiveHref, label: tr("Carpetas y documentos", "Folders and documents"), current: !isNews },
     { url: newsHref, label: tr("Novedades", "Updates"), current: isNews },
   ];
-  const tabs = (
+  const tabs = (<>
+    <CaseWorkflowNav causaId={id} title={causa.titulo} current="archive" canUseKnowledge={canAsk} />
     <nav className="flex flex-wrap gap-x-5 border-b border-[var(--line)]" aria-label={tr("Vistas del expediente", "Case file views")}>
       {archiveViews.map(({ url, label, current }) => (
         <Link key={url} href={url} aria-current={current ? "page" : undefined}
           className={`inline-flex min-h-11 items-center border-b-2 px-1 text-sm font-medium hover:text-[var(--sea)] ${current ? "border-[var(--sea)] text-[var(--sea)]" : "border-transparent text-[var(--ink-soft)]"}`}>{label}</Link>
       ))}
     </nav>
-  );
+  </>);
   if (isNews) {
     const before = typeof filters.antes === "string" ? filters.antes : null;
     const feed = await listCaseUpdates(id, user, { before }).catch(error => {
@@ -85,7 +94,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
     return <div className="mx-auto max-w-6xl space-y-5" data-testid="case-archive">
       {heading}
       {tabs}
-      <CaseDocumentNews feed={feed} archiveHref={base} newsHref={newsHref} older={Boolean(before)} canWrite={canWrite} locale={locale} />
+      <CaseDocumentNews feed={feed} archiveHref={archiveHref} newsHref={newsHref} older={Boolean(before)} canWrite={canWrite} locale={locale} />
     </div>;
   }
 
@@ -126,7 +135,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const origin = typeof filters.origen === "string" && Object.hasOwn(origins, filters.origen) ? filters.origen : "";
   const page = Math.min(5000, Math.max(1, Number.parseInt(String(filters.pagina), 10) || 1));
   function href(next: { folderId?: string | null; page?: number; preserve?: boolean } = {}) {
-    const query = new URLSearchParams();
+    const query = new URLSearchParams(context);
     const selected = next.folderId === undefined ? folderId : next.folderId;
     if (selected) query.set("carpeta", selected);
     if (next.preserve) {
@@ -134,7 +143,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       if (origin) query.set("origen", origin);
     }
     if (next.page && next.page > 1) query.set("pagina", String(next.page));
-    return query.size ? `${base}?${query}` : base;
+    return caseViewHref(base, query);
   }
   const where: Prisma.DocumentoWhereInput = { AND: [
     documentReadWhere(user),
@@ -164,8 +173,9 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
     return { id: value.id, path: path.map(item => item.name).join(" / "), ancestorIds: path.slice(0, -1).map(item => item.id) };
   });
   const destinationNames = new Map(destinations.map(value => [value.id, value.path]));
-  const studyDriveFolderId = (!causa.driveSyncSubscription || causa.driveSyncSubscription.account === "study") &&
-    isRealDriveFolderId(causa.googleDriveFolderId) ? causa.googleDriveFolderId : null;
+  const { sharedOrganization, destinations: intakeOptions } = await uploadDestinations([causa]);
+  const destination = intakeOptions[0];
+  const studyDriveFolderId = destination.drive?.id ?? null;
   const downloads = await documentDownloadOptions(documents.map(document => document.id));
   const rows = documents.map(document => {
     const fromDrive = document.driveImport?.causaId === id;
@@ -186,9 +196,9 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
     {heading}
     {tabs}
     <nav aria-label="Ubicación en Mis Causas" className="flex flex-wrap items-baseline gap-x-2 text-xs sm:text-sm">
-      <Link className="inline-flex min-h-11 items-center text-[var(--sea)]" href="/mis-causas">Mis Causas</Link>
+      <Link className="inline-flex min-h-11 items-center text-[var(--sea)]" href={backHref}>{backPath === "/pjud" ? "PJUD" : backPath === "/causas" ? "Causas" : "Mis Causas"}</Link>
       <span aria-hidden="true">/</span>
-      {folder ? <Link className="inline-flex min-h-11 items-center text-[var(--sea)]" href={base}>Expediente</Link> : <span aria-current="location">Expediente</span>}
+      {folder ? <Link className="inline-flex min-h-11 items-center text-[var(--sea)]" href={archiveHref}>Expediente</Link> : <span aria-current="location">Expediente</span>}
       {trail.map(item => <span key={item.id} className="min-w-0 break-words">
         <span aria-hidden="true" className="mr-2">/</span>
         {item.id === folderId ? <span aria-current="location">{item.name}</span> : <Link className="inline-flex min-h-11 items-center text-[var(--sea)]" href={href({ folderId: item.id })}>{item.name}</Link>}
@@ -206,6 +216,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
         </div>
       </div>
       <form action={base} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2">
+        {Array.from(context, ([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
         {folderId && <input type="hidden" name="carpeta" value={folderId} />}
         <label className="grid min-w-0 gap-1.5 text-sm font-medium">
           Buscar en el expediente
@@ -245,11 +256,14 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       </nav>}
     </section>
     {canWrite && <section aria-label="Incorporar archivos" className="space-y-3"><ContextDisclosure id="incorporar-documentos" title="Añadir archivos" className="panel rounded-[var(--radius-lg)] px-4">
-      <DocumentoIngestForm key={folderId || "root"} lockedCausaId={id} compact allowDriveCopy={false} destinationFolder={folder || undefined} />
+      <DocumentoIngestForm key={folderId || "root"} lockedCausaId={id} causas={intakeOptions} compact allowDriveCopy={false} destinationFolder={folder || undefined} />
       {managementMode === "pjud_cl" && causa.rit && validarRit(causa.rit) && <CausaDocumentImportButton causaId={id} />}
     </ContextDisclosure></section>}
     <ContextDisclosure id="drive-del-expediente" title="Archivos de Google Drive" className="panel rounded-[var(--radius-lg)] px-4">
-      <DriveFolderPanel sharedOrganization={await studyDriveMode()} canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
+      {canWrite && destination.driveSetup === "folder" && causa.googleDriveFolderId && <p className="py-2 text-sm">
+        Para usar una carpeta organizada, revisa la carpeta anterior. Si eliges «Desvincular», se pausará su sincronización y se conservarán los archivos de Drive. Después, elige «Preparar carpeta organizada».
+      </p>}
+      <DriveFolderPanel sharedOrganization={sharedOrganization} canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
     </ContextDisclosure>
   </div>;
 }

@@ -6,6 +6,31 @@ import { loginAs } from "./helpers";
 
 // Both portal responses are supplied by the browser fixture.
 test.use({ serviceWorkers: "block" });
+test("los recorridos de jurisprudencia abren la vista correcta y conservan filtros al recargar", async ({ page }) => {
+  await loginAs(page, "abogado@estudio.cl");
+  const external: string[] = [];
+  await page.route("**/*", route => {
+    const url = new URL(route.request().url());
+    if (["http:", "https:"].includes(url.protocol) && !["localhost", "127.0.0.1"].includes(url.hostname)) { external.push(url.origin); return route.abort(); }
+    return route.continue();
+  });
+  await page.goto("/jurisprudencia?q=filtro%20ficticio&materia=civil");
+  const navigation = page.getByRole("navigation", { name: "Recorridos de jurisprudencia", exact: true });
+  await navigation.getByRole("link", { name: "Buscador Unificado PJUD", exact: true }).click();
+  await expect(page.locator("#unificado")).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("q")).toBe("filtro ficticio");
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
+  await navigation.getByRole("link", { name: "Biblioteca del estudio", exact: true }).click();
+  await expect(page.locator("#fuentes-estudio")).toBeVisible();
+  await navigation.getByRole("link", { name: "Investigaciones guardadas", exact: true }).click();
+  await expect(page.locator("#investigaciones")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("#investigaciones")).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("materia")).toBe("civil");
+  await expect(page.getByRole("link", { name: "Mis sentencias y resoluciones · archivo personal", exact: true })).toHaveAttribute("href", "/biblioteca?fuentes=judicial");
+  expect(external).toEqual([]);
+});
+
 test("búsqueda PJUD: páginas remotas, invalidación y preparación explícita", async ({ page }) => {
   test.setTimeout(180_000);
   const queries: unknown[] = [];

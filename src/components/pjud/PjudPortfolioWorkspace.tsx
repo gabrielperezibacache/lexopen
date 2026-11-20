@@ -11,6 +11,7 @@ import {
 import { PjudQuickAddPanel } from "@/components/pjud/PjudQuickAddPanel";
 import { apiMutation } from "@/lib/api-mutation";
 import { PjudCuadernosCoverage } from "@/components/pjud/PjudCuadernosCoverage";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type Item = {
   id: string;
@@ -66,55 +67,66 @@ const DOT: Record<Semaforo, string> = {
   gris: "bg-slate-300",
 };
 
-function fmtShort(value: string | null) {
-  if (!value) return "nunca";
+function fmtShort(value: string | null, empty: string) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return empty;
   return new Date(value).toLocaleString("es-CL", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: "America/Santiago",
   });
 }
 
 export default function MonitoreoCausasPage() {
+  const { dict } = useI18n(), operations = dict.judicialOperations;
   const [items, setItems] = useState<Item[]>([]);
   const [fallidos, setFallidos] = useState<Fallido[]>([]);
   const [resumen, setResumen] = useState<Record<string, number> | null>(null);
   const [scheduler, setScheduler] = useState<Scheduler | null>(null);
+  const [provider, setProvider] = useState<{ liveIngestConfigured?: boolean; managementMode?: string } | null>(null);
   const [filter, setFilter] = useState<
     "todas" | Semaforo | "monitoreadas" | "fallidas"
   >("monitoreadas");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
 
   async function load() {
-    const res = await fetch("/api/causas/monitoreo");
-    if (!res.ok) return;
-    const data = await res.json();
-    setItems(data.items || []);
-    setFallidos(data.fallidos || []);
-    setResumen(data.resumen || null);
-    setScheduler(data.scheduler || null);
+    setLoading(true); setLoadError("");
+    try {
+      const res = await fetch("/api/causas/monitoreo", { cache: "no-store" });
+      if (!res.ok) throw new Error("unavailable");
+      const data = await res.json();
+      if (!Array.isArray(data.items)) throw new Error("invalid portfolio response");
+      setItems(data.items || []); setFallidos(data.fallidos || []);
+      setResumen(data.resumen || null); setScheduler(data.scheduler || null); setProvider(data.provider || null);
+    } catch { setLoadError(operations.loadFailed); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => {
     let active = true;
-    fetch("/api/causas/monitoreo")
+    fetch("/api/causas/monitoreo", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error("No se pudo cargar el monitoreo");
         return res.json();
       })
       .then((data) => {
         if (!active) return;
+        if (!Array.isArray(data.items)) throw new Error("invalid portfolio response");
+        setLoadError("");
         setItems(data.items || []);
         setFallidos(data.fallidos || []);
         setResumen(data.resumen || null);
         setScheduler(data.scheduler || null);
+        setProvider(data.provider || null);
       })
-      .catch(() => undefined);
+      .catch(() => { if (active) setLoadError(operations.loadFailed); })
+      .finally(() => { if (active) setLoading(false); });
     return () => {
       active = false;
     };
-  }, []);
+  }, [operations.loadFailed]);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase(); // ⚡ Bolt: compute toLowerCase() outside the loop to optimize list filtering
@@ -272,6 +284,14 @@ export default function MonitoreoCausasPage() {
         }
       />
 
+      <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5" aria-label={operations.operationState}>
+        <dl className="grid gap-5 md:grid-cols-3">
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.connection}</dt><dd className="mt-2 font-medium">{provider?.managementMode === "manual" ? operations.channelPaused : typeof provider?.liveIngestConfigured === "boolean" ? provider.liveIngestConfigured ? operations.channelConfigured : operations.channelPending : operations.notVerified}</dd><dd className="mt-1 text-sm text-[var(--ink-soft)]">{operations.connectionScope}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.consultation}</dt><dd className="mt-2 font-medium">{loading ? operations.loading : loadError ? operations.notVerified : `${items.length} ${operations.loadedCases}`}</dd><dd className="mt-1 text-sm text-[var(--ink-soft)]">{operations.caseCoverage}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-[var(--muted)]">{operations.tracking}</dt><dd className="mt-2 font-medium">{resumen ? `${resumen.monitoreadas} ${operations.monitored}` : operations.notVerified}</dd><dd className="mt-1"><Link className="text-sm text-[var(--sea)] underline" href="/causas/mis-causas#ingreso-manual">{operations.connectOjv}</Link></dd></div>
+        </dl>
+      </section>
+      {loadError && <div role="alert" className="space-y-2 text-sm text-[var(--danger)]"><p>{loadError}</p><button type="button" className="btn btn-ghost" disabled={loading} onClick={() => void load()}>{operations.retry}</button></div>}
       {msg && (
         <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-[var(--ink-soft)]/80">
           <p className="min-w-0 flex-1">{msg}</p>
@@ -325,7 +345,7 @@ export default function MonitoreoCausasPage() {
                   </div>
                 </div>
                 <span className="text-xs text-rose-700/70">
-                  {fmtShort(f.createdAt)}
+                  {fmtShort(f.createdAt, operations.noAttempt)}
                 </span>
               </li>
             ))}
@@ -458,12 +478,12 @@ export default function MonitoreoCausasPage() {
                 </td>
                 <td role="cell" data-label="Actualización" className="px-4 py-3 text-xs text-[var(--muted)]">
                   <div>
-                    Último: {fmtShort(i.lastSyncAt)}
+                    {operations.lastAttempt}: {fmtShort(i.lastSyncAt, operations.noAttempt)}
                     {i.lastSyncStatus
                       ? ` · ${labelPjudSyncStatus(i.lastSyncStatus)}`
                       : ""}
                   </div>
-                  <div>Próximo: {fmtShort(i.nextSyncAt)}</div>
+                  <div>{operations.nextCheck}: {fmtShort(i.nextSyncAt, operations.notScheduled)}</div>
                   <PjudCuadernosCoverage coverage={i.cuadernosCoverage} compact />
                   {i.lastSyncNote && (
                     <div
@@ -483,8 +503,8 @@ export default function MonitoreoCausasPage() {
                   colSpan={6}
                   className="px-4 py-8 text-center text-[var(--muted)]"
                 >
-                  No hay causas con este filtro.{" "}
-                  {filter === "monitoreadas" ? (
+                  {loading ? operations.loading : loadError ? operations.notVerified : "No hay causas con este filtro."}{" "}
+                  {!loading && !loadError && filter === "monitoreadas" ? (
                     <>
                       Active el monitoreo en{" "}
                       <Link href="/causas" className="text-[var(--sea)]">

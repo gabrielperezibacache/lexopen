@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { fiscaliaFields, fiscaliaValidation, FISCALIA_PORTAL } from "./contract";
+import { fiscaliaFields, fiscaliaValidation, fiscaliaNextAction, FISCALIA_PORTAL } from "./contract";
 const now = new Date("2026-11-10T15:00:00Z");
 const draft = fiscaliaFields.parse({ causaId: "case", title: "Solicitar copia", kind: "copia" });
 assert.equal(fiscaliaValidation(draft, null, now), null);
@@ -22,4 +22,5 @@ assert.ok(fiscaliaValidation(draft, "closed", now));
 assert.equal(fiscaliaFields.safeParse({ ...draft, submittedAt: "2026-02-31" }).success, false);
 assert.equal(fiscaliaFields.safeParse({ ...draft, password: "never-accepted" }).success, false);
 assert.equal(new URL(FISCALIA_PORTAL).origin, "https://agenda.minpublico.cl");
+assert.deepEqual(["draft", "ready", "submitted", "answered", "closed", "cancelled", "unknown"].map(fiscaliaNextAction), ["prepare", "present", "followUp", "reviewAnswer", "reviewHistory", "reviewHistory", "reviewHistory"]);
 console.log("Mi Fiscalía contract: manual-state transitions, dates, receipt confirmation and no credential fields passed.");

@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { ICARO_LIMITS, type IcaroMemoryRef, type IcaroMemoryView } from "@/lib/altazor/icaros/types";
 
 type Props = {
@@ -10,13 +11,14 @@ type Props = {
 };
 
 export function IcaroMemoryChoices({ memory, selection, onChange, disabled }: Props) {
+  const en = useI18n().locale === "en";
   const available = memory.filter(item => item.available);
   const selected = available.filter(item => selection.some(ref => ref.id === item.id && ref.revision === item.revision && ref.hash === item.hash));
   const characters = selected.reduce((total, item) => total + item.label.length + item.body.length, 0);
   return <fieldset disabled={disabled} className="space-y-1">
-    <legend>Recuerdos para este encargo · {selection.length}/{ICARO_LIMITS.memoryEntriesInContext}</legend>
-    {available.length === 0 && <p className="altazor-panel-note">Este Ícaro aún no tiene recuerdos disponibles.</p>}
-    {selected.length !== selection.length && <p role="alert">La selección cambió. <button type="button" className="btn btn-ghost" onClick={() => onChange([])}>Limpiar selección</button></p>}
+    <legend>{en ? "Memories for this assignment" : "Recuerdos para este encargo"} · {selection.length}/{ICARO_LIMITS.memoryEntriesInContext}</legend>
+    {available.length === 0 && <p className="altazor-panel-note">{en ? "This Ícaro has no available memories yet." : "Este Ícaro aún no tiene recuerdos disponibles."}</p>}
+    {selected.length !== selection.length && <p role="alert">{en ? "The selection has changed. " : "La selección cambió. "}<button type="button" className="btn btn-ghost" onClick={() => onChange([])}>{en ? "Clear selection" : "Limpiar selección"}</button></p>}
     {available.map(item => {
       const checked = selected.some(ref => ref.id === item.id);
       const overLimit = selection.length >= ICARO_LIMITS.memoryEntriesInContext || characters + item.label.length + item.body.length > ICARO_LIMITS.memoryCharacters;
@@ -28,6 +30,6 @@ export function IcaroMemoryChoices({ memory, selection, onChange, disabled }: Pr
         {item.label}
       </label>;
     })}
-    {available.length > 0 && <span className="altazor-panel-note">{characters.toLocaleString("es-CL")} de 6.000 caracteres seleccionados</span>}
+    {available.length > 0 && <span className="altazor-panel-note">{characters.toLocaleString(en ? "en" : "es-CL")} {en ? "of 6,000 characters selected" : "de 6.000 caracteres seleccionados"}</span>}
   </fieldset>;
 }

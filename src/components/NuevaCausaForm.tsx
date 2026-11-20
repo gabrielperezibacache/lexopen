@@ -27,10 +27,12 @@ export function NuevaCausaForm({
   userId,
   clientes,
   initialClienteId,
+  canUseAssistant,
 }: {
   userId: string;
   clientes: { id: string; razonSocial: string; rut: string | null }[];
   initialClienteId: string;
+  canUseAssistant: boolean;
 }) {
   const fieldId = useId();
   const router = useRouter();
@@ -234,13 +236,7 @@ export function NuevaCausaForm({
               {t(acceso === "equipo" ? "caseCreation.teamHelp" : "caseCreation.studyHelp")}
             </p>
           </div>
-          <details>
-            <summary className="min-h-11 cursor-pointer py-3 text-sm text-[var(--ink-soft)]">
-              Completar desde un texto
-            </summary>
-            <CausaExtraerAi formId="nueva-causa-form" />
-          </details>
-          <h2 className="text-lg font-semibold">Identificación de la causa</h2>
+          <h2 className="text-lg font-semibold">Datos obligatorios de la causa</h2>
           <div>
             <label
               htmlFor={`${fieldId}-titulo`}
@@ -257,6 +253,43 @@ export function NuevaCausaForm({
               placeholder="Nombre del asunto o expediente"
             />
           </div>
+          <div>
+            <label
+              htmlFor={`${fieldId}-tribunal`}
+              className="mb-2 block text-sm font-medium"
+            >
+              Tribunal u órgano
+            </label>
+            <input
+              id={`${fieldId}-tribunal`}
+              className="input"
+              name="tribunal"
+              required
+              maxLength={300}
+              placeholder="Tribunal, organismo o sede arbitral"
+              defaultValue=""
+              autoComplete="off"
+            />
+          </div>
+            <div>
+              <label
+                htmlFor={`${fieldId}-materia`}
+                className="mb-2 block text-sm font-medium"
+              >
+                Materia
+              </label>
+              <input
+                id={`${fieldId}-materia`}
+                className="input"
+                name="materia"
+                required
+                minLength={2}
+                maxLength={120}
+                placeholder="Área del asunto"
+              />
+            </div>
+          <details className="space-y-4">
+            <summary className="min-h-11 cursor-pointer py-3 font-medium">Datos procesales y partes</summary>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label
@@ -289,42 +322,6 @@ export function NuevaCausaForm({
               />
             </div>
           </div>
-          <div>
-            <label
-              htmlFor={`${fieldId}-tribunal`}
-              className="mb-2 block text-sm font-medium"
-            >
-              Tribunal u órgano
-            </label>
-            <input
-              id={`${fieldId}-tribunal`}
-              className="input"
-              name="tribunal"
-              required
-              maxLength={300}
-              placeholder="Tribunal, organismo o sede arbitral"
-              defaultValue=""
-              autoComplete="off"
-            />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label
-                htmlFor={`${fieldId}-materia`}
-                className="mb-2 block text-sm font-medium"
-              >
-                Materia
-              </label>
-              <input
-                id={`${fieldId}-materia`}
-                className="input"
-                name="materia"
-                required
-                minLength={2}
-                maxLength={120}
-                placeholder="Área del asunto"
-              />
-            </div>
             <div>
               <label
                 htmlFor={`${fieldId}-etapa`}
@@ -345,7 +342,6 @@ export function NuevaCausaForm({
                 ))}
               </select>
             </div>
-          </div>
           <div>
             <label
               htmlFor={`${fieldId}-procedimiento`}
@@ -427,6 +423,13 @@ export function NuevaCausaForm({
               </label>
             </div>
           </div>
+          </details>
+          {canUseAssistant && <details>
+            <summary className="min-h-11 cursor-pointer py-3 text-sm text-[var(--ink-soft)]">
+              Completar desde un texto
+            </summary>
+            <CausaExtraerAi formId="nueva-causa-form" />
+          </details>}
           {conflictStatus !== "idle" && (
             <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4 text-sm">
               <div className="font-semibold">

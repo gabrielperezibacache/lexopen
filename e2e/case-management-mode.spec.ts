@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { expect, test } from "@playwright/test";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs } from "./helpers";
+import { apiRequest, loginAs } from "./helpers";
 
 // Playwright must intercept the import requests before they can reach the Host.
 test.use({ serviceWorkers: "block" });
@@ -59,6 +59,7 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
     const additional = `Expediente UE #${tag}-${suffix}`;
     const tribunal = `Sede arbitral ficticia ${tag}`;
     await page.getByRole("textbox", { name: "Título", exact: true }).fill(`Asunto general ficticio ${tag} ${suffix}`);
+    await page.getByText("Datos procesales y partes", { exact: true }).click();
     await page.getByRole("textbox", { name: "Referencia", exact: true }).fill(reference);
     await page.getByRole("textbox", { name: "Identificador adicional", exact: true }).fill(additional);
     await page.getByRole("textbox", { name: "Tribunal u órgano", exact: true }).fill(tribunal);
@@ -95,7 +96,7 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
   }
 
   async function expectNoNumericAlias() {
-    const response = await page.request.post("/api/conflict-check", {
+    const response = await apiRequest(page).post("/api/conflict-check", {
       data: { partes: [{ nombre: `Persona diferente ${randomUUID()}`, rut: numericIdentifier.compact }] },
     });
     expect(response.status()).toBe(200);
@@ -106,11 +107,11 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
   await expectNoNumericAlias();
   const revisedReference = `Dossier #${tag}/B`;
   await editManualCase(manual.id, manual.reference, revisedReference, `Referencia complementaria ${tag}`);
-  const tooLong = await page.request.patch(`/api/causas/${manual.id}`, { data: { ruc: "X".repeat(81) } });
+  const tooLong = await apiRequest(page).patch(`/api/causas/${manual.id}`, { data: { ruc: "X".repeat(81) } });
   expect(tooLong.status()).toBe(400);
-  const oversizedCreate = await page.request.post("/api/causas", { data: { titulo: "Referencia demasiado extensa", rit: "X".repeat(81), tribunal: "Órgano ficticio", materia: "General" } });
+  const oversizedCreate = await apiRequest(page).post("/api/causas", { data: { titulo: "Referencia demasiado extensa", rit: "X".repeat(81), tribunal: "Órgano ficticio", materia: "General" } });
   expect(oversizedCreate.status()).toBe(400);
-  const controlCharacter = await page.request.patch(`/api/causas/${manual.id}`, { data: { rit: "Referencia\u0000inválida" } });
+  const controlCharacter = await apiRequest(page).patch(`/api/causas/${manual.id}`, { data: { rit: "Referencia\u0000inválida" } });
   expect(controlCharacter.status()).toBe(400);
 
   await db.firmSettings.update({ where: { id: setting!.id }, data: { caseManagementMode: "pjud_cl" } });
@@ -127,20 +128,20 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
 
   const tribunal = "1º Juzgado Civil de Santiago";
   for (const action of ["preview-rol", "add-rol"]) {
-    const invalidReference = await page.request.post("/api/pjud/lookup", { data: { action, rit: finalReference, tribunal } });
+    const invalidReference = await apiRequest(page).post("/api/pjud/lookup", { data: { action, rit: finalReference, tribunal } });
     expect(invalidReference.status()).toBe(400);
     expect((await invalidReference.json()).error).toMatch(/RIT\/ROL/);
-    const invalidRuc = await page.request.post("/api/pjud/lookup", { data: { action, rit: "C-123-2026", ruc: `Referencia ${tag}`, tribunal } });
+    const invalidRuc = await apiRequest(page).post("/api/pjud/lookup", { data: { action, rit: "C-123-2026", ruc: `Referencia ${tag}`, tribunal } });
     expect(invalidRuc.status()).toBe(400);
     expect((await invalidRuc.json()).error).toMatch(/RUC/);
   }
-  const invalidRut = await page.request.post("/api/pjud/lookup", { data: { action: "buscar-rut", rut: numericIdentifier.formatted } });
+  const invalidRut = await apiRequest(page).post("/api/pjud/lookup", { data: { action: "buscar-rut", rut: numericIdentifier.formatted } });
   expect(invalidRut.status()).toBe(400);
   expect((await invalidRut.json()).error).toMatch(/RUT/);
 
   await db.causa.update({ where: { id: manual.id }, data: { acceso: "equipo" } });
   await loginAs(page, "asistente@estudio.cl");
-  const forbidden = await page.request.patch(`/api/causas/${manual.id}`, { data: { titulo: "No debe reemplazar el título", rit: "X".repeat(81) } });
+  const forbidden = await apiRequest(page).patch(`/api/causas/${manual.id}`, { data: { titulo: "No debe reemplazar el título", rit: "X".repeat(81) } });
   expect(forbidden.status()).toBe(404);
   expect(JSON.stringify(await forbidden.json())).not.toContain(finalReference);
 });

@@ -18,6 +18,16 @@ export const fiscaliaFields = z.strictObject({
 export const fiscaliaUpdate = fiscaliaFields.extend({ id: z.string().min(1).max(120), expectedUpdatedAt: z.iso.datetime() });
 export type FiscaliaInput = z.infer<typeof fiscaliaFields>;
 export type FiscaliaState = keyof typeof FISCALIA_STATUSES;
+/** Suggested local follow-up, never an inferred official portal status. */
+export function fiscaliaNextAction(status: string) {
+  switch (status) {
+    case "draft": return "prepare";
+    case "ready": return "present";
+    case "submitted": return "followUp";
+    case "answered": return "reviewAnswer";
+    default: return "reviewHistory";
+  }
+}
 const transitions: Record<FiscaliaState, readonly FiscaliaState[]> = {
   draft: ["draft", "ready", "cancelled"], ready: ["draft", "ready", "submitted", "cancelled"],
   submitted: ["submitted", "answered", "closed"], answered: ["answered", "closed"], closed: ["closed"], cancelled: ["cancelled"],

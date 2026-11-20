@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ACADEMIC_MODES, academicCongressSchema, emptyAcademicBrief } from "./academic-schemas";
-import { ACADEMIC_JOURNEYS, ACADEMIC_INSTRUCTIONS, academicHref, academicJourney, academicManuscriptBody, academicOutline, academicTextStats, tidyAcademicSpacing } from "./academic-templates";
+import { ACADEMIC_JOURNEYS, ACADEMIC_INSTRUCTIONS, academicHref, academicLocation, academicJourney, academicManuscriptBody, academicOutline, academicTextStats, tidyAcademicSpacing } from "./academic-templates";
 
 test("the three academic journeys retain every supported task exactly once", () => {
   assert.deepEqual(ACADEMIC_JOURNEYS.flatMap(item => [...item.modes]).sort(), [...ACADEMIC_MODES].sort());
@@ -9,6 +9,16 @@ test("the three academic journeys retain every supported task exactly once", () 
   assert.equal(academicJourney("career"), "writing");
   assert.equal(academicHref("a&b", "c=d"), "/academico?trabajo=a%26b&resultado=c%3Dd");
 });
+test("the academic route round-trips the pane, workspace, result and step", () => {
+  for (const pane of ["work", "teaching", "discovery", "review", "matrix", "profile"] as const) {
+    const location = new URL(academicHref("workspace", "article", pane, 1), "https://example.invalid");
+    assert.deepEqual(academicLocation(Object.fromEntries(location.searchParams)), { workspaceId: "workspace", artifactId: "article", pane, step: 1 });
+  }
+  assert.deepEqual(academicLocation({ vista: "docencia" }), { workspaceId: "", artifactId: "", pane: "teaching", step: undefined });
+  assert.equal(academicLocation({ vista: "matriz", trabajo: ["invalid"], resultado: "orphan" }).pane, "work");
+  assert.equal(academicLocation({ vista: "unknown" }).pane, "work");
+});
+
 test("academic text helpers count Unicode and locate headings without interpreting markup", () => {
   const text = "# Educación\n\nNiño, investigación y fuentes [R1].\n\n## Límites";
   assert.equal(academicTextStats(text).words, 7);

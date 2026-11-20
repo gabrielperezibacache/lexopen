@@ -70,6 +70,32 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/api/pjud/manual-session", route => route.fulfill({ json: { capabilities: { available: false, allowed: true, hostLocal: true, reason: "Ingreso manual no habilitado en esta prueba ficticia del acceso guardado.", importLimit: 20 }, session: null } }));
 });
 
+test("cartera distingue error de consulta de una lista vacía y permite volver a consultar", async ({ page }) => {
+  let responseState: "unavailable" | "invalid" | "ready" = "unavailable";
+  const methods: string[] = [];
+  await interceptLookup(page, async () => { throw new Error("This reading test must not mutate or query OJV"); });
+  await page.route("**/api/causas/monitoreo", route => {
+    methods.push(route.request().method());
+    return responseState === "unavailable" ? route.fulfill({ status: 503, json: { error: "fixture unavailable" } }) : responseState === "invalid" ? route.fulfill({ json: { unexpected: true } }) : route.fulfill({ json: { items: [], fallidos: [], resumen: { total: 0, monitoreadas: 0 }, scheduler: { configured: true, intervalMinutes: 720, runtime: "unverified", note: "Fixture local" }, provider: { liveIngestConfigured: false, managementMode: "manual" } } });
+  });
+  await page.goto("/causas/monitoreo");
+  await expect(page.getByRole("alert").filter({ hasText: "No se pudo leer el estado actual" })).toBeVisible();
+  await expect(page.getByText("No hay causas con este filtro.", { exact: false })).toHaveCount(0);
+  responseState = "invalid";
+  await page.getByRole("button", { name: "Volver a consultar", exact: true }).click();
+  await expect.poll(() => methods.length).toBeGreaterThanOrEqual(2);
+  await expect(page.getByRole("button", { name: "Volver a consultar", exact: true })).toBeEnabled();
+  await expect(page.getByRole("alert").filter({ hasText: "No se pudo leer el estado actual" })).toBeVisible();
+  await expect(page.getByText("No hay causas con este filtro.", { exact: false })).toHaveCount(0);
+  responseState = "ready";
+  await page.getByRole("button", { name: "Volver a consultar", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "No se pudo leer el estado actual" })).toHaveCount(0);
+  await expect(page.getByText("No hay causas con este filtro.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Estado de la operación", exact: true })).toContainText("Seguimiento judicial en pausa");
+  expect(methods.length).toBeGreaterThanOrEqual(3);
+  expect(methods.every(method => method === "GET")).toBe(true);
+});
+
 test("la consulta es de sólo lectura y el registro se confirma por separado", async ({ page }, info) => {
   const payloads: Payload[] = [];
   await interceptLookup(page, async (route, body) => {

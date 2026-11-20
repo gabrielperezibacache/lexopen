@@ -14,6 +14,7 @@ type OriginalDocument = Prisma.DocumentoGetPayload<{ select: typeof originalSele
 type IntakeScope = { causaId: string; clienteId: string | null; confidencial: boolean; privilegio: boolean };
 type OriginalIdentity = { sourceSha256: string; sizeBytes: number };
 type ManualInput = IntakeScope & {
+  expectedClienteId?: string | null;
   nombre: string;
   tipo: string;
   contenido: string | null;
@@ -169,7 +170,7 @@ export async function findCaseIntakeOriginal(
 }
 
 /** Same manual input and uploader is the same receipt, even after an HTTP retry. */
-export async function ingestManualCaseDocument(input: ManualInput, original: Buffer | null, user: CausaAccessUser) {
+export async function ingestManualCaseDocument({ expectedClienteId, ...input }: ManualInput, original: Buffer | null, user: CausaAccessUser) {
   const identity = original?.length ? { sourceSha256: sha256(original), sizeBytes: original.length } : null;
   const sourceKey = identity ? sha256(JSON.stringify([
     user.id, identity.sourceSha256, input.nombre, input.tipo, input.mimeType, input.ruta,
@@ -185,9 +186,10 @@ export async function ingestManualCaseDocument(input: ManualInput, original: Buf
     });
     if (!actor || !isStaff(actor.role)) throw httpError("No tiene permiso para incorporar documentos", 403);
     await assertCausaCapability(input.causaId, actor, "causa.write", tx);
-    if (input.clienteId) {
+    if (input.clienteId || expectedClienteId !== undefined) {
       const cause = await tx.causa.findUniqueOrThrow({ where: { id: input.causaId }, select: { clienteId: true } });
-      if (cause.clienteId !== input.clienteId) throw httpError("El cliente no corresponde al expediente", 400);
+      if (expectedClienteId !== undefined && cause.clienteId !== expectedClienteId) throw httpError("Cambió el cliente de la causa. Actualiza el destino antes de incorporar el archivo.", 409);
+      if (input.clienteId && cause.clienteId !== input.clienteId) throw httpError("El cliente no corresponde al expediente", 400);
     }
     if (input.confidencial && !canSeeConfidential(actor) || input.privilegio && !canSeePrivileged(actor)) {
       throw httpError("Su rol no puede crear contenido confidencial o privilegiado", 403);

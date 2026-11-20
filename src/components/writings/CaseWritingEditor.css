@@ -1,9 +1,9 @@
 .writing-page { min-width: 0; }
-.writing-page-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+.writing-page-heading { margin-bottom: 2rem; }
 .writing-page-heading h1 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(2rem, 3vw, 3.35rem); line-height: 1.15; letter-spacing: -.025em; margin: .75rem 0; }
 .writing-page-heading p { color: var(--ink-soft); line-height: 1.75; overflow-wrap: anywhere; }
-.writing-back, .writing-text-link { color: var(--sea); min-height: 44px; display: inline-flex; align-items: center; gap: .5rem; text-underline-offset: .3rem; }
-.writing-back:hover, .writing-text-link:hover { text-decoration: underline; }
+.writing-text-link { color: var(--sea); min-height: 44px; display: inline-flex; align-items: center; gap: .5rem; text-underline-offset: .3rem; }
+.writing-text-link:hover { text-decoration: underline; }
 .writing-overview { border-block: 1px solid var(--line-strong); padding-block: 1.25rem; margin-bottom: 1.5rem; display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(17rem, 1.2fr); gap: 1.5rem; align-items: end; }
 .writing-overview label, .writing-companion label { display: grid; gap: .5rem; font-size: 1rem; }
 .writing-overview select, .writing-overview input, .writing-companion input, .writing-companion select { min-height: 44px; width: 100%; min-width: 0; }
@@ -80,7 +80,7 @@
 .writing-companion-panel { animation: writing-sheet-open 180ms cubic-bezier(.16, 1, .3, 1); }
 @keyframes writing-sheet-open { from { clip-path: inset(0 0 12% 0); } to { clip-path: inset(0); } }
 @media (max-width: 1120px) { .writing-body { min-height: 28rem; } }
-@media (max-width: 700px) { .writing-page-heading { display: block; } .writing-overview { grid-template-columns: minmax(0, 1fr); gap: 1rem; } .writing-create { display: grid; grid-template-columns: minmax(0, 1fr); } .writing-create button { justify-self: start; } .writing-overview-note { margin: 0; } .writing-paper { padding: 1.25rem; } .writing-body { min-height: 24rem; } .writing-actions { align-items: stretch; } .writing-actions .btn { flex: 1 1 auto; } .writing-mobile-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .writing-overview { grid-template-columns: minmax(0, 1fr); gap: 1rem; } .writing-create { display: grid; grid-template-columns: minmax(0, 1fr); } .writing-create button { justify-self: start; } .writing-overview-note { margin: 0; } .writing-paper { padding: 1.25rem; } .writing-body { min-height: 24rem; } .writing-actions { align-items: stretch; } .writing-actions .btn { flex: 1 1 auto; } .writing-mobile-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .writing-companion-panel { animation: none; } }
 
 .writing-review-panel { display: grid; gap: .75rem; padding-bottom: 1.25rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); }

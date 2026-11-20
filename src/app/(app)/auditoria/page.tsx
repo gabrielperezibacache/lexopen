@@ -24,8 +24,9 @@ type Props = {
 export default async function AuditoriaPage({ searchParams }: Props) {
   const user = await requireStaff();
   if (!can(user, "audit.read")) redirect("/cuenta#permisos");
-  const { dict } = await getI18n();
+  const { dict, locale } = await getI18n();
   const h = dict.hubs.auditoria;
+  const english = locale === "en";
   const sp = await searchParams;
   const actionFilter = (sp.action || "").trim();
   const actorFilter = (sp.actor || "").trim();
@@ -55,56 +56,41 @@ export default async function AuditoriaPage({ searchParams }: Props) {
     <div className={`${styles.area} space-y-6`}>
       <ModuleHeader artwork="research" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
-      <p className="text-sm text-[var(--ink-soft)]">
-        Los filtros consultan todo el historial autorizado.
-      </p>
-      <form className="panel grid grid-cols-1 items-end gap-3 rounded-3xl p-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_2fr_auto_auto]" method="get">
-        <label className="min-w-0 text-sm">
-          <span className="mb-1.5 block font-medium text-[var(--ink-soft)]">Acción</span>
-          <select className="select" name="action" defaultValue={actionFilter}>
-            <option value="">Todas</option>
-            {actionOptions.map((a) => (
-              <option key={a} value={a}>
-                {labelAuditAction(a)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="min-w-0 text-sm">
-          <span className="mb-1.5 block font-medium text-[var(--ink-soft)]">Actor</span>
-          <select className="select" name="actor" defaultValue={actorFilter}>
-            <option value="">Todos</option>
-            {actors.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-1">
-          <span className="mb-1.5 block font-medium text-[var(--ink-soft)]">Buscar</span>
-          <input
-            className="input"
-            name="q"
-            defaultValue={sp.q || ""}
-            placeholder="email, entidad, detalle…"
-          />
-        </label>
-        <button className="btn btn-primary" type="submit">
-          Filtrar
-        </button>
-        <Link href="/auditoria" className="btn btn-ghost">
-          Limpiar
-        </Link>
+      <form className="panel space-y-3 rounded-3xl p-4" method="get">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-0 flex-auto text-sm">
+            <span className="mb-1.5 block font-medium">{english ? "Search the audit log" : "Buscar en el historial"}</span>
+            <input className="input" name="q" defaultValue={sp.q || ""} placeholder={english ? "Email, record or detail…" : "Correo, entidad o detalle…"} />
+          </label>
+          <button className="btn btn-primary" type="submit">{english ? "Filter" : "Filtrar"}</button>
+          {(actionFilter || actorFilter || q) && (
+            <Link href="/auditoria" className="btn btn-ghost">{english ? "Clear filters" : "Limpiar filtros"}</Link>
+          )}
+        </div>
+        <details open={Boolean(actionFilter || actorFilter)}>
+          <summary className="cursor-pointer py-2 text-sm font-medium">{english ? "Filter by action or user" : "Filtrar por acción o usuario"}</summary>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label>{english ? "Action" : "Acción"}
+              <select className="select" name="action" defaultValue={actionFilter}>
+                <option value="">{english ? "All actions" : "Todas las acciones"}</option>
+                {actionOptions.map(a => <option key={a} value={a}>{labelAuditAction(a)}</option>)}
+              </select>
+            </label>
+            <label>{english ? "User" : "Usuario"}
+              <select className="select" name="actor" defaultValue={actorFilter}>
+                <option value="">{english ? "All users" : "Todos los usuarios"}</option>
+                {actors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </label>
+          </div>
+        </details>
       </form>
 
       <ListPagination path="/auditoria" filters={{ action: actionFilter, actor: actorFilter, q }} after={sp.after} next={next} count={filtered.length} />
       {filtered.length === 0 ? (
         <EmptyState
-          title="Sin eventos"
-          description="No hay registros de auditoría con estos filtros."
-          actionLabel="Limpiar filtros"
-          actionHref="/auditoria"
+          title={english ? "No events" : "Sin eventos"}
+          description={english ? "There are no audit events for this view." : "No hay eventos de auditoría en esta vista."}
         />
       ) : (
         <div className="panel overflow-hidden rounded-3xl">
@@ -112,11 +98,11 @@ export default async function AuditoriaPage({ searchParams }: Props) {
           <table className="min-w-full text-left text-sm">
             <thead className="table-heading">
               <tr>
-                <th className="px-4 py-3">Fecha</th>
-                <th className="px-4 py-3">Actor</th>
-                <th className="px-4 py-3">Acción</th>
-                <th className="px-4 py-3">Entidad</th>
-                <th className="px-4 py-3">Detalle</th>
+                <th className="px-4 py-3">{english ? "Date" : "Fecha"}</th>
+                <th className="px-4 py-3">{english ? "User" : "Usuario"}</th>
+                <th className="px-4 py-3">{english ? "Action" : "Acción"}</th>
+                <th className="px-4 py-3">{english ? "Entity" : "Entidad"}</th>
+                <th className="px-4 py-3">{english ? "Detail" : "Detalle"}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +112,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
                     {formatDateTime(event.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    {event.actor?.name || event.actor?.email || "Sistema"}
+                    {event.actor?.name || event.actor?.email || (english ? "System" : "Sistema")}
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{labelAuditAction(event.action)}</div>

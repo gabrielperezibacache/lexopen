@@ -32,7 +32,7 @@ test("correo PJUD separa la configuración personal de la bandeja", async ({
   expect(serialized).not.toContain("oauthRefreshEnc");
   expect(serialized).not.toContain("oauthAccessEnc");
 
-  await page.goto("/configuracion");
+  await page.goto("/configuracion#comunicaciones");
   await page.locator("main").getByRole("link", { name: "Configurar correo" }).click();
   await expect(page).toHaveURL(/\/configuracion\/correo$/, { timeout: 15_000 });
   await expect(page.getByTestId("mailbox-connect")).toBeVisible();
@@ -77,6 +77,7 @@ test("el equipo encuentra su correo en Configuración y el portal no puede acced
   await page.goto("/cuenta");
   await expect(page.locator("main").getByRole("link", { name: "Configurar correo" })).toHaveCount(0);
   await page.locator("main").getByRole("link", { name: "Configuración", exact: true }).click();
+  await page.getByLabel("Ajuste seleccionado", { exact: true }).selectOption("comunicaciones");
   await page.locator("main").getByRole("link", { name: "Configurar correo" }).click();
   await expect(page.getByRole("heading", { name: "Configuración de correo" })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });

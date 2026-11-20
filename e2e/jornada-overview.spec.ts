@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
+import { addCivilDays, santiagoDateKey } from "../src/lib/chile-time";
 import { loginAs } from "./helpers";
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 const tag = randomUUID(); let dueId = "", doneId = "", restrictedId = "";
@@ -36,24 +37,40 @@ test("jornada: vencidos de otros meses, navegación por términos y adaptación 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(summary).toBeVisible();
   await expect(summary.getByRole("link", { name: /Vencidos pendientes/ })).toBeVisible();
-  await expect(summary.getByRole("link", { name: /Próximos plazos/ })).toBeVisible();
-  await expect(summary.getByRole("link", { name: /Eventos de hoy/ })).toBeVisible();
+  await expect(summary.locator("a[data-attention]").first()).toContainText("Vencidos pendientes");
   await expect(page.getByTestId("inicio-composer").filter({ visible: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("jornada-mobile.png"), fullPage: false });
 });
 
-test("jornada disponible sin permiso de asistente", async ({ page }) => {
+test("una jornada sin actividad reúne los ceros y destaca un próximo plazo aun sin permiso de asistente", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
   await loginAs(page, restrictedEmail);
   await expect(page.getByRole("heading", { name: "Tu jornada", exact: true })).toBeVisible();
   await expect(page.getByTestId("inicio-composer")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Mis Causas/ })).toBeVisible();
+  const overview = page.getByTestId("day-overview");
+  await expect(overview.getByText("Sin plazos vencidos o próximos ni eventos hoy.")).toBeVisible();
+  await expect(overview.getByRole("link", { name: "Ver agenda" })).toHaveAttribute("href", /calendario\?vista=semana/);
+  await expect(overview.locator("strong")).toHaveCount(0);
+  const date = addCivilDays(santiagoDateKey(new Date()), 2);
+  const due = await db.plazo.create({ data: { titulo: `Único plazo ${tag}`, fechaLimite: new Date(`${date}T00:00:00Z`), esFatal: true, responsableId: restrictedId } });
+  try {
+    await page.reload();
+    const link = overview.getByRole("link", { name: /Próximos plazos/ });
+    await expect(link).toHaveAttribute("data-attention", "true");
+    await expect(link.locator("strong")).toHaveText("1");
+    await expect(overview.getByText("Sin vencidos · Sin eventos hoy")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  } finally {
+    await db.plazo.deleteMany({ where: { id: due.id } });
+  }
 });
 
 test("buscar ajustes conserva los formularios sin guardar", async ({ page }) => {
   test.setTimeout(180_000);
   await loginAs(page, "socio@estudio.cl");
-  await page.goto("/configuracion");
+  await page.goto("/configuracion#estudio");
   const draft = page.locator('#estudio input[name="name"]').first();
   await expect(draft).toBeVisible({ timeout: 20_000 });
   await draft.fill("Borrador de estudio sin guardar");

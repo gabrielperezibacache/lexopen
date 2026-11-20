@@ -70,6 +70,7 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
         causaId: cause.id,
         responsableId: user.id,
         fechaLimite: new Date("2088-11-20T00:00:00Z"),
+        esFatal: true,
       })),
     });
     await loginAs(page, user.email);
@@ -107,6 +108,19 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
     const card = page.locator("div.panel").filter({
       has: page.getByRole("heading", { name: target.titulo, exact: true }),
     });
+    // An explicit destination must remain reachable even when it is beyond the first window.
+    await card.getByRole("link", { name: target.titulo, exact: true }).click();
+    await expect(page.getByRole("heading", { name: target.titulo, level: 1 })).toBeVisible({ timeout: 30_000 });
+    expect(new URL(page.url()).pathname).toBe(`/plazos/${target.id}`);
+    const back = page.getByRole("link", { name: "Volver a plazos" });
+    const origin = new URL((await back.getAttribute("href"))!, page.url());
+    expect(origin.searchParams.get("causaId")).toBe(cause.id);
+    expect(origin.searchParams.get("after")).toBe(firstResponse.headers()["x-next-cursor"]);
+    expect(origin.hash).toBe(`#plazo-${target.id}`);
+    await back.click();
+    await expect(page).toHaveURL(origin.href);
+    await expect(card.getByRole("heading", { level: 2, name: target.titulo, exact: true })).toBeVisible();
+    await expect(card).toBeInViewport();
     await card
       .getByRole("button", { name: "Registrar cumplimiento", exact: true })
       .click();
@@ -196,6 +210,28 @@ test("plazos: páginas completas, respaldo documental retenido, historial y móv
         })
       ).status(),
     ).toBe(409);
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto("/calendario?vista=mes&ym=2088-11&tipo=plazo");
+    await page.getByTestId("cal-day-2088-11-20").getByRole("link", { name: /Ver los \d+ plazos/ }).click();
+    const fromAgenda = page.locator(`#agenda-plazo-${target.id}`);
+    await expect(fromAgenda).toContainText("Fatal");
+    await expect(fromAgenda).toContainText(user.name);
+    await fromAgenda.click();
+    await expect(page.getByRole("heading", { name: target.titulo, level: 1 })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(`#plazo-${target.id}`)).toContainText(user.name);
+    await page.getByRole("link", { name: "Volver al calendario" }).click();
+    await expect(fromAgenda).toBeInViewport();
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.locator(`#movil-plazo-${target.id}`).click();
+    await expect(page.getByRole("heading", { name: target.titulo, level: 1 })).toBeVisible({ timeout: 30_000 });
+    const calendarReturn = page.getByRole("link", { name: "Volver al calendario" });
+    await expect(calendarReturn).toHaveAttribute("href", `/calendario?vista=agenda&ym=2088-11&tipo=plazo#movil-plazo-${target.id}`);
+    await calendarReturn.click();
+    await expect(page.locator(`#movil-plazo-${target.id}`)).toBeInViewport();
+    await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: outsider.id } });
+    await page.goto(`/plazos/${target.id}`);
+    await expect(page.getByRole("heading", { name: "Página no encontrada", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: target.titulo, exact: true })).toHaveCount(0);
   } finally {
     if (causeId) await prisma.causa.deleteMany({ where: { id: causeId } });
     await prisma.commandExecution.deleteMany({

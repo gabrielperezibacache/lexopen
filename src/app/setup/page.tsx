@@ -109,11 +109,11 @@ function SetupForm() {
           autoComplete="new-password"
         />
       </label>
-      <section aria-labelledby="setup-sections-title" className="space-y-2 border-t border-[var(--line)] pt-4">
-        <h2 id="setup-sections-title" className="text-lg font-semibold">Apartados visibles</h2>
+      <details className="space-y-3">
+        <summary className="min-h-11 cursor-pointer py-2 font-medium">Personalizar apartados del estudio</summary>
         <p className="text-sm text-[var(--ink-soft)]">Puedes cambiarlos después en Configuración del Host.</p>
         <HostSectionChoices visible={visibleSections} onChange={setVisibleSections} disabled={busy} />
-      </section>
+      </details>
       <details className="text-sm text-[var(--ink-soft)]">
         <summary className="cursor-pointer">Código de instalación manual</summary>
         <label className="mt-2 block">

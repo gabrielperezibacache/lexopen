@@ -2,8 +2,9 @@ import { BillingNav } from "@/components/billing/BillingNav";
 import Link from "next/link";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp, formatHours, labelTimeBillingState } from "@/lib/billing";
-import { loadBillingOverview } from "@/lib/billing-overview";
-import { formatCivilDate } from "@/lib/chile-time";
+import { BillingIndicatorDetail } from "@/components/billing/BillingIndicatorDetail";
+import { indicatorHref, loadBillingOverview } from "@/lib/billing-overview";
+import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { requireStaff } from "@/lib/auth/session";
 import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
 import { getDictionary } from "@/lib/i18n";
@@ -16,13 +17,19 @@ import {
   CircleDollarSign,
 } from "lucide-react";
 
-export default async function FacturacionPage() {
+export default async function FacturacionPage({ searchParams }: { searchParams: Promise<{ detalle?: string; mes?: string; pagina?: string }> }) {
   const user = await requireStaff();
   const locale = await getLocale();
   const dict = getDictionary(locale);
   const b = dict.billingHub;
+  const query = await searchParams;
+  if (query.detalle === "por-cobrar" || query.detalle === "pagos") {
+    return <BillingIndicatorDetail user={user} indicator={query.detalle} monthKey={query.mes} requestedPage={query.pagina} english={locale === "en"} />;
+  }
   const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview(user);
 
+  const english = locale === "en";
+  const monthLabel = new Intl.DateTimeFormat(english ? "en-GB" : "es-CL", { month: "long", year: "numeric", timeZone: SANTIAGO_TZ }).format(month.start);
   const provisionSub =
     kpis.adeudoClp > 0
       ? `${kpis.clientsInCredit} con provisión · adeudo ${clp(kpis.adeudoClp)}`
@@ -50,16 +57,16 @@ export default async function FacturacionPage() {
       value: clp(kpis.porCobrar),
       sub: b.stats.docs.replace("{count}", String(kpis.openInvoiceCount)),
       icon: CircleDollarSign,
-      href: "/facturacion/facturas",
+      href: indicatorHref("por-cobrar"),
     },
     {
       label: b.stats.paidMonth,
       value: clp(kpis.cobradoMes),
       sub: kpis.cobradoMesCount
-        ? `${kpis.cobradoMesCount} pagos · ${month.label}`
-        : `Sin pagos en ${month.label}`,
+        ? `${kpis.cobradoMesCount} ${english ? (kpis.cobradoMesCount === 1 ? "payment" : "payments") : (kpis.cobradoMesCount === 1 ? "pago" : "pagos")} · ${monthLabel}`
+        : `${english ? "No payments in" : "Sin pagos en"} ${monthLabel}`,
       icon: Receipt,
-      href: "/facturacion/facturas",
+      href: indicatorHref("pagos", month.key),
     },
   ];
 

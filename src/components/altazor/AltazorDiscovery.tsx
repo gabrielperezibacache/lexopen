@@ -21,7 +21,7 @@ async function api<T>(path: string, payload?: unknown, method = "POST", signal?:
   const response = await fetch(base + path, { method: payload === undefined && method === "POST" ? "GET" : method, headers: payload === undefined ? undefined : withCsrfHeaders({ "Content-Type": "application/json" }), body: payload === undefined ? undefined : JSON.stringify(payload), cache: "no-store", signal });
   const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo completar la consulta académica"); return data;
 }
-export function AltazorDiscovery({ initialQuery = "" }: { initialQuery?: string }) {
+export function AltazorDiscovery({ initialQuery = "", onDraftChange }: { initialQuery?: string; onDraftChange?: (dirty: boolean) => void }) {
   const uid = useId(), [query, setQuery] = useState(initialQuery), [providers, setProviders] = useState<DiscoveryProvider[]>(["crossref", "openalex"]), [results, setResults] = useState<AcademicPaper[] | null>(null), [warnings, setWarnings] = useState<string[]>([]), [checkedAt, setCheckedAt] = useState<string | null>(null), [saved, setSaved] = useState<Saved[]>([]), [entries, setEntries] = useState<Entry[]>([]), [books, setBooks] = useState<{ id: string; title: string; author: string }[]>([]), [bookId, setBookId] = useState(""), [style, setStyle] = useState<BibliographyStyle>("apa"), [doi, setDoi] = useState(""), [orcid, setOrcid] = useState(""), [author, setAuthor] = useState<Orcid | null>(null), [graph, setGraph] = useState<Graph | null>(null), [searchName, setSearchName] = useState(""), [importFormat, setImportFormat] = useState<"bibtex" | "ris" | "json">("bibtex"), [importText, setImportText] = useState(""), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const active = useRef<AbortController | null>(null), saveKey = useRef(createSubmissionKeys(undefined, "altazor:discovery:save")), importKey = useRef(createSubmissionKeys(undefined, "altazor:discovery:import")), paperKey = useRef(createSubmissionKeys()), doiKey = useRef(createSubmissionKeys(undefined, "altazor:discovery:doi")), bookKey = useRef(createSubmissionKeys(undefined, "altazor:discovery:book"));
   const importFile = useRef<HTMLInputElement>(null);
@@ -29,6 +29,7 @@ export function AltazorDiscovery({ initialQuery = "" }: { initialQuery?: string 
   const graphTrigger = useRef<HTMLButtonElement>(null);
   const [importError, setImportError] = useState("");
   const [importNotice, setImportNotice] = useState("");
+  useEffect(() => { onDraftChange?.(importText.trim() !== ""); }, [onDraftChange, importText]);
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([api<{ searches: Saved[] }>("/saved", undefined, "POST", controller.signal), api<{ entries: Entry[] }>("/bibliography?style=apa", undefined, "POST", controller.signal), api<{ books: typeof books }>("/books", undefined, "POST", controller.signal)]).then(([searches, bibliography, library]) => { setSaved(searches.searches); setEntries(bibliography.entries); setBooks(library.books); }).catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });

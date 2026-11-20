@@ -105,6 +105,30 @@ export function scopedLedgerRunningBalances<T extends { id: string; clienteId: s
   }).reverse();
 }
 
+export type BillingIndicator = "por-cobrar" | "pagos";
+
+export function indicatorHref(indicator: BillingIndicator, month?: string, page = 1) {
+  const query = new URLSearchParams({ detalle: indicator });
+  if (indicator === "pagos" && month) query.set("mes", month);
+  if (page > 1) query.set("pagina", String(page));
+  return `/facturacion?${query}`;
+}
+
+export function indicatorMonth(key?: string) {
+  return key && /^\d{4}-(0[1-9]|1[0-2])$/.test(key) && key >= "1000-01" && key < "9999-12"
+    ? billingMonthRange(new Date(`${key}-15T12:00:00Z`))
+    : billingMonthRange();
+}
+
+export function openInvoiceWhere(user: CausaAccessUser): Prisma.InvoiceWhereInput {
+  return { AND: [billingRelatedWhere(user), { status: { in: [...OPEN_INVOICE_STATUSES] } }] };
+}
+
+export function paidInMonthWhere(user: CausaAccessUser, month: ReturnType<typeof billingMonthRange>): Prisma.PaymentWhereInput {
+  const scope = billingRelatedWhere(user);
+  return { date: { gte: month.start, lte: month.end }, OR: [{ invoice: scope }, { invoiceId: null, ledger: { some: scope } }] };
+}
+
 /** KPIs use only the actor's authorized billing scope. */
 export async function loadBillingOverview(user: CausaAccessUser, client: PrismaClient = prisma) {
   const scope = billingRelatedWhere(user);
@@ -129,12 +153,12 @@ export async function loadBillingOverview(user: CausaAccessUser, client: PrismaC
       _count: true,
     }),
     client.invoice.aggregate({
-      where: { AND: [scope, { status: { in: [...OPEN_INVOICE_STATUSES] } }] },
+      where: openInvoiceWhere(user),
       _sum: { totalClp: true, paidClp: true },
       _count: true,
     }),
     client.payment.aggregate({
-      where: { date: { gte: month.start, lte: month.end }, OR: [{ invoice: scope }, { invoiceId: null, ledger: { some: scope } }] },
+      where: paidInMonthWhere(user, month),
       _sum: { amountClp: true },
       _count: true,
     }),

@@ -4,7 +4,7 @@ Al preparar el equipo principal, LexOpen comprueba el motor Docker local e inici
 
 LexOpen identifica la arquitectura del motor y comprueba la huella SHA-256 antes de cargar un paquete oficial de su versión. Cuando no hay un paquete publicado, utiliza la receta verificada incluida en el instalador para construir el perfil local. Esa primera preparación necesita conexión y espacio para las herramientas. La receta comprueba la conversión de documentos, la lectura de PDF, el OCR y el audio antes de marcar el perfil como listo.
 
-Cuando las herramientas estén disponibles, abre **Mi asistente → Computadora** y vincula el escritorio que el administrador preparó para tu espacio. El diagnóstico del instalador comprueba el motor y la imagen local. La conexión se verifica por separado en LexOpen.
+Cuando las herramientas estén disponibles, abre **Altazor → Herramientas → Escritorio** y vincula el escritorio que el administrador preparó para tu espacio. El diagnóstico del instalador comprueba el motor y la imagen local. La conexión se verifica por separado en LexOpen.
 
 | Herramientas del escritorio | Trabajo que permiten |
 | --- | --- |
@@ -24,9 +24,9 @@ La lectura del navegador omite contraseñas, valores de formularios y parámetro
 
 El escritorio nuevo no caduca a los veinte minutos ni tiene un máximo de dos horas. Conserva su contenedor, aplicaciones, archivos y conversación, aunque cierres LexOpen o reinicies el Host. El motor debe estar disponible y su servicio dedicado debe iniciarse con el equipo. Docker conserva la política de reinicio `unless-stopped`; LexOpen desactiva el apagado por inactividad de ese escritorio.
 
-- **Conexiones:** antes de abrirlo puedes seleccionar juntas las cuentas disponibles y autorizadas. El acceso conserva el ámbito del profesional y de la causa. Los servicios que aún no estén conectados se preparan desde Conexiones; no se copian cookies ni credenciales silenciosamente.
+- **Conexiones:** antes de abrirlo puedes seleccionar juntas las cuentas disponibles y autorizadas. El acceso conserva el ámbito del profesional y de la causa. Los servicios que aún no estén conectados se preparan desde **Herramientas → Aplicaciones**.
 - **Trabajo en segundo plano:** una tarea aceptada sigue ejecutándose en el gateway sin mantener abierto el chat. La supervisión rota entre los escritorios para no dejar otros sin revisión cuando un puesto queda inactivo o bajo control manual. Las consultas y solicitudes de ayuda se conservan; el worker y ntfy/WhatsApp requieren la configuración y preferencias de segundo plano del usuario.
-- **Detener y reanudar:** Detener cancela el trabajo actual y apaga la máquina sin eliminarla. Reanudar utiliza la misma máquina y conversación, tras revisar nuevamente permisos y disponibilidad. No repite un encargo anterior.
+- **Detener y reanudar.** En una sesión lista, abre **Opciones de sesión → Detener escritorio** para cancelar el trabajo actual y apagar la máquina. Si la apertura queda pendiente de confirmación, **Detener escritorio** aparece directamente. **Reanudar el mismo escritorio** recupera la máquina y la conversación después de comprobar los permisos y la disponibilidad.
 - **Escritorios anteriores:** Conservar escritorio persistente convierte la sesión temporal seleccionada, incluso después del antiguo plazo máximo, con comprobación de su identidad. Los registros anteriores no se activan automáticamente durante la migración.
 - **Conservación y respaldo:** mantén la carpeta de datos del gateway, el workspace dedicado y los datos del motor Docker. El perfil del navegador y las aplicaciones también viven en el contenedor conservado. Eliminarlo manualmente, limpiar Docker o perder el disco puede destruir ese estado; el motor puede reconstruir un contenedor eliminado a partir del workspace, pero no se garantiza recuperar el perfil del navegador ni sus cookies sin un respaldo adecuado.
 
@@ -44,7 +44,7 @@ La persistencia del puesto no convierte en permanentes las autorizaciones de una
    El programa construye la imagen y prueba las herramientas con documentos sintéticos sin red como usuario del escritorio. Al terminar imprime el identificador `sha256:…` de la imagen y registra el perfil local para que lo detecte el asistente. Los paquetes Debian de la imagen quedan inventariados en `/usr/share/lexopen-desktop/packages.tsv`.
 3. Configura la instancia dedicada al profesional y al espacio con ese identificador en `containers.image`, actualizaciones automáticas de imagen desactivadas y su carpeta propia. La [guía de operación](../src/lib/altazor/computer/README.md) describe el proveedor de IA y la conexión al Host local. Vincula y comprueba el escritorio desde la aplicación.
 
-El instalador incluye el Host, Chromium y la receta del perfil. Los pasos manuales anteriores sirven también para diagnóstico y para instalaciones sin el asistente de Desktop. El motor de contenedores y el servicio dedicado de cada profesional conservan su preparación propia. Comprueba la conexión en **Mi asistente → Computadora** antes de enviar archivos o encargos.
+El instalador incluye el Host, Chromium y la receta del perfil. Los pasos manuales anteriores sirven también para diagnóstico y para instalaciones sin el asistente de Desktop. El motor de contenedores y el servicio dedicado de cada profesional conservan su preparación propia. Comprueba la conexión en **Altazor → Herramientas → Escritorio** antes de enviar archivos o encargos.
 
 ## Comprobar los paquetes de escritorio
 
@@ -62,6 +62,6 @@ Fuentes de los paquetes principales. [LibreOffice en Debian](https://packages.de
 
 ## Recibos históricos de descargas
 
-En **Computadora → Historial de descargas**, cada usuario consulta sus recibos del espacio personal o de la causa seleccionada. Se pueden filtrar por fecha de solicitud (hora de Chile), conexión y estado: confirmada, fallida o rechazada, y sin confirmar. Anterior y Siguiente recorren el historial, incluidas las páginas sin coincidencias con un filtro.
+En **Herramientas → Escritorio → Historial de descargas**, cada usuario consulta sus recibos del espacio personal o de la causa seleccionada. Se pueden filtrar por fecha de solicitud (hora de Chile), conexión y estado: confirmada, fallida o rechazada, y sin confirmar. Anterior y Siguiente recorren el historial, incluidas las páginas sin coincidencias con un filtro.
 
 Funciona con sesiones cerradas o vencidas y con el gateway desactivado. La consulta comprueba los permisos actuales; no abre sesiones ni ejecuta descargas. Solo una confirmación vinculada a su solicitud original acredita una descarga. Un resultado pendiente, incompleto o inconsistente se muestra sin confirmar. El historial omite el contenido y las rutas locales del archivo; la existencia actual del archivo se comprueba desde el escritorio.

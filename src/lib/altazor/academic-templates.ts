@@ -12,10 +12,24 @@ export const ACADEMIC_JOURNEYS = [
 export function academicJourney(kind: string): AcademicJourney {
   return isAcademicTeachingKind(kind) ? "course" : kind === "writing" || kind === "career" ? "writing" : "research";
 }
-export function academicHref(workspaceId?: string, artifactId?: string) {
+const paneKeys = { work: "", discovery: "bibliografia", teaching: "docencia", review: "revision", matrix: "matriz", profile: "perfil" } as const;
+export type AcademicPane = keyof typeof paneKeys;
+const stepKeys = ["objetivo", "fuentes", "trabajo"] as const;
+const academicId = (id: unknown) => typeof id === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(id) ? id : "";
+export function academicLocation(query: { trabajo?: unknown; resultado?: unknown; vista?: unknown; paso?: unknown }) {
+  const workspaceId = academicId(query.trabajo);
+  const artifactId = workspaceId ? academicId(query.resultado) : "";
+  const pane = (Object.keys(paneKeys) as AcademicPane[]).find(key => paneKeys[key] === query.vista) ?? "work";
+  const step = stepKeys.findIndex(key => key === query.paso);
+  return { workspaceId, artifactId, pane: pane === "matrix" && !workspaceId ? "work" as const : pane, step: workspaceId && step !== -1 ? step : undefined };
+}
+
+export function academicHref(workspaceId?: string, artifactId?: string, pane: AcademicPane = "work", step?: number) {
   const query = new URLSearchParams();
   if (workspaceId) query.set("trabajo", workspaceId);
-  if (artifactId) query.set("resultado", artifactId);
+  if (workspaceId && artifactId) query.set("resultado", artifactId);
+  if (pane !== "work") query.set("vista", paneKeys[pane]);
+  if (workspaceId && step !== undefined && stepKeys[step]) query.set("paso", stepKeys[step]);
   return `/academico${query.size ? `?${query}` : ""}`;
 }
 

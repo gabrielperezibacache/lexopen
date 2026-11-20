@@ -25,7 +25,7 @@
   font-weight: 600;
 }
 .header span {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 .header > a {
@@ -39,7 +39,7 @@
 }
 .cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.5rem;
 }
 .card {
@@ -48,6 +48,7 @@
   align-items: center;
   column-gap: 0.5rem;
   min-width: 0;
+  min-height: 44px;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 0.65rem;
@@ -59,13 +60,12 @@
   border-color: var(--sea);
   background: var(--mist);
 }
-.card:focus-visible,
-.header > a:focus-visible {
+.overview a:focus-visible {
   outline: 2px solid var(--sea);
   outline-offset: 3px;
 }
 .card[data-attention] {
-  border-inline-start: 3px solid var(--rust, #a04d3b);
+  border-inline-start: 3px solid var(--warn);
 }
 .label {
   display: flex;
@@ -88,42 +88,32 @@
 }
 .note {
   grid-column: 1;
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   line-height: 1.4;
   color: var(--muted);
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
 }
+.quiet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 0.75rem;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.cards + .quiet { margin-top: 0.35rem; }
+.quiet a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--sea);
+  text-decoration: underline;
+}
 @media (max-width: 600px) {
-  .overview {
-    margin-bottom: 0.75rem;
-  }
-  .header > div {
-    display: block;
-  }
-  .header span {
-    display: block;
-    font-size: 0.66rem;
-  }
-  .card {
-    grid-template-columns: 1fr;
-    padding: 0.5rem;
-    align-content: start;
-  }
-  .card strong {
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 1.4rem;
-    margin-top: 0.25rem;
-  }
-  .label {
-    font-size: 0.7rem;
-    min-height: 2.6em;
-  }
-  .label svg {
-    display: none;
-  }
-  .note {
-    font-size: 0.65rem;
-  }
+  .overview { margin-bottom: 0.75rem; }
+  .header > div, .header span { display: block; }
+  .cards { gap: 0.35rem; }
+  .card { padding: 0.35rem 0.65rem; }
 }

@@ -13,19 +13,26 @@ LexOpen es una aplicación de código abierto para profesionales y estudios jur�
 
 **LexOpen 1.1.0.** La aplicación y los instaladores de escritorio comparten esta versión. La disponibilidad para instalar se consulta en las publicaciones de GitHub. El estudio puede seguir las pruebas de actualización, restauración, trabajo por causa y aceptación del piloto. [Publicaciones](https://github.com/gabrielperezibacache/lexopen/releases) · [Seguimiento de producción](docs/ACEPTACION-1.1.0.md) · [Cambios](CHANGELOG.md)
 
-![Inicio de LexOpen con datos ficticios](docs/readme/inicio-escritorio.jpg)
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/ui/informacion/inicio-movil-v1.1.png">
+  <img src="docs/ui/informacion/inicio-escritorio-v1.1.png" alt="Inicio de LexOpen con el próximo vencimiento y el chat de Altazor en un estudio de prueba">
+</picture>
 
-*Las imágenes de la galería son ilustrativas y utilizan expedientes ficticios; algunos controles han evolucionado desde su captura.*
+*Las capturas utilizan expedientes ficticios. La galería conserva también vistas de versiones anteriores.*
 
 ## Información y acciones a mano
 
-Las pantallas priorizan el estado y los registros. Los formularios de incorporación, la preparación de causas y las ayudas se despliegan cuando los necesitas; plegarlos conserva el borrador. En Documentos, **Descargar** aparece directamente en cada registro. En Configuración, cada apartado indica si afecta a tu usuario, al navegador o a todo el estudio.
+En **Inicio → Tu jornada** aparecen los plazos vencidos, los próximos vencimientos y los eventos que requieren atención. Al pulsar un indicador se abre la lista que produce ese conteo. Si hoy está despejado, puedes pasar directamente a la agenda o trabajar con Altazor.
 
-En Clientes, la ficha avisa al salir con cambios sin guardar. Si se interrumpe la revisión de propuestas de Altazor, vuelve a comprobar el acceso y recupera tus ediciones cuando sigue vigente la misma revisión. El espacio sin conexión espera a que abra su almacenamiento antes de desbloquearlo; salir de la página cancela una apertura pendiente y limpia la clave del campo. [Preparación y recuperación](docs/TRABAJO-SIN-CONEXION.md).
+| Para trabajar en… | Abre |
+| --- | --- |
+| Un expediente | **Mis Causas → ficha de la causa**. Consulta el estado, abre la fuente de un plazo y regresa a la cartera con sus filtros. |
+| Un documento | **Documentos → Añadir archivos**. Revisa el cliente, la causa y el destino antes de subirlo. Puedes descargar el original desde la lista. |
+| Jurisprudencia | Elige el **Buscador Unificado**, las fuentes del estudio o una investigación guardada. |
+| La conversación de Altazor | **Herramientas** reúne el escritorio, los Ícaros y las conexiones. Al volver al chat puedes continuar el borrador con su contexto. |
+| Un ajuste | En **Configuración**, usa **Buscar un ajuste** o elige un apartado. Puedes cambiar de apartado y volver al formulario que estabas editando. |
 
-Los guardados con recibo conservan su identidad al reintentar. Si PostgreSQL rechaza una transacción por concurrencia, el Host espera antes de volver a intentarla y comprueba de nuevo los permisos; mantiene un máximo de cinco intentos. Un fallo de conexión con resultado incierto requiere comprobar el recibo, sin repetir automáticamente la operación.
-
-**Próximos plazos** abre los pendientes asignados a ti desde hoy hasta la fecha indicada, inclusive (hoy + 7 días), aunque cambien de mes. Los avisos de acceso, datos desactualizados y autorizaciones siguen visibles. [Criterios y comparación visual](docs/JERARQUIA-INFORMACION.md).
+**Próximos plazos** incluye los pendientes asignados a ti desde hoy hasta siete días después, incluso cuando cambia el mes. Los enlaces a un plazo individual abren su ficha con su fecha y responsable. [Inventario de pantallas y recorridos](docs/JERARQUIA-INFORMACION.md)
 
 ## Continuidad del expediente
 
@@ -56,11 +63,11 @@ La serie **preview es preliminar**. Consulta `release-manifest.json` para conoce
 
 ## Primeros pasos
 
-1. **Elige el equipo principal.** Abre LexOpen, selecciona **Este PC es el servidor** y crea la primera cuenta de administración. En los demás equipos, selecciona **Conectar a un servidor** e introduce la dirección del Host.
+1. **Elige el equipo principal.** Abre LexOpen, selecciona **Guardar los datos del estudio** y crea la primera cuenta de administración. En los demás equipos, selecciona **Conectar a un servidor** e introduce la dirección del Host.
 2. **Configura tu estudio y su equipo.** Revisa el país de trabajo, los roles y las secciones habilitadas. En **Mi cuenta → Mi rol y permisos**, cada persona puede consultar su acceso efectivo.
 3. **Conecta Google una vez.** La administración autoriza la cuenta compartida del estudio y selecciona una carpeta de **Organización** en Drive. La misma conexión se utiliza para Drive, Calendar y Gmail; las cuentas antiguas pueden necesitar ampliar su autorización.
 4. **Organiza un cliente y su causa.** Abre **Nueva causa** desde el cliente para conservar su selección, o búscalo en el formulario. Prepara su carpeta y añade documentos: la ficha del cliente reúne sus archivos directos y los de sus causas accesibles, sin duplicarlos. Registra plazos y revisa las fuentes antes de preparar una audiencia o un escrito.
-5. **Empieza tu jornada.** Inicio conserva Altazor como espacio central y muestra tres indicadores compactos, también en móvil: vencidos pendientes, próximos plazos y eventos propios. Pulsa un indicador para abrir sus registros. **Ctrl+K / ⌘K** permite ir a un apartado; **Buscar un ajuste** te lleva a la configuración correspondiente.
+5. **Empieza tu jornada.** Consulta tus vencimientos y eventos en Inicio. En móvil, toca el menú y el apartado que necesitas. En el teclado, **Ctrl+K / ⌘K** abre la búsqueda de apartados.
 
 Antes de actualizar una instalación existente, conserva un respaldo y comprueba la carpeta de datos que utiliza el Host. Las migraciones sobre datos reales se aplican con `prisma migrate deploy`; no ejecutes los reinicios de las pruebas sobre una instalación real. [Guía del Host](docs/WEB-HOST.md)
 
@@ -134,11 +141,11 @@ Al abrir una causa, **Estado de la causa** muestra automáticamente sus plazos a
 
 **Mi Fiscalía** reúne la preparación de solicitudes por causa, RUC, folio de presentación, respuesta e historial. Abre el portal oficial para ingresar con la misma ClaveÚnica del Registro Civil, sin pedir otra contraseña en LexOpen. La presentación se completa en el portal; cada solicitud tiene una ficha con historial, rectificaciones motivadas de folio y fecha, y acceso al comprobante o respuesta en la versión documental vinculada. [Flujo, permisos y alcance](docs/MI-FISCALIA.md). Los plazos abiertos desde una causa conservan su filtro al cambiar de mes o de vista.
 
-El escritorio de Altazor es persistente: conserva archivos, aplicaciones y conversación sin vencimiento automático. Puede trabajar en segundo plano, detenerse y reanudarse como la misma máquina. Las conexiones disponibles se seleccionan juntas y mantienen los permisos del estudio. Los escritorios temporales anteriores pueden conservarse expresamente desde Computadora. [Persistencia, respaldo y operación](docs/ESCRITORIO-ALTAZOR.md#un-puesto-de-trabajo-persistente).
+El escritorio de Altazor es persistente: conserva archivos, aplicaciones y conversación sin vencimiento automático. Puede trabajar en segundo plano, detenerse y reanudarse como la misma máquina. Las conexiones disponibles se seleccionan juntas y mantienen los permisos del estudio. Los escritorios temporales anteriores pueden conservarse expresamente desde **Herramientas → Escritorio**. [Persistencia, respaldo y operación](docs/ESCRITORIO-ALTAZOR.md#un-puesto-de-trabajo-persistente).
 
 Altazor conserva la conversación y sus adjuntos, propone un plan resumido y cuenta las acciones. Puedes consultar los detalles bajo demanda y revisar los cambios preparados. El visor permite seguir una sesión activa del escritorio.
 
-En **Computadora → Historial de descargas** puedes consultar recibos anteriores por fecha, estado y conexión, incluso con el escritorio cerrado. Se distinguen confirmaciones verificadas, fallos y resultados sin confirmar. El historial conserva los permisos actuales de cada usuario y causa, y muestra solo metadatos.
+En **Herramientas → Escritorio → Historial de descargas** puedes consultar recibos anteriores por fecha, estado y conexión, incluso con el escritorio cerrado. Se distinguen confirmaciones verificadas, fallos y resultados sin confirmar. El historial conserva los permisos actuales de cada usuario y causa, y muestra solo metadatos.
 
 El escritorio prioriza leer texto del navegador y de los documentos antes de recurrir a capturas. **Ícaros** permite elegir el modelo y las notas concretas que recibe cada especialista. Desde el chat se puede retomar un informe de la misma causa y conversación, incluso después de cerrar el navegador. **Ayuda a distancia** conserva una solicitud en espera y permite responder por ntfy o WhatsApp cuando el canal está conectado. Estas capacidades requieren configurar el perfil de escritorio, el worker y los canales correspondientes.
 

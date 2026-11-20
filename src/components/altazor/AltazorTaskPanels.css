@@ -6,3 +6,7 @@
 .altazor-panel-jobs,.altazor-panel-memory { margin-top:2rem; }.altazor-panel-jobs>h3,.altazor-panel-memory>h3 { font-size:1.1rem; font-weight:600; }.altazor-panel-job,.altazor-panel-memory>article { padding:1.2rem; border:1px solid var(--line); border-radius:12px; margin-top:1rem; background:var(--surface-solid); }.altazor-panel-job>header { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.5rem; margin-bottom:.75rem; }.altazor-panel-job>header time { color:var(--muted); font-size:.82rem; }.altazor-panel-job .altazor-message-content+.altazor-message-content { border-top:1px solid var(--line); margin-top:1rem; padding-top:1rem; }
 .altazor-help-code { display:block; max-width:100%; overflow-wrap:anywhere; white-space:pre-wrap; font-family:var(--font-mono),monospace; border:1px solid var(--line); border-radius:8px; padding:.8rem; margin:1rem 0; }.altazor-help-settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }.altazor-help-request { padding:1rem; border:1px solid var(--line); border-radius:12px; margin-block:1rem; }.altazor-help-request h3 { font-size:1.05rem; font-weight:600; }.altazor-help-request p { line-height:1.75; }
 @media(max-width:600px) { .altazor-help-settings-grid { grid-template-columns:1fr; }.altazor-panel-heading { gap:.65rem; }.altazor-panel-job { padding:.85rem; }.altazor-panel-actions .btn { min-height:44px; } }
+
+.altazor-job-summary { overflow-wrap: anywhere; }
+.altazor-job-summary span { display: block; color: var(--ink-soft); font-size: .9rem; }
+.altazor-panel-jobs > button { margin-top: .5rem; }

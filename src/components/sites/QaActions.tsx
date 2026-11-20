@@ -30,7 +30,7 @@ export function QaActions({
     const fd = new FormData(e.currentTarget);
     let result;
     if (reply && threadId) {
-      result = await apiMutation(`/api/sites/${siteId}/qa`, {
+      result = await apiMutation<{ id: string }>(`/api/sites/${siteId}/qa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -41,7 +41,7 @@ export function QaActions({
         }),
       });
     } else {
-      result = await apiMutation(`/api/sites/${siteId}/qa`, {
+      result = await apiMutation<{ id: string }>(`/api/sites/${siteId}/qa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -58,7 +58,13 @@ export function QaActions({
       return;
     }
     setOpen(false);
-    router.refresh();
+    if (!reply && result.data.id) {
+      const query = new URLSearchParams(window.location.search);
+      query.set("pregunta", result.data.id);
+      router.push(`/sites/${siteId}/qa?${query}`);
+    } else {
+      router.refresh();
+    }
   }
 
   if (reply) {

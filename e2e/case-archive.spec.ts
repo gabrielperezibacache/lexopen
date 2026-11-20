@@ -55,6 +55,11 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
     await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole("link", { name: title, exact: true }).click();
+    await expect(page.getByTestId("case-status")).toBeVisible();
+    const returnToPortfolio = page.getByRole("link", { name: "Volver a mis causas", exact: true });
+    await returnToPortfolio.click();
+    await expect(page).toHaveURL(url => url.pathname === "/mis-causas" && url.searchParams.get("q") === term && url.hash === `#causa-${causaId}`);
+    await page.getByRole("link", { name: `Expediente de ${title}`, exact: true }).click();
     const archive = page.locator("#main-content").getByTestId("case-archive");
     await expect(archive.getByRole("heading", { name: "Carpetas y documentos" })).toBeVisible();
     await expect(archive.getByText("Descargado de OJV", { exact: true })).toBeVisible();
@@ -110,6 +115,17 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
       mimeType: "text/plain",
       buffer: Buffer.from("Original de demostración subido a la carpeta."),
     });
+    const destination = archive.getByLabel("Destino de los documentos", { exact: true });
+    await expect(destination).toContainText(title);
+    await expect(destination).toContainText("Prueba documental");
+    await expect(destination).toContainText("Sin cliente asociado");
+    await expect(destination).toContainText("Sin copia en Drive");
+    const outdated = await apiRequest(page).post("/api/documentos", { multipart: {
+      causaId, expectedClienteId: "cliente-anterior", nombre: "Destino cambiado.txt",
+      file: { name: "Destino cambiado.txt", mimeType: "text/plain", buffer: Buffer.from("Archivo de prueba") },
+    } });
+    expect(outdated.status()).toBe(409);
+    expect(await db.documento.count({ where: { causaId, nombre: "Destino cambiado.txt" } })).toBe(0);
     const upload = page.waitForResponse(response => response.url().endsWith("/api/documentos") && response.request().method() === "POST");
     await archive.getByRole("button", { name: "Incorporar 1", exact: true }).click();
     const created = await upload;
@@ -131,6 +147,54 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
       await db.auditEvent.deleteMany({ where: { OR: [{ entityId: causaId }, { entityType: "CaseDocumentFolder", entityId: { in: (await db.caseDocumentFolder.findMany({ where: { causaId }, select: { id: true } })).map(folder => folder.id) } }] } });
       await db.documento.deleteMany({ where: { id: { in: documentIds } } });
       await db.causa.delete({ where: { id: causaId } });
+    }
+    await db.$disconnect();
+  }
+});
+
+test("la ficha y el expediente mantienen el recorrido del profesional sin acceso a la IA", async ({ page }) => {
+  test.setTimeout(120_000);
+  const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  const db = new PrismaClient({ datasources: { db: { url } } });
+  const email = `ficha-${randomUUID()}@example.test`;
+  let actorId = "", causeId = "", documentId = "";
+  try {
+    const seed = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" }, select: { password: true } });
+    actorId = (await db.user.create({ data: { name: "Profesional de prueba", email, role: "abogado", capabilityRevokes: "assistant.use", password: seed.password } })).id;
+    causeId = (await db.causa.create({ data: { titulo: "Materia del profesional", materia: "civil", tribunal: "Tribunal de prueba", acceso: "equipo", abogadoId: actorId } })).id;
+    documentId = (await db.documento.create({ data: { nombre: "Registro del equipo.txt", contenido: "Texto ficticio", mimeType: "text/plain", causaId: causeId, autorId: actorId } })).id;
+    await loginAs(page, email);
+    const origin = `/mis-causas?q=profesional#causa-${causeId}`;
+    await page.goto(`/causas/${causeId}?${new URLSearchParams({ volver: origin })}`);
+    const nav = page.getByRole("navigation", { name: "Recorrido de la causa", exact: true });
+    await expect(nav.getByRole("link", { name: "Biblioteca", exact: true })).toHaveCount(0);
+    await expect(nav.getByRole("link", { name: "Escritos", exact: true })).toHaveCount(0);
+    const main = page.locator("#main-content");
+    await main.getByText("Más acciones", { exact: true }).click();
+    await expect(main.getByRole("link", { name: "Hablar con ALTAZOR" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Registrar plazo", exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Nueva minuta", exact: true })).toBeVisible();
+    await expect(main.getByRole("button", { name: "Actualizar estado", exact: true })).toBeVisible();
+    await expect(main.locator("#plazos").getByRole("button", { name: "Sugerir plazos con IA", exact: true })).toHaveCount(0);
+    const documents = main.locator("#documentos");
+    await expect(documents.getByRole("link", { name: /Preguntar.*IA/ })).toHaveCount(0);
+    for (const label of ["Resumir", "Clasificar"]) await expect(documents.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+    await expect(documents.getByRole("link", { name: "Descargar original", exact: true })).toHaveAttribute("href", `/api/documentos/${documentId}/content?download=1`);
+    await nav.getByRole("link", { name: "Preparación", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Preparar la causa", exact: true })).toBeVisible();
+    await nav.getByRole("link", { name: "Expediente", exact: true }).click();
+    await expect(page.getByTestId("case-archive")).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Expediente", exact: true })).toHaveAttribute("aria-current", "page");
+    await nav.getByRole("link", { name: "Resumen", exact: true }).click();
+    await expect(page.getByTestId("case-status")).toBeVisible();
+    await page.getByRole("link", { name: "Volver a mis causas", exact: true }).click();
+    await expect(page).toHaveURL(url => url.pathname + url.search + url.hash === origin);
+  } finally {
+    if (documentId) await db.documento.deleteMany({ where: { id: documentId } });
+    if (causeId) await db.causa.deleteMany({ where: { id: causeId } });
+    if (actorId) {
+      await db.auditEvent.deleteMany({ where: { actorId } });
+      await db.user.deleteMany({ where: { id: actorId } });
     }
     await db.$disconnect();
   }

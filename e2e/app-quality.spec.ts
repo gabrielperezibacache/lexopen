@@ -65,6 +65,43 @@ test("menú móvil accesible, foco restaurado y preferencia de movimiento", asyn
   await page.screenshot({ path: testInfo.outputPath("search-desktop.png"), fullPage: true });
 });
 
+test.describe("estados de la búsqueda global", () => {
+  test.use({ serviceWorkers: "block" });
+  test("muestra solo coincidencias, un único vacío y permite reintentar una consulta fallida", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const queries: string[] = [];
+    let fail = false;
+    await page.route("**/api/search?*", route => {
+      const q = new URL(route.request().url()).searchParams.get("q")!;
+      queries.push(q);
+      if (fail) return route.fulfill({ status: 503, json: { error: "Servicio temporalmente ocupado" } });
+      return route.fulfill({ json: { q, jurisprudencia: q === "vacío" ? [] : [{ id: "1", rol: "R-10", caratula: "Sentencia de prueba" }] } });
+    });
+    await page.goto("/buscar");
+    const main = page.getByRole("main");
+    const input = main.getByRole("searchbox");
+    await input.fill("referencia");
+    await input.press("Enter");
+    await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Jurisprudencia"]);
+    await expect(main.getByRole("link", { name: /Sentencia de prueba/ })).toHaveAttribute("href", "/jurisprudencia?q=R-10");
+    await input.fill("vacío");
+    await input.press("Enter");
+    await expect(main.getByRole("status")).toHaveText("Sin resultados para esta búsqueda.");
+    await expect(main.getByRole("heading", { level: 2 })).toHaveCount(0);
+    fail = true;
+    await input.fill("consulta original");
+    await input.press("Enter");
+    await expect(main.getByRole("alert")).toHaveText("Servicio temporalmente ocupado");
+    await expect(main.getByText("Sin resultados para esta búsqueda.")).toHaveCount(0);
+    await expect(input).toHaveValue("consulta original");
+    fail = false;
+    await main.getByRole("button", { name: "Reintentar" }).click();
+    await expect(main.getByRole("link", { name: /Sentencia de prueba/ })).toBeVisible();
+    expect(queries).toEqual(["referencia", "vacío", "consulta original", "consulta original"]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+});
+
 test("búsqueda rechaza consultas excesivas y mantiene sincronizado el campo", async ({ page }) => {
   await page.goto("/dashboard");
   const response = await page.request.get(`/api/search?q=${"a".repeat(201)}`);

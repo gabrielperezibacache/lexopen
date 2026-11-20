@@ -86,3 +86,34 @@ html.dark .shell-workspace::before { display: block; }
 @media (min-width: 768px) { .shell-icon-button.md\:hidden { display: none; } }
 @media (max-width: 767px) { .shell-secondary-link { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .shell-sidebar { transition: none; } }
+
+.shell-area-toggle {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  color: var(--sidebar-muted);
+  border-radius: var(--radius-md);
+}
+.shell-area-toggle[aria-expanded=true] svg { transform: rotate(180deg); }
+.shell-mobile-sections {
+  margin-inline-start: 1.4rem;
+  padding-inline-start: .5rem;
+  border-inline-start: 1px solid var(--brand-rule);
+}
+.shell-area-popover {
+  position: fixed;
+  inset: min(7rem, 10vh) auto auto 5rem;
+  margin: 0;
+  padding: .5rem;
+  max-height: 80dvh;
+  width: min(17rem, calc(100vw - 6rem));
+  overflow: auto;
+  border: 1px solid var(--brand-rule);
+  border-radius: var(--radius-md);
+  color: var(--brand-silver);
+  background: var(--brand-panel);
+  box-shadow: var(--shadow);
+}
+.shell-area-popover .nav-link { min-height: 44px; }
+.shell-area-heading { padding: .5rem .75rem; font-weight: 600; }

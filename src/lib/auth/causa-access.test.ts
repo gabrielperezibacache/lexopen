@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { assertCausaAccess, assertCausaCapability, causaAccessWhere } from "./causa-access";
+import { assertCausaAccess, assertCausaCapability, causaAccessWhere, writableCausaWhere } from "./causa-access";
 import { FOUNDER_ADMIN_GRANTS } from "./permissions";
 
 const admin = {
@@ -36,6 +36,14 @@ assert.equal(
   ),
   false
 );
+
+assert.deepEqual(writableCausaWhere(socio), causaAccessWhere(socio));
+assert.deepEqual(writableCausaWhere(conta), { id: "__none__" });
+assert.deepEqual(writableCausaWhere({ ...abogado, capabilityRevokes: "causa.write" }), { id: "__none__" });
+const writeScope = writableCausaWhere(abogado).AND as { OR?: { miembros?: { some: { rol: { in: string[] } } } }[] }[];
+const writeRoles = writeScope[1].OR?.find(item => item.miembros)?.miembros?.some.rol.in;
+assert.ok(writeRoles?.includes("colaborador"));
+assert.ok(!writeRoles?.includes("lectura"));
 
 // Cliente: bloqueado en helper de staff.
 assert.deepEqual(causaAccessWhere(cliente), { id: "__none__" });
