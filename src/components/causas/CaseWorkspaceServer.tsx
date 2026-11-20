@@ -12,14 +12,13 @@ import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
 import { ConflictReviewPanel } from "@/components/ConflictReviewPanel";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
-import { studyDriveMode } from "@/lib/integrations/google-study-drive";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
 import { CausaEquipoPanel } from "@/components/causas/CausaEquipoPanel";
 import { CasePreparation, CasePreparationIndex } from "@/components/causas/CasePreparation";
-import { uploadDestination } from "@/lib/causas/upload-destination";
+import { uploadDestinations } from "@/lib/causas/upload-destination";
 import { deadlineHref } from "@/lib/deadlines/navigation";
 import { caseViewHref, caseViewParams, type CaseViewContext } from "@/lib/causas/portfolio-navigation";
 import { CaseWorkflowNav } from "@/components/causas/CaseWorkflowNav";
@@ -85,7 +84,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: {
         cliente: true,
-        driveSyncSubscription: { select: { account: true } },
+        driveSyncSubscription: { select: { account: true, connectionId: true, folderId: true } },
         abogado: { select: publicUserSelect },
         partes: true,
         documentos: {
@@ -165,6 +164,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
     readCaseStatus(id, user),
   ]);
   if (!causa) notFound();
+  const { sharedOrganization, destinations } = await uploadDestinations([causa]);
 
   const downloads = await documentDownloadOptions(causa.documentos.map(document => document.id));
   const documentos = causa.documentos.map(({ storageKey, ...document }) => ({
@@ -252,7 +252,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
         </div>
 
         <DriveFolderPanel
-          sharedOrganization={await studyDriveMode()}
+          sharedOrganization={sharedOrganization}
           canImport={can(user, "causa.write", { causaRol: access.causaRol })}
           causaId={causa.id}
           folderId={causa.googleDriveFolderId}
@@ -478,7 +478,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
 
       {canUseKnowledge && <div id="audios" className="case-destination"><CaseAudioManager causaId={id} /></div>}
 
-      {can(user, "causa.write", { causaRol: access.causaRol }) && <DocumentoIngestForm lockedCausaId={causa.id} causas={[uploadDestination(causa, causa.cliente?.razonSocial ?? null)]} compact />}
+      {can(user, "causa.write", { causaRol: access.causaRol }) && <DocumentoIngestForm lockedCausaId={causa.id} causas={destinations} compact />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {causa.notas.length > 0 && <section className="panel rounded-[var(--radius-lg)] p-5">

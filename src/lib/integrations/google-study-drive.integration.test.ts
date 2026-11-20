@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { encryptGoogleToken } from "./google-crypto";
 import { putObject } from "@/lib/storage";
+import { uploadDestinations } from "@/lib/causas/upload-destination";
 import { copyIntakeToStudyFolder } from "./case-drive";
 import { resolveStudyDriveAccount } from "./google-study-drive";
 import { configureOrganizationDrive, organizationDriveState } from "./drive-organization";
@@ -96,10 +97,27 @@ async function main() {
     const cause = await prisma.causa.create({ data: { titulo: "Read fixture", materia: "civil", tribunal: "Fixture", acceso: "equipo", clienteId: clientId, abogadoId: owner.id, miembros: { create: { userId: staff.id, rol: "lectura" } } } }); cases.push(cause.id);
     const otherCause = await prisma.causa.create({ data: { titulo: "Other read fixture", materia: "civil", tribunal: "Fixture", acceso: "equipo", clienteId: clientId, abogadoId: owner.id } }); cases.push(otherCause.id);
     const options = { client: prisma, account };
+    const inherited = await prisma.causa.create({ data: { titulo: "Carpeta previa", materia: "civil", tribunal: "Fixture", acceso: "equipo", abogadoId: owner.id, googleDriveFolderId: "LegacySharedFolder123", googleDriveFolderName: "Carpeta heredada" } }); cases.push(inherited.id);
+    const uploadChoices = async () => uploadDestinations(await prisma.causa.findMany({
+      where: { id: { in: cases } }, include: { driveSyncSubscription: { select: { account: true, connectionId: true, folderId: true } } },
+    }));
+    const legacy = await uploadChoices();
+    assert.equal(legacy.sharedOrganization, false);
+    assert.equal(legacy.destinations.find(option => option.id === inherited.id)?.drive?.id, inherited.googleDriveFolderId);
     await configureOrganizationDrive(owner, { action: "root", folderRef: rootId, connectionId: account.connectionId, bindingRevision: account.bindingRevision, revision: "", confirmed: true }, options);
     const organization = await organizationDriveState(owner, options);
     const prepare = (id: string) => configureOrganizationDrive(owner, { action: "organize", kind: "causa", id, revision: organization.revision, confirmed: true }, options);
     const folderId = (await prepare(cause.id)).folder!.id, otherFolderId = (await prepare(otherCause.id)).folder!.id;
+    const postsBeforeList = posts;
+    const organized = await uploadChoices();
+    assert.equal(organized.sharedOrganization, true);
+    const pendingSetup = organized.destinations.find(option => option.id === inherited.id);
+    assert.equal(pendingSetup?.drive, null);
+    assert.equal(pendingSetup?.driveSetup, "folder");
+    assert.equal(organized.destinations.find(option => option.id === cause.id)?.drive?.id, folderId);
+    assert.equal((await prisma.causa.findUniqueOrThrow({ where: { id: inherited.id } })).googleDriveFolderId, inherited.googleDriveFolderId);
+    assert.equal(await prisma.commandExecution.count({ where: { key: `drive-case-binding:${inherited.id}` } }), 0);
+    assert.equal(posts, postsBeforeList, "rendering destinations preserves the existing folder without writing to Google");
     const fileId = "SharedCaseReadFile123", bytes = Buffer.from("Only this case's selected fictitious document");
     const uploadBytes = Buffer.from("Archivo de incorporación de prueba");
     const uploadKey = `tests/intake-${tag}.txt`;
@@ -142,6 +160,9 @@ async function main() {
     const beforeRecovery = downloads;
     await assert.rejects(importSelectedDriveFile(selected(), owner, staleList), (e: unknown) => (e as { code?: string }).code === "disabled", "an old receipt cannot bypass a disconnected account");
     assert.equal(downloads, beforeRecovery);
+    const disconnected = (await uploadChoices()).destinations.find(option => option.id === cause.id);
+    assert.equal(disconnected?.drive, null);
+    assert.equal(disconnected?.driveSetup, "connection");
     await resetAccount();
     metadata.version = "2";
     const count = await prisma.documento.count({ where: { causaId: cause.id } });

@@ -23,7 +23,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ClienteEditForm } from "@/components/clientes/ClienteEditForm";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ClienteAiChat } from "@/components/clientes/ClienteAiChat";
-import { uploadDestination } from "@/lib/causas/upload-destination";
+import { uploadDestinations } from "@/lib/causas/upload-destination";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
@@ -52,7 +52,7 @@ export default async function ClienteDetailPage({
           where: causaAccessWhere(user),
           orderBy: { updatedAt: "desc" },
           include: {
-            driveSyncSubscription: { select: { account: true } },
+            driveSyncSubscription: { select: { account: true, connectionId: true, folderId: true } },
             abogado: { select: { id: true, name: true } },
             tramites: {
               where: {
@@ -120,6 +120,7 @@ export default async function ClienteDetailPage({
 
   if (!cliente) notFound();
   const uploadCaseIds = new Set(writableCases.map(cause => cause.id));
+  const { destinations } = await uploadDestinations(cliente.causas.filter(cause => uploadCaseIds.has(cause.id)), cliente.razonSocial);
   const { items: documentos, next: documentsNext } = listWindow(
     documentRows,
     50,
@@ -320,7 +321,7 @@ export default async function ClienteDetailPage({
         <DocumentoIngestForm
           lockedClienteId={cliente.id}
           clientName={cliente.razonSocial}
-          causas={cliente.causas.filter(c => uploadCaseIds.has(c.id)).map(c => uploadDestination(c, cliente.razonSocial))}
+          causas={destinations}
         />
         <div className="space-y-2">
           {documentos.map((d) => (

@@ -1,5 +1,5 @@
 import { documentDownloadOptions } from "@/lib/sites/document-download-options";
-import { uploadDestination } from "@/lib/causas/upload-destination";
+import { uploadDestinations } from "@/lib/causas/upload-destination";
 import { caseViewHref, caseViewParams, type CaseViewContext } from "@/lib/causas/portfolio-navigation";
 import { CaseWorkflowNav } from "@/components/causas/CaseWorkflowNav";
 import { ContextDisclosure } from "@/components/ui/ContextDisclosure";
@@ -10,7 +10,6 @@ import type { Prisma } from "@prisma/client";
 import { CaseArchiveOrganizer } from "@/components/causas/CaseArchiveOrganizer";
 import { CaseDocumentNews } from "@/components/causas/CaseDocumentNews";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
-import { studyDriveMode } from "@/lib/integrations/google-study-drive";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -22,7 +21,6 @@ import { listCaseUpdates } from "@/lib/causas/updates";
 import { validarRit } from "@/lib/chile";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
-import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -42,7 +40,7 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const [causa, { locale }] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [{ id }, causaAccessWhere(user)] },
-      select: { id: true, clienteId: true, cliente: { select: { razonSocial: true } }, titulo: true, rit: true, tribunal: true, googleDriveFolderId: true, googleDriveFolderName: true, googleDriveFolderUrl: true, driveSyncSubscription: { select: { account: true } } },
+      select: { id: true, clienteId: true, cliente: { select: { razonSocial: true } }, titulo: true, rit: true, tribunal: true, googleDriveFolderId: true, googleDriveFolderName: true, googleDriveFolderUrl: true, driveSyncSubscription: { select: { account: true, connectionId: true, folderId: true } } },
     }),
     getI18n(),
   ]);
@@ -175,8 +173,9 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
     return { id: value.id, path: path.map(item => item.name).join(" / "), ancestorIds: path.slice(0, -1).map(item => item.id) };
   });
   const destinationNames = new Map(destinations.map(value => [value.id, value.path]));
-  const studyDriveFolderId = (!causa.driveSyncSubscription || causa.driveSyncSubscription.account === "study") &&
-    isRealDriveFolderId(causa.googleDriveFolderId) ? causa.googleDriveFolderId : null;
+  const { sharedOrganization, destinations: intakeOptions } = await uploadDestinations([causa]);
+  const destination = intakeOptions[0];
+  const studyDriveFolderId = destination.drive?.id ?? null;
   const downloads = await documentDownloadOptions(documents.map(document => document.id));
   const rows = documents.map(document => {
     const fromDrive = document.driveImport?.causaId === id;
@@ -257,11 +256,14 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       </nav>}
     </section>
     {canWrite && <section aria-label="Incorporar archivos" className="space-y-3"><ContextDisclosure id="incorporar-documentos" title="Añadir archivos" className="panel rounded-[var(--radius-lg)] px-4">
-      <DocumentoIngestForm key={folderId || "root"} lockedCausaId={id} causas={[uploadDestination(causa, causa.cliente?.razonSocial ?? null)]} compact allowDriveCopy={false} destinationFolder={folder || undefined} />
+      <DocumentoIngestForm key={folderId || "root"} lockedCausaId={id} causas={intakeOptions} compact allowDriveCopy={false} destinationFolder={folder || undefined} />
       {managementMode === "pjud_cl" && causa.rit && validarRit(causa.rit) && <CausaDocumentImportButton causaId={id} />}
     </ContextDisclosure></section>}
     <ContextDisclosure id="drive-del-expediente" title="Archivos de Google Drive" className="panel rounded-[var(--radius-lg)] px-4">
-      <DriveFolderPanel sharedOrganization={await studyDriveMode()} canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
+      {canWrite && destination.driveSetup === "folder" && causa.googleDriveFolderId && <p className="py-2 text-sm">
+        Para usar una carpeta organizada, revisa la carpeta anterior. Si eliges «Desvincular», se pausará su sincronización y se conservarán los archivos de Drive. Después, elige «Preparar carpeta organizada».
+      </p>}
+      <DriveFolderPanel sharedOrganization={sharedOrganization} canImport={canWrite} causaId={id} folderId={causa.googleDriveFolderId} folderName={causa.googleDriveFolderName} folderUrl={causa.googleDriveFolderUrl} />
     </ContextDisclosure>
   </div>;
 }

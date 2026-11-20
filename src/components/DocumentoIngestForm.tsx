@@ -2,6 +2,7 @@
 
 import { FormEvent, useId, useMemo, useRef, useState } from "react";
 import { Files, FolderOpen } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   inferDocumentoTipo,
@@ -311,7 +312,10 @@ export function DocumentoIngestForm({
         <dt>Cliente</dt><dd>{destination?.clientName || clientName || "Sin cliente asociado"}</dd>
         <dt>Causa</dt><dd>{destination?.label || "Sin causa asociada"}</dd>
         <dt>Carpeta del estudio</dt><dd>{destinationFolder?.name || (destination ? "Raíz del expediente" : "Documentos")}</dd>
-        <dt>Google Drive</dt><dd>{pushDrive && drive ? drive.name : "Sin copia en Drive"}</dd>
+        <dt>Google Drive</dt><dd>{pushDrive && drive ? drive.name : "Sin copia en Drive"}
+          {allowDriveCopy && destination?.driveSetup === "folder" && <Link className="ml-2 text-[var(--sea)] underline" href={`/causas/${encodeURIComponent(destination.id)}/expediente#drive-del-expediente`}>Revisar la carpeta de la causa</Link>}
+          {allowDriveCopy && destination?.driveSetup === "connection" && <span className="ml-2">Pide a la administración que revise la conexión de Google del estudio.</span>}
+        </dd>
       </dl>}
       {rows.length > 0 && <details className="text-sm">
         <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Opciones de importación{confidencial ? " · Confidencial" : ""}{privilegio ? " · Privilegio" : ""}{pushDrive ? " · Copia en Drive" : ""}</summary>

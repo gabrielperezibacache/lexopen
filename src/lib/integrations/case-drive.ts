@@ -47,8 +47,7 @@ async function actor(causaId: string, user: CausaAccessUser, db: Db, write = tru
   if (write) await assertCausaCapability(causaId, current, "causa.write", db); else await assertCausaAccess(causaId, current, { auditOverride: false }, db);
   return current;
 }
-export async function readAltazorDriveFolderBinding(causaId: string, db: Db = prisma): Promise<CaseDriveBinding | null> {
-  const row = await db.commandExecution.findUnique({ where: { key: bindingKey(causaId) } });
+function parseCaseDriveBinding(row: { status: string; ownerId: string | null; resultJson: string | null } | null): CaseDriveBinding | null {
   if (!row || row.status !== "completed" || !row.resultJson) return null;
   try {
     const value = JSON.parse(row.resultJson) as CaseDriveBinding;
@@ -56,6 +55,19 @@ export async function readAltazorDriveFolderBinding(causaId: string, db: Db = pr
     return value;
   } catch { return null; }
 }
+export async function readAltazorDriveFolderBinding(causaId: string, db: Db = prisma) {
+  return parseCaseDriveBinding(await db.commandExecution.findUnique({ where: { key: bindingKey(causaId) } }));
+}
+
+export async function readCaseDriveFolderBindings(ids: string[], db: Db = prisma) {
+  const rows = await db.commandExecution.findMany({
+    where: { key: { in: ids.map(bindingKey) }, status: "completed" },
+    select: { key: true, ownerId: true, status: true, resultJson: true },
+  });
+  const byKey = new Map(rows.map(row => [row.key, parseCaseDriveBinding(row)]));
+  return new Map(ids.map(id => [id, byKey.get(bindingKey(id)) ?? null]));
+}
+
 export async function caseDriveRevision(causaId: string, db: Db = prisma) {
   const [cause, subscription, binding] = await Promise.all([db.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } }), db.driveSyncSubscription.findUnique({ where: { causaId }, select: { generation: true } }), readAltazorDriveFolderBinding(causaId, db)]);
   return digest(canonicalJson({ causaId, folderId: cause.googleDriveFolderId, subscriptionGeneration: subscription?.generation ?? null, bindingGeneration: binding?.generation ?? null }));

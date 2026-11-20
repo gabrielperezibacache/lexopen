@@ -12,7 +12,7 @@ import { writableCausaWhere, documentReadWhere as scopeddocumentReadWhere } from
 import { requireStaff } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
-import { uploadDestination } from "@/lib/causas/upload-destination";
+import { uploadDestinations } from "@/lib/causas/upload-destination";
 import { canSome } from "@/lib/auth/permissions";
 import Link from "next/link";
 
@@ -34,14 +34,16 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
       take: LIST_TAKE + 1,
     }),
     prisma.causa.findMany({ where: writableCausaWhere(user),
-      select: { id: true, rit: true, titulo: true, clienteId: true, googleDriveFolderId: true, googleDriveFolderName: true, cliente: { select: { razonSocial: true } }, driveSyncSubscription: { select: { account: true } } },
+      select: { id: true, rit: true, titulo: true, clienteId: true, googleDriveFolderId: true, googleDriveFolderName: true, cliente: { select: { razonSocial: true } }, driveSyncSubscription: { select: { account: true, connectionId: true, folderId: true } } },
       orderBy: { updatedAt: "desc" },
       take: 100,
     }),
   ]);
 
   const { items: rawDocumentos, next } = listWindow(documentRows, LIST_TAKE, "updatedAt");
-  const downloads = await documentDownloadOptions(rawDocumentos.map(document => document.id));
+  const [downloads, { destinations }] = await Promise.all([
+    documentDownloadOptions(rawDocumentos.map(document => document.id)), uploadDestinations(causas),
+  ]);
   const documentos = rawDocumentos.map(document => ({ ...document, downloads: downloads.get(document.id) }));
 
   return (
@@ -57,7 +59,7 @@ export default async function DocumentosPage({ searchParams }: { searchParams: P
         <label className="min-w-0 flex-1">Buscar documentos o causas<input className="input" name="q" defaultValue={q} maxLength={200} /></label>
         <button className="btn btn-secondary" type="submit">Buscar</button>
       </form>
-      <ContextDisclosure id="document-upload" title="Añadir archivos"><DocumentoIngestForm causas={causas.map(c => uploadDestination(c, c.cliente?.razonSocial ?? null))}/></ContextDisclosure>
+      <ContextDisclosure id="document-upload" title="Añadir archivos"><DocumentoIngestForm causas={destinations}/></ContextDisclosure>
 
       {documentos.length === 0 ? (
         <EmptyState

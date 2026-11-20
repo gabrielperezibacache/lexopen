@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import { digest } from "@/lib/personal-connectors/core";
 import { canonicalJson } from "@/lib/command-execution";
-import { getGoogleConfig, requireDriveSession } from "./google";
+import { getGoogleConfig, googleCredentialsConfigured, requireDriveSession } from "./google";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import type { DriveWriteCommand, DriveWriteReceipt, ManagedDriveAccount } from "@/lib/altazor/connectors/drive-management";
 const API = "https://www.googleapis.com/drive/v3/files";
@@ -17,17 +17,32 @@ function commandHash(command: DriveWriteCommand) {
 }
 export const STUDY_ORGANIZATION_KEY = "google-organization-root:study";
 export async function studyDriveMode(db: typeof prisma | Prisma.TransactionClient = prisma) { return Boolean(await db.commandExecution.findUnique({ where: { key: STUDY_ORGANIZATION_KEY }, select: { id: true } })); }
+function studyIdentity(rowId: string, config: Awaited<ReturnType<typeof getGoogleConfig>>) {
+  return {
+    connectionId: createHash("sha256").update(JSON.stringify([rowId, config.connectedEmail || "study"])).digest("hex"),
+    bindingRevision: digest(canonicalJson({ row: rowId, refresh: config.refreshToken || "", email: config.connectedEmail || "", scopes: [...config.scopes].sort() })),
+  };
+}
+
+/** Local configuration only: rendering an upload form never contacts Google. */
+export async function configuredStudyDriveIdentity() {
+  const [row, config] = await Promise.all([
+    prisma.integrationConfig.findUnique({ where: { provider: "google" }, select: { id: true, enabled: true } }),
+    getGoogleConfig(),
+  ]);
+  if (!row?.enabled || config.syncDrive === false || !config.accessToken) return null;
+  if ((config.tokenExpiresAt || 0) <= Date.now() + 60_000 && !(config.refreshToken && googleCredentialsConfigured())) return null;
+  return studyIdentity(row.id, config);
+}
 export async function resolveStudyDriveAccount(user: CausaAccessUser, db = prisma, fetcher: typeof fetch = fetch): Promise<ManagedDriveAccount> {
   const initial = await requireDriveSession(), row = await db.integrationConfig.findUniqueOrThrow({ where: { provider: "google" } });
-  const connectionId = createHash("sha256").update(JSON.stringify([row.id, initial.connectedEmail || "study"])).digest("hex");
-  const revision = (config: typeof initial) => digest(canonicalJson({ row: row.id, refresh: config.refreshToken || "", email: config.connectedEmail || "", scopes: [...config.scopes].sort() }));
-  const bindingRevision = revision(initial);
+  const { connectionId, bindingRevision } = studyIdentity(row.id, initial);
   async function assertActive(client: typeof prisma | Prisma.TransactionClient = db) {
     const actor = await client.user.findUnique({ where: { id: user.id }, select: { role: true } });
     if (!actor || !isStaff(actor.role)) throw httpError("Cuenta del equipo requerida", 403);
     const current = await client.integrationConfig.findUnique({ where: { provider: "google" } });
     const config = await getGoogleConfig();
-    if (!current?.enabled || current.id !== row.id || config.syncDrive === false || revision(config) !== bindingRevision) throw httpError("La conexión de Google del estudio cambió", 409);
+    if (!current?.enabled || current.id !== row.id || config.syncDrive === false || studyIdentity(row.id, config).bindingRevision !== bindingRevision) throw httpError("La conexión de Google del estudio cambió", 409);
   }
   async function request(url: string, init: RequestInit = {}, max = 256 * 1024) {
     await assertActive(); const config = await requireDriveSession();
