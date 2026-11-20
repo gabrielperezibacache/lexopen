@@ -197,7 +197,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
       <PageHeader
         title={causa.titulo}
         subtitle={[causa.rit,causa.caratula].filter(Boolean).join(" · ")}
-        actions={<CausaActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={user.role === "admin"} extraActions={<>
+        actions={<CausaActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={user.role === "admin"} canUseAssistant={canUseKnowledge} extraActions={<>
           {can(user,"causa.write",{causaRol:access.causaRol})&&<Link href={`/offline.html?kind=causa&record=${causa.id}`} className="btn btn-ghost">Trabajar sin conexión</Link>}
           <Link href={`/plazos?causaId=${causa.id}#registrar-plazo`} className="btn btn-ghost">Registrar plazo</Link>
           <Link href={`/mi-fiscalia?causaId=${causa.id}`} className="btn btn-ghost">Solicitudes a Mi Fiscalía</Link>
@@ -415,7 +415,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
               </p>
             )}
           </div>
-          <PlazoSugerirAi causaId={causa.id} />
+          {canUseKnowledge && <PlazoSugerirAi causaId={causa.id} />}
         </section>
 
         <section id="documentos" className="panel case-destination rounded-[var(--radius-lg)] p-5">
@@ -426,12 +426,12 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
               <Link href={archiveHref} className="btn btn-secondary">
                 Organizar expediente
               </Link>
-              <Link
+              {canUseKnowledge && <Link
                 href={`/agente?causaId=${causa.id}&utility=doc_qa`}
                 className="text-sm text-[var(--sea)]"
               >
                 Preguntar con IA
-              </Link>
+              </Link>}
               <Link href="/documentos" className="text-sm text-[var(--sea)]">
                 Ver repositorio
               </Link>
@@ -449,12 +449,12 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
                   {d.extractionStatus === "completed" ? " · Texto preparado" : ["pending", "processing", "queued"].includes(d.extractionStatus || "") ? " · Preparando lectura" : d.extractionStatus === "failed" ? " · Revisar lectura" : ""}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-3">
-                  <Link
+                  {canUseKnowledge && <Link
                     href={`/agente?causaId=${causa.id}&utility=doc_qa&documentoId=${d.id}`}
                     className="text-xs text-[var(--sea)]"
                   >
                     Preguntar IA
-                  </Link>
+                  </Link>}
                   <DocumentDownloads id={d.id} options={d.downloads} className="text-xs text-[var(--sea)]" />
                   <DocumentDriveAction
                     documentId={d.id}
@@ -464,7 +464,7 @@ export async function CaseWorkspaceServer({ params, searchParams, mode }: CaseWo
                   />
                 </div>
                 <Link href={`/offline.html?kind=documento&record=${d.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)]">Sin conexión</Link>
-                <DocumentoAiActions documentoId={d.id} causaId={causa.id} version={d.version} />
+                {canUseKnowledge && <DocumentoAiActions documentoId={d.id} causaId={causa.id} version={d.version} />}
               </div>
             ))}
             {documentos.length === 0 && (

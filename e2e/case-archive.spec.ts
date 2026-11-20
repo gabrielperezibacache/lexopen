@@ -157,17 +157,29 @@ test("la ficha y el expediente mantienen el recorrido del profesional sin acceso
   const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
   const db = new PrismaClient({ datasources: { db: { url } } });
   const email = `ficha-${randomUUID()}@example.test`;
-  let actorId = "", causeId = "";
+  let actorId = "", causeId = "", documentId = "";
   try {
     const seed = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" }, select: { password: true } });
     actorId = (await db.user.create({ data: { name: "Profesional de prueba", email, role: "abogado", capabilityRevokes: "assistant.use", password: seed.password } })).id;
     causeId = (await db.causa.create({ data: { titulo: "Materia del profesional", materia: "civil", tribunal: "Tribunal de prueba", acceso: "equipo", abogadoId: actorId } })).id;
+    documentId = (await db.documento.create({ data: { nombre: "Registro del equipo.txt", contenido: "Texto ficticio", mimeType: "text/plain", causaId: causeId, autorId: actorId } })).id;
     await loginAs(page, email);
     const origin = `/mis-causas?q=profesional#causa-${causeId}`;
     await page.goto(`/causas/${causeId}?${new URLSearchParams({ volver: origin })}`);
     const nav = page.getByRole("navigation", { name: "Recorrido de la causa", exact: true });
     await expect(nav.getByRole("link", { name: "Biblioteca", exact: true })).toHaveCount(0);
     await expect(nav.getByRole("link", { name: "Escritos", exact: true })).toHaveCount(0);
+    const main = page.locator("#main-content");
+    await main.getByText("Más acciones", { exact: true }).click();
+    await expect(main.getByRole("link", { name: "Hablar con ALTAZOR" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Registrar plazo", exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Nueva minuta", exact: true })).toBeVisible();
+    await expect(main.getByRole("button", { name: "Actualizar estado", exact: true })).toBeVisible();
+    await expect(main.locator("#plazos").getByRole("button", { name: "Sugerir plazos con IA", exact: true })).toHaveCount(0);
+    const documents = main.locator("#documentos");
+    await expect(documents.getByRole("link", { name: /Preguntar.*IA/ })).toHaveCount(0);
+    for (const label of ["Resumir", "Clasificar"]) await expect(documents.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+    await expect(documents.getByRole("link", { name: "Descargar original", exact: true })).toHaveAttribute("href", `/api/documentos/${documentId}/content?download=1`);
     await nav.getByRole("link", { name: "Preparación", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Preparar la causa", exact: true })).toBeVisible();
     await nav.getByRole("link", { name: "Expediente", exact: true }).click();
@@ -178,6 +190,7 @@ test("la ficha y el expediente mantienen el recorrido del profesional sin acceso
     await page.getByRole("link", { name: "Volver a mis causas", exact: true }).click();
     await expect(page).toHaveURL(url => url.pathname + url.search + url.hash === origin);
   } finally {
+    if (documentId) await db.documento.deleteMany({ where: { id: documentId } });
     if (causeId) await db.causa.deleteMany({ where: { id: causeId } });
     if (actorId) {
       await db.auditEvent.deleteMany({ where: { actorId } });

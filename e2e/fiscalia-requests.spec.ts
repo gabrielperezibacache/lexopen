@@ -160,9 +160,10 @@ test("Mi Fiscalía permite descartar un borrador sin fingir una presentación", 
   } finally { await f.cleanup(); }
 });
 
-retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page }) => {
+retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión adjunta", async ({ page }, info) => {
   const f = await fixture(page);
   const date = addCivilDays(santiagoDateKey(new Date()), -1);
+  const correctedFolio = `Folio-2${"A".repeat(100)}`;
   const row = await db.fiscaliaRequest.create({ data: { causaId: f.cause.id, creatorId: f.owner.id, title: f.title, kind: "copia", body: "Solicitud de prueba presentada", status: "submitted", folio: "Orig-1", submittedAt: new Date(date) } });
   const doc = await db.documento.create({ data: { causaId: f.cause.id, autorId: f.owner.id, nombre: "Comprobante ficticio.txt", mimeType: "text/plain", contenido: "Comprobante original" } });
   try {
@@ -173,7 +174,7 @@ retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión 
     await expect(page.getByRole("heading", { name: "Próxima gestión", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Rectificar presentación", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Folio corregido", { exact: true }).fill("Folio-2");
+    await dialog.getByLabel("Folio corregido", { exact: true }).fill(correctedFolio);
     await dialog.getByLabel("Motivo de rectificación", { exact: true }).fill("Revisión del folio oficial.");
     const path = `/api/fiscalia/solicitudes/${row.id}`;
     const attempts = await loseFirstReceipt(page, path, 200);
@@ -182,7 +183,7 @@ retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión 
     await dialog.getByRole("button", { name: "Comprobar guardado" }).click();
     const history = page.getByRole("region", { name: "Historial de la solicitud" });
     await expect(history).toContainText("Anterior: Orig-1");
-    await expect(history).toContainText("Corregido: Folio-2");
+    await expect(history).toContainText(`Corregido: ${correctedFolio}`);
     expectSameRetry(attempts, 200);
     expect(await db.fiscaliaRequestEvent.count({ where: { requestId: row.id, correctionReason: "Revisión del folio oficial." } })).toBe(1);
     await page.getByRole("button", { name: "Vincular respaldo" }).click();
@@ -195,5 +196,8 @@ retryTest("ficha de Fiscalía conserva la rectificación y descarga la versión 
     const result = await page.request.get((await link.getAttribute("href"))!);
     expect(result.status()).toBe(200); expect(await result.text()).toBe("Comprobante original");
     expect(result.headers()["content-disposition"]).toMatch(/^attachment;/);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath("mi-fiscalia-detail-mobile.png"), fullPage: true });
   } finally { await db.documento.deleteMany({ where: { id: doc.id } }); await f.cleanup(); }
 });
