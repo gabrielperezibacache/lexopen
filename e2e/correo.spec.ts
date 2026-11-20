@@ -77,6 +77,7 @@ test("el equipo encuentra su correo en Configuración y el portal no puede acced
   await page.goto("/cuenta");
   await expect(page.locator("main").getByRole("link", { name: "Configurar correo" })).toHaveCount(0);
   await page.locator("main").getByRole("link", { name: "Configuración", exact: true }).click();
+  await page.getByLabel("Ajuste seleccionado", { exact: true }).selectOption("comunicaciones");
   await page.locator("main").getByRole("link", { name: "Configurar correo" }).click();
   await expect(page.getByRole("heading", { name: "Configuración de correo" })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });
