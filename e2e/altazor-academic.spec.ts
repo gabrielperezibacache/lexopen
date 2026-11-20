@@ -102,9 +102,15 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   await expect(picker.locator(".altazor-source-quote")).toContainText(sourceText);
   await picker.getByRole("checkbox").check();
   await academic.getByRole("button", { name: "Guardar fuentes y continuar", exact: true }).click();
+  const steps = academic.getByRole("navigation", { name: "Pasos del trabajo académico" });
+  const workStep = steps.getByRole("button", { name: "Trabajo", exact: true });
+  await expect(workStep).toHaveAttribute("aria-current", "step");
   await page.reload();
+  await expect(workStep).toHaveAttribute("aria-current", "step");
+  await steps.getByRole("button", { name: "Objetivo", exact: true }).click();
+  await academic.getByText("Opciones del trabajo", { exact: true }).click();
   await expect(academic.getByLabel("Qué quieres preparar", { exact: true })).toHaveValue("synthesis");
-  await academic.getByRole("button", { name: "Trabajo", exact: true }).click();
+  await workStep.click();
   await expect(academic.getByText("1 pasaje elegido", { exact: false })).toBeVisible();
   await expect(academic.getByRole("checkbox", { name: /Autorizo enviar el encargo/ })).toHaveCount(0);
   await academic.getByRole("button", { name: "Preparar propuesta", exact: true }).click();
