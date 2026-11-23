@@ -27,7 +27,7 @@
     "tsx": "^4.23.15"
   },
   "devDependencies": {
-    "electron": "^43.8.7",
+    "electron": "^43.8.12",
     "electron-builder": "26.18.0",
     "@electron/asar": "3.4.1",
     "js-yaml": "4.3.2"
