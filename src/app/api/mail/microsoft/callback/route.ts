@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/api";
 import { connectMailboxOauth } from "@/lib/mail/ingest";
 import { exchangeMicrosoftMailboxCode } from "@/lib/mail/oauth";
 import { MAIL_SETTINGS_PATH } from "@/lib/mail/settings-location";
+import { resolveOAuthReturnUrl } from "@/lib/net/oauth-return-url";
 import {
   MICROSOFT_OAUTH_COOKIE,
   MICROSOFT_OAUTH_PATH,
@@ -13,7 +14,13 @@ import {
 
 function redirectTo(req: NextRequest, query: string) {
   return clearOauthStateCookie(
-    NextResponse.redirect(new URL(`${MAIL_SETTINGS_PATH}?${query}`, req.url)),
+    NextResponse.redirect(
+      resolveOAuthReturnUrl(
+        req.url,
+        `${MAIL_SETTINGS_PATH}?${query}`,
+        process.env.MICROSOFT_REDIRECT_URI
+      )
+    ),
     MICROSOFT_OAUTH_COOKIE,
     MICROSOFT_OAUTH_PATH
   );
