@@ -339,11 +339,12 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
   }
 }
 
-function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): string {
+export function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): string {
   const scrapeNote = error instanceof Error ? error.message : "scrape falló";
   const sidecarNote = sidecarError.message || "no responde";
+  const manualLoginIssue = /INGRESA|deshabilitad|Sesión manual asistida/i.test(scrapeNote);
   const formIssue =
-    /Timeout|not visible|locator\.fill|rut_hidden|formulario visible|campo RUN|campo de contraseña|Página no encontrada|404|no se completó el login|no llegó a OJV/i.test(
+    /Timeout|not visible|locator\.fill|rut_hidden|formulario visible|campo RUN|campo de contraseña|Página no encontrada|404|no se completó el login|no llegó a OJV|INGRESA|deshabilitad|Sesión manual asistida/i.test(
       scrapeNote
     );
   const listIssue =
@@ -366,7 +367,9 @@ function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): strin
       "No se pudo completar el login de ClaveÚnica (formulario no disponible o bloqueo del sitio).",
       "LexOpen intentó la consulta directa porque el servicio auxiliar no responde.",
       sidecarTip,
-      scrapeNote.length > 140 ? `Detalle: ${scrapeNote.slice(0, 140)}…` : `Detalle: ${scrapeNote}`,
+      manualLoginIssue
+        ? "Complete el ingreso en la ventana visible con Sesión manual asistida en http://127.0.0.1:3000/causas/mis-causas."
+        : scrapeNote.length > 140 ? `Detalle: ${scrapeNote.slice(0, 140)}…` : `Detalle: ${scrapeNote}`,
     ].join(" ");
   }
   const short =

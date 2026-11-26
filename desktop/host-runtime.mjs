@@ -276,10 +276,20 @@ function lifecycleFailure(phase, diagnostic) {
   return error;
 }
 
+function hostStartAbortError() {
+  const error = new Error("El inicio del Host se canceló por una solicitud de parada.");
+  error.code = "HOST_START_ABORTED";
+  return error;
+}
+
+function isHostStartAbort(error) {
+  return error?.code === "HOST_START_ABORTED";
+}
+
 async function duringHostPhase(phase, work, diagnostic = () => "UNKNOWN") {
   try { return await work(); }
   catch (error) {
-    if (error?.[safeLifecycleFailure]) throw error;
+    if (error?.[safeLifecycleFailure] || isHostStartAbort(error)) throw error;
     const fromError = classifyPostgresDiagnostic(error);
     throw lifecycleFailure(phase, fromError === "UNKNOWN" ? diagnostic() : fromError);
   }
@@ -440,14 +450,29 @@ export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execut
 }
 
 export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overrides = {}) {
+  const signal = overrides.signal;
+  const throwIfAborted = () => { if (signal?.aborted) throw hostStartAbortError(); };
+  throwIfAborted();
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
   const preparationPhase = alreadyInitialized ? "PG_START" : "PG_INIT";
   const EmbeddedPostgres = await duringHostPhase(preparationPhase, async () => {
     if (overrides.EmbeddedPostgres) return overrides.EmbeddedPostgres;
     const modPath = bundledModuleFile("embedded-postgres", "dist/index.js") || require.resolve("embedded-postgres");
-    return (await import(pathToFileURL(modPath).href)).default;
+    const beforeListeners = overrides.manageSignals
+      ? new Map(["exit", "beforeExit", "SIGHUP", "SIGINT", "SIGTERM", "SIGBREAK", "message"].map(event => [event, new Set(process.listeners(event))]))
+      : null;
+    const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
+    if (beforeListeners) {
+      for (const [event, existing] of beforeListeners) {
+        for (const listener of process.listeners(event)) {
+          if (!existing.has(listener)) process.removeListener(event, listener);
+        }
+      }
+    }
+    return EmbeddedPostgres;
   });
+  throwIfAborted();
   // Prefer password from DATABASE_URL. Brand-new clusters may briefly use
   // "lexopen" only when URL has no password; migrateLegacyPgPassword rotates it.
   const password =
@@ -469,29 +494,84 @@ export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overri
     onLog: classifyLog,
     onError: classifyLog,
   }));
-  if (!alreadyInitialized) {
-    await duringHostPhase("PG_INIT", () => withPrivatePostgresTemp(dataDir, () => pg.initialise()), () => diagnostic);
-  }
-  if ((overrides.platform || process.platform) === "win32") {
-    const pgCtl = await duringHostPhase("PG_START", () => overrides.pgCtl || resolveWindowsPgCtl());
-    Object.assign(pg, createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute: overrides.executePgCtl, probes: overrides.pgCtlProbes, env: overrides.pgCtlEnv }));
-  }
-  diagnostic = "UNKNOWN";
-  await duringHostPhase("PG_START", () => pg.start(), () => diagnostic);
-  try {
-    await pg.createDatabase("lexopen");
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (!/already exists/i.test(msg)) {
-      console.warn("[lexopen-host] createDatabase: PG_START_UNKNOWN");
+  overrides.onPostgresCreated?.(pg);
+  throwIfAborted();
+  const stopPostgres = () => overrides.stopPostgres ? overrides.stopPostgres() : boundedStop(() => pg.stop(), "PostgreSQL", 30_000);
+  let startAttempted = false;
+  let startSettled = true;
+  let stopOnAbortPromise = null;
+  const stopOnAbort = async () => {
+    if (!startAttempted) return;
+    while (!startSettled && !pg.process) await new Promise(resolve => setImmediate(resolve));
+    if (pg.process && pg.process.exitCode == null && pg.process.signalCode == null) {
+      await stopPostgres();
     }
+  };
+  const onAbort = () => {
+    stopOnAbortPromise = stopOnAbort();
+    void stopOnAbortPromise.catch(() => {});
+  };
+  if (signal) {
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
   }
-  try { await duringHostPhase("PG_START", () => migrateLegacyPgPassword(pg, dataDir, databaseUrl), () => diagnostic); }
-  catch (error) {
-    try { await boundedStop(() => pg.stop(), "PostgreSQL", 30_000); } catch { error.cleanupFailed = true; }
+  try {
+    if (!alreadyInitialized) {
+      await duringHostPhase("PG_INIT", () => withPrivatePostgresTemp(dataDir, () => pg.initialise()), () => diagnostic);
+      throwIfAborted();
+    }
+    if ((overrides.platform || process.platform) === "win32") {
+      const pgCtl = await duringHostPhase("PG_START", () => overrides.pgCtl || resolveWindowsPgCtl());
+      Object.assign(pg, createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute: overrides.executePgCtl, probes: overrides.pgCtlProbes, env: overrides.pgCtlEnv }));
+    }
+    throwIfAborted();
+    diagnostic = "UNKNOWN";
+    startAttempted = true;
+    startSettled = false;
+    const startOperation = duringHostPhase("PG_START", () => pg.start(), () => diagnostic).then(
+      value => { startSettled = true; return value; },
+      error => { startSettled = true; throw error; },
+    );
+    try {
+      await startOperation;
+    } catch (error) {
+      if (signal?.aborted) {
+        const aborted = hostStartAbortError();
+        try { await stopOnAbortPromise; } catch { aborted.cleanupFailed = true; }
+        throw aborted;
+      }
+      throw error;
+    }
+    throwIfAborted();
+    try {
+      await pg.createDatabase("lexopen");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/already exists/i.test(msg)) {
+        console.warn("[lexopen-host] createDatabase: PG_START_UNKNOWN");
+      }
+    }
+    throwIfAborted();
+    try { await duringHostPhase("PG_START", () => migrateLegacyPgPassword(pg, dataDir, databaseUrl), () => diagnostic); }
+    catch (error) {
+      if (signal?.aborted) throw hostStartAbortError();
+      if (!overrides.onPostgresCreated) {
+        try { await stopPostgres(); } catch { error.cleanupFailed = true; }
+      }
+      throw error;
+    }
+    throwIfAborted();
+    return pg;
+  } catch (error) {
+    if (signal?.aborted && !isHostStartAbort(error)) {
+      const aborted = hostStartAbortError();
+      try { await stopOnAbortPromise; } catch { aborted.cleanupFailed = true; }
+      throw aborted;
+    }
     throw error;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
-  return pg;
 }
 
 export function toolUsesShell(command, platform = process.platform) {
@@ -832,8 +912,9 @@ function startNextServer(port, bindHost = "127.0.0.1") {
 
 async function waitForHealth(url, expected = {}, attempts = 60) {
   for (let i = 0; i < attempts; i++) {
+    if (expected.signal?.aborted) return { ok: false, needsSetup: false };
     try {
-      const res = await fetch(`${url}/api/health`, { redirect: "error" });
+      const res = await fetch(`${url}/api/health`, { redirect: "error", ...(expected.signal ? { signal: expected.signal } : {}) });
       const body = await res.json().catch(() => ({}));
       if (res.ok && body.ok === true && body.db === "up" && (!expected.version || body.version === expected.version) && (!expected.buildId || body.buildId === expected.buildId)) {
         return { ok: true, needsSetup: Boolean(body.needsSetup) };
@@ -841,6 +922,7 @@ async function waitForHealth(url, expected = {}, attempts = 60) {
     } catch {
       /* retry */
     }
+    if (expected.signal?.aborted) return { ok: false, needsSetup: false };
     await new Promise((r) => setTimeout(r, 500));
   }
   return { ok: false, needsSetup: false };
@@ -877,6 +959,15 @@ export function embeddedDatabasePort(databaseUrl) {
 /** Lifecycle overrides are an internal seam for offline startup/rollback tests. */
 export async function startHost(options = {}, overrides = {}) {
   const lifecycle = { assertPortAvailable, startEmbeddedPostgres, migrate, maybeSeed, startNextServer, waitForHealth, stopChild, assertHostStopped, ...overrides };
+  const signal = overrides.signal;
+  const throwIfAborted = () => { if (signal?.aborted) throw hostStartAbortError(); };
+  const startupPhase = async (phase, work, diagnostic) => {
+    throwIfAborted();
+    const result = await duringHostPhase(phase, work, diagnostic);
+    throwIfAborted();
+    return result;
+  };
+  throwIfAborted();
   const dataDir = options.dataDir || defaultDataDir();
   process.env.LEXOPEN_DATA_DIR = dataDir;
 
@@ -957,16 +1048,49 @@ export async function startHost(options = {}, overrides = {}) {
 
   let pg = null;
   let child = null;
+  let hostSchedulers = null;
+  let cleanupPromise = null;
+  let postgresStopPromise = null;
+  const stopPostgres = () => {
+    if (!pg) return Promise.resolve();
+    if (!postgresStopPromise) postgresStopPromise = boundedStop(() => pg.stop(), "PostgreSQL", process.platform === "win32" ? 30_000 : 15_000);
+    return postgresStopPromise;
+  };
+  const schedulerAbort = new AbortController();
+  const relayAbort = () => schedulerAbort.abort();
+  if (signal) {
+    if (signal.aborted) relayAbort();
+    else signal.addEventListener("abort", relayAbort, { once: true });
+  }
+  const cleanupResources = () => {
+    if (cleanupPromise) return cleanupPromise;
+    cleanupPromise = (async () => {
+      schedulerAbort.abort();
+      const errors = [], postgresPid = readPostgresPid(dataDir);
+      try { await boundedStop(() => Promise.resolve(hostSchedulers?.stop?.()), "El programador"); } catch (error) { errors.push(error); }
+      try { await lifecycle.stopChild(child); } catch (error) { errors.push(error); }
+      try { await stopPostgres(); } catch (error) { errors.push(error); }
+      try { await lifecycle.assertHostStopped({ dataDir, port: host.port, pgPort, child, postgresPid }); } catch (error) { errors.push(error); }
+      if (errors.length) throw new AggregateError(errors, "No se confirmó una parada completa del Host. El respaldo y la instalación quedan bloqueados.");
+    })();
+    return cleanupPromise;
+  };
   let nextStartupError = null, nextStartupFailure;
   let unwatchNextStartup = () => {};
   try {
-    await duringHostPhase("PG_START", () => lifecycle.assertPortAvailable(pgPort, "PostgreSQL"));
-    pg = await duringHostPhase("PG_START", () => lifecycle.startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl));
-    await duringHostPhase("MIGRATION", () => lifecycle.migrate());
-    await duringHostPhase("MIGRATION", () => lifecycle.maybeSeed(seedDemo, dataDir));
-    await duringHostPhase("NEXT_START", () => lifecycle.assertPortAvailable(host.port, "LexOpen", bindHost));
+    await startupPhase("PG_START", () => lifecycle.assertPortAvailable(pgPort, "PostgreSQL"));
+    const startedPostgres = await startupPhase("PG_START", () => lifecycle.startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl, {
+      manageSignals: Boolean(overrides.manageSignals),
+      signal,
+      stopPostgres,
+      onPostgresCreated: resource => { pg = resource; },
+    }));
+    pg ||= startedPostgres;
+    await startupPhase("MIGRATION", () => lifecycle.migrate());
+    await startupPhase("MIGRATION", () => lifecycle.maybeSeed(seedDemo, dataDir));
+    await startupPhase("NEXT_START", () => lifecycle.assertPortAvailable(host.port, "LexOpen", bindHost));
 
-    child = await duringHostPhase("NEXT_START", () => {
+    await startupPhase("NEXT_START", () => {
       const started = lifecycle.startNextServer(host.port, bindHost);
       // spawn errors are emitted asynchronously; observe them before awaiting
       // anything so a failed launch remains NEXT_START rather than a timeout.
@@ -978,13 +1102,17 @@ export async function startHost(options = {}, overrides = {}) {
         });
         void nextStartupFailure.catch(() => undefined);
       }
+      child = started;
       return started;
     });
     const url = localAppUrl(host.port);
-    const health = await duringHostPhase("HEALTH", async () => {
+    const health = await startupPhase("HEALTH", async () => {
       if (nextStartupError) throw nextStartupError;
-      const pending = lifecycle.waitForHealth(url, { version, buildId: identity.buildId });
-      const result = await (nextStartupFailure ? Promise.race([pending, nextStartupFailure]) : pending);
+      const pending = lifecycle.waitForHealth(url, { version, buildId: identity.buildId, signal });
+      let result;
+      try { result = await (nextStartupFailure ? Promise.race([pending, nextStartupFailure]) : pending); }
+      catch (error) { if (signal?.aborted) return { ok: false, needsSetup: false }; throw error; }
+      if (signal?.aborted) return result;
       if (nextStartupError) throw nextStartupError;
       if (!result?.ok) throw new Error("Host health unavailable");
       return result;
@@ -1007,7 +1135,6 @@ export async function startHost(options = {}, overrides = {}) {
       );
     }
 
-    let hostSchedulers = null;
     try {
       const schedulersModule = path.join(
         repoRoot,
@@ -1015,7 +1142,7 @@ export async function startHost(options = {}, overrides = {}) {
         "local-host-schedulers.mjs"
       );
       if (overrides.startSchedulers) {
-        hostSchedulers = await overrides.startSchedulers();
+        hostSchedulers = await overrides.startSchedulers({ signal: schedulerAbort.signal });
       } else if (fs.existsSync(schedulersModule)) {
         const { startLocalHostSchedulers } = await import(
           pathToFileURL(schedulersModule).href
@@ -1025,6 +1152,7 @@ export async function startHost(options = {}, overrides = {}) {
           env: process.env,
           logPrefix: "lexopen-host",
           alreadyHealthy: true,
+          signal: schedulerAbort.signal,
         });
       } else {
         console.warn(
@@ -1032,25 +1160,15 @@ export async function startHost(options = {}, overrides = {}) {
         );
       }
     } catch (e) {
+      if (signal?.aborted) throw hostStartAbortError();
       console.warn(
         "[lexopen-host] No se pudieron iniciar schedulers locales:",
         e instanceof Error ? e.message : e
       );
     }
+    throwIfAborted();
 
-    let stopPromise = null;
-    const stop = async () => {
-      if (stopPromise) return stopPromise;
-      stopPromise = (async () => {
-        const errors = [], postgresPid = readPostgresPid(dataDir);
-        try { await boundedStop(() => Promise.resolve(hostSchedulers?.stop?.()), "El programador"); } catch (error) { errors.push(error); }
-        try { await lifecycle.stopChild(child); } catch (error) { errors.push(error); }
-        try { await boundedStop(() => pg.stop(), "PostgreSQL", process.platform === "win32" ? 30_000 : 15_000); } catch (error) { errors.push(error); }
-        try { await lifecycle.assertHostStopped({ dataDir, port: host.port, pgPort, child, postgresPid }); } catch (error) { errors.push(error); }
-        if (errors.length) throw new AggregateError(errors, "No se confirmó una parada completa del Host. El respaldo y la instalación quedan bloqueados.");
-      })();
-      try { return await stopPromise; } catch (error) { stopPromise = null; throw error; }
-    };
+    const stop = () => cleanupResources();
 
     recognizeAppVersion(version, dataDir);
     console.log(`[lexopen-host] Host verificado · versión aplicada v${version}`);
@@ -1073,28 +1191,54 @@ export async function startHost(options = {}, overrides = {}) {
   } catch (error) {
     unwatchNextStartup();
     // A cleanup error must not replace the safe diagnostic of the failing step.
-    try { await lifecycle.stopChild(child); } catch { if (error) error.cleanupFailed = true; }
-    if (pg) await pg.stop().catch(() => undefined);
+    try { await cleanupResources(); } catch { if (error && (typeof error === "object" || typeof error === "function")) error.cleanupFailed = true; }
     throw error;
   }
+}
+
+export function runStandaloneHost({ processRef = process, startHostFn = startHost, exit = code => processRef.exit(code), log = message => console.error(message) } = {}) {
+  const controller = new AbortController();
+  let hostHandle = null;
+  let shutdownPromise = null;
+  const startup = Promise.resolve().then(() => startHostFn({}, { signal: controller.signal, manageSignals: true }));
+  const safeCode = error => typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "UNKNOWN";
+  const shutdown = () => {
+    if (shutdownPromise) return shutdownPromise;
+    controller.abort();
+    shutdownPromise = (async () => {
+      try {
+        const handle = await startup;
+        hostHandle = handle;
+        await handle?.stop?.();
+        exit(0);
+      } catch (error) {
+        if (isHostStartAbort(error) && !error.cleanupFailed) exit(0);
+        else {
+          log(`[lexopen-host] No se confirmó una parada completa del Host (${safeCode(error)}).`);
+          exit(1);
+        }
+      }
+    })();
+    return shutdownPromise;
+  };
+  const onMessage = message => { if (message?.type === "lexopen:stop") void shutdown(); };
+  const onSignal = () => { void shutdown(); };
+  processRef.once("SIGINT", onSignal);
+  processRef.once("SIGTERM", onSignal);
+  processRef.on("message", onMessage);
+  if (processRef.connected) processRef.once("disconnect", onSignal);
+  startup.then(handle => {
+    hostHandle = handle;
+  }, error => {
+    if (!shutdownPromise) {
+      log(`[lexopen-host] No se pudo iniciar el Host (${safeCode(error)}).`);
+      exit(1);
+    }
+  });
+  return { startup, shutdown, controller, get hostHandle() { return hostHandle; } };
 }
 
 const isMain =
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain) {
-  let hostHandle;
-  const shutdown = () => Promise.resolve(hostHandle?.stop?.()).then(() => process.exit(0), error => { console.error("[lexopen-host] No se confirmó la parada:", error.message); process.exit(1); });
-  process.once("SIGINT", () => void shutdown());
-  process.once("SIGTERM", () => void shutdown());
-  process.on("message", message => { if (message?.type === "lexopen:stop") void shutdown(); });
-  if (process.connected) process.once("disconnect", () => void shutdown());
-  startHost()
-    .then((handle) => {
-      hostHandle = handle;
-    })
-    .catch((e) => {
-      console.error(e);
-      process.exit(1);
-    });
-}
+if (isMain) runStandaloneHost();

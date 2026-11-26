@@ -441,6 +441,64 @@ async function waitForConsultaEntryState(
   return readConsultaFormState(page);
 }
 
+async function jqueryRequestActive(page: PlaywrightPage) {
+  return page.evaluate(() => {
+    const jquery = (window as unknown as {
+      jQuery?: ((...args: unknown[]) => unknown) & { active?: number };
+    }).jQuery;
+    return typeof jquery === "function" && Number(jquery.active) > 0;
+  }).catch(() => false);
+}
+
+/** Avoid starting a second consultaUnificada.php request over the shell's initial AJAX load. */
+async function waitForJQueryIdleOrConsultaReady(
+  page: PlaywrightPage,
+  timeout: number,
+  signal?: AbortSignal
+) {
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  if (!(await jqueryRequestActive(page))) return;
+  try {
+    await page.waitForFunction((fieldsSelector) => {
+      const jquery = (window as unknown as {
+        jQuery?: ((...args: unknown[]) => unknown) & { active?: number };
+      }).jQuery;
+      const active = typeof jquery === "function" && Number(jquery.active) > 0;
+      const ready = [...document.querySelectorAll(fieldsSelector)].some((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      return !active || ready;
+    }, CONSULTA_FIELD_SELECTOR, { timeout: Math.max(1, timeout), polling: 50 });
+  } catch {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (await jqueryRequestActive(page) && !(await readConsultaFormState(page)).ready) {
+      throw new PjudScrapeError("OJV siguió cargando Consulta Unificada y no se abrió una segunda carga. Reintente cuando el portal termine de responder.");
+    }
+  }
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+}
+
+/** Wait for an in-flight jQuery update to finish before using the loaded form. */
+async function waitForJQueryIdle(page: PlaywrightPage, timeout: number, signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  if (!(await jqueryRequestActive(page))) return;
+  try {
+    await page.waitForFunction(() => {
+      const jquery = (window as unknown as {
+        jQuery?: ((...args: unknown[]) => unknown) & { active?: number };
+      }).jQuery;
+      return typeof jquery !== "function" || Number(jquery.active) <= 0;
+    }, undefined, { timeout: Math.max(1, timeout), polling: 50 });
+  } catch {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (await jqueryRequestActive(page)) {
+      throw new PjudScrapeError("OJV mantuvo una actualización AJAX activa y no se confirmó que el formulario siguiera estable.");
+    }
+  }
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+}
+
 function assertManualConsultaState(state: ConsultaFormState) {
   if (state.loginRequired || state.captchaVisible || state.promptVisible) {
     throw new PjudScrapeError(`La entrada OJV requiere intervención manual (${state.stage}). No se aceptaron avisos, no se resolvió CAPTCHA y no se inició una búsqueda de causas.`);
@@ -453,6 +511,8 @@ export async function enterConsultaCausas(
   opts: { formTimeoutMs?: number; signal?: AbortSignal; mode?: "automatic" | "manual" } = {}
 ) {
   const timeout = opts.formTimeoutMs ?? 20_000;
+  const deadline = Date.now() + timeout;
+  const remaining = () => Math.max(1, deadline - Date.now());
   const manual = opts.mode === "manual";
   const prepare = async () => {
     if (manual) assertManualConsultaState(await readConsultaFormState(page));
@@ -463,7 +523,13 @@ export async function enterConsultaCausas(
   };
   await prepare();
 
-  if (!(await readConsultaFormState(page)).ready) {
+  let entryState = await readConsultaFormState(page);
+  if (!entryState.ready) {
+    await waitForJQueryIdleOrConsultaReady(page, remaining(), opts.signal);
+    entryState = await readConsultaFormState(page);
+  }
+
+  if (!entryState.ready) {
     const acceso = page.locator(OJV.accesoConsulta).filter({ visible: true }).first();
     if (await acceso.count()) {
       try {
@@ -475,12 +541,17 @@ export async function enterConsultaCausas(
       }
       await prepare();
     }
-    if (!(await readConsultaFormState(page)).ready) {
+    entryState = await readConsultaFormState(page);
+    if (!entryState.ready) {
+      await waitForJQueryIdleOrConsultaReady(page, remaining(), opts.signal);
+      entryState = await readConsultaFormState(page);
+    }
+    if (!entryState.ready) {
       const menu = page.getByRole("link", { name: /^Consulta Unificada$/i })
         .filter({ visible: true }).first();
       try {
-        await menu.waitFor({ state: "visible", timeout });
-        await waitForObservedClickHandler(page, menu, timeout);
+        await menu.waitFor({ state: "visible", timeout: remaining() });
+        await waitForObservedClickHandler(page, menu, remaining());
         await menu.click({ timeout: 15_000 });
       } catch {
         throw new PjudScrapeError("No se encontró o no se pudo abrir el acceso visible a Consulta Unificada en OJV. No se inició una búsqueda de causas.");
@@ -491,6 +562,12 @@ export async function enterConsultaCausas(
   if (!manual) await maybeSolveCaptchaOnPage(page, opts.signal);
   const state = await waitForConsultaEntryState(page, timeout, (current) => current.ready || (manual && (current.loginRequired || current.captchaVisible || current.promptVisible)), opts.signal);
   if (manual) assertManualConsultaState(state);
+  if (state.ready) {
+    await waitForJQueryIdle(page, remaining(), opts.signal);
+    if (!(await readConsultaFormState(page)).ready) {
+      throw new PjudScrapeError("OJV reemplazó el formulario durante una actualización AJAX; no se iniciará la búsqueda con controles inestables.");
+    }
+  }
   if (!state.ready) {
     if (state.stage === "guest-shell") {
       throw new PjudScrapeError("OJV abrió Consulta Unificada pero no mostró el formulario de búsqueda: el portal quedó en el menú sin campos de consulta. Reintente desde la OJV o pruebe más tarde. No se inició una búsqueda de causas.");

@@ -20,6 +20,7 @@ import {
   embeddedDatabasePort,
   toolUsesShell,
   startHost,
+  runStandaloneHost,
   startEmbeddedPostgres,
   classifyPostgresDiagnostic,
   createWindowsPostgresController,
@@ -448,6 +449,86 @@ try {
   for (const key of Object.keys(process.env)) if (!(key in originalEnvironment)) delete process.env[key];
   Object.assign(process.env, originalEnvironment);
 }
+
+const abortDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-startup-abort-"));
+const abortOriginalEnvironment = { ...process.env };
+try {
+  process.env.LEXOPEN_APP_VERSION = "2.0.0";
+  process.env.LEXOPEN_PACKAGED = "0";
+  const controller = new AbortController();
+  const order = [];
+  let schedulerStartedResolve, schedulerRelease;
+  const schedulerStarted = new Promise(resolve => { schedulerStartedResolve = resolve; });
+  const lifecycle = {
+    buildIdentity: { buildId: "fixture-build", sourceRevision: "a".repeat(40) },
+    signal: controller.signal,
+    assertPortAvailable: async () => undefined,
+    startEmbeddedPostgres: async (_directory, _pgPort, _databaseUrl, { onPostgresCreated }) => {
+      const database = { stop: async () => { order.push("pg.stop"); } };
+      onPostgresCreated(database);
+      return database;
+    },
+    migrate: async () => undefined,
+    maybeSeed: async () => undefined,
+    startNextServer: () => ({ fixture: true }),
+    waitForHealth: async () => ({ ok: true, needsSetup: false }),
+    stopChild: async child => { if (child) order.push("child.stop"); },
+    assertHostStopped: async () => { order.push("assertHostStopped"); },
+    startSchedulers: async ({ signal }) => {
+      signal.addEventListener("abort", () => order.push("scheduler.abort"), { once: true });
+      schedulerStartedResolve();
+      return new Promise(resolve => { schedulerRelease = resolve; });
+    },
+  };
+  const startup = startHost({ dataDir: abortDataDir, port: 3149, pgPort: 55449 }, lifecycle);
+  await schedulerStarted;
+  controller.abort();
+  assert.deepEqual(order, ["scheduler.abort"], "shutdown waits for a pending scheduler start before cleanup");
+  schedulerRelease({ stop: async () => { order.push("scheduler.stop"); } });
+  await assert.rejects(startup, error => error.code === "HOST_START_ABORTED" && !error.cleanupFailed);
+  assert.deepEqual(order, ["scheduler.abort", "scheduler.stop", "child.stop", "pg.stop", "assertHostStopped"]);
+} finally {
+  fs.rmSync(abortDataDir, { recursive: true, force: true });
+  for (const key of Object.keys(process.env)) if (!(key in abortOriginalEnvironment)) delete process.env[key];
+  Object.assign(process.env, abortOriginalEnvironment);
+}
+
+for (const trigger of [
+  processRef => processRef.emit("SIGTERM"),
+  processRef => processRef.emit("message", { type: "lexopen:stop" }),
+]) {
+  const processRef = new EventEmitter();
+  processRef.connected = true;
+  const exits = [];
+  let finishCleanup, announceStarted;
+  let cleanupComplete = false;
+  const cleanupGate = new Promise(resolve => { finishCleanup = resolve; });
+  const started = new Promise(resolve => { announceStarted = resolve; });
+  const runtime = runStandaloneHost({
+    processRef,
+    exit: code => exits.push(code),
+    log: message => { throw new Error(`unexpected standalone log: ${message}`); },
+    startHostFn: (_options, { signal }) => new Promise((_resolve, reject) => {
+      announceStarted();
+      signal.addEventListener("abort", async () => {
+        await cleanupGate;
+        cleanupComplete = true;
+        const error = new Error("startup cleanup complete");
+        error.code = "HOST_START_ABORTED";
+        reject(error);
+      }, { once: true });
+    }),
+  });
+  await started;
+  trigger(processRef);
+  await Promise.resolve();
+  assert.deepEqual(exits, [], "standalone process must wait for startup cleanup");
+  finishCleanup();
+  await runtime.shutdown();
+  assert.equal(cleanupComplete, true);
+  assert.deepEqual(exits, [0], "clean early shutdown exits only after cleanup");
+}
+
 fs.rmSync(tmp, { recursive: true }); fs.rmSync(cloneRoot, { recursive: true });
 
 const signals = [], delayed = new EventEmitter(); Object.assign(delayed, { exitCode: null, signalCode: null, killed: false, pid: 12345 });
