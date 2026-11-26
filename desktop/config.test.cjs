@@ -108,10 +108,23 @@ assert.match(
   /LEXOPEN_DEMO_SWITCHER=0/
 );
 assert.match(env1, /HOSTNAME=0\.0\.0\.0/);
+// A new Host keeps the optional local scraper default for first install.
 assert.match(env1, /PJUD_SCRAPER_URL=http:\/\/127\.0\.0\.1:8787/);
 assert.match(env1, /PJUD_SCRAPER_ALLOW_PRIVATE=1/);
 assert.match(env1, /^CRON_SECRET=[a-f0-9]{48}$/m);
 assert.match(env1, /^PJUD_SCRAPER_KEY=[a-f0-9]{48}$/m);
+
+const scraperOptOutDir = path.join(tmp, "pjud-scraper-opt-out");
+fs.mkdirSync(scraperOptOutDir);
+fs.writeFileSync(envPath(scraperOptOutDir), "SESSION_SECRET=fixture-session-secret\nPJUD_SCRAPER_URL=\n", "utf8");
+ensureHostEnv(scraperOptOutDir, { port: 3050, pgPort: 54340 });
+assert.match(fs.readFileSync(envPath(scraperOptOutDir), "utf8"), /^PJUD_SCRAPER_URL=$/m);
+
+const scraperOmittedDir = path.join(tmp, "pjud-scraper-omitted");
+fs.mkdirSync(scraperOmittedDir);
+fs.writeFileSync(envPath(scraperOmittedDir), "SESSION_SECRET=fixture-session-secret\n", "utf8");
+ensureHostEnv(scraperOmittedDir, { port: 3051, pgPort: 54341 });
+assert.doesNotMatch(fs.readFileSync(envPath(scraperOmittedDir), "utf8"), /^PJUD_SCRAPER_URL=/m);
 
 const loopbackHost = ensureHostEnv(
   fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-loop-")),

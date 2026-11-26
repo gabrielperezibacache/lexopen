@@ -482,7 +482,12 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     LEXOPEN_COOKIE_SECURE: publicUrl.startsWith("https://") ? "1" : "0",
   };
 
-  const merged = mergeEnvPreserveUser(existing, defaults);
+  // A new Host gets the optional local scraper default. On an existing .env,
+  // absence or an empty PJUD_SCRAPER_URL is an intentional sidecar opt-out.
+  const hostDefaults = existing.trim()
+    ? Object.fromEntries(Object.entries(defaults).filter(([key]) => key !== "PJUD_SCRAPER_URL"))
+    : defaults;
+  const merged = mergeEnvPreserveUser(existing, hostDefaults);
   let finalMap = merged.map;
   let finalText = merged.text;
 

@@ -88,6 +88,32 @@ async function main() {
     assert.equal(await page.evaluate(() => sessionStorage.getItem("menuClicked")), "yes");
     assert.equal(await page.locator("#jurCompetencia").isVisible(), true);
 
+    await page.setContent(`
+      <main id="contMain"><a id="consultaUnificada" href="#">Consulta Unificada</a></main>
+      <script>
+        window.jqueryMenuClicks = 0;
+        const jquery = Object.assign(function () {}, { active: 1 });
+        window.jQuery = jquery;
+        document.querySelector('#consultaUnificada').addEventListener('click', event => {
+          event.preventDefault();
+          window.jqueryMenuClicks++;
+          jquery.active++;
+          setTimeout(() => {
+            document.querySelector('#contMain').innerHTML = '<select id="competencia"><option value="0">Seleccione</option><option value="3">Civil</option></select><select id="conCorte" disabled><option value="0">Cargando</option></select>';
+            jquery.active--;
+          }, 180);
+        });
+        setTimeout(() => {
+          document.querySelector('#contMain').innerHTML = '<select id="competencia"><option value="0">Seleccione</option><option value="3">Civil</option></select><select id="conCorte"><option value="0">Todos</option><option value="90">C.A. Santiago</option></select>';
+          jquery.active--;
+        }, 80);
+      </script>
+    `);
+    await enterConsultaCausas(page, { formTimeoutMs: 2_000 });
+    await page.waitForTimeout(250);
+    assert.equal(await page.evaluate(() => (window as typeof window & { jqueryMenuClicks?: number }).jqueryMenuClicks), 0, "the shell's in-flight initial AJAX load makes a second menu click unnecessary");
+    assert.equal(await page.locator("#conCorte").isDisabled(), false, "the completed initial load is not overwritten by a duplicate disabled select");
+
     await page.setContent(`<select id="jurCompetencia"><option>Civil</option></select><button class="dropbtn" onclick="window.unexpectedGuestClick=true;accesoConsultaCausas()">Entrar</button><a href="" onclick="window.unexpectedMenuClick=true">Consulta Unificada</a>`);
     await enterConsultaCausas(page, { formTimeoutMs: 100 });
     assert.equal(await page.evaluate(() => Boolean((window as typeof window & { unexpectedGuestClick?: boolean; unexpectedMenuClick?: boolean }).unexpectedGuestClick || (window as typeof window & { unexpectedMenuClick?: boolean }).unexpectedMenuClick)), false, "an already open form must not navigate again");

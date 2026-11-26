@@ -5,13 +5,14 @@ import {
   maskRut,
   secretsKeySource,
 } from "@/lib/pjud/secret";
-import { parseClaveUnicaRut } from "@/lib/pjud/claveunica";
+import { humanizeClaveUnicaSyncError, parseClaveUnicaRut } from "@/lib/pjud/claveunica";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
   PjudScrapeError,
   CLAVEUNICA_LOGIN_URLS,
   CLAVEUNICA_RUT_SELECTORS,
   formatClaveUnicaRunInput,
+  fillClaveUnicaLoginForm,
   isClaveUnicaAccountsUrl,
   MIS_CAUSAS_MATERIAS,
   claveUnicaAutomationAllowed,
@@ -130,6 +131,109 @@ async function main() {
 
   assert.match(pjudPlaywrightInstallHint(), /pjud:chromium/);
   assert.match(pjudPlaywrightInstallHint(), /web:host/);
+
+  function makeLoginFixture(options: { showRecaptcha?: string | null; visibleCaptcha?: boolean; enableOnValidation?: boolean } = {}) {
+    let submitDisabled = true;
+    let submitClicks = 0;
+    let disabledChecks = 0;
+    let navigationWaits = 0;
+    let currentUrl = "https://accounts.claveunica.gob.cl/accounts/login";
+    const dispatchedEvents: string[] = [];
+    const field = {
+      first() { return this; },
+      isVisible: async () => true,
+      click: async () => undefined,
+      fill: async () => undefined,
+      pressSequentially: async () => undefined,
+      evaluate: async (callback: (element: HTMLElement) => void) => {
+        const target = {
+          dispatchEvent(event: Event) {
+            dispatchedEvents.push(event.type);
+            if (options.enableOnValidation && ["input", "keyup", "change", "blur"].includes(event.type)) {
+              submitDisabled = false;
+            }
+            return true;
+          },
+        } as unknown as HTMLElement;
+        callback(target);
+      },
+    };
+    const submit = {
+      or() { return this; },
+      first() { return this; },
+      isVisible: async () => true,
+      isDisabled: async () => { disabledChecks += 1; return submitDisabled; },
+      click: async () => {
+        submitClicks += 1;
+        currentUrl = "https://oficinajudicialvirtual.pjud.cl/";
+      },
+    };
+    const page = {
+      getByPlaceholder: () => field,
+      getByLabel: () => field,
+      locator: (selector: string) => selector === "#login-form"
+        ? { getAttribute: async () => options.showRecaptcha ?? null }
+        : { ...field, filter() { return this; }, count: async () => options.visibleCaptcha ? 1 : 0 },
+      getByRole: () => submit,
+      waitForURL: async () => { navigationWaits += 1; return undefined; },
+      waitForLoadState: async () => undefined,
+      url: () => currentUrl,
+    };
+    return {
+      page,
+      get submitClicks() { return submitClicks; },
+      get disabledChecks() { return disabledChecks; },
+      get navigationWaits() { return navigationWaits; },
+      dispatchedEvents,
+    };
+  }
+
+  const disabledLogin = makeLoginFixture();
+  let disabledLoginError: unknown;
+  try {
+    await fillClaveUnicaLoginForm(disabledLogin.page, "88.777.666-5", "fixture-password-do-not-leak");
+  } catch (error) {
+    disabledLoginError = error;
+  }
+  assert.ok(disabledLoginError instanceof PjudScrapeError);
+  assert.ok(disabledLogin.disabledChecks > 1, "the disabled state is checked briefly after validation events");
+  assert.deepEqual(disabledLogin.dispatchedEvents.slice(0, 4), ["input", "keyup", "change", "blur"]);
+  assert.equal(disabledLogin.submitClicks, 0, "a disabled INGRESA button is never clicked");
+  assert.equal(disabledLogin.navigationWaits, 0, "a disabled submit does not start a navigation timeout");
+  assert.match(disabledLoginError.message, /INGRESA.*deshabilitado.*CAPTCHA/i);
+  assert.match(disabledLoginError.message, /Sesión manual asistida/);
+  assert.match(disabledLoginError.message, /http:\/\/127\.0\.0\.1:3000\/causas\/mis-causas/);
+  assert.doesNotMatch(disabledLoginError.message, /88\.777\.666-5|fixture-password-do-not-leak/);
+  const humanizedLoginError = humanizeClaveUnicaSyncError(disabledLoginError, new Error("fetch failed"));
+  assert.match(humanizedLoginError, /Sesión manual asistida/);
+  assert.doesNotMatch(humanizedLoginError, /locator\.click|Timeout 15000ms|fixture-password-do-not-leak|88\.777\.666-5/);
+
+  const captchaLogin = makeLoginFixture({ showRecaptcha: "true", enableOnValidation: true });
+  await assert.rejects(
+    () => fillClaveUnicaLoginForm(captchaLogin.page, "88.777.666-5", "fixture-password-do-not-leak"),
+    (error: unknown) => {
+      assert.ok(error instanceof PjudScrapeError);
+      assert.match(error.message, /CAPTCHA visible/);
+      assert.match(error.message, /Sesión manual asistida/);
+      assert.doesNotMatch(error.message, /88\.777\.666-5|fixture-password-do-not-leak/);
+      return true;
+    }
+  );
+  assert.equal(captchaLogin.submitClicks, 0, "a server-enabled CAPTCHA aborts without clicking INGRESA");
+  assert.equal(captchaLogin.disabledChecks, 0, "CAPTCHA detection happens before submit-state recovery");
+
+  const visibleCaptchaLogin = makeLoginFixture({ visibleCaptcha: true });
+  await assert.rejects(
+    () => fillClaveUnicaLoginForm(visibleCaptchaLogin.page, "88.777.666-5", "fixture-password-do-not-leak"),
+    /CAPTCHA visible.*Sesión manual asistida/
+  );
+  assert.equal(visibleCaptchaLogin.submitClicks, 0, "a visible challenge also aborts without clicking INGRESA");
+
+  const enabledLogin = makeLoginFixture({ enableOnValidation: true });
+  await fillClaveUnicaLoginForm(enabledLogin.page, "88.777.666-5", "fixture-password-do-not-leak");
+  assert.ok(enabledLogin.dispatchedEvents.includes("keyup"));
+  assert.equal(enabledLogin.submitClicks, 1, "the button is clicked once after the portal validation events enable it");
+  assert.equal(enabledLogin.navigationWaits, 1);
 
   await assert.rejects(
     () => scrapeMisCausasWithClaveUnica({ rut: "12345678-5", password: "x" }),
