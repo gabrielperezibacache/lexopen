@@ -5,13 +5,14 @@ import {
   maskRut,
   secretsKeySource,
 } from "@/lib/pjud/secret";
-import { parseClaveUnicaRut } from "@/lib/pjud/claveunica";
+import { humanizeClaveUnicaSyncError, parseClaveUnicaRut } from "@/lib/pjud/claveunica";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
   PjudScrapeError,
   CLAVEUNICA_LOGIN_URLS,
   CLAVEUNICA_RUT_SELECTORS,
   formatClaveUnicaRunInput,
+  fillClaveUnicaLoginForm,
   isClaveUnicaAccountsUrl,
   MIS_CAUSAS_MATERIAS,
   claveUnicaAutomationAllowed,
@@ -130,6 +131,49 @@ async function main() {
 
   assert.match(pjudPlaywrightInstallHint(), /pjud:chromium/);
   assert.match(pjudPlaywrightInstallHint(), /web:host/);
+
+  let submitClicks = 0;
+  let disabledChecks = 0;
+  let navigationWaits = 0;
+  const field = {
+    first() { return this; },
+    isVisible: async () => true,
+    click: async () => undefined,
+    fill: async () => undefined,
+    pressSequentially: async () => undefined,
+  };
+  const submit = {
+    or() { return this; },
+    first() { return this; },
+    isVisible: async () => true,
+    isDisabled: async () => { disabledChecks += 1; return true; },
+    click: async () => { submitClicks += 1; },
+  };
+  const disabledLoginPage = {
+    getByPlaceholder: () => field,
+    getByLabel: () => field,
+    locator: () => field,
+    getByRole: () => submit,
+    waitForURL: async () => { navigationWaits += 1; return undefined; },
+    url: () => "https://accounts.claveunica.gob.cl/accounts/login",
+  };
+  let disabledLoginError: unknown;
+  try {
+    await fillClaveUnicaLoginForm(disabledLoginPage, "88.777.666-5", "fixture-password-do-not-leak");
+  } catch (error) {
+    disabledLoginError = error;
+  }
+  assert.ok(disabledLoginError instanceof PjudScrapeError);
+  assert.equal(disabledChecks, 1);
+  assert.equal(submitClicks, 0, "a disabled INGRESA button is never clicked");
+  assert.equal(navigationWaits, 0, "a disabled submit does not start a navigation timeout");
+  assert.match(disabledLoginError.message, /INGRESA.*deshabilitado.*CAPTCHA/i);
+  assert.match(disabledLoginError.message, /Sesión manual asistida/);
+  assert.match(disabledLoginError.message, /http:\/\/127\.0\.0\.1:3000\/causas\/mis-causas/);
+  assert.doesNotMatch(disabledLoginError.message, /88\.777\.666-5|fixture-password-do-not-leak/);
+  const humanizedLoginError = humanizeClaveUnicaSyncError(disabledLoginError, new Error("fetch failed"));
+  assert.match(humanizedLoginError, /Sesión manual asistida/);
+  assert.doesNotMatch(humanizedLoginError, /locator\.click|Timeout 15000ms|fixture-password-do-not-leak|88\.777\.666-5/);
 
   await assert.rejects(
     () => scrapeMisCausasWithClaveUnica({ rut: "12345678-5", password: "x" }),

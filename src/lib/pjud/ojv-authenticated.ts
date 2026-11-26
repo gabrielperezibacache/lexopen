@@ -65,7 +65,7 @@ function sleep(ms: number) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPage = any;
 
-async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: string) {
+export async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: string) {
   const runValue = formatClaveUnicaRunInput(rut);
   const rutCandidates = [
     page.getByPlaceholder(/RUN|RUT/i).first(),
@@ -141,6 +141,13 @@ async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: str
     )
     .first();
 
+  const manualLoginHint = "Complete el ingreso en la ventana visible con Sesión manual asistida en http://127.0.0.1:3000/causas/mis-causas.";
+  if (!(await submit.isVisible().catch(() => false))) {
+    throw new PjudScrapeError(`El botón INGRESA de ClaveÚnica no está visible en modo automático. ${manualLoginHint}`);
+  }
+  if (await submit.isDisabled().catch(() => false)) {
+    throw new PjudScrapeError(`ClaveÚnica mantuvo el botón INGRESA deshabilitado en modo automático (validación del portal o control anti-bot/CAPTCHA). ${manualLoginHint}`);
+  }
   const navAway = page
     .waitForURL(
       (url: URL) => !/accounts\.claveunica\.gob\.cl\/accounts\/login/i.test(url.href),
