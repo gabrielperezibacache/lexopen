@@ -47,6 +47,18 @@ export const CLAVEUNICA_LOGIN_URLS = [
   "https://accounts.claveunica.gob.cl/openid/login",
 ] as const;
 
+const CLAVEUNICA_VISIBLE_CAPTCHA_SELECTOR = [
+  '.g-recaptcha:not([data-size="invisible"])',
+  ".h-captcha",
+  'iframe[src*="/recaptcha/api2/bframe"]',
+  'iframe[src*="/recaptcha/enterprise/bframe"]',
+  'iframe[src*="hcaptcha.com"]',
+  'iframe[src*="/recaptcha/api2/anchor"]:not([src*="size=invisible"])',
+  'iframe[src*="/recaptcha/enterprise/anchor"]:not([src*="size=invisible"])',
+].join(", ");
+
+const CLAVEUNICA_MANUAL_LOGIN_HINT = "Complete el ingreso en la ventana visible con Sesión manual asistida en http://127.0.0.1:3000/causas/mis-causas.";
+
 /** RUN con puntos para el campo visible de ClaveÚnica (12.345.678-5). */
 export function formatClaveUnicaRunInput(rut: string): string {
   const compact = rut.trim().replace(/\./g, "").replace(/\s+/g, "");
@@ -64,6 +76,26 @@ function sleep(ms: number) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPage = any;
+
+async function claveUnicaCaptchaIsVisible(page: AnyPage) {
+  const showRecaptcha = await page
+    .locator("#login-form")
+    .getAttribute("data-show-recaptcha")
+    .catch(() => null);
+  if (String(showRecaptcha).toLowerCase() === "true") return true;
+  return (await page.locator(CLAVEUNICA_VISIBLE_CAPTCHA_SELECTOR)
+    .filter({ visible: true })
+    .count()
+    .catch(() => 0)) > 0;
+}
+
+async function dispatchClaveUnicaValidationEvents(field: AnyPage) {
+  await field.evaluate((element: HTMLElement) => {
+    for (const type of ["input", "keyup", "change", "blur"]) {
+      element.dispatchEvent(new Event(type, { bubbles: true }));
+    }
+  }).catch(() => undefined);
+}
 
 export async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: string) {
   const runValue = formatClaveUnicaRunInput(rut);
@@ -141,12 +173,24 @@ export async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, passwo
     )
     .first();
 
-  const manualLoginHint = "Complete el ingreso en la ventana visible con Sesión manual asistida en http://127.0.0.1:3000/causas/mis-causas.";
-  if (!(await submit.isVisible().catch(() => false))) {
-    throw new PjudScrapeError(`El botón INGRESA de ClaveÚnica no está visible en modo automático. ${manualLoginHint}`);
+  if (await claveUnicaCaptchaIsVisible(page)) {
+    throw new PjudScrapeError(`ClaveÚnica solicitó un control CAPTCHA visible; el modo automático no lo resolverá. ${CLAVEUNICA_MANUAL_LOGIN_HINT}`);
   }
-  if (await submit.isDisabled().catch(() => false)) {
-    throw new PjudScrapeError(`ClaveÚnica mantuvo el botón INGRESA deshabilitado en modo automático (validación del portal o control anti-bot/CAPTCHA). ${manualLoginHint}`);
+  if (!(await submit.isVisible().catch(() => false))) {
+    throw new PjudScrapeError(`El botón INGRESA de ClaveÚnica no está visible en modo automático. ${CLAVEUNICA_MANUAL_LOGIN_HINT}`);
+  }
+  let submitDisabled = await submit.isDisabled().catch(() => false);
+  if (submitDisabled) {
+    await dispatchClaveUnicaValidationEvents(rutField);
+    await dispatchClaveUnicaValidationEvents(passField);
+    const validationDeadline = Date.now() + 500;
+    while (submitDisabled && Date.now() < validationDeadline) {
+      await sleep(Math.min(50, Math.max(1, validationDeadline - Date.now())));
+      submitDisabled = await submit.isDisabled().catch(() => false);
+    }
+  }
+  if (submitDisabled) {
+    throw new PjudScrapeError(`ClaveÚnica mantuvo el botón INGRESA deshabilitado en modo automático (validación del portal o control anti-bot/CAPTCHA). ${CLAVEUNICA_MANUAL_LOGIN_HINT}`);
   }
   const navAway = page
     .waitForURL(
