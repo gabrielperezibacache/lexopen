@@ -5,6 +5,7 @@ import { exchangeGoogleCode } from "@/lib/integrations/google";
 import { requireStaff } from "@/lib/api";
 import { isAdmin } from "@/lib/auth/rbac";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
+import { resolveOAuthReturnUrl } from "@/lib/net/oauth-return-url";
 
 const OAUTH_STATE_COOKIE = "google_oauth_state";
 const OAUTH_STATE_PATH = "/api/integrations/google/callback";
@@ -36,17 +37,35 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     return clearOauthState(
-      NextResponse.redirect(new URL("/integraciones?google=error", req.url))
+      NextResponse.redirect(
+        resolveOAuthReturnUrl(
+          req.url,
+          "/integraciones?google=error",
+          process.env.GOOGLE_REDIRECT_URI
+        )
+      )
     );
   }
   if (!code) {
     return clearOauthState(
-      NextResponse.redirect(new URL("/integraciones?google=missing_code", req.url))
+      NextResponse.redirect(
+        resolveOAuthReturnUrl(
+          req.url,
+          "/integraciones?google=missing_code",
+          process.env.GOOGLE_REDIRECT_URI
+        )
+      )
     );
   }
   if (!state || !expectedState || !stateMatches(state, expectedState)) {
     return clearOauthState(
-      NextResponse.redirect(new URL("/integraciones?google=invalid_state", req.url))
+      NextResponse.redirect(
+        resolveOAuthReturnUrl(
+          req.url,
+          "/integraciones?google=invalid_state",
+          process.env.GOOGLE_REDIRECT_URI
+        )
+      )
     );
   }
 
@@ -55,18 +74,34 @@ export async function GET(req: NextRequest) {
     if (!isAdmin(user)) {
       return clearOauthState(
         NextResponse.redirect(
-          new URL("/integraciones?google=forbidden", req.url)
+          resolveOAuthReturnUrl(
+            req.url,
+            "/integraciones?google=forbidden",
+            process.env.GOOGLE_REDIRECT_URI
+          )
         )
       );
     }
     await exchangeGoogleCode(code);
     await connectStudyGmail(user.id);
     return clearOauthState(
-      NextResponse.redirect(new URL("/integraciones?google=connected", req.url))
+      NextResponse.redirect(
+        resolveOAuthReturnUrl(
+          req.url,
+          "/integraciones?google=connected",
+          process.env.GOOGLE_REDIRECT_URI
+        )
+      )
     );
   } catch {
     return clearOauthState(
-      NextResponse.redirect(new URL("/integraciones?google=error", req.url))
+      NextResponse.redirect(
+        resolveOAuthReturnUrl(
+          req.url,
+          "/integraciones?google=error",
+          process.env.GOOGLE_REDIRECT_URI
+        )
+      )
     );
   }
 }
