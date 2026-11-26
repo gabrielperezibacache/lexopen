@@ -4,11 +4,24 @@ import { caseRefreshWindow, CASE_REFRESH_LABEL } from "../src/lib/pjud/daily-sch
  * Se activan con INTERVAL_MINUTES > 0 y CRON_SECRET. Causas usa horarios fijos.
  */
 
-async function waitForHost(url, attempts = 60) {
+function throwIfAborted(signal) {
+  if (!signal?.aborted) return;
+  const error = new Error("El inicio de schedulers del Host se canceló.");
+  error.code = "HOST_START_ABORTED";
+  throw error;
+}
+
+function requestSignal(timeoutMs, signal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal;
+}
+
+async function waitForHost(url, attempts = 60, signal) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (signal?.aborted) return false;
     try {
       const response = await fetch(`${url}/api/health`, {
-        signal: AbortSignal.timeout(2_000),
+        signal: requestSignal(2_000, signal),
         redirect: "error",
       });
       const body = await response.json().catch(() => ({}));
@@ -39,7 +52,9 @@ async function startIntervalJob(opts) {
     run,
     timeoutMs = 120_000,
     runOnStart = true,
+    signal,
   } = opts;
+  throwIfAborted(signal);
   const intervalMinutes = Number(env[intervalKey] || 0);
   if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return null;
 
@@ -51,18 +66,19 @@ async function startIntervalJob(opts) {
     return null;
   }
 
-  if (!alreadyHealthy && !(await waitForHost(baseUrl))) {
+  if (!alreadyHealthy && !(await waitForHost(baseUrl, 60, signal))) {
     log.warn(`No se pudo iniciar el scheduler ${label}: health no disponible.`);
     return null;
   }
 
   let busy = false;
   const tick = async () => {
-    if (busy) return;
+    if (busy || signal?.aborted) return;
     busy = true;
     try {
-      await run({ baseUrl, secret, env, log, timeoutMs });
+      await run({ baseUrl, secret, env, log, timeoutMs, signal });
     } catch (error) {
+      if (signal?.aborted) return;
       log.warn(
         `${label} falló: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -72,13 +88,14 @@ async function startIntervalJob(opts) {
   };
 
   if (runOnStart) await tick();
+  throwIfAborted(signal);
   const timer = setInterval(() => void tick(), intervalMinutes * 60_000);
   log.info(`Scheduler ${label} activo cada ${intervalMinutes} minutos.`);
   return timer;
 }
 
 async function postCron(opts) {
-  const { url, secret, body = "{}", timeoutMs, log, failLabel } = opts;
+  const { url, secret, body = "{}", timeoutMs, log, failLabel, signal } = opts;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -86,7 +103,7 @@ async function postCron(opts) {
       "x-cron-secret": secret,
     },
     body,
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: requestSignal(timeoutMs, signal),
     redirect: "error",
   });
   const data = await response.json().catch(() => ({}));
@@ -98,37 +115,39 @@ async function postCron(opts) {
 }
 
 /** A clock check is not a provider refresh. No startup catch-up outside the scheduled minute. */
-export async function startDailyCaseRefreshJob({ env, baseUrl, alreadyHealthy, log }) {
+export async function startDailyCaseRefreshJob({ env, baseUrl, alreadyHealthy, log, signal }) {
+  throwIfAborted(signal);
   const monitored = Number(env.PJUD_SYNC_INTERVAL_MINUTES || 0) > 0;
   const portfolio = Number(env.PJUD_MIS_CAUSAS_INTERVAL_MINUTES || 0) > 0;
   if (!monitored && !portfolio) return null;
   const secret = env.CRON_SECRET;
   if (!secret) { log.warn("Actualización automática desactivada: falta CRON_SECRET."); return null; }
-  if (!alreadyHealthy && !await waitForHost(baseUrl)) return null;
+  if (!alreadyHealthy && !await waitForHost(baseUrl, 60, signal)) return null;
   let busy = false;
   let lastSlot = null;
   const tick = async () => {
     const window = caseRefreshWindow();
-    if (busy || !window?.canStart || lastSlot === window.key) return;
+    if (busy || signal?.aborted || !window?.canStart || lastSlot === window.key) return;
     busy = true;
     lastSlot = window.key;
     try {
       if (portfolio) {
         try { await postCron({ url: `${baseUrl}/api/pjud/mis-causas`, secret,
-        body: JSON.stringify({ syncMovimientos: true }), timeoutMs: 300_000, log, failLabel: "Mis Causas" }); }
-        catch (error) { log.warn(`Mis Causas: ${error instanceof Error ? error.message : String(error)}`); }
+        body: JSON.stringify({ syncMovimientos: true }), timeoutMs: 300_000, log, failLabel: "Mis Causas", signal }); }
+        catch (error) { if (!signal?.aborted) log.warn(`Mis Causas: ${error instanceof Error ? error.message : String(error)}`); }
       }
       if (monitored) {
         while (caseRefreshWindow()?.key === window.key) {
           const result = await postCron({ url: `${baseUrl}/api/causas/monitoreo`, secret,
-            body: JSON.stringify({ limit: 100 }), timeoutMs: 120_000, log, failLabel: "Sync PJUD" });
+            body: JSON.stringify({ limit: 100 }), timeoutMs: 120_000, log, failLabel: "Sync PJUD", signal });
           if (!result || (!result.enqueued && !result.synced)) break;
         }
       }
-    } catch (error) { log.warn(`Actualización automática: ${error instanceof Error ? error.message : String(error)}`); }
+    } catch (error) { if (!signal?.aborted) log.warn(`Actualización automática: ${error instanceof Error ? error.message : String(error)}`); }
     finally { busy = false; }
   };
   await tick();
+  throwIfAborted(signal);
   const timer = setInterval(() => void tick(), 15_000);
   log.info(`Actualización automática: ${CASE_REFRESH_LABEL}.`);
   return timer;
@@ -148,10 +167,26 @@ export async function startLocalHostSchedulers(opts) {
   const baseUrl = String(opts.baseUrl || "").replace(/\/$/, "");
   const log = logFactory(opts.logPrefix || "host-schedulers");
   const alreadyHealthy = Boolean(opts.alreadyHealthy);
+  const signal = opts.signal;
+  throwIfAborted(signal);
 
-  const timers = await Promise.all([
+  const timers = [];
+  let stopped = false;
+  const stop = () => {
+    stopped = true;
+    for (const timer of timers) if (timer) clearInterval(timer);
+  };
+  if (signal) signal.addEventListener("abort", stop, { once: true });
+  const tracked = promise => promise.then(timer => {
+    if (timer) {
+      if (stopped) clearInterval(timer);
+      else timers.push(timer);
+    }
+    return timer;
+  });
+  const results = await Promise.allSettled([
     startIntervalJob({
-      env, baseUrl, alreadyHealthy, log,
+      env, baseUrl, alreadyHealthy, log, signal,
       intervalKey: "LEXOPEN_JORNADA_INTERVAL_MINUTES",
       label: "trabajo pendiente",
       timeoutMs: 300_000,
@@ -160,11 +195,12 @@ export async function startLocalHostSchedulers(opts) {
         await postCron({ url: `${url}/api/jornada/worker`, secret, timeoutMs, log: l, failLabel: "No se completó el ciclo de trabajo pendiente" });
       },
     }),
-    startDailyCaseRefreshJob({ env, baseUrl, alreadyHealthy, log }),
+    startDailyCaseRefreshJob({ env, baseUrl, alreadyHealthy, log, signal }),
     startIntervalJob({
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "PJUD_DIGEST_INTERVAL_MINUTES",
       label: "digest PJUD",
       log,
@@ -189,6 +225,7 @@ export async function startLocalHostSchedulers(opts) {
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "PLAZOS_ALERTAS_INTERVAL_MINUTES",
       label: "alertas de plazos",
       log,
@@ -217,6 +254,7 @@ export async function startLocalHostSchedulers(opts) {
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "UF_SYNC_INTERVAL_MINUTES",
       label: "sync UF",
       log,
@@ -241,6 +279,7 @@ export async function startLocalHostSchedulers(opts) {
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "MAIL_SYNC_INTERVAL_MINUTES",
       label: "sync correo PJUD",
       log,
@@ -265,6 +304,7 @@ export async function startLocalHostSchedulers(opts) {
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "NOTIFY_WORKER_INTERVAL_MINUTES",
       label: "notify outbox",
       log,
@@ -289,6 +329,7 @@ export async function startLocalHostSchedulers(opts) {
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "ESCALATION_INTERVAL_MINUTES",
       label: "escalamiento plazos",
       log,
@@ -313,6 +354,7 @@ export async function startLocalHostSchedulers(opts) {
       env,
       baseUrl,
       alreadyHealthy,
+      signal,
       intervalKey: "DIGEST_INTERVAL_MINUTES",
       label: "digest notificaciones",
       log,
@@ -331,15 +373,18 @@ export async function startLocalHostSchedulers(opts) {
         }
       },
     }),
-  ]);
+  ].map(tracked));
+  const failed = results.find(result => result.status === "rejected");
+  if (failed) {
+    stop();
+    signal?.removeEventListener("abort", stop);
+    throw failed.reason;
+  }
+  throwIfAborted(signal);
 
   return {
     timers,
-    stop() {
-      for (const timer of timers) {
-        if (timer) clearInterval(timer);
-      }
-    },
+    stop,
   };
 }
 
