@@ -109,7 +109,14 @@ async function shutdown(exitCode = 0) {
       console.warn("[web-host] No se pudo detener el scheduler de backups:", error);
     });
   }
-  if (child) await stopCurrentHost();
+  if (child) {
+    try {
+      await stopCurrentHost();
+    } catch {
+      console.error("[web-host] No se confirmó la parada del Host; el respaldo y la actualización quedan bloqueados.");
+      exitCode = 1;
+    }
+  }
   process.exit(exitCode);
 }
 
