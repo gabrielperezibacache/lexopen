@@ -15,6 +15,21 @@ export function isActiveJobUniqueViolation(error: unknown): boolean {
 }
 
 const DEFAULT_BATCH = 40;
+
+/** Run an exact set of queued job IDs in bounded batches without broadening the selection. */
+export async function processPjudSyncJobIdBatches<T>(
+  jobIds: string[],
+  processBatch: (batchIds: string[]) => Promise<T>,
+): Promise<T[]> {
+  if (!jobIds.length) return [];
+  const uniqueIds = [...new Set(jobIds)];
+  const results: T[] = [];
+  for (let offset = 0; offset < uniqueIds.length; offset += DEFAULT_BATCH) {
+    results.push(await processBatch(uniqueIds.slice(offset, offset + DEFAULT_BATCH)));
+  }
+  return results;
+}
+
 /** Durable reservation: these jobs are usable only by their in-memory session provider. */
 export const PJUD_MANUAL_SESSION_TRIGGER = "manual-session" as const;
 export const PJUD_MANUAL_SESSION_JOB_TTL_MS = 30 * 60_000;

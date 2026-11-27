@@ -36,6 +36,7 @@ async function main() {
   let caseManagementMode = "pjud_cl", pauseAt: "health" | "mis-causas" | null = null;
   const whereCalls: unknown[] = [];
   const queueBatches: string[][] = [];
+  const drainedJobSelections: string[][] = [];
   const fixture = () => ({
     id: "fixture-settings",
     claveUnicaEnabled: true,
@@ -94,7 +95,10 @@ async function main() {
     return [{ count: failed.length }];
   });
   overrideMethod(prisma.pjudSyncJob, "updateMany", async () => ({ count: 0 }));
-  overrideMethod(prisma.pjudSyncJob, "findMany", async () => []);
+  overrideMethod(prisma.pjudSyncJob, "findMany", async ({ where }: { where: { status?: string; id?: { in?: string[] } } }) => {
+    if (where.status === "pending" && Array.isArray(where.id?.in)) drainedJobSelections.push(where.id.in);
+    return [];
+  });
   overrideMethod(prisma.pjudSyncJob, "create", async ({ data }: { data: { causaId: string; trigger: string; status: string } }) => {
     if (++jobCreateCount === failJobCreateAt) throw new Error("fixture-second-job-create-failure");
     const job = { id: `fixture-job-${data.causaId}`, ...data };
@@ -114,7 +118,7 @@ async function main() {
   });
   const reset = () => {
     settings = fixture(); created = 0; failCreateAt = 0; replaceClaim = false;
-    failQueue = false; claimBeforeClear = false; fetches = 0; credentialReads = 0; whereCalls.length = 0; queueBatches.length = 0;
+    failQueue = false; claimBeforeClear = false; fetches = 0; credentialReads = 0; whereCalls.length = 0; queueBatches.length = 0; drainedJobSelections.length = 0;
     jobCreateCount = 0; failJobCreateAt = 0; createdJobs.length = 0;
     causes = [item("C-1-2026")];
     caseManagementMode = "pjud_cl"; pauseAt = null;
@@ -203,6 +207,15 @@ async function main() {
     const large = await syncMisCausas();
     assert.equal(large.enqueued, 101, "terminated cases beyond the first 100 must enter durable queue too");
     assert.deepEqual(queueBatches.map((batch) => batch.length), [100, 1]);
+
+    reset();
+    causes = Array.from({ length: 87 }, (_, i) => item(`C-${i + 1}-2026`));
+    const waited = await syncMisCausas({ processJobsInline: true });
+    assert.equal(waited.enqueued, 87);
+    assert.deepEqual(drainedJobSelections.map((batch) => batch.length), [40, 40, 7]);
+    assert.deepEqual(drainedJobSelections.flat(), createdJobs.map((job) => job.id));
+    assert.equal(drainedJobSelections.flat().includes("unrelated-pending-job"), false,
+      "inline wait drains only IDs enqueued by this synchronization");
 
     reset();
     settings.claveUnicaLastSyncStatus = "failed";

@@ -17,7 +17,7 @@ import {
   probeScraperSidecarHealth,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
-import { enqueueDueSyncJobs, failPendingSessionSyncJobs, processPendingSyncJobs, PJUD_MANUAL_SESSION_TRIGGER } from "@/lib/pjud/queue";
+import { enqueueDueSyncJobs, failPendingSessionSyncJobs, processPendingSyncJobs, processPjudSyncJobIdBatches, PJUD_MANUAL_SESSION_TRIGGER } from "@/lib/pjud/queue";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import { misCausasClaimableWhere } from "@/lib/pjud/mis-causas-sync-state";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
@@ -631,26 +631,24 @@ export async function syncMisCausas(opts?: {
       }
       enqueued = jobs.length;
       if (opts?.processJobsInline) {
-        const processed: Awaited<ReturnType<typeof processPendingSyncJobs>> = [];
-        // Every session-backed job must finish while its browser context exists.
-        const batches = opts?.sessionSource
-          ? Array.from({ length: Math.ceil(jobs.length / 40) }, (_, index) => jobs.slice(index * 40, (index + 1) * 40))
-          : [jobs];
-        for (const batch of batches) {
+        // Process only the jobs enqueued by this sync, in bounded batches. Session-backed jobs
+        // must finish while their browser context exists; ordinary wait=true runs use the same limit.
+        const processedBatches = await processPjudSyncJobIdBatches(jobs.map((job) => job.id), async (jobIds) => {
           await assertPjudManagementEnabled();
           assertSchedule();
           await opts?.sessionSource?.assertActive?.();
-          processed.push(...await processPendingSyncJobs({
+          return processPendingSyncJobs({
             automatic: opts?.automatic,
             actorId: opts?.actorId,
-            limit: Math.min(batch.length || 20, 40),
-            jobIds: batch.map((job) => job.id),
+            limit: jobIds.length,
+            jobIds,
             fetchMovimientos: opts?.sessionSource?.fetchMovimientos,
             assertActive: opts?.sessionSource?.assertActive,
             downloadDocuments: opts?.sessionSource?.downloadDocuments,
             ...(opts?.sessionSource ? { concurrency: 1 } : {}),
-          }));
-        }
+          });
+        });
+        const processed = processedBatches.flat();
         syncResults = processed.map((r) => ({
           causaId: r.causaId,
           status: r.status,

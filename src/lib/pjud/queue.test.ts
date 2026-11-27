@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { Prisma } from "@prisma/client";
-import { dueSyncWhere, pjudSyncConcurrency, processPendingSyncJobs, requeueFailedJobs, enqueueDueSyncJobs, reclaimStuckRunningJobs } from "@/lib/pjud/queue";
+import { dueSyncWhere, pjudSyncConcurrency, processPendingSyncJobs, processPjudSyncJobIdBatches, requeueFailedJobs, enqueueDueSyncJobs, reclaimStuckRunningJobs } from "@/lib/pjud/queue";
 import { claimOrCreatePjudSyncJob, clearFallidosMonitoreoAvisos, syncCausaPjud } from "@/lib/pjud/sync";
 import {
   isBackupableDocumentoRef,
@@ -33,6 +33,21 @@ async function emptySelectionDoesNotTouchDatabase() {
   await assert.rejects(processPendingSyncJobs({ fetchMovimientos: async () => { throw new Error("must not run"); } }), /trabajos explícitos/);
   await assert.rejects(processPendingSyncJobs({ jobIds: ["fixture"], fetchMovimientos: JSON.parse('"not-a-function"') }), /función interna/);
   await assert.rejects(syncCausaPjud("fixture", { fetchMovimientos: JSON.parse('"not-a-function"') }), /función interna/);
+}
+async function selectedJobIdsAreDrainedInBoundedBatches() {
+  const selectedIds = Array.from({ length: 87 }, (_, index) => `selected-${index + 1}`);
+  const touchedIds: string[] = [];
+  const batchSizes: number[] = [];
+  const result = await processPjudSyncJobIdBatches(selectedIds, async (batchIds) => {
+    batchSizes.push(batchIds.length);
+    touchedIds.push(...batchIds);
+    return batchIds;
+  });
+  assert.deepEqual(batchSizes, [40, 40, 7]);
+  assert.deepEqual(result.flat(), selectedIds);
+  assert.deepEqual(touchedIds, selectedIds, "the drain callback receives only the exact selected IDs");
+  assert.equal(touchedIds.includes("unrelated-pending-job"), false);
+  assert.equal((await processPjudSyncJobIdBatches([], async () => { throw new Error("empty selection must not drain"); })).length, 0);
 }
 async function ordinarySyncClaimsPendingJob() {
   let updateArgs: unknown;
@@ -128,6 +143,7 @@ else process.env.PJUD_SYNC_CONCURRENCY = prevConc;
 
 async function runQueueTests() {
   await emptySelectionDoesNotTouchDatabase();
+  await selectedJobIdsAreDrainedInBoundedBatches();
   await ordinarySyncClaimsPendingJob();
   await activeJobP2002BecomesHttp409();
   console.log("pjud/queue.test.ts OK");

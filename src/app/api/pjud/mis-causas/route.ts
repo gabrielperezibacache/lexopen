@@ -13,7 +13,7 @@ import {
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { parseMisCausasRequest } from "@/lib/pjud/mis-causas-request";
 import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
-import { processPendingSyncJobs } from "@/lib/pjud/queue";
+import { processPendingSyncJobs, processPjudSyncJobIdBatches } from "@/lib/pjud/queue";
 import { privatePjudJson as json, privatePjudResponse } from "@/lib/pjud/private-response";
 import { after, NextRequest } from "next/server";
 
@@ -127,7 +127,10 @@ export async function POST(req: NextRequest) {
           }
           if (syncMovimientos && result.enqueuedJobIds.length && await getCaseManagementMode() === "pjud_cl") {
             try {
-              await processPendingSyncJobs({ actorId: actor, jobIds: result.enqueuedJobIds });
+              await processPjudSyncJobIdBatches(result.enqueuedJobIds, async (jobIds) => {
+                if (await getCaseManagementMode() !== "pjud_cl") return [];
+                return processPendingSyncJobs({ actorId: actor, jobIds, limit: jobIds.length });
+              });
             } catch {
               if (await getCaseManagementMode() === "pjud_cl") {
                 console.error("[pjud/mis-causas] background movement processing failed.");
@@ -158,7 +161,9 @@ export async function POST(req: NextRequest) {
       automatic: Boolean(cron),
       actorId,
       syncMovimientos,
-      processJobsInline: false,
+      // Scheduled refresh keeps its enqueue-only contract. An explicit wait=true request
+      // drains just the IDs created by this run before returning.
+      processJobsInline: !cron && body?.wait === true,
     });
 
     if (actorId) {
