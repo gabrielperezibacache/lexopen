@@ -58,6 +58,52 @@ function externalKey(rit: string | null, tribunal: string) {
 
 const nextSyncAtFrom = nextCaseRefreshAt;
 
+/** Atomically reuse one ordinary pending reservation before creating a new one. */
+export async function claimOrCreatePjudSyncJob(
+  client: Pick<Prisma.TransactionClient, "pjudSyncJob">,
+  input: { causaId: string; trigger: "manual" | "manual-session" | "cron" | "retry" | "webhook" | "import" }
+) {
+  if (input.trigger !== "manual-session") {
+    const startedAt = new Date();
+    const claimed = await client.pjudSyncJob.updateMany({
+      where: { causaId: input.causaId, status: "pending", trigger: { not: "manual-session" } },
+      data: {
+        status: "running",
+        attempts: { increment: 1 },
+        startedAt,
+        finishedAt: null,
+        trigger: input.trigger,
+        lastError: null,
+        note: null,
+      },
+    });
+    if (claimed.count) {
+      return client.pjudSyncJob.findFirst({
+        where: { causaId: input.causaId, status: "running", trigger: input.trigger, startedAt },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+  }
+
+  try {
+    return await client.pjudSyncJob.create({
+      data: {
+        causaId: input.causaId,
+        status: "running",
+        trigger: input.trigger,
+        attempts: 1,
+        startedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    const { isActiveJobUniqueViolation } = await import("@/lib/pjud/queue");
+    if (isActiveJobUniqueViolation(error)) {
+      throw httpError("Ya hay una actualización en curso o reservada para esta causa. Espere a que termine antes de reintentar.", 409);
+    }
+    throw error;
+  }
+}
+
 /** Promote a compatible historical fingerprint in place, preserving its documents. */
 export async function persistFetchedPjudMovimientos(
   tx: Pick<Prisma.TransactionClient, "$queryRaw" | "causaMovimiento">,
@@ -83,7 +129,12 @@ export async function persistFetchedPjudMovimientos(
     const current = byExternalId.get(movement.externalId);
     if (current) {
       // Signed download links expire; refresh unresolved sources without replacing saved originals.
-      if (movement.documentoRef && current.documentoRef !== movement.documentoRef && !current.documentoRef?.startsWith("doc:") && !current.documentoRef?.startsWith("lexopen:")) await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: movement.documentoRef } });
+      if (current.documentoRef?.includes("#") && !current.documentoRef.startsWith("doc:") && !current.documentoRef.startsWith("lexopen:")) {
+        const nextRef = movement.documentoRef && !movement.documentoRef.includes("#") ? movement.documentoRef : null;
+        if (nextRef !== current.documentoRef) await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: nextRef } });
+      } else if (movement.documentoRef && current.documentoRef !== movement.documentoRef && !current.documentoRef?.startsWith("doc:") && !current.documentoRef?.startsWith("lexopen:")) {
+        await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: movement.documentoRef } });
+      }
       continue;
     }
     seen.add(movement.externalId);
@@ -141,6 +192,7 @@ export async function syncCausaPjud(
     /** Internal session guards; HTTP handlers must never accept these options. */
     assertActive?: () => Promise<void>;
     downloadDocuments?: boolean;
+    excludeDocumentExternalIds?: readonly string[];
   }
 ): Promise<SyncCausaResult> {
   if (opts?.fetchMovimientos !== undefined && typeof opts.fetchMovimientos !== "function") {
@@ -201,15 +253,7 @@ export async function syncCausaPjud(
     ? await prisma.pjudSyncJob.findUnique({
         where: { id: opts.existingJob.id, attempts: opts.existingJob.attempts, causaId, status: "running", trigger },
       })
-    : await prisma.pjudSyncJob.create({
-        data: {
-          causaId,
-          status: "running",
-          trigger,
-          attempts: 1,
-          startedAt: new Date(),
-        },
-      });
+    : await claimOrCreatePjudSyncJob(prisma, { causaId, trigger });
 
   const reservationEnded = "La reserva de esta consulta ya terminó. Inicie una nueva consulta para reintentar.";
   if (!job) throw httpError(reservationEnded, 409);
@@ -241,7 +285,15 @@ export async function syncCausaPjud(
     await assertPjudManagementEnabled();
     assertSchedule();
     await opts?.assertActive?.();
+    const documentDownloadsAllowed = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled &&
+      causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId) && process.env.PJUD_DOC_DOWNLOADS !== "0";
+    const backedDocuments = documentDownloadsAllowed
+      ? await prisma.causaMovimiento.findMany({ where: { causaId, documentoRef: { startsWith: "doc:" } }, select: { externalId: true } })
+      : [];
+    const excludeDocumentExternalIds = opts?.excludeDocumentExternalIds ?? backedDocuments.flatMap((movement) => movement.externalId ? [movement.externalId] : []);
     const fetchMovimientos: PjudMovimientosFetcher = opts?.fetchMovimientos ?? ((ref) => fetchPjudMovimientos(ref, {
+      downloadDocuments: documentDownloadsAllowed,
+      excludeDocumentExternalIds,
       assertActive: async () => {
         await assertPjudManagementEnabled();
         assertSchedule();
@@ -371,7 +423,7 @@ export async function syncCausaPjud(
   });
 
   let pdfBackedUp = 0;
-  const downloadDocuments = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled && causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId);
+  const downloadDocuments = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled && causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId) && process.env.PJUD_DOC_DOWNLOADS !== "0";
   if (downloadDocuments) await enqueuePjudDocumentJobs(causaId, { actorId: opts?.actorId, waitingLogin: Boolean(opts?.fetchMovimientos) });
   // Prefer bytes captured with OJV session cookies during scrape.
   for (const m of fetchResult.movimientos) {
@@ -390,6 +442,8 @@ export async function syncCausaPjud(
         movimientoId: mov.id,
         bytes: m.documentoBytes,
         filename: m.documentoFilename,
+        documentRef: mov.documentoRef,
+        mimeHint: m.documentoMimeType,
         esReceptor: m.esReceptor,
         actorId: opts?.fetchMovimientos ? opts.actorId || undefined : undefined,
         expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),

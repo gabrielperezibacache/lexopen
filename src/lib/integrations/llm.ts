@@ -626,6 +626,25 @@ export async function askLlm(params: {
     };
   }
 
+  if (
+    !localProfile &&
+    !config.apiKey &&
+    !isLoopbackHostname(apiUrl.hostname) &&
+    config.preset !== "custom"
+  ) {
+    if (config.allowDemo) return demoLlmResponse(config, params);
+    return {
+      source: "error" as const,
+      content: "",
+      requireApproval: true,
+      provider: config.preset,
+      model: config.model,
+      note: "Falta configurar la API key del proveedor de IA en Configuración → IA.",
+      error: "El proveedor de IA no tiene API key configurada.",
+      code: "llm_unconfigured" as const,
+    };
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -700,29 +719,34 @@ export async function askLlm(params: {
         code: classified.code,
       };
     }
-    const lastUser = [...params.messages]
-      .reverse()
-      .find((m) => m.role === "user");
-    const demo = buildDemoReply(lastUser?.content || "", params.utilityLabel);
-    if (params.causaId) {
-      await prisma.activity.create({
-        data: {
-          tipo: "ia",
-          mensaje: `IA (demo): ${demo.slice(0, 180)}…`,
-          causaId: params.causaId,
-          userId: params.userId,
-        },
-      });
-    }
-    return {
-      source: "demo" as const,
-      content: demo,
-      requireApproval: true,
-      provider: config.preset,
-      model: config.model,
-      note: "⚠ Modo demo: proveedor no alcanzable. Esta respuesta NO es del modelo real.",
-    };
+    return demoLlmResponse(config, params);
   }
+}
+
+async function demoLlmResponse(
+  config: LlmConfig,
+  params: { messages: LlmMessage[]; causaId?: string; userId?: string; utilityLabel?: string },
+) {
+  const lastUser = [...params.messages].reverse().find((m) => m.role === "user");
+  const demo = buildDemoReply(lastUser?.content || "", params.utilityLabel);
+  if (params.causaId) {
+    await prisma.activity.create({
+      data: {
+        tipo: "ia",
+        mensaje: `IA (demo): ${demo.slice(0, 180)}…`,
+        causaId: params.causaId,
+        userId: params.userId,
+      },
+    });
+  }
+  return {
+    source: "demo" as const,
+    content: demo,
+    requireApproval: true,
+    provider: config.preset,
+    model: config.model,
+    note: "⚠ Modo demo: proveedor no alcanzable. Esta respuesta NO es del modelo real.",
+  };
 }
 
 export async function testLlmConnection() {

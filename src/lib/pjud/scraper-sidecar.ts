@@ -40,7 +40,7 @@ const movementSchema = z.object({
   tramite: z.string().max(200).optional().nullable(),
   esReceptor: z.boolean().optional(),
   receptor: z.boolean().optional(),
-  documentoRef: z.string().max(500).optional().nullable(),
+  documentoRef: z.string().max(4000).optional().nullable(),
 });
 
 export function scraperSidecarConfigured() {

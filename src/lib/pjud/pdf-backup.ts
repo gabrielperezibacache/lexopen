@@ -47,14 +47,62 @@ export function looksLikePdf(buf: Buffer) {
   return buf.subarray(0, 5).toString("utf8") === "%PDF-";
 }
 
-/** Reject login/error pages and files advertised as PDF without a PDF signature. */
+export type PjudDownloadedFileMeta = { filename: string; mimeType: string };
+
+/** Infer a usable Office/PDF extension from the response signature and official source. */
+export function inferPjudDownloadedFileMeta(
+  bytes: Buffer,
+  contentType: string | null | undefined,
+  ref: string | null | undefined,
+  fallbackBase: string,
+): PjudDownloadedFileMeta | null {
+  const mime = (contentType || "").split(";")[0]!.trim().toLowerCase();
+  const path = (() => {
+    try { return new URL(ref || "").pathname; } catch { return ref || ""; }
+  })();
+  let originalName = path.split(/[\\/]/).filter(Boolean).pop() || "";
+  try { originalName = decodeURIComponent(originalName); } catch { /* Keep the encoded name if malformed. */ }
+  const originalExtension = /\.([a-z0-9]+)$/i.exec(originalName)?.[1]?.toLowerCase() || "";
+  let extension = "";
+  let mimeType = "";
+  if (looksLikePdf(bytes)) {
+    extension = "pdf";
+    mimeType = "application/pdf";
+  } else if (bytes.length >= 5 && bytes.subarray(0, 5).toString("ascii").toLowerCase() === "{\\rtf") {
+    extension = "rtf";
+    mimeType = "application/rtf";
+  } else if (bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("504b0304", "hex")) &&
+    (/officedocument\.wordprocessingml\.document/i.test(mime) || originalExtension === "docx")) {
+    extension = "docx";
+    mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  } else if (bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("d0cf11e0", "hex")) &&
+    (/msword|octet-stream/i.test(mime) || originalExtension === "doc")) {
+    extension = "doc";
+    mimeType = "application/msword";
+  }
+  if (!extension) return null;
+  const coherentExtensions = new Set(["pdf", "docx", "doc", "rtf"]);
+  if (coherentExtensions.has(originalExtension) && originalExtension === extension) {
+    return { filename: originalName.replace(/[^\w.\-()+ ]+/g, "_").slice(0, 180), mimeType };
+  }
+  const base = fallbackBase.replace(/\.[a-z0-9]+$/i, "").replace(/[^\w.\-()+ ]+/g, "_").slice(0, 160) || "pjud-documento";
+  return { filename: base + "." + extension, mimeType };
+}
+
+/** Reject login/error pages and verify the binary signature for each supported file type. */
 export function validPjudDownloadedContent(bytes: Buffer, contentType: string, ref: string, maximum: number) {
   if (bytes.length < 100 || bytes.length > maximum || /^\s*</.test(bytes.subarray(0, 40).toString("utf8"))) return false;
   const pdf = looksLikePdf(bytes);
-  let pdfPath = false;
-  try { pdfPath = new URL(ref).pathname.toLowerCase().endsWith(".pdf"); } catch { return false; }
-  if ((pdfPath || /pdf/i.test(contentType)) && !pdf) return false;
-  return pdf || /msword|officedocument|octet-stream/i.test(contentType);
+  const mime = contentType.toLowerCase();
+  let path = "";
+  try { path = new URL(ref).pathname.toLowerCase(); } catch { return false; }
+  if (path.endsWith(".pdf") || /application\/pdf/i.test(mime)) return pdf;
+  if (pdf) return true;
+  const ole = bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("d0cf11e0", "hex"));
+  const docxZip = bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("504b0304", "hex")) && /officedocument\.wordprocessingml\.document|application\/msword/i.test(mime);
+  const rtf = bytes.subarray(0, 5).toString("ascii").toLowerCase() === "{\\rtf";
+  const legacyDocPath = /\.doc$/i.test(path);
+  return docxZip || rtf || (ole && (/msword|octet-stream/i.test(mime) || legacyDocPath));
 }
 
 /** PJUD document hosts only — not arbitrary public HTTPS (SSRF / data exfil). */
@@ -67,6 +115,7 @@ function isAllowedPjudDocumentoHost(hostname: string) {
 export function isBackupableDocumentoRef(ref: string | null | undefined) {
   if (!ref?.trim()) return false;
   const value = ref.trim();
+  if (value.length > 4000 || value.includes("#")) return false;
   if (value.startsWith("doc:") || value.startsWith("lexopen:")) return false;
   if (!/^https?:\/\//i.test(value)) return false;
   // OJV / pjud.cl hosts only — block SSRF to private/metadata and unrelated HTTPS.
@@ -78,7 +127,8 @@ export function isBackupableDocumentoRef(ref: string | null | undefined) {
     return false;
   }
   try {
-    return isAllowedPjudDocumentoHost(new URL(value).hostname);
+    const parsed = new URL(value);
+    return !parsed.hash && isAllowedPjudDocumentoHost(parsed.hostname);
   } catch {
     return false;
   }
@@ -101,6 +151,7 @@ export async function ingestPjudDocumentBuffer(opts: {
   movimientoId: string;
   bytes: Buffer;
   filename?: string | null;
+  documentRef?: string | null;
   esReceptor?: boolean;
   mimeHint?: string | null;
   actorId?: string;
@@ -124,21 +175,22 @@ export async function ingestPjudDocumentBuffer(opts: {
   ) {
     return null;
   }
-  const mime = looksLikePdf(buf)
-    ? "application/pdf"
-    : opts.mimeHint && !/text\/html/i.test(opts.mimeHint)
-      ? opts.mimeHint
-      : "application/octet-stream";
+  const meta = inferPjudDownloadedFileMeta(
+    buf,
+    opts.mimeHint,
+    opts.filename && /\.(?:pdf|docx|doc|rtf)$/i.test(opts.filename) ? opts.filename : opts.documentRef || opts.filename,
+    "pjud-" + opts.movimientoId,
+  );
+  if (!meta) return null;
+  const mime = meta.mimeType;
   if (
     !looksLikePdf(buf) &&
-    !/pdf|octet-stream|msword|officedocument/i.test(mime)
+    !/msword|officedocument|rtf/i.test(mime)
   ) {
     return null;
   }
 
-  const filename = (opts.filename || `pjud-${opts.movimientoId}.pdf`)
-    .replace(/[^\w.\-()+ ]+/g, "_")
-    .slice(0, 180);
+  const filename = meta.filename;
   const sourceSha256 = createHash("sha256").update(buf).digest("hex");
   const key = `pjud/intake-attempt/${randomUUID()}`;
   let staged: ReturnType<typeof putObject> | undefined;
@@ -289,6 +341,7 @@ export async function backupMovimientoDocuments(
         filename:
           parsed.pathname.split("/").filter(Boolean).pop() ||
           `pjud-${mov.folio || mov.id}.pdf`,
+        documentRef: ref,
         esReceptor: mov.esReceptor,
         mimeHint: contentType,
         actorId: opts?.actorId,

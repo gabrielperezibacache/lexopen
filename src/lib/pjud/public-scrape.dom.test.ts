@@ -1,7 +1,7 @@
 /** Offline browser fixtures only. No OJV navigation, credentials, or CAPTCHA. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
+import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, pjudDocumentDownloadsAllowed, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeAllCuadernos, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -232,6 +232,23 @@ async function main() {
     await page.setContent(`<table><tr><td>C-1-2024</td></tr></table><nav class="pagination"><button>Siguiente</button></nav>`);
     await assert.rejects(() => collectOjvResultPages(page, async () => {}), /repitió una página/);
 
+    await page.setContent(`
+      <div id="dtScope"><table><tbody id="dtRows"></tbody></table><div class="dataTables_paginate"><a href="#" class="paginate_button next" aria-label="Next">Next</a></div></div>
+      <script>
+        window.dtPage=0;
+        function renderDataTablePage(){
+          document.querySelector('#dtRows').innerHTML='<tr><td>RIT ficticio '+(window.dtPage+1)+'</td></tr>';
+          const next=document.querySelector('.dataTables_paginate a.next');
+          next.classList.toggle('disabled',window.dtPage===1);
+          next.onclick=event=>{event.preventDefault();if(window.dtPage===0){window.dtPage=1;renderDataTablePage()}};
+        }
+        renderDataTablePage();
+      </script>
+    `);
+    const dataTablePages: string[] = [];
+    await collectOjvResultPages(page, async () => { dataTablePages.push(await page.locator("#dtRows").innerText()); }, page.locator("#dtScope"));
+    assert.deepEqual(dataTablePages, ["RIT ficticio 1", "RIT ficticio 2"], "DataTables next controls are followed only while enabled");
+
     await page.setContent(`<button id="btnBuscar" onclick="setTimeout(()=>document.querySelector('#resultConsultaJuridica').textContent='C-2-2024',150)">Buscar</button><div id="resultConsultaJuridica">C-1-2024</div>`);
     await clickBuscar(page, 2_000);
     assert.equal(await page.locator("#resultConsultaJuridica").innerText(), "C-2-2024", "submission must await the new response before parsing");
@@ -276,6 +293,151 @@ async function main() {
     assert.ok(scopedMovements.every(movement => !movement.titulo.includes("otra corte")), "auxiliary referrals outside the active tab are not movements");
     assert.ok(scopedMovements.every(movement => !movement.titulo.includes("otro modal")), "a coexisting document modal is not the selected case detail");
     assert.equal(await page.evaluate(() => Boolean((window as typeof window & { badAnexoClicked?: boolean }).badAnexoClicked)), false, "an earlier document Anexo link must not be mistaken for Historia");
+
+    await page.setContent(`
+      <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+      <div id="modalDetalleSupremaFixture" class="modal show" style="display:block">
+        <nav class="nav-tabs">
+          <a href="#movimientosFixture" data-toggle="tab">Movimientos</a>
+          <a href="#pendientesFixture" data-toggle="tab">Escritos Pendientes</a>
+          <a href="#diligenciasFixture" data-toggle="tab">Diligencias</a>
+        </nav>
+        <div id="movimientosFixture" class="tab-pane active"><table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th></tr></thead><tbody><tr><td>1</td><td>05/01/2026</td><td>Movimiento ficticio de Suprema</td></tr></tbody></table></div>
+        <div id="pendientesFixture" class="tab-pane"><table><thead><tr><th>Folio</th><th>Fecha Ingreso</th><th>Tipo Escrito</th></tr></thead><tbody><tr><td>2</td><td>06/01/2026</td><td>Escrito pendiente ficticio</td></tr></tbody></table></div>
+        <div id="diligenciasFixture" class="tab-pane"><table><thead><tr><th>Folio</th><th>Fecha</th><th>Trámite</th></tr></thead><tbody><tr><td>3</td><td>07/01/2026</td><td>Diligencia ficticia</td></tr></tbody></table></div>
+      </div>
+      <script>document.querySelectorAll('.nav-tabs a').forEach(link=>link.onclick=event=>{event.preventDefault();document.querySelectorAll('.tab-pane').forEach(pane=>pane.classList.toggle('active',pane.id===link.hash.slice(1)))})</script>
+    `);
+    const multiTabMovements = await scrapeModalTabs(page);
+    assert.ok(multiTabMovements.some(movement => movement.titulo.includes("Movimiento ficticio de Suprema")), "Movimientos is the primary history tab when Historia is absent");
+    assert.ok(multiTabMovements.some(movement => movement.titulo.includes("Escrito pendiente ficticio")), "Escritos Pendientes contributes its rows");
+    assert.ok(multiTabMovements.some(movement => movement.titulo.includes("Diligencia ficticia")), "Diligencias contributes its rows");
+
+    const priorDocPolicy = process.env.PJUD_DOC_DOWNLOADS;
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    assert.equal(pjudDocumentDownloadsAllowed(), true, "the fixture opts into only its synthetic document capture");
+    let annexPostRequests = 0;
+    const wordBytes = Buffer.concat([Buffer.from("d0cf11e0", "hex"), Buffer.alloc(140)]);
+    await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      if (route.request().method() === "POST") {
+        annexPostRequests++;
+        assert.match(route.request().postData() || "", /^jwt=fictional-annex-token$/);
+        await route.fulfill({ status: 200, contentType: "application/msword", body: wordBytes });
+      } else {
+        await route.fulfill({ contentType: "text/html", body: `
+          <meta charset="utf-8">
+          <table><tbody><tr><td>Resolucion con anexo</td><td><a href="#" onclick="event.preventDefault();escritoSuprema(1)">Anexo</a></td></tr></tbody></table>
+          <script>function escritoSuprema(){window.annexOpened=(window.annexOpened||0)+1;document.body.insertAdjacentHTML('beforeend','<div class="modal show" id="modalAnexoFixture" style="display:block"><form action="/ADIR_871/1/documentos/docCausaSuprema.php" method="post"><input type="hidden" name="jwt" value="fictional-annex-token"></form><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button></div>')}</script>
+        ` });
+      }
+    });
+    try {
+      await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+      assert.equal(await page.locator('a[onclick*="escritoSuprema"]').count(), 1, "the intercepted annex trigger is present in the fixture row");
+      assert.equal(await page.locator("tr").filter({ hasText: "Resolucion con anexo" }).count(), 1, "the annex trigger belongs to one exact movement row");
+      assert.equal(await page.locator("tr").filter({ hasText: "Resolucion con anexo" }).locator('a[onclick*="escritoSuprema"]').count(), 1);
+      const annexResult = await attachDocumentoBytesFromPage(page, [{
+        externalId: "fixture-annex", titulo: "Resolucion con anexo", fecha: new Date("2026-01-01T12:00:00Z"),
+        fuente: "pjud", documentoRef: null, documentoAnexoAction: "escritoSuprema",
+      }], { limit: 1, delayMs: 0, allowPrompts: false });
+      assert.equal(annexPostRequests, 1, `the exact annex form is submitted once through the intercepted official-origin route; click=${await page.evaluate(() => (window as typeof window & { annexOpened?: number }).annexOpened || 0)} result=${JSON.stringify(annexResult.map(row => ({ documentoBytes: Boolean(row.documentoBytes), documentoAnexoAction: row.documentoAnexoAction, documentoPost: Boolean(row.documentoPost) })))}`);
+      assert.equal(annexResult[0].documentoBytes?.subarray(0, 4).toString("hex"), "d0cf11e0", "a valid Word attachment is captured while the OJV page is open");
+      assert.equal(await page.locator("#modalAnexoFixture").count(), 0, "only the opened annex modal is closed after capture");
+      assert.equal(annexResult[0].documentoPost, undefined, "temporary signed POST fields never leave the page capture");
+    } finally {
+      await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
+      if (priorDocPolicy === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
+      else process.env.PJUD_DOC_DOWNLOADS = priorDocPolicy;
+    }
+
+    const previousDocDownload = process.env.PJUD_DOC_DOWNLOADS;
+    const previousDocDelay = process.env.PJUD_DOC_DOWNLOAD_DELAY_MS;
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    process.env.PJUD_DOC_DOWNLOAD_DELAY_MS = "0";
+    const delayedWordBytes = Buffer.concat([Buffer.from("d0cf11e0", "hex"), Buffer.alloc(140)]);
+    let delayedAnnexPosts = 0;
+    await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      if (route.request().method() === "POST") {
+        delayedAnnexPosts++;
+        await route.fulfill({ status: 200, contentType: "application/msword", body: delayedWordBytes });
+      } else {
+        await route.fulfill({ contentType: "text/html", body: `
+          <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+          <div id="modalDetalleCivil" class="modal show" style="display:block">
+            <table class="table-titulos"><tbody><tr><td>Detalle ficticio de causa</td></tr></tbody></table>
+            <nav class="nav-tabs">
+              <a href="#historyAnnex" onclick="event.preventDefault();fixtureTab('historyAnnex')">Historia</a>
+              <a href="#writingsAnnex" onclick="event.preventDefault();fixtureTab('writingsAnnex')">Escritos</a>
+            </nav>
+            <div id="historyAnnex" class="tab-pane">
+              <table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th><th>Descripción</th><th>Anexo</th></tr></thead>
+                <tbody><tr><td>11</td><td>01/01/2026</td><td>Escrito</td><td>Movimiento con anexo desde Historia</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil()">Anexo</a></td></tr></tbody>
+              </table>
+            </div>
+            <div id="writingsAnnex" class="tab-pane active"><table><thead><tr><th>Folio</th><th>Fecha</th><th>Trámite</th></tr></thead><tbody><tr><td>20</td><td>02/01/2026</td><td>Escrito secundario</td></tr></tbody></table></div>
+          </div>
+          <script>
+            function fixtureTab(id){document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id===id))}
+            function anexoSolicitudCivil(){const modal=document.createElement('div');modal.id='modalAsyncAnnex';modal.className='modal show';modal.style.display='block';modal.innerHTML='<div class="modal-body"></div><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button>';document.body.append(modal);setTimeout(()=>{modal.querySelector('.modal-body').innerHTML='<form method="post" action="/ADIR_871/1/documentos/docCausaSuprema.php"><input type="hidden" name="jwt" value="fictional-doc-token"></form>'},150)}
+          </script>
+        ` });
+      }
+    });
+    try {
+      await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+      const scrapedWithAnnex = await scrapeAllCuadernos(page, { downloadDocuments: true, allowPrompts: false, totalTimeoutMs: 10_000 });
+      const historyAnnex = scrapedWithAnnex.movimientos.find(row => row.titulo.includes("Movimiento con anexo desde Historia"));
+      assert.ok(historyAnnex?.documentoBytes, "scrapeAllCuadernos returns to an inactive Historia pane before capturing its annex");
+      assert.equal(historyAnnex.documentoFilename, "pjud-11.doc", "async .php response is named with its detected Word type");
+      assert.equal(historyAnnex.documentoMimeType, "application/msword");
+      assert.equal(delayedAnnexPosts, 1, "capture waits for the form injected after the annex modal opens");
+    } finally {
+      await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
+      if (previousDocDownload === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
+      else process.env.PJUD_DOC_DOWNLOADS = previousDocDownload;
+      if (previousDocDelay === undefined) delete process.env.PJUD_DOC_DOWNLOAD_DELAY_MS;
+      else process.env.PJUD_DOC_DOWNLOAD_DELAY_MS = previousDocDelay;
+    }
+
+    const previousDuplicateDownload = process.env.PJUD_DOC_DOWNLOADS;
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    let duplicateAnnexPosts = 0;
+    const duplicateAnnexPostBodies: string[] = [];
+    await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      if (route.request().method() === "POST") {
+        duplicateAnnexPosts++;
+        duplicateAnnexPostBodies.push(route.request().postData() || "");
+        await route.fulfill({ status: 200, contentType: "application/msword", body: delayedWordBytes });
+      } else {
+        await route.fulfill({ contentType: "text/html", body: `
+          <div id="modalDetalleCivil" class="modal show" style="display:block"><table class="table-titulos"><tbody><tr><td>Detalle ficticio de causa</td></tr></tbody></table><table>
+            <tbody>
+              <tr><td>01/01/2026</td><td>Se hace parte</td><td>Presentado por Ana</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('ana')">Anexo</a></td></tr>
+              <tr><td>02-01-2026</td><td>Se hace parte</td><td>Presentado por Beatriz</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('beatriz')">Anexo</a></td></tr>
+              <tr><td>03/01/2026</td><td>Se hace parte</td><td>Presentado por Carlos</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('carlos')">Anexo</a></td></tr>
+              <tr><td>03/01/2026</td><td>Se hace parte</td><td>Presentado por Daniela</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('daniela')">Anexo</a></td></tr>
+            </tbody>
+          </table></div>
+          <script>function anexoSolicitudCivil(id){document.body.insertAdjacentHTML('beforeend','<div class="modal show" id="modalDuplicate'+id+'" style="display:block"><form method="post" action="/ADIR_871/1/documentos/docuS.php"><input type="hidden" name="jwt" value="'+id+'"></form><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button></div>')}</script>
+        ` });
+      }
+    });
+    try {
+      await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+      const duplicateResult = await attachDocumentoBytesFromPage(page, [
+        { externalId: "duplicate-ana", titulo: "Se hace parte", detalle: "01/01/2026 | Se hace parte | Presentado por Ana | Anexo", folio: "1", fecha: new Date("2026-01-01T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-beatriz", titulo: "Se hace parte", detalle: "02-01-2026 | Se hace parte | Presentado por Beatriz | Anexo", folio: "2", fecha: new Date("2026-01-02T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-carlos", titulo: "Se hace parte", detalle: "03/01/2026 | Se hace parte | Presentado por Carlos | Anexo", folio: "3", fecha: new Date("2026-01-03T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-daniela", titulo: "Se hace parte", detalle: "03/01/2026 | Se hace parte | Presentado por Daniela | Anexo", folio: "4", fecha: new Date("2026-01-03T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+      ], { limit: 4, delayMs: 0, allowPrompts: false });
+      assert.equal(duplicateAnnexPosts, 4, "same-title rows without a folio column are resolved by date, then exact detail for same-day entries");
+      assert.deepEqual(duplicateAnnexPostBodies, ["jwt=ana", "jwt=beatriz", "jwt=carlos", "jwt=daniela"], "the selected annex belongs to the matching movement");
+      assert.ok(duplicateResult.every(row => Boolean(row.documentoBytes)), "each uniquely identified annex is captured");
+    } finally {
+      await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
+      if (previousDuplicateDownload === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
+      else process.env.PJUD_DOC_DOWNLOADS = previousDuplicateDownload;
+    }
     await page.setContent('<div id="modalDetalleCivil" class="modal in" style="display:block"><nav class="nav-tabs"><a href="#historiaMissing">Historia</a></nav><div id="historiaCiv" class="tab-pane active"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/01/2026</td><td>Historia visible ficticia</td></tr></table></div></div>');
     await assert.rejects(() => scrapeModalTabs(page), /destino existente/, "a declared but missing Historia target must not be replaced blindly by the currently active pane");
     await page.setContent('<div class="modal in" style="display:block"><div class="tab-pane">Historial no seleccionado</div><table><tr><td>Auxiliar</td></tr></table></div>');
@@ -425,6 +587,25 @@ async function main() {
     assert.equal(await openExactCauseModal(current, { rit: "C-42-2024", tribunal: "3º Juzgado Civil de Santiago" }), "3º Juzgado Civil de Santiago");
     assert.equal(await current.evaluate(() => Boolean((window as typeof window & { wrongDetail?: boolean }).wrongDetail)), false);
     assert.equal(await current.locator("#modalDetalleCivil").isVisible(), true);
+
+    await current.setContent(`<table id="dtaTableDetalle"><thead><tr><th></th><th>Rol</th><th>Tipo Recurso</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th></tr></thead>
+      <tbody><tr><td><a href="#" onclick="event.preventDefault();const modal=document.querySelector('#modalDetalleSuprema');modal.innerHTML='<table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th><th>Des. Trámite</th></tr></thead><tbody><tr><td>4</td><td>14/11/2025</td><td>Ingreso</td><td>Resolución ficticia</td></tr></tbody></table>';modal.style.display='block';modal.classList.add('show')">Ver</a></td>
+        <td>18390-2025</td><td>(Penal) Contienda de Competencia</td><td>Parte A contra Sala de la Corte de Apelaciones de Iquique</td><td>14/11/2025</td><td>Tramitación</td><td>Corte Suprema</td></tr></tbody>
+      </table>
+      <div id="modalDetalleSuprema" class="modal" style="display:none"></div>`);
+    assert.equal(await openExactCauseModal(current, { rit: "18390-2025", tribunal: "Corte Suprema" }), "Corte Suprema");
+    assert.equal(await current.locator("#modalDetalleSuprema").isVisible(), true, "the exact mapped Corte Suprema row opens its detail");
+
+    const familyTribunal = "1º Juzgado de Familia de Santiago";
+    await current.setContent(`<select id="competencia"><option value="3">Civil</option><option value="7">Familia</option></select>
+      <select id="conTribunal"><option value="0">Todos</option><option value="261">${familyTribunal}</option></select>`);
+    await selectTribunalOrCorte(current, familyTribunal);
+    assert.equal(await current.locator("#competencia").inputValue(), "7");
+    assert.equal(await current.locator("#conTribunal").inputValue(), "261");
+    await current.setContent(`<select id="competencia"><option value="3">Civil</option></select>
+      <select id="conTribunal"><option value="0">Todos</option><option value="261">${familyTribunal}</option></select>`);
+    await selectTribunalOrCorte(current, familyTribunal);
+    assert.equal(await current.locator("#competencia").inputValue(), "3", "older OJV fixtures fall back to Civil when Familia value 7 is missing");
 
     await current.setContent(`<select id="competencia"><option value="3">Civil</option></select><select id="conCorte"><option value="0">Todos</option><option value="90">C.A. Santiago</option><option value="92">C.A. Santiago</option></select><select id="conTribunal"><option value="0">Todos</option></select>`);
     await assert.rejects(() => selectTribunalOrCorte(current, "3º Juzgado Civil de Santiago"), /única corte/);

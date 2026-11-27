@@ -112,6 +112,7 @@ export default function MisCausasPage() {
   const [rutError, setRutError] = useState("");
   const [credentialsRut, setCredentialsRut] = useState("");
   const [credentialsPassword, setCredentialsPassword] = useState("");
+  const [downloadDocuments, setDownloadDocuments] = useState(true);
 
   async function load(signal?: AbortSignal) {
     setLoading(true);
@@ -242,7 +243,7 @@ export default function MisCausasPage() {
     setMsg("Sincronización solicitada. OJV puede tardar varios minutos. Las causas recuperadas se incorporan al estudio y sus movimientos se actualizan por separado.");
     const response = await apiMutation<SyncResult & { status?: Status; async?: boolean; started?: boolean }>("/api/pjud/mis-causas", {
       method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-      body: JSON.stringify({ syncMovimientos: true }),
+      body: JSON.stringify({ syncMovimientos: true, downloadDocuments }),
     });
     if (controller.signal.aborted) return;
     if (!response.ok) {
@@ -552,6 +553,15 @@ export default function MisCausasPage() {
         {!canManageCredentials && role && <p className="text-sm text-[var(--muted)]">Sólo quien administra el estudio puede guardar o cambiar estas credenciales.</p>}
         {!canOperate && role && role !== "asistente" && <p className="text-sm text-[var(--muted)]">La sincronización incorpora causas al estudio y requiere permiso de supervisión. Puede consultar el estado actual.</p>}
         <div className="pjud-cu-actions flex flex-wrap gap-2 border-t border-[var(--line)] pt-4">
+          <label className="flex w-full items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={downloadDocuments}
+              onChange={event => setDownloadDocuments(event.target.checked)}
+              disabled={syncDisabled}
+            />
+            <span>Descargar documentos adjuntos (PDF/escritos) en cada causa</span>
+          </label>
           <button
             type="button"
             className="btn btn-secondary"

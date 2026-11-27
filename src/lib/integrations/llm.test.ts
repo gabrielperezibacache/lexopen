@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   applyPreset,
+  askLlm,
   classifyLlmProviderError,
   describeLlmProviderError,
   LLM_PRESETS,
@@ -13,6 +14,7 @@ import {
   sanitizeLlmMessages,
 } from "./llm";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
+import { prisma } from "@/lib/db";
 
 assert.ok(LLM_PRESETS.openai.apiUrl.includes("openai.com"));
 assert.ok(LLM_PRESETS.groq.apiUrl.includes("groq.com"));
@@ -186,4 +188,110 @@ assert.equal(
 );
 assert.match(llmEnvSnippet({ apiUrl: "https://api.openai.com/v1" }), /LLM_API_KEY=\n/);
 
-console.log("integrations/llm.test.ts OK");
+async function runMissingApiKeyGuardTests() {
+const llmTestEnvKeys = [
+  "NODE_ENV", "LLM_API_URL", "HERMES_API_URL", "LLM_API_KEY", "HERMES_API_KEY",
+  "LLM_MODEL", "HERMES_MODEL", "LLM_ALLOW_DEMO", "HERMES_ALLOW_DEMO", "LLM_ALLOW_PRIVATE_URL",
+];
+const priorLlmTestEnv = new Map(llmTestEnvKeys.map((key) => [key, process.env[key]]));
+const originalFetch = globalThis.fetch;
+const originalWarn = console.warn;
+const originalConfigFindUnique = prisma.integrationConfig.findUnique;
+const originalFirmFindFirst = prisma.firmSettings.findFirst;
+const originalActivityCreate = prisma.activity.create;
+const testPrisma = prisma as unknown as {
+  integrationConfig: { findUnique: (...args: unknown[]) => Promise<unknown> };
+  firmSettings: { findFirst: (...args: unknown[]) => Promise<unknown> };
+  activity: { create: (args: { data: { mensaje?: string; causaId?: string } }) => Promise<unknown> };
+};
+const fetchCalls: string[] = [];
+let warnCalls = 0;
+const demoActivities: Array<{ mensaje?: string; causaId?: string }> = [];
+
+try {
+  testPrisma.integrationConfig.findUnique = async () => null;
+  testPrisma.firmSettings.findFirst = async () => null;
+  testPrisma.activity.create = (async ({ data }: { data: { mensaje?: string; causaId?: string } }) => {
+    demoActivities.push(data);
+    return data;
+  });
+  console.warn = (() => { warnCalls += 1; }) as typeof console.warn;
+  globalThis.fetch = (async (input) => {
+    fetchCalls.push(String(input));
+    return new Response(JSON.stringify({ choices: [{ message: { content: "Synthetic provider response" } }] }), { status: 200 });
+  }) as typeof fetch;
+
+  const configureWithoutApiKey = (url?: string, allowDemo?: "0" | "1") => {
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+    for (const key of ["LLM_API_URL", "HERMES_API_URL", "LLM_API_KEY", "HERMES_API_KEY", "LLM_MODEL", "HERMES_MODEL", "LLM_ALLOW_DEMO", "HERMES_ALLOW_DEMO", "LLM_ALLOW_PRIVATE_URL"]) delete process.env[key];
+    if (url) process.env.LLM_API_URL = url;
+    if (allowDemo) process.env.LLM_ALLOW_DEMO = allowDemo;
+  };
+  const input = { messages: [{ role: "user" as const, content: "Synthetic key guard fixture" }] };
+
+  configureWithoutApiKey();
+  const missingOpenAiKey = await askLlm(input);
+  assert.equal(missingOpenAiKey.source, "error");
+  assert.equal(missingOpenAiKey.provider, "openai");
+  assert.equal("code" in missingOpenAiKey && missingOpenAiKey.code, "llm_unconfigured");
+  assert.equal("error" in missingOpenAiKey && missingOpenAiKey.error, "El proveedor de IA no tiene API key configurada.");
+  assert.equal("note" in missingOpenAiKey && missingOpenAiKey.note, "Falta configurar la API key del proveedor de IA en Configuración → IA.");
+  assert.equal(fetchCalls.length, 0, "default OpenAI without a key must not call fetch");
+  assert.equal(warnCalls, 0, "missing-key errors must not log provider warnings");
+
+  configureWithoutApiKey(undefined, "1");
+  const demo = await askLlm({ ...input, causaId: "fixture-causa" });
+  assert.equal(demo.source, "demo");
+  assert.equal(fetchCalls.length, 0, "missing-key demo must not call fetch");
+  assert.equal(warnCalls, 0, "missing-key demo must not log provider warnings");
+  assert.equal(demoActivities.length, 1, "demo mode still records the case activity");
+  assert.equal(demoActivities[0]?.causaId, "fixture-causa");
+
+  for (const [provider, url] of [
+    ["groq", "https://api.groq.com/openai/v1"],
+    ["azure", "https://lexopen-fixture.openai.azure.com/openai/deployments/fixture"],
+  ] as const) {
+    configureWithoutApiKey(url);
+    const missingKey = await askLlm(input);
+    assert.equal(missingKey.source, "error", `${provider} without an API key fails before fetch`);
+    assert.equal(missingKey.provider, provider);
+    assert.equal("code" in missingKey && missingKey.code, "llm_unconfigured");
+    assert.equal(fetchCalls.length, 0);
+    assert.equal(warnCalls, 0);
+  }
+
+  configureWithoutApiKey("http://localhost:11434/v1");
+  process.env.LLM_ALLOW_PRIVATE_URL = "1";
+  const loopback = await askLlm(input);
+  assert.equal(loopback.source, "llm", "loopback providers remain callable without a key");
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0], "http://localhost:11434/v1/chat/completions");
+
+  configureWithoutApiKey("https://example.com/v1");
+  const customWithoutKey = await askLlm(input);
+  assert.equal(customWithoutKey.source, "llm", "custom providers remain callable without a key");
+  assert.equal(customWithoutKey.provider, "custom");
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(fetchCalls[1], "https://example.com/v1/chat/completions");
+  assert.equal(warnCalls, 0);
+} finally {
+  testPrisma.integrationConfig.findUnique = originalConfigFindUnique as unknown as (...args: unknown[]) => Promise<unknown>;
+  testPrisma.firmSettings.findFirst = originalFirmFindFirst as unknown as (...args: unknown[]) => Promise<unknown>;
+  testPrisma.activity.create = originalActivityCreate as unknown as (args: { data: { mensaje?: string; causaId?: string } }) => Promise<unknown>;
+  globalThis.fetch = originalFetch;
+  console.warn = originalWarn;
+  for (const key of llmTestEnvKeys) {
+    const value = priorLlmTestEnv.get(key);
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  await prisma.$disconnect();
+}
+}
+
+runMissingApiKeyGuardTests().then(() => {
+  console.log("integrations/llm.test.ts OK");
+}).catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

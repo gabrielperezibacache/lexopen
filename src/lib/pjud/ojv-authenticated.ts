@@ -227,7 +227,7 @@ export const MIS_CAUSAS_MATERIAS = [
   "Penal",
   "Garantía",
   "Tribunal Oral",
-  "Apelaciones",
+  "Corte Apelaciones",
   "Corte Suprema",
   "Constitucional",
 ] as const;
@@ -257,7 +257,7 @@ async function dismissOjvPrompts(page: AnyPage) {
   }
 }
 
-export type MisCausasMateria = typeof MIS_CAUSAS_MATERIAS[number] | "Corte Apelaciones";
+export type MisCausasMateria = typeof MIS_CAUSAS_MATERIAS[number] | "Apelaciones";
 export type MisCausasReadOptions = {
   allowPrompts?: boolean;
   downloadDocuments?: boolean;
@@ -266,6 +266,155 @@ export type MisCausasReadOptions = {
   materias?: readonly MisCausasMateria[];
   signal?: AbortSignal;
 };
+
+function preferredMisCausasMateria(tribunal: string): MisCausasMateria | null {
+  const label = tribunal.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/suprema/.test(label)) return "Corte Suprema";
+  if (/apelaci|corte de apel/.test(label)) return "Corte Apelaciones";
+  if (/oral|juicio oral/.test(label)) return "Tribunal Oral";
+  if (/laboral|trabajo|previsional/.test(label)) return "Laboral";
+  if (/cobranza/.test(label)) return "Cobranza";
+  if (/familia/.test(label)) return "Familia";
+  if (/garantia/.test(label)) return "Garantía";
+  if (/penal/.test(label)) return "Penal";
+  if (/constitucional/.test(label)) return "Constitucional";
+  if (/civil/.test(label)) return "Civil";
+  return null;
+}
+
+function normalizeMateriaName(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\(\s*\d+\s*\)/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function materiaAliases(materia: MisCausasMateria) {
+  if (materia === "Corte Apelaciones" || materia === "Apelaciones") return ["Corte Apelaciones", "Apelaciones"];
+  return [materia];
+}
+
+function uniqueMaterias(materias: readonly MisCausasMateria[]) {
+  const seen = new Set<string>();
+  return materias.filter((materia) => {
+    const key = normalizeMateriaName(materiaAliases(materia)[0]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const MIS_CAUSAS_TAB_SELECTOR = [
+  "[role='tab']", ".nav-tabs a", ".nav-pills a", "[data-toggle='tab']", "[data-toggle='pill']",
+  "[data-bs-toggle='tab']", "[data-bs-toggle='pill']", ".panel-heading a", ".card-header a",
+  "[data-toggle='collapse']", "[data-bs-toggle='collapse']", "a", "button",
+].join(",");
+
+/** Resolve only interactive tab/header controls; never click the surrounding card container. */
+async function findMisCausasMateriaControl(page: PlaywrightPage, materia: MisCausasMateria) {
+  const root = (await page.locator("#contMain").count().catch(() => 0)) ? page.locator("#contMain") : page.locator("body");
+  const aliases = materiaAliases(materia).map(normalizeMateriaName);
+  const controls = root.locator(MIS_CAUSAS_TAB_SELECTOR);
+  const match = await controls.evaluateAll((nodes, labels) => {
+    for (let index = 0; index < nodes.length; index++) {
+      const node = nodes[index];
+      let visible = true;
+      for (let current: Element | null = node; current; current = current.parentElement) {
+        const rect = current.getBoundingClientRect();
+        const style = getComputedStyle(current);
+        if (!rect.width || !rect.height || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+          visible = false;
+          break;
+        }
+      }
+      if (!visible) continue;
+      const clone = node.cloneNode(true) as Element;
+      clone.querySelectorAll("svg, i, .badge, .count, .counter, [aria-hidden='true']").forEach((el) => el.remove());
+      const label = (clone.textContent || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+        .replace(/\(\s*\d+\s*\)/g, " ").replace(/\s+/g, " ").trim();
+      if (!labels.includes(label)) continue;
+      let target = node.getAttribute("data-bs-target") || node.getAttribute("data-target") || node.getAttribute("href") || "";
+      if (target.startsWith("#")) target = target.slice(1);
+      else target = node.getAttribute("aria-controls") || "";
+      return { index, target };
+    }
+    return null;
+  }, aliases);
+  if (match) {
+    const control = controls.nth(match.index);
+    if (await control.isVisible().catch(() => false)) return { root, control, target: match.target || null };
+  }
+
+  const select = root.locator("select");
+  const selectMatch = await select.evaluateAll((nodes, labels) => {
+    for (let index = 0; index < nodes.length; index++) {
+      const rect = nodes[index]!.getBoundingClientRect();
+      if (!rect.width || !rect.height || getComputedStyle(nodes[index]!).display === "none") continue;
+      const options = [...(nodes[index] as HTMLSelectElement).options];
+      if (options.some((option) => labels.includes(option.textContent?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim() || ""))) return index;
+    }
+    return -1;
+  }, aliases);
+  return selectMatch >= 0 ? { root, control: select.nth(selectMatch), target: null, select: true as const } : null;
+}
+
+async function activateMisCausasMateria(page: PlaywrightPage, materia: MisCausasMateria, options: MisCausasReadOptions) {
+  const found = await findMisCausasMateriaControl(page, materia);
+  if (!found) return false;
+  assertMisCausasReadActive(options);
+  const activeSelector = ".tab-pane.active, .panel-collapse.in, .collapse.show";
+  const materiaTokens: Record<MisCausasMateria, string[]> = {
+    "Corte Suprema": ["sup", "suprema"],
+    "Corte Apelaciones": ["ca", "ape", "apel", "apelaciones", "appeals"],
+    Apelaciones: ["ca", "ape", "apel", "apelaciones", "appeals"],
+    Civil: ["civ", "civil"], Familia: ["fam", "familia", "family"],
+    Laboral: ["lab", "laboral", "labor"], Cobranza: ["cob", "cobranza", "collection"],
+    Penal: ["pen", "penal", "criminal"], Garantía: ["gar", "garantia"],
+    "Tribunal Oral": ["oral", "tribunaloral"], Constitucional: ["cons", "constitucional"],
+  };
+  const activePanelHasMateriaData = async () => page.locator(activeSelector).evaluateAll((panels, tokens) => {
+    const wanted = new Set((tokens as string[]).map(value => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")));
+    return panels.some((panel) => {
+      const ids = [panel.id, ...[...panel.querySelectorAll("[id]")].map((node) => node.id)].filter(Boolean);
+      return ids.some((id) => {
+        const match = /^(?:dtaTableDetalleMisCau|btnConsultaMisCau|filtroMisCau|tab|panel|MisCau)([A-Za-z]+)$/i.exec(id);
+        const suffix = match?.[1]?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        return Boolean(suffix && wanted.has(suffix));
+      });
+    });
+  }, materiaTokens[materia]);
+  if (await activePanelHasMateriaData()) return true;
+  if ("select" in found && found.select) {
+    const value = await found.control.locator("option").evaluateAll((nodes, labels) => {
+      const option = nodes.find((node) => labels.includes((node.textContent || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim()));
+      return option?.getAttribute("value") || "";
+    }, materiaAliases(materia).map(normalizeMateriaName));
+    if (!value) return false;
+    await found.control.selectOption(value, { timeout: 8_000 });
+  } else {
+    await found.control.click({ timeout: 8_000 });
+  }
+  await waitForMisCausasSearchIdle(page, options);
+  const deadline = Date.now() + 4_000;
+  while (Date.now() < deadline) {
+    assertMisCausasReadActive(options);
+    const selected = await found.control.evaluate((element) => {
+      const parentActive = Boolean(element.closest("li.active, .active, .in, .show"));
+      return element.getAttribute("aria-selected") === "true" ||
+        element.getAttribute("aria-expanded") === "true" || parentActive;
+    });
+    const active = await page.evaluate(({ targetId }) => {
+      if (targetId) {
+        const target = document.getElementById(targetId);
+        if (!target) return false;
+        const shown = target.classList.contains("active") || target.classList.contains("in") || target.classList.contains("show");
+        const rect = target.getBoundingClientRect();
+        return shown && rect.width > 0 && rect.height > 0;
+      }
+      return false;
+    }, { targetId: found.target });
+    if (active || selected || await activePanelHasMateriaData()) return true;
+    await sleep(100);
+  }
+  return false;
+}
 
 function assertMisCausasReadActive(options: MisCausasReadOptions) {
   if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -286,9 +435,81 @@ async function waitForMisCausasMenuReady(page: AnyPage, options: MisCausasReadOp
     assertMisCausasReadActive(options);
     await assertPjudPromptPolicy(page, true);
     if (await ready.filter({ visible: true }).count()) return;
+    for (const materia of uniqueMaterias(materias)) {
+      if (await findMisCausasMateriaControl(page, materia)) return;
+    }
     await sleep(100);
   } while (Date.now() < deadline);
   throw new PjudScrapeError("El menú de Mis Causas no terminó de cargar las materias seleccionadas.");
+}
+
+function isOfficialOjvUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ["oficinajudicialvirtual.pjud.cl", "ojv.pjud.cl"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function hasVisibleOjvSessionSignal(page: AnyPage) {
+  const structural = page.locator([
+    OJV.misCausasMenu,
+    'a[href*="logout" i], button[onclick*="logout" i], a[onclick*="cerrarSesion" i], button[onclick*="cerrarSesion" i], #btnSalir, #btnCerrarSesion',
+  ].join(", ")).filter({ visible: true });
+  if (await structural.count().catch(() => 0)) return true;
+  const sessionLabel = page.getByRole("link", { name: /^(?:Mis Causas|Cerrar sesión|Salir)$/i })
+    .or(page.getByRole("button", { name: /^(?:Mis Causas|Cerrar sesión|Salir)$/i }))
+    .filter({ visible: true });
+  return (await sessionLabel.count().catch(() => 0)) > 0;
+}
+
+/** Select only an official OJV tab whose visible DOM confirms an authenticated session. */
+export async function waitForAuthenticatedOjvPage(
+  page: PlaywrightPage,
+  options: Pick<MisCausasReadOptions, "signal"> = {},
+  timeoutMs = 30_000,
+): Promise<PlaywrightPage> {
+  const deadline = Date.now() + Math.max(timeoutMs, 1);
+  do {
+    assertMisCausasReadActive(options);
+    const candidates = page.context().pages().filter((candidate) => isOfficialOjvUrl(candidate.url())).reverse();
+    for (const candidate of candidates) {
+      assertMisCausasReadActive(options);
+      if (await hasVisibleOjvSessionSignal(candidate)) return candidate;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(Math.min(100, deadline - Date.now()));
+  } while (Date.now() < deadline);
+  throw new PjudScrapeError(
+    "No se confirmó una señal visible de sesión en una pestaña oficial de OJV tras volver de ClaveÚnica; no se abrió Mis Causas.",
+    502,
+  );
+}
+
+/** Wait briefly for the authenticated OJV shell to render its Mis Causas entry. */
+export async function waitForMisCausasMenuEntry(
+  page: AnyPage,
+  options: MisCausasReadOptions = {},
+  timeoutMs = 8_000,
+) {
+  const candidates = [
+    page.getByRole("link", { name: /^Mis Causas$/i }).first(),
+    page.getByRole("button", { name: /^Mis Causas$/i }).first(),
+    page.locator(OJV.misCausasMenu).first(),
+    page.locator("#menuMisCausas, #misCausas, a[href*='misCausa' i]").first(),
+    page.locator("text=/^\\s*Mis Causas\\s*$/i").first(),
+  ];
+  const deadline = Date.now() + Math.max(timeoutMs, 1);
+  do {
+    assertMisCausasReadActive(options);
+    for (const candidate of candidates) {
+      if (await candidate.count().catch(() => 0)) return true;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(Math.min(100, deadline - Date.now()));
+  } while (Date.now() < deadline);
+  return false;
 }
 
 async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = {}): Promise<boolean> {
@@ -323,6 +544,7 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
     await waitForMisCausasMenuReady(page, options);
     return true;
   }
+  if (!(await waitForMisCausasMenuEntry(page, options))) return false;
   const candidates = [
     page.getByRole("link", { name: /^Mis Causas$/i }).first(),
     page.getByRole("button", { name: /^Mis Causas$/i }).first(),
@@ -336,28 +558,49 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
     } else {
       await loc.click({ timeout: 8_000 }).catch(() => undefined);
     }
-    await page
-      .waitForLoadState("domcontentloaded")
-      .catch(() => undefined);
-    await sleep(700);
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
     await dismissOjvPrompts(page);
+    await waitForMisCausasMenuReady(page, options);
     return true;
   }
   // Intento por texto en sidebar / menú
   const byText = page.locator("text=/^\\s*Mis Causas\\s*$/i").first();
   if ((await byText.count().catch(() => 0)) > 0) {
     await byText.click({ force: true, timeout: 8_000 }).catch(() => undefined);
-    await sleep(700);
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    await dismissOjvPrompts(page);
+    await waitForMisCausasMenuReady(page, options);
     return true;
   }
   return false;
 }
 
 async function misCausasActiveScope(page: PlaywrightPage) {
-  const active = page.locator(".tab-pane.active").filter({ visible: true });
+  const active = page.locator(".tab-pane.active, .panel-collapse.in, .collapse.show").filter({ visible: true });
   const current = active.filter({ has: page.locator('[id^="filtroMisCau"], [id^="btnConsultaMisCau"], table[id^="dtaTableDetalleMisCau"]') });
   if (await current.count()) return current.last();
   return await active.count() ? active.last() : page.locator("body");
+}
+
+async function waitForMisCausasSearchIdle(page: AnyPage, options: MisCausasReadOptions) {
+  const deadline = Date.now() + 3_500;
+  while (Date.now() < deadline) {
+    assertMisCausasReadActive(options);
+    const idle = await page.evaluate(() => {
+      const jquery = (window as typeof window & { jQuery?: { active?: number } }).jQuery;
+      const active = Number(jquery?.active || 0);
+      const visible = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width || !rect.height) return false;
+        const style = getComputedStyle(element);
+        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) !== 0;
+      };
+      const loaders = [...document.querySelectorAll('#loadPreMisCau, #loadPreJuridica, #loadPreCausa, .loadingConsulta, .dataTables_processing, [aria-busy="true"], .spinner, .spinner-border, .fa-spinner')];
+      return !(Number.isFinite(active) && active > 0) && !loaders.some(visible);
+    }).catch(() => true);
+    if (idle) return;
+    await sleep(100);
+  }
 }
 
 export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}, scope?: Locator) {
@@ -379,11 +622,12 @@ export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasRead
   }
   await sleep(1200);
   await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+  await waitForMisCausasSearchIdle(page, options);
   return true;
 }
 
-export async function applyMisCausasFiltros(page: AnyPage) {
-  const scope = await misCausasActiveScope(page);
+export async function applyMisCausasFiltros(page: AnyPage, providedScope?: Locator) {
+  const scope = providedScope ?? await misCausasActiveScope(page);
   // The current portal hides the input itself; its visible label is the control.
   const switchLabel = scope.locator('label.switch:has(input[id^="filtroMisCau"])').filter({ visible: true }).first();
   if (await switchLabel.count()) {
@@ -401,7 +645,9 @@ export async function applyMisCausasFiltros(page: AnyPage) {
   }
   // Manual OJV: Estado → Seleccionar Todos para no omitir concluidas.
   const estado = scope
-    .getByRole("button", { name: /^Estado$/i })
+    .getByRole("button", { name: /^(?:Estado|[^\n]*Estado[^\n]*)$/i })
+    .or(scope.locator(".bootstrap-select button, button[data-id*='estado' i], .bs-container.open .dropdown-toggle"))
+    .or(page.locator("body > .bs-container.open .dropdown-toggle, body > .bs-container.open button"))
     .or(scope.getByText(/^Estado$/i))
     .filter({ visible: true })
     .first();
@@ -411,12 +657,14 @@ export async function applyMisCausasFiltros(page: AnyPage) {
   }
   const selectAll = scope
     .getByText(/Seleccionar Todos|Seleccionar todos/i)
+    .or(page.locator("body > .bs-container.open .dropdown-menu :text-matches('Seleccionar Todos', 'i')"))
     .filter({ visible: true })
     .first();
   if (await selectAll.isVisible().catch(() => false)) {
     await selectAll.click().catch(() => undefined);
     await sleep(200);
   }
+  await page.keyboard?.press("Escape").catch(() => undefined);
 }
 
 function parseMisCausasItemsFromHtml(html: string): MisCausasItem[] {
@@ -467,13 +715,15 @@ async function ensureAuthenticatedOjvShell(page: AnyPage, options: MisCausasRead
 export async function collectMisCausasFromAuthenticatedOjv(
   page: AnyPage,
   options: MisCausasReadOptions = {}
-): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[] }> {
+): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[]; countsByMateria: Record<string, number>; materiasWithErrors: string[] }> {
   assertMisCausasReadActive(options);
   if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
   page = await ensureAuthenticatedOjvShell(page, options);
 
   const openedMenu = await openMisCausasMenu(page, options);
   const materiasTried: string[] = [];
+  const countsByMateria: Record<string, number> = {};
+  const materiasWithErrors: string[] = [];
   const all: MisCausasItem[] = [];
   const seen = new Set<string>();
 
@@ -485,62 +735,55 @@ export async function collectMisCausasFromAuthenticatedOjv(
       all.push(item);
     }
   };
-  const pushParsed = async () => pushItems(parseMisCausasItemsFromHtml(await pagesAndFramesHtml(page)));
-  const searchAndCollect = async () => {
-    const firstResponse = await clickMisCausasBuscar(page, options);
+  const pushParsed = async (scope?: Locator) => {
+    const html = scope ? await scope.innerHTML().catch(() => "") : await pagesAndFramesHtml(page);
+    return parseMisCausasItemsFromHtml(html);
+  };
+  const searchAndCollect = async (scope: Locator) => {
+    const firstResponse = await clickMisCausasBuscar(page, options, scope);
     if (options.allowPrompts === false) {
       let first = true;
       await collectOjvResultPages(page, async () => {
         const fresh = first && Array.isArray(firstResponse)
           ? firstResponse
-          : await waitForFreshManualMisCausasRows(page, options.responseTimeoutMs);
+          : await waitForFreshManualMisCausasRows(page, options.responseTimeoutMs, scope);
         first = false;
         pushItems(fresh);
-      });
+      }, scope);
     } else {
-      await collectOjvResultPages(page, pushParsed);
+      await collectOjvResultPages(page, async () => pushItems(await pushParsed(scope)), scope);
     }
   };
 
   try {
-    if (options.allowPrompts !== false) await pushParsed();
-
-    for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
+    const requested = uniqueMaterias(options.materias ?? MIS_CAUSAS_MATERIAS);
+    for (const materia of requested) {
       assertMisCausasReadActive(options);
       if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
-      let tab = page
-        .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
-        .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
-        .or(
-          page.locator(
-            `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a, div.card:has-text("${materia}")`
-          )
-        );
-      if (options.allowPrompts === false) tab = tab.filter({ visible: true });
-      tab = tab.first();
-      if ((await tab.count().catch(() => 0)) === 0) continue;
-      if (options.allowPrompts === false) {
-        await tab.click({ timeout: 8_000 });
-      } else if (!(await tab.isVisible().catch(() => false))) {
-        // Algunas materias están en acordeón colapsado.
-        await tab.click({ force: true, timeout: 8_000 }).catch(() => undefined);
-      } else {
-        await tab.click({ timeout: 8_000 }).catch(() => undefined);
+      try {
+        if (!(await activateMisCausasMateria(page, materia, options))) continue;
+        materiasTried.push(materia);
+        const scope = await misCausasActiveScope(page);
+        await applyMisCausasFiltros(page, scope);
+        const before = all.length;
+        await searchAndCollect(scope);
+        countsByMateria[materia] = all.length - before;
+      } catch (error) {
+        if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
+        if (options.allowPrompts === false) throw error;
+        materiasWithErrors.push(materia);
+        console.warn(`[pjud] No se completó la lectura del apartado ${materia}.`);
       }
-      materiasTried.push(materia);
-      await sleep(500);
-
-      await applyMisCausasFiltros(page);
-      await searchAndCollect();
     }
 
     if (materiasTried.length === 0) {
       if (options.materias) throw new PjudScrapeError("No se encontraron las materias seleccionadas en Mis Causas.");
-      await applyMisCausasFiltros(page);
-      await searchAndCollect();
+      const scope = await misCausasActiveScope(page);
+      await applyMisCausasFiltros(page, scope);
+      await searchAndCollect(scope);
     }
 
-    return { items: all, openedMenu, materiasTried };
+    return { items: all, openedMenu, materiasTried, countsByMateria, materiasWithErrors };
   } finally {
     if (options.allowPrompts === false) await clearManualMisCausasRows(page);
   }
@@ -594,6 +837,7 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
   password: string;
   signal?: AbortSignal;
   optedIn?: boolean;
+  onSummary?: (summary: { countsByMateria: Record<string, number>; materiasWithErrors: string[] }) => void;
 }): Promise<MisCausasItem[]> {
   if (!claveUnicaAutomationAllowed(opts.optedIn)) {
     throw new PjudScrapeError(
@@ -647,40 +891,28 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
       .catch(() => undefined);
     await fillClaveUnicaLoginForm(page, opts.rut, opts.password);
 
-    // Tras OIDC puede haber popup de return.php; preferir pestaña OJV.
-    const pages = page.context().pages();
-    for (const p of pages) {
-      if (/oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(p.url())) {
-        page = p;
-        break;
-      }
-    }
-    await page
-      .waitForURL(/pjud\.cl/i, { timeout: 60_000 })
-      .catch(() => undefined);
-    await page
-      .waitForLoadState("domcontentloaded")
-      .catch(() => undefined);
+    // The first OJV tab may still be the public pre-login page. Wait for a
+    // visible session marker across official OJV tabs before selecting one.
+    page = await waitForAuthenticatedOjvPage(page, { signal: opts.signal });
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
     await dismissOjvPrompts(page);
 
-    const { items, openedMenu, materiasTried } =
-      await collectMisCausasFromAuthenticatedOjv(page);
+    const { items, openedMenu, materiasTried, countsByMateria, materiasWithErrors } =
+      await collectMisCausasFromAuthenticatedOjv(page, { signal: opts.signal });
+    opts.onSummary?.({ countsByMateria, materiasWithErrors });
 
     if (items.length === 0) {
       const location = new URL(page.url());
       const url = `${location.origin}${location.pathname}`;
-      const stillLogin = isClaveUnicaAccountsUrl(url);
       throw new PjudScrapeError(
-        stillLogin
-          ? `El login de ClaveÚnica no llegó a OJV (url=${url}). Revise credenciales o CAPTCHA.`
-          : [
-              "Se autenticó en ClaveÚnica pero no se listaron causas en Mis Causas.",
-              openedMenu
-                ? `Menú Mis Causas abierto; materias probadas: ${materiasTried.join(", ") || "(ninguna visible)"}.`
-                : "No se encontró el menú «Mis Causas» (sesión incompleta o layout distinto).",
-              `url=${url}.`,
-              "En OJV: Mis Causas → materia (p. ej. Civil/Familia) → Filtros/Buscar.",
-            ].join(" ")
+        [
+          "Se confirmó una señal visible de sesión en OJV, pero no se listaron causas en Mis Causas.",
+          openedMenu
+            ? `Menú Mis Causas abierto; materias probadas: ${materiasTried.join(", ") || "(ninguna visible)"}.`
+            : "La sesión OJV fue visible, pero no apareció el menú «Mis Causas».",
+          `url=${url}.`,
+          "En OJV: Mis Causas → materia (p. ej. Civil/Familia) → Filtros/Buscar.",
+        ].join(" ")
       );
     }
     return items;
@@ -712,9 +944,14 @@ export async function readCausaDetailFromAuthenticatedOjv(
   }
 
   const identity = { rit: causa.rit, tribunal: causa.tribunal };
+  const requestedMaterias = uniqueMaterias(options.materias ?? MIS_CAUSAS_MATERIAS);
+  const preferredMateria = preferredMisCausasMateria(causa.tribunal);
+  const materias = preferredMateria && requestedMaterias.includes(preferredMateria)
+    ? [preferredMateria, ...requestedMaterias.filter((materia) => materia !== preferredMateria)]
+    : requestedMaterias;
   const searchForDetail = async () => {
-    await applyMisCausasFiltros(page);
-    const scope = options.allowPrompts === false ? await misCausasActiveScope(page) : undefined;
+    const scope = await misCausasActiveScope(page);
+    await applyMisCausasFiltros(page, scope);
     const response = await clickMisCausasBuscar(page, options, scope);
     let firstPage = Array.isArray(response) ? response : undefined;
     return collectOjvResultPages(page, async () => {
@@ -725,29 +962,23 @@ export async function readCausaDetailFromAuthenticatedOjv(
           return false;
         }
       }
-      return Boolean(await openExactCauseModal(page, identity, "tr, .card, .list-group-item", scope));
+      return Boolean(await openExactCauseModal(page, identity, "tr, .card, .list-group-item", scope, options.allowPrompts === false));
     }, scope);
   };
 
   let opened = false;
   try {
-    for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
+    for (const materia of materias) {
       assertMisCausasReadActive(options);
       if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
-      let tab = page
-        .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
-        .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
-        .or(page.locator(`a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a`));
-      if (options.allowPrompts === false) tab = tab.filter({ visible: true });
-      tab = tab.first();
-      if ((await tab.count().catch(() => 0)) === 0) continue;
-      if (options.allowPrompts === false) {
-        await tab.click({ timeout: 8_000 });
-      } else {
-        await tab.click({ force: !(await tab.isVisible().catch(() => false)), timeout: 8_000 }).catch(() => undefined);
+      if (!(await activateMisCausasMateria(page, materia, options))) continue;
+      try {
+        opened = await searchForDetail();
+      } catch (error) {
+        if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
+        if (options.allowPrompts === false) throw error;
+        console.warn("[pjud] No se completó la consulta de detalle en el apartado solicitado.");
       }
-      await sleep(400);
-      opened = await searchForDetail();
       if (opened) break;
     }
     if (!opened && !options.materias) {
@@ -782,6 +1013,8 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
   causa: PjudCausaRef;
   signal?: AbortSignal;
   optedIn?: boolean;
+  downloadDocuments?: boolean;
+  excludeDocumentExternalIds?: readonly string[];
 }): Promise<ScrapeLookupResult> {
   if (!opts.causa.rit || !parseRitParts(opts.causa.rit) || isPlaceholderTribunal(opts.causa.tribunal)) {
     throw new PjudScrapeError("Se requiere RIT válido y tribunal identificado para detalle ClaveÚnica.", 400);
@@ -843,7 +1076,11 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
     await page.waitForLoadState("domcontentloaded").catch(() => undefined);
     await dismissOjvPrompts(page);
 
-    return await readCausaDetailFromAuthenticatedOjv(page, opts.causa, { signal: opts.signal });
+    return await readCausaDetailFromAuthenticatedOjv(page, opts.causa, {
+      signal: opts.signal,
+      downloadDocuments: opts.downloadDocuments,
+      excludeDocumentExternalIds: opts.excludeDocumentExternalIds,
+    });
   } finally {
     await browser.close();
   }

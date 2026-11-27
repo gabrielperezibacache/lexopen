@@ -15,6 +15,21 @@ export function isActiveJobUniqueViolation(error: unknown): boolean {
 }
 
 const DEFAULT_BATCH = 40;
+
+/** Run an exact set of queued job IDs in bounded batches without broadening the selection. */
+export async function processPjudSyncJobIdBatches<T>(
+  jobIds: string[],
+  processBatch: (batchIds: string[]) => Promise<T>,
+): Promise<T[]> {
+  if (!jobIds.length) return [];
+  const uniqueIds = [...new Set(jobIds)];
+  const results: T[] = [];
+  for (let offset = 0; offset < uniqueIds.length; offset += DEFAULT_BATCH) {
+    results.push(await processBatch(uniqueIds.slice(offset, offset + DEFAULT_BATCH)));
+  }
+  return results;
+}
+
 /** Durable reservation: these jobs are usable only by their in-memory session provider. */
 export const PJUD_MANUAL_SESSION_TRIGGER = "manual-session" as const;
 export const PJUD_MANUAL_SESSION_JOB_TTL_MS = 30 * 60_000;
@@ -77,17 +92,20 @@ export async function reclaimStuckRunningJobs(opts?: { olderThanMs?: number; job
 
 /** Finalize only the jobs still owned by this attempt. A later judicial query wins. */
 async function failUnfinishedPjudJobs(filter: Prisma.Sql, caseNote: string, at: Date, jobNote = caseNote) {
+  // Prisma DateTime columns use TIMESTAMP WITHOUT TIME ZONE. Raw Date parameters
+  // are timestamptz values, so convert them to UTC wall time before assignment.
+  const atUtc = Prisma.sql`(${at} AT TIME ZONE 'UTC')`;
   const [result] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
     WITH failed AS (
       UPDATE "PjudSyncJob"
-      SET status = 'failed', note = ${jobNote}, "lastError" = ${jobNote}, "finishedAt" = ${at},
+      SET status = 'failed', note = ${jobNote}, "lastError" = ${jobNote}, "finishedAt" = ${atUtc},
           "pjudCuadernosCoverage" = NULL
       WHERE status IN ('pending', 'running') AND (${filter})
       RETURNING "causaId", "createdAt"
     ), recorded AS (
       UPDATE "Causa" c
-      SET "pjudLastSyncStatus" = 'failed', "pjudLastSyncAt" = ${at}, "pjudLastSyncNote" = ${caseNote},
-          "pjudCuadernosCoverage" = NULL, "pjudFailCount" = c."pjudFailCount" + 1, "updatedAt" = ${at}
+      SET "pjudLastSyncStatus" = 'failed', "pjudLastSyncAt" = ${atUtc}, "pjudLastSyncNote" = ${caseNote},
+          "pjudCuadernosCoverage" = NULL, "pjudFailCount" = c."pjudFailCount" + 1, "updatedAt" = ${atUtc}
       FROM failed WHERE c.id = failed."causaId" AND c."pjudMonitoreoActivo"
         AND (c."pjudLastSyncAt" IS NULL OR c."pjudLastSyncAt" <= failed."createdAt")
     )
@@ -108,8 +126,9 @@ export async function failPendingSessionSyncJobs(jobIds: string[]) {
 export async function expireManualSessionSyncJobs(opts?: { jobIds?: string[]; causaIds?: string[]; now?: Date }) {
   if (opts?.jobIds?.length === 0 || opts?.causaIds?.length === 0) return 0;
   const now = opts?.now ?? new Date();
+  const expiredBefore = new Date(now.getTime() - PJUD_MANUAL_SESSION_JOB_TTL_MS);
   return failUnfinishedPjudJobs(Prisma.sql`
-    trigger = ${PJUD_MANUAL_SESSION_TRIGGER} AND "createdAt" <= ${new Date(now.getTime() - PJUD_MANUAL_SESSION_JOB_TTL_MS)}
+    trigger = ${PJUD_MANUAL_SESSION_TRIGGER} AND "createdAt" <= (${expiredBefore} AT TIME ZONE 'UTC')
     ${opts?.jobIds ? Prisma.sql`AND id IN (${Prisma.join(opts.jobIds)})` : Prisma.empty}
     ${opts?.causaIds ? Prisma.sql`AND "causaId" IN (${Prisma.join(opts.causaIds)})` : Prisma.empty}
   `, "La sesión temporal terminó antes de completar la actualización. Inicie sesión de nuevo para reintentar.", now);

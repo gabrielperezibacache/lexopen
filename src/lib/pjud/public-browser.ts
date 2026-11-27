@@ -16,7 +16,7 @@
 
 import { captchaSolverConfigured, CaptchaSolveError, CaptchaSolverConfigError, captchaConfigErrorMessage, solveImageCaptcha } from "@/lib/pjud/captcha-solver";
 import { BROWSER_ARGS, BROWSER_UA, causeRowMatches, inferCompetenciaFromTribunal, isPlaceholderTribunal, OJV, OJV_CONSULTA_URL, parseRitParts, pickBestTribunalOption, pickCorteForTribunal, pickTribunalFromTexts, splitRut, type OjvCompetenciaValue } from "@/lib/pjud/ojv-dom";
-import { hasExplicitEmptyHistory, parseCausasListFromHtml, parseMovimientosFromHtml, parseSalaFromHtml, parseVerDetalleJuridicaHtml } from "@/lib/pjud/parse-html";
+import { extractDocumentoHrefFromRowHtml, extractDocumentoPostFromRowHtml, hasExplicitEmptyHistory, parseCausasListFromHtml, parseMovimientosFromHtml, parseSalaFromHtml, parseVerDetalleJuridicaHtml } from "@/lib/pjud/parse-html";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { manualPjudInteractionActive, manualPjudDocumentDownloadsAllowed } from "@/lib/pjud/manual-interaction-policy";
@@ -628,7 +628,15 @@ async function readTribunalSelectOptions(
 }
 
 export async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
-  const competencia = inferCompetenciaFromTribunal(tribunal);
+  let competencia = inferCompetenciaFromTribunal(tribunal);
+  if (competencia === "7") {
+    const select = page.locator(OJV.competencia).filter({ visible: true }).first();
+    const hasFamilyOption = await select.locator("option").evaluateAll((options) =>
+      options.some((option) => (option as HTMLOptionElement).value === "7")
+    ).catch(() => false);
+    // Older OJV fixtures and portal variants expose Familia under Civil.
+    if (!hasFamilyOption) competencia = "3";
+  }
   await selectCompetencia(page, competencia);
 
   if (competencia === "1") {
@@ -646,7 +654,7 @@ export async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: stri
     return;
   }
 
-  if (["3", "4", "5", "6"].includes(competencia)) {
+  if (["3", "4", "5", "6", "7"].includes(competencia)) {
     // Prefer visible select in active tab (ROL vs Jurídica).
     const trib = page
       .locator(OJV.tribunal).filter({ visible: true })
@@ -807,22 +815,33 @@ export async function openExactCauseModal(
   page: PlaywrightPage,
   causa: { rit: string; tribunal: string },
   selector = "#dtaTableDetalle tr, #verDetalleJuridica tr, #resultConsultaJuridica tr",
-  freshScope?: Locator
+  freshScope?: Locator,
+  requireFresh = Boolean(freshScope)
 ): Promise<string | null> {
   const rows = (freshScope ?? page).locator(selector);
-  const snapshots = await rows.evaluateAll((nodes, requireFresh) => nodes.map((node) => {
+  const snapshots = await rows.evaluateAll((nodes, requireCurrentResponse) => nodes.map((node) => {
     const el = node as HTMLElement;
     const visible = el.getBoundingClientRect().height > 0 && getComputedStyle(el).visibility !== "hidden" &&
       (el.tagName === "TR" || !el.querySelector("tr, .card, .list-group-item"));
-    const fresh = !requireFresh || Boolean((window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node));
+    const fresh = !requireCurrentResponse || Boolean((window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node));
     const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
+    const table = el.closest("table");
+    const headerRow = table?.querySelector("thead tr") || [...(table?.querySelectorAll("tr") || [])].find((row) => row.querySelector("th"));
+    const headers = [...(headerRow?.children || [])].filter((cell) => /^(TD|TH)$/.test(cell.tagName))
+      .map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[._]/g, " ").replace(/\s+/g, " ").trim());
+    const ritColumn = headers.findIndex((label) => /^(?:rol|rit|nro rol|numero rol)$/.test(label));
+    const tribunalColumn = headers.findIndex((label) => /^(?:tribunal|corte)$/.test(label));
+    const mappedColumns = ritColumn >= 0 && tribunalColumn >= 0
+      ? { rit: (cells[ritColumn]?.textContent || "").replace(/\s+/g, " ").trim(), tribunal: (cells[tribunalColumn]?.textContent || "").replace(/\s+/g, " ").trim() }
+      : null;
     return {
       eligible: visible && fresh,
       cells: (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim()),
+      mappedColumns,
     };
-  }), Boolean(freshScope));
+  }), requireFresh);
   const matches = snapshots.map((row, index) => ({ ...row, index }))
-    .filter((row) => row.eligible && causeRowMatches(row.cells, causa));
+    .filter((row) => row.eligible && causeRowMatches(row.cells, causa, row.mappedColumns || undefined));
   if (matches.length > 1) {
     throw new PjudScrapeError(`OJV devolvió varias filas para ${causa.rit} y «${causa.tribunal}». No se pudo confirmar un expediente único.`);
   }
@@ -835,19 +854,19 @@ export async function openExactCauseModal(
   const staleDetails = (await page.locator(".modal").evaluateAll((nodes) => nodes.map((node) => node.innerHTML)))
     .filter((html) => parseMovimientosFromHtml(html).length > 0 || hasExplicitEmptyHistory(html));
   const row = rows.nth(matches[0].index);
-  const clicked = await row.evaluate((node, expectedCells) => {
-    if (expectedCells) {
+  const clicked = await row.evaluate((node, expected) => {
+    if (expected?.requireFresh) {
       if (!(window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node)) return false;
       const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
       const texts = (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim());
-      if (texts.length !== expectedCells.length || texts.some((text, index) => text !== expectedCells[index])) return false;
+      if (texts.length !== expected.cells.length || texts.some((text, index) => text !== expected.cells[index])) return false;
     }
     const icon = node.querySelector('img[src*="lupa" i], .glyphicon-search, .fa-search');
     const target = icon?.closest("a, button") || node.querySelector('a[title*="detalle" i], a[title*="ver" i], td a[onclick], td a, a[onclick], button');
     if (!(target instanceof HTMLElement)) return false;
     target.click();
     return true;
-  }, freshScope ? matches[0].cells : undefined);
+  }, requireFresh ? { cells: matches[0].cells, requireFresh: true } : undefined);
   if (!clicked) throw new PjudScrapeError(`La fila exacta de ${causa.rit} no tiene un enlace de detalle reconocible.`);
   await page.locator(`:is(${OJV.modal}):visible`).first().waitFor({ state: "visible", timeout: 20_000 });
   if (staleDetails.length) {
@@ -862,7 +881,7 @@ export async function openExactCauseModal(
   if (!(await cuadernoSelector(page))?.options.length) {
     await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId });
   }
-  return pickTribunalFromTexts(matches[0].cells);
+  return matches[0].mappedColumns?.tribunal || pickTribunalFromTexts(matches[0].cells);
 }
 
 export async function modalInnerHtml(page: PlaywrightPage) {
@@ -890,16 +909,16 @@ async function visibleCauseDetailModal(page: PlaywrightPage) {
 }
 
 /** Document links can contain 'anexo' too; only existing tab destinations qualify. */
-async function findModalHistoryTab(page: PlaywrightPage, kind: "history" | "notifications" | "writings") {
+async function findModalHistoryTab(page: PlaywrightPage, kind: "history" | "notifications" | "writings" | "diligences") {
   const modal = await visibleCauseDetailModal(page);
-  const selector = kind === "history" ? OJV.historiaTab : kind === "notifications" ? OJV.receptorTab : OJV.escritosTab;
+  const selector = kind === "history" ? OJV.historiaTab : kind === "notifications" ? OJV.receptorTab : kind === "writings" ? OJV.escritosTab : "a,button,[role='tab'],[data-toggle='tab'],[data-bs-toggle='tab']";
   const tabs = modal.locator(selector).filter({ visible: true });
   const resolution = await tabs.evaluateAll((nodes, options) => {
     const candidates = nodes.map((node, index) => {
       const owner = node.closest(".modal");
       if (!owner || (options.modalId && owner.id !== options.modalId)) return null;
       const label = (node.textContent || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
-      const semantic = options.kind === "history" ? /^(?:historia|historial|movimientos)(?:\b|_)/i : options.kind === "notifications" ? /^(?:notificaciones?|receptor)(?:\b|_)/i : /^(?:escritos?)(?:\b|_)/i;
+      const semantic = options.kind === "history" ? /^(?:historia|historial|movimientos)(?:\b|_)/i : options.kind === "notifications" ? /^(?:notificaciones?|receptor)(?:\b|_)/i : options.kind === "writings" ? /^(?:escritos?)(?:\b|_)/i : /^diligencias?(?:\b|_)/i;
       const navigation = Boolean(node.closest('.nav-tabs, .nav-pills, [role="tablist"]') || node.getAttribute("role") === "tab" || /^(?:tab|pill)$/.test(node.getAttribute("data-toggle") || node.getAttribute("data-bs-toggle") || ""));
       let panelId: string | undefined;
       for (const attribute of ["data-bs-target", "data-target", "href"]) {
@@ -907,7 +926,7 @@ async function findModalHistoryTab(page: PlaywrightPage, kind: "history" | "noti
         if (/^#[^\s#]+$/.test(value)) { panelId = value.slice(1); break; }
       }
       const target = panelId ? [...owner.querySelectorAll("[id]")].find((element) => element.id === panelId) : undefined;
-      const semanticId = Boolean(panelId && (options.kind === "history" ? /^(?:historia|historial|movimientos)/i : options.kind === "notifications" ? /^(?:notific|receptor)/i : /^escrito/i).test(panelId));
+      const semanticId = Boolean(panelId && (options.kind === "history" ? /^(?:historia|historial|movimientos)/i : options.kind === "notifications" ? /^(?:notific|receptor)/i : options.kind === "writings" ? /^escrito/i : /^diligencia/i).test(panelId));
       const meaningful = semantic.test(label) || semanticId;
       const anexoTab = options.kind === "history" && navigation && /^anexo/i.test(panelId || "");
       const panes = owner.querySelectorAll(".tab-pane").length;
@@ -1149,6 +1168,7 @@ export function mergePjudMovimientos(
       documentoRef: m.documentoRef || prev.documentoRef,
       documentoBytes: m.documentoBytes || prev.documentoBytes,
       documentoFilename: m.documentoFilename || prev.documentoFilename,
+      documentoMimeType: m.documentoMimeType || prev.documentoMimeType,
     });
   }
   return [...map.values()].sort(
@@ -1242,6 +1262,20 @@ export async function scrapeModalTabs(
   } catch (error) {
     if (!options.recoverPartial) throw error;
     options.onIncomplete?.("Escritos");
+  }
+
+  try {
+    const diligencias = await findModalHistoryTab(page, "diligences");
+    if (diligencias) {
+      await diligencias.tab.click();
+      const html = await waitForModalHistoryPanel(page, { label: "Diligencias", panelId: diligencias.panelId, optional: true, timeoutMs: timeout(), emptyIdleMs: options.emptyIdleMs });
+      await checkPaging("Diligencias");
+      const rows = parse(html, "Diligencias").map((movement) => ({ ...movement, relevante: true }));
+      movimientos = mergePjudMovimientos(movimientos, rows);
+    }
+  } catch (error) {
+    if (!options.recoverPartial) throw error;
+    options.onIncomplete?.("Diligencias");
   }
 
   return movimientos;
@@ -1392,6 +1426,14 @@ export async function changeCuaderno(
 }
 
 /** Read every listed cuaderno in its own scope, retaining explicit partial results. */
+function stripTransientDocumentoPayload(movement: PjudFetchedMovimiento): PjudFetchedMovimiento {
+  const copy = { ...movement };
+  delete copy.documentoPost;
+  delete copy.documentoAnexo;
+  delete copy.documentoAnexoAction;
+  return copy;
+}
+
 export async function scrapeAllCuadernos(
   page: PlaywrightPage,
   options: { panelTimeoutMs?: number; transitionTimeoutMs?: number; totalTimeoutMs?: number; emptyIdleMs?: number; allowPrompts?: boolean; signal?: AbortSignal; downloadDocuments?: boolean; excludeDocumentExternalIds?: readonly string[]; documentExternalIds?: readonly string[] } = {}
@@ -1404,17 +1446,23 @@ export async function scrapeAllCuadernos(
     remainingDocuments = (await import("@/lib/pjud/pdf-backup")).pjudDocDownloadMaxPerRun();
   }
   const download = async (rows: PjudFetchedMovimiento[]) => {
-    if (remainingDocuments <= 0 || remainingDocumentBytes < 100) return rows;
+    const stripTransient = (items: PjudFetchedMovimiento[]) => items.map(stripTransientDocumentoPayload);
+    if (remainingDocuments <= 0 || remainingDocumentBytes < 100 || !options.downloadDocuments || !pjudDocumentDownloadsAllowed()) return stripTransient(rows);
     const excluded = new Set(options.excludeDocumentExternalIds);
     const allowed = options.documentExternalIds ? new Set(options.documentExternalIds) : null;
     const { isBackupableDocumentoRef } = await import("@/lib/pjud/pdf-backup");
-    const eligible = rows.filter(row => isBackupableDocumentoRef(row.documentoRef) && !excluded.has(row.externalId) && (!allowed || allowed.has(row.externalId))).slice(0, remainingDocuments);
-    const downloaded = await attachDocumentoBytesFromPage(page, eligible, { limit: remainingDocuments, maxTotalBytes: remainingDocumentBytes });
+    const eligible = rows.filter(row => (isBackupableDocumentoRef(row.documentoRef) || Boolean(row.documentoPost) || Boolean(row.documentoAnexoAction)) && !excluded.has(row.externalId) && (!allowed || allowed.has(row.externalId))).slice(0, remainingDocuments);
+    const downloaded: PjudFetchedMovimiento[] = [];
+    for (let index = 0; index < eligible.length; index++) {
+      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      if (index > 0) await delay((await import("@/lib/pjud/pdf-backup")).pjudDocDownloadDelayMs());
+      downloaded.push(...await attachDocumentoBytesFromPage(page, [eligible[index]], { limit: 1, maxTotalBytes: remainingDocumentBytes, allowPrompts: options.allowPrompts, signal: options.signal }));
+      remainingDocumentBytes -= downloaded[downloaded.length - 1]?.documentoBytes?.length || 0;
+      remainingDocuments -= 1;
+    }
     const byId = new Map(downloaded.map(row => [row.externalId, row]));
     const result = rows.map(row => byId.get(row.externalId) || row);
-    remainingDocuments -= eligible.length;
-    remainingDocumentBytes -= downloaded.reduce((sum, row) => sum + (row.documentoBytes?.length || 0), 0);
-    return result;
+    return stripTransient(result);
   };
   if (!first?.options.length) {
     let incomplete = false;
@@ -1467,33 +1515,189 @@ export async function scrapeAllCuadernos(
  * Bare `fetch()` after scrape usually hits a login wall HTML page.
  * Downloads are strictly sequential with a delay between requests.
  */
+async function captureAnnexDocumentFromRow(
+  page: PlaywrightPage,
+  movement: PjudFetchedMovimiento,
+  manualPolicy: boolean,
+  signal?: AbortSignal,
+): Promise<PjudFetchedMovimiento> {
+  const action = movement.documentoAnexoAction || "";
+  if (!/^(?:anexoSolicitudCivil|escritoSuprema|verDocTramiteSupremaPdf|anexoEscritoApelaciones|anexoEscritoLaboral|anexoEscritoCobranza|anexoEscritoPenal|documentosCobranza|anexoEscritoSuprema|#modal[A-Za-z0-9_-]+)$/i.test(action)) return movement;
+  const detailModals = page.locator(OJV.modal).filter({ visible: true }).and(page.locator('[id^="modalDetalle"]'));
+  const detailModalCount = await detailModals.count().catch(() => 0);
+  if (detailModalCount > 1) throw new PjudScrapeError("OJV mostró varios detalles de causa simultáneos; no se capturará un anexo ambiguo.");
+  const scope = detailModalCount === 1 ? detailModals.first() : page;
+  const selector = action.startsWith("#") ? 'a[href="' + action + '"]' : 'a[onclick*="' + action + '"]';
+  const rows = scope.locator("tr").filter({ hasText: movement.titulo });
+  const matching: Array<{ row: Locator; trigger: Locator }> = [];
+  for (const row of await rows.all()) {
+    const trigger = row.locator(selector);
+    if (await trigger.count().catch(() => 0) === 1) matching.push({ row, trigger });
+  }
+  const normalizeDate = (value: string) => {
+    const text = value.trim();
+    let parts = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|T)/.exec(text);
+    if (parts) return parts[1] + "-" + parts[2]!.padStart(2, "0") + "-" + parts[3]!.padStart(2, "0");
+    parts = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/.exec(text);
+    if (!parts) return null;
+    const year = parts[3]!.length === 2 ? "20" + parts[3] : parts[3]!;
+    return year + "-" + parts[2]!.padStart(2, "0") + "-" + parts[1]!.padStart(2, "0");
+  };
+  if (matching.length > 1) {
+    const candidates = await Promise.all(matching.map(async candidate => ({
+      ...candidate,
+      cells: await candidate.row.locator("td").allInnerTexts().catch(() => [] as string[]),
+    })));
+    let identified = candidates;
+    const expectedDate = movement.fecha instanceof Date && Number.isFinite(movement.fecha.getTime())
+      ? movement.fecha.toISOString().slice(0, 10)
+      : null;
+    if (expectedDate) {
+      const rowsWithDates = identified.filter(candidate => candidate.cells.some(cell => normalizeDate(cell)));
+      if (rowsWithDates.length) {
+        identified = rowsWithDates.filter(candidate => candidate.cells.some(cell => normalizeDate(cell) === expectedDate));
+      }
+    }
+    const folio = movement.folio?.trim();
+    if (folio && identified.some(candidate => candidate.cells.some(cell => cell.trim() === folio))) {
+      identified = identified.filter(candidate => candidate.cells.some(cell => cell.trim() === folio));
+    }
+    if (identified.length > 1 && movement.detalle?.trim()) {
+      const normalizeText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ").trim().toLowerCase();
+      const detalle = normalizeText(movement.detalle);
+      const byDetail = identified.filter(candidate => normalizeText(candidate.cells.join(" | ")) === detalle);
+      if (byDetail.length) identified = byDetail;
+    }
+    matching.splice(0, matching.length, ...identified.map(({ row, trigger }) => ({ row, trigger })));
+  }
+  if (matching.length !== 1) return movement;
+  await assertPjudPromptPolicy(page, manualPolicy);
+  const activeModals = () => page.locator(".modal.in, .modal.show").filter({ visible: true });
+  const before = await activeModals().count().catch(() => 0);
+  let annex: Locator | null = null;
+  try {
+    const paneId = await matching[0]!.trigger.evaluate(element => element.closest(".tab-pane[id]")?.id || "").catch(() => "");
+    if (paneId) {
+      const panes = scope.locator(".tab-pane[id]");
+      const paneVisible = await panes.evaluateAll((nodes, id) => nodes.some(node => {
+        if ((node as HTMLElement).id !== id) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && getComputedStyle(node).display !== "none";
+      }), paneId).catch(() => false);
+      if (!paneVisible) {
+        const tabs = scope.locator("a,button,[role='tab'],[data-toggle='tab'],[data-bs-toggle='tab']");
+        const tabIndex = await tabs.evaluateAll((nodes, id) => nodes.findIndex(node =>
+          ["href", "data-target", "data-bs-target"].some(attribute => node.getAttribute(attribute) === "#" + id)
+        ), paneId).catch(() => -1);
+        if (tabIndex < 0) return movement;
+        const paneTab = tabs.nth(tabIndex);
+        if (!(await paneTab.isVisible().catch(() => false))) return movement;
+        await paneTab.click({ timeout: 5_000 });
+      }
+      if (!(await waitForLocatorVisible(matching[0]!.trigger, signal, 3_000))) return movement;
+    }
+    await matching[0]!.trigger.click({ timeout: 8_000 });
+    const deadline = Date.now() + 8_000;
+    while (Date.now() < deadline) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const modals = activeModals();
+      if (await modals.count().catch(() => 0) > before) {
+        annex = modals.last();
+        const id = await annex.getAttribute("id").catch(() => "");
+        if (/^modalDetalle/i.test(id || "")) annex = null;
+        else break;
+      }
+      await delay(100);
+    }
+    if (!annex) return movement;
+    const readinessDeadline = Math.min(deadline, Date.now() + 3_000);
+    let idleSince = 0;
+    while (Date.now() < readinessDeadline) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const readiness = await annex.evaluate(node => {
+        const downloadable = Boolean(node.querySelector('form[action], a[href]:not([href=""]):not([href^="#"])'));
+        const busy = Boolean(node.querySelector('.spinner, .spinner-border, .fa-spinner, [aria-busy="true"], .loading, .loadingConsulta, .dataTables_processing'));
+        const host = window as typeof window & { jQuery?: { active?: number }; $?: { active?: number } };
+        const jquery = host.jQuery || host.$;
+        return { downloadable, busy, ajaxActive: Number(jquery?.active || 0) > 0 };
+      }).catch(() => ({ downloadable: false, busy: true, ajaxActive: true }));
+      if (readiness.downloadable) break;
+      if (!readiness.busy && !readiness.ajaxActive) {
+        if (!idleSince) idleSince = Date.now();
+        else if (Date.now() - idleSince >= 200) break;
+      } else idleSince = 0;
+      await delay(Math.min(50, Math.max(0, readinessDeadline - Date.now())));
+    }
+    const html = await annex.innerHTML().catch(() => "");
+    const post = extractDocumentoPostFromRowHtml(html);
+    if (post) return { ...movement, documentoPost: post, documentoAnexoAction: undefined };
+    const href = extractDocumentoHrefFromRowHtml(html);
+    if (href) return { ...movement, documentoRef: href, documentoAnexoAction: undefined };
+    return movement;
+  } finally {
+    const modals = activeModals();
+    if (await modals.count().catch(() => 0) > before) {
+      const last = modals.last();
+      const id = await last.getAttribute("id").catch(() => "");
+      if (!/^modalDetalle/i.test(id || "")) {
+        const close = last.locator('button[data-dismiss="modal"], a[data-dismiss="modal"], button[data-bs-dismiss="modal"], a[data-bs-dismiss="modal"], .modal-header .close').filter({ visible: true }).first();
+        if (await close.count().catch(() => 0)) {
+          await close.click({ timeout: 5_000 }).catch(() => undefined);
+          await last.waitFor({ state: "hidden", timeout: 8_000 }).catch(() => undefined);
+          await page.locator(".modal-backdrop").filter({ visible: true }).first().waitFor({ state: "hidden", timeout: 8_000 }).catch(() => undefined);
+        }
+      }
+    }
+  }
+}
+
+async function waitForLocatorVisible(locator: Locator, signal: AbortSignal | undefined, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (await locator.isVisible().catch(() => false)) return true;
+    await delay(Math.min(50, Math.max(0, deadline - Date.now())));
+  }
+  return false;
+}
+
 export async function attachDocumentoBytesFromPage(
   page: PlaywrightPage,
   movimientos: PjudFetchedMovimiento[],
-  opts?: { limit?: number; delayMs?: number; maxTotalBytes?: number }
+  opts?: { limit?: number; delayMs?: number; maxTotalBytes?: number; allowPrompts?: boolean; signal?: AbortSignal }
 ): Promise<PjudFetchedMovimiento[]> {
   if (!pjudDocumentDownloadsAllowed()) return movimientos;
-  const { validPjudDownloadedContent, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
+  const { inferPjudDownloadedFileMeta, validPjudDownloadedContent, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
   const limit = opts?.limit ?? pjudDocDownloadMaxPerRun(), delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
   let remainingBytes = Math.min(opts?.maxTotalBytes ?? 20 * 1024 * 1024, 20 * 1024 * 1024), attempted = 0;
   const out: PjudFetchedMovimiento[] = [];
   const pageUrl = new URL(page.url());
-  for (const movement of movimientos) {
-    const ref = movement.documentoRef || null;
+  for (const original of movimientos) {
+    if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const movement = original.documentoAnexoAction && !original.documentoRef && !original.documentoPost
+      ? await captureAnnexDocumentFromRow(page, original, opts?.allowPrompts === false, opts?.signal)
+      : original;
+    const post = movement.documentoPost || null;
+    const ref = post?.action || movement.documentoRef || null;
     let allowed = false;
     try { const url = new URL(ref || ""); allowed = url.protocol === "https:" && (!url.port || url.port === "443") && !url.username && !url.password && (url.hostname === "pjud.cl" || url.hostname.endsWith(".pjud.cl")) && pageUrl.protocol === "https:" && (!pageUrl.port || pageUrl.port === "443") && (pageUrl.hostname === "pjud.cl" || pageUrl.hostname.endsWith(".pjud.cl")); } catch { /* Not a valid official document URL. */ }
-    if (attempted >= limit || remainingBytes < 100 || !allowed || !ref) { out.push(movement); continue; }
+    if (attempted >= limit || remainingBytes < 100 || !allowed || !ref || (post && new URL(ref).origin !== pageUrl.origin)) { out.push(movement); continue; }
     if (attempted > 0 && delayMs > 0) await delay(delayMs);
     attempted++;
     try {
       // Same-origin reads stay in the browser; cross-origin official documents use a URL-scoped local transport.
       // APIRequestContext.get buffers the entire response; the page reader cancels at the bound.
-      const result = new URL(ref).origin === pageUrl.origin ? await page.evaluate(async ({ href, maximum }) => {
+      const result = new URL(ref).origin === pageUrl.origin ? await page.evaluate(async ({ href, maximum, fields }) => {
         const target = new URL(href);
         if (target.protocol !== "https:" || target.origin !== location.origin || target.username || target.password || !(target.hostname === "pjud.cl" || target.hostname.endsWith(".pjud.cl"))) return null;
         const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 35_000);
         try {
-          const response = await fetch(target.href, { credentials: "include", redirect: "error", cache: "no-store", signal: controller.signal });
+          const response = await fetch(target.href, {
+            method: fields ? "POST" : "GET",
+            ...(fields ? { headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: new URLSearchParams(fields).toString() } : {}),
+            credentials: "include", redirect: "error", cache: "no-store", signal: controller.signal
+          });
           const contentType = response.headers.get("content-type") || "";
           if (!response.ok || /text\/html/i.test(contentType) || Number(response.headers.get("content-length") || 0) > maximum) { await response.body?.cancel(); return null; }
           const reader = response.body?.getReader();
@@ -1510,18 +1714,19 @@ export async function attachDocumentoBytesFromPage(
           } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
         } catch { return null; }
         finally { clearTimeout(timer); }
-      }, { href: ref, maximum: remainingBytes }) : null;
-      const direct = new URL(ref).origin === pageUrl.origin ? null : await (await import("@/lib/pjud/authenticated-document")).readAuthenticatedPjudDocument(page, ref, remainingBytes);
+      }, { href: ref, maximum: remainingBytes, fields: post?.fields || null }) : null;
+      const direct = !post && new URL(ref).origin !== pageUrl.origin ? await (await import("@/lib/pjud/authenticated-document")).readAuthenticatedPjudDocument(page, ref, remainingBytes) : null;
       if (!result && !direct) { out.push(movement); continue; }
       const bytes = direct?.bytes || Buffer.concat(result!.chunks.map(chunk => Buffer.from(chunk, "base64")));
       const contentType = direct?.contentType || result!.contentType;
       if (!validPjudDownloadedContent(bytes, contentType, ref, remainingBytes)) { out.push(movement); continue; }
       remainingBytes -= bytes.length;
-      const filename = new URL(ref).pathname.split("/").filter(Boolean).pop() || `folio-${movement.folio || attempted}.pdf`;
-      out.push({ ...movement, documentoBytes: bytes, documentoFilename: filename });
+      const meta = inferPjudDownloadedFileMeta(bytes, contentType, ref, "pjud-" + (movement.folio || attempted));
+      if (!meta) { out.push(movement); continue; }
+      out.push({ ...movement, documentoBytes: bytes, documentoFilename: meta.filename, documentoMimeType: meta.mimeType });
     } catch { out.push(movement); }
   }
-  return out;
+  return out.map(stripTransientDocumentoPayload);
 }
 
 export async function fillRolSearchFields(
@@ -1848,7 +2053,7 @@ export async function collectOjvResultPages(
     const next = panel
       .getByRole("link", { name: /^(Siguiente|Next|›|»)$/i })
       .or(panel.getByRole("button", { name: /^(Siguiente|Next|›|»)$/i }))
-      .or(panel.locator('.pagination a[rel="next"], [aria-label="Next" i], [aria-label="Siguiente" i], .paginate_button.next, a.page-link:has-text("›")'))
+      .or(panel.locator('.pagination a[rel="next"], [aria-label="Next" i], [aria-label="Siguiente" i], .paginate_button.next, .dataTables_paginate a.paginate_button.next:not(.disabled), .dataTables_paginate li.next:not(.disabled) a, a.page-link:has-text("›")'))
       .filter({ visible: true }).first();
     if (!(await next.count())) return false;
     const disabled = await next.evaluate((el) => Boolean(

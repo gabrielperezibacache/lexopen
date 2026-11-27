@@ -130,7 +130,7 @@ function lifetimeMs(value: number | undefined) {
 
 function checkedMaterias(materias?: readonly MisCausasMateria[]) {
   if (materias === undefined) return undefined;
-  const allowed = new Set<string>([...MIS_CAUSAS_MATERIAS, "Corte Apelaciones"]);
+  const allowed = new Set<string>([...MIS_CAUSAS_MATERIAS, "Apelaciones"]);
   if (!materias.length || materias.length > allowed.size || materias.some(materia => !allowed.has(materia))) throw new ManualOjvSessionError("invalid-materias");
   return [...new Set(materias)];
 }

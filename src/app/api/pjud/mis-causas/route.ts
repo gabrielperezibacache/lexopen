@@ -11,8 +11,9 @@ import {
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
-import { parseMisCausasRequest } from "@/lib/pjud/mis-causas-request";
+import { parseMisCausasRequest, resolveMisCausasDownloadDocuments, shouldProcessMisCausasInline } from "@/lib/pjud/mis-causas-request";
 import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
+import { processPendingSyncJobs, processPjudSyncJobIdBatches } from "@/lib/pjud/queue";
 import { privatePjudJson as json, privatePjudResponse } from "@/lib/pjud/private-response";
 import { after, NextRequest } from "next/server";
 
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     const syncMovimientos = body?.syncMovimientos !== false;
+    const downloadDocuments = resolveMisCausasDownloadDocuments(body?.downloadDocuments);
     // Cron / explicit wait: await. UI: 202 + background (Cloudflare ~100s).
     const waitForResult = Boolean(cron) || body?.wait === true;
 
@@ -107,6 +109,7 @@ export async function POST(req: NextRequest) {
           const result = await syncMisCausas({
             actorId: actor,
             syncMovimientos,
+            downloadDocuments,
             processJobsInline: false,
             claim: { settingsId: claim.settingsId, claimedAt: claim.claimedAt! },
           });
@@ -123,6 +126,18 @@ export async function POST(req: NextRequest) {
                 async: true,
               },
             });
+          }
+          if (syncMovimientos && result.enqueuedJobIds.length && await getCaseManagementMode() === "pjud_cl") {
+            try {
+              await processPjudSyncJobIdBatches(result.enqueuedJobIds, async (jobIds) => {
+                if (await getCaseManagementMode() !== "pjud_cl") return [];
+                return processPendingSyncJobs({ actorId: actor, jobIds, limit: jobIds.length, downloadDocuments });
+              });
+            } catch {
+              if (await getCaseManagementMode() === "pjud_cl") {
+                console.error("[pjud/mis-causas] background movement processing failed.");
+              }
+            }
           }
         } catch (error) {
           if (await getCaseManagementMode() !== "pjud_cl") return;
@@ -148,7 +163,10 @@ export async function POST(req: NextRequest) {
       automatic: Boolean(cron),
       actorId,
       syncMovimientos,
-      processJobsInline: false,
+      downloadDocuments,
+      // Scheduled refresh keeps its enqueue-only contract. An explicit wait=true request
+      // drains just the IDs created by this run before returning.
+      processJobsInline: shouldProcessMisCausasInline({ cron: Boolean(cron), wait: body?.wait }),
     });
 
     if (actorId) {

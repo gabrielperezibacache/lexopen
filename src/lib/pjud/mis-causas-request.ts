@@ -4,8 +4,23 @@ import { httpError } from "@/lib/auth/access";
 const requestSchema = z.object({
   action: z.enum(["sync", "clear_errors"]).optional(),
   syncMovimientos: z.boolean().optional(),
+  downloadDocuments: z.boolean().optional(),
   wait: z.boolean().optional(),
 }).strict();
+
+/** Scheduled cron requests enqueue; only an explicit non-cron wait drains inline. */
+export function shouldProcessMisCausasInline(input: { cron: boolean; wait?: boolean }) {
+  return !input.cron && input.wait === true;
+}
+
+/** Preserve a user's saved per-cause preference unless the global kill switch is set. */
+export function resolveMisCausasDownloadDocuments(
+  requested: boolean | undefined,
+  policyValue: string | undefined = process.env.PJUD_DOC_DOWNLOADS,
+): boolean | undefined {
+  if (policyValue?.trim() === "0") return false;
+  return requested;
+}
 
 /** Cron puede omitir el cuerpo; un cuerpo inválido nunca inicia trabajo. */
 export async function parseMisCausasRequest(req: Request) {

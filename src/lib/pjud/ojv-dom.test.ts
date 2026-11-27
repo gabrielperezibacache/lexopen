@@ -33,11 +33,21 @@ assert.deepEqual(parseRitParts("100-2024"), {
   numero: "100",
   era: "2024",
 });
+assert.deepEqual(parseRitParts("Civil-1234-2024"), { tipo: "CIVIL", numero: "1234", era: "2024" });
+assert.deepEqual(parseRitParts("Protección-55-2025"), { tipo: "PROTECCION", numero: "55", era: "2025" });
+assert.deepEqual(parseRitParts("Policía Local-7-2025"), { tipo: "POLICIA LOCAL", numero: "7", era: "2025" });
+assert.deepEqual(extractRitsFromText("Civil-1234-2024 · Protección-55-2025 · Policía Local-7-2025 · Penal-99-2025"), [
+  "CIVIL-1234-2024", "PROTECCION-55-2025", "POLICIA LOCAL-7-2025", "PENAL-99-2025",
+]);
+assert.deepEqual(extractRitsFromText("Fecha 27-11-2026"), [], "date fragments must not be misread as a RIT");
+assert.deepEqual(extractRitsFromText("Notificación resolución C-1234-2024"), ["C-1234-2024"], "ordinary prose before a typed RIT must not consume its prefix");
+assert.equal(parseRitParts("27-11-2026"), null, "a full day-month-year date is not a RIT");
 
 assert.equal(inferCompetenciaFromTribunal("1º Juzgado Civil de Santiago"), "3");
 assert.equal(inferCompetenciaFromTribunal("Corte de Apelaciones de Santiago"), "2");
 assert.equal(inferCompetenciaFromTribunal("C.A. Santiago"), "2");
 assert.equal(inferCompetenciaFromTribunal("Juzgado de Cobranza de Santiago"), "6");
+assert.equal(inferCompetenciaFromTribunal("1º Juzgado de Familia de Santiago"), "7");
 assert.equal(inferCompetenciaFromTribunal("Tribunal de Juicio Oral en lo Penal"), "5");
 assert.equal(tribunalLabelsMatch("C.A. Santiago", "Corte de Apelaciones de Santiago"), true);
 assert.equal(pickCorteForTribunal([
@@ -56,9 +66,30 @@ assert.equal(pickCorteForTribunal([
 assert.equal(isPlaceholderTribunal("Tribunal no identificado"), true);
 assert.equal(isPlaceholderTribunal("Por identificar"), true);
 assert.equal(isPlaceholderTribunal("1º Juzgado Civil de Santiago"), false);
+assert.equal(pickTribunalFromTexts(["1º J.L.T. de Santiago"]), "1º J.L.T. de Santiago");
+assert.equal(pickTribunalFromTexts(["J.G. de Iquique"]), "J.G. de Iquique");
+assert.equal(pickTribunalFromTexts(["T.O.P. de Santiago"]), "T.O.P. de Santiago");
+assert.equal(pickTribunalFromTexts(["Juz. de Letras de Santiago"]), "Juz. de Letras de Santiago");
+assert.equal(pickTribunalFromTexts(["C.A. de Iquique"]), "C.A. de Iquique");
+assert.equal(pickTribunalFromTexts(["Corte de Apelaciones de Iquique contra Rebolledo", "Corte Suprema"]), "Corte Suprema",
+  "a caption that begins with a canonical court name is still not a tribunal cell");
 assert.equal(
   pickTribunalFromTexts(["C-1-2024", "1º Juzgado de Familia de Santiago", "Tramitación"]),
   "1º Juzgado de Familia de Santiago"
+);
+assert.equal(
+  pickTribunalFromTexts([
+    "38220-2025",
+    "REBOLLEDO DIAZ MARIA FERNANDA CONTRA SALA DE LA ILUSTRÍSIMA CORTE DE APELACIONES DE IQUIQUE",
+    "Corte Suprema",
+  ]),
+  "Corte Suprema",
+  "a canonical Supreme Court cell outranks the court name embedded in a case caption"
+);
+assert.equal(
+  pickTribunalFromTexts(["18390-2025", "(Penal) Contienda de Competencia", "Corte Suprema"]),
+  "Corte Suprema",
+  "a resource type must not be mistaken for the tribunal"
 );
 assert.equal(
   tribunalLabelsMatch(
@@ -99,6 +130,10 @@ assert.equal(ritLabelsMatch("C-11-2024", wanted.rit), false);
 assert.equal(ritLabelsMatch("F-1-2024", wanted.rit), false);
 assert.equal(ritLabelsMatch("1-2024", wanted.rit), false, "a missing letter is not a confirmed identity");
 assert.equal(causeRowMatches(["C-1-2024", wanted.tribunal], wanted), true);
+assert.equal(causeRowMatches(
+  ["18390-2025", "(Penal) Contienda de Competencia", "Parte A CONTRA Sala de la Corte de Apelaciones de Iquique", "Corte Suprema"],
+  { rit: "18390-2025", tribunal: "Corte Suprema" }
+), true, "the exact Supreme Court column confirms this row despite unrelated text cells");
 assert.equal(causeRowMatches(["C-11-2024", wanted.tribunal], wanted), false);
 assert.equal(causeRowMatches(["F-1-2024", wanted.tribunal], wanted), false);
 assert.equal(causeRowMatches(["C-1-2024", "2º Juzgado Civil de Santiago"], wanted), false);
