@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { readManuallyAuthenticatedMisCausas } from "@/lib/pjud/live-validation";
 import { redactedPjudValidationUrl, startClaveUnicaOidcFromOjv } from "@/lib/pjud/ojv-oidc";
-import { applyMisCausasFiltros, clickMisCausasBuscar, collectMisCausasFromAuthenticatedOjv, openClaveUnicaFromOjv, readCausaDetailFromAuthenticatedOjv } from "@/lib/pjud/public-scrape";
+import { applyMisCausasFiltros, clickMisCausasBuscar, collectMisCausasFromAuthenticatedOjv, openClaveUnicaFromOjv, PjudScrapeError, readCausaDetailFromAuthenticatedOjv, waitForAuthenticatedOjvPage, waitForMisCausasMenuEntry } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -258,6 +258,60 @@ async function main() {
     assert.equal(await detailPage.evaluate(() => Boolean((window as typeof window & { detailOpened?: boolean }).detailOpened)), true);
     assert.equal(detailResult.movimientos.some(movement => movement.titulo.includes("Resolución ficticia de Corte Suprema")), true);
     await detailContext.close();
+
+    const readinessContext = await browser.newContext();
+    await readinessContext.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      const pathname = new URL(route.request().url()).pathname;
+      const body = pathname === "/home/index.php"
+        ? '<main><h1>Consulta Unificada</h1></main>'
+        : `<main id="return"></main><script>
+            setTimeout(()=>{const signout=document.createElement('a');signout.href='/logout';signout.textContent='Cerrar sesión';document.querySelector('#return').append(signout)},250);
+            setTimeout(()=>{const menu=document.createElement('a');menu.id='menuMisCausas';menu.href='#';menu.textContent='Mis Causas';document.querySelector('#return').append(menu)},450);
+          </script>`;
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body });
+    });
+    const publicTab = await readinessContext.newPage();
+    await publicTab.goto("https://oficinajudicialvirtual.pjud.cl/home/index.php");
+    const delayedReturnTab = await readinessContext.newPage();
+    await delayedReturnTab.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+    const readyTab = await waitForAuthenticatedOjvPage(publicTab, {}, 1_500);
+    assert.equal(readyTab, delayedReturnTab, "a delayed authenticated return beats the initial public OJV tab");
+    assert.equal(await waitForMisCausasMenuEntry(readyTab, {}, 1_000), true, "menu entry may appear after the session marker");
+    assert.equal(await waitForMisCausasMenuEntry(publicTab, {}, 150), false, "a public tab without the menu is not treated as authenticated");
+    await readinessContext.close();
+
+    const absentMenuContext = await browser.newContext();
+    await absentMenuContext.route("https://oficinajudicialvirtual.pjud.cl/**", route => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: '<a href="/logout">Cerrar sesión</a><main>OJV</main>',
+    }));
+    const absentMenuPage = await absentMenuContext.newPage();
+    await absentMenuPage.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+    assert.equal(await waitForAuthenticatedOjvPage(absentMenuPage, {}, 150), absentMenuPage,
+      "a visible session marker confirms the OJV page even when Mis Causas has not rendered");
+    assert.equal(await waitForMisCausasMenuEntry(absentMenuPage, {}, 150), false,
+      "a confirmed session with no menu remains distinct from an unconfirmed session");
+    await absentMenuContext.close();
+
+    const noSessionContext = await browser.newContext();
+    await noSessionContext.route("https://oficinajudicialvirtual.pjud.cl/**", route => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: "<main><h1>Consulta Unificada</h1></main>",
+    }));
+    const noSessionPage = await noSessionContext.newPage();
+    await noSessionPage.goto("https://oficinajudicialvirtual.pjud.cl/home/index.php");
+    await assert.rejects(waitForAuthenticatedOjvPage(noSessionPage, {}, 150), error => {
+      assert.ok(error instanceof PjudScrapeError);
+      assert.match(error.message, /No se confirmó una señal visible de sesión/);
+      assert.doesNotMatch(error.message, /Se autenticó/);
+      return true;
+    });
+    const controller = new AbortController();
+    const pendingSessionWait = waitForAuthenticatedOjvPage(noSessionPage, { signal: controller.signal }, 5_000);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    controller.abort();
+    await assert.rejects(pendingSessionWait, error => error instanceof DOMException && error.name === "AbortError");
+    await noSessionContext.close();
     console.log("pjud/live-validation.dom.test.ts OK (offline browser fixtures)");
   } finally {
     await browser.close();

@@ -306,6 +306,75 @@ async function waitForMisCausasMenuReady(page: AnyPage, options: MisCausasReadOp
   throw new PjudScrapeError("El menú de Mis Causas no terminó de cargar las materias seleccionadas.");
 }
 
+function isOfficialOjvUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ["oficinajudicialvirtual.pjud.cl", "ojv.pjud.cl"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function hasVisibleOjvSessionSignal(page: AnyPage) {
+  const structural = page.locator([
+    OJV.misCausasMenu,
+    'a[href*="logout" i], button[onclick*="logout" i], a[onclick*="cerrarSesion" i], button[onclick*="cerrarSesion" i], #btnSalir, #btnCerrarSesion',
+  ].join(", ")).filter({ visible: true });
+  if (await structural.count().catch(() => 0)) return true;
+  const sessionLabel = page.getByRole("link", { name: /^(?:Mis Causas|Cerrar sesión|Salir)$/i })
+    .or(page.getByRole("button", { name: /^(?:Mis Causas|Cerrar sesión|Salir)$/i }))
+    .filter({ visible: true });
+  return (await sessionLabel.count().catch(() => 0)) > 0;
+}
+
+/** Select only an official OJV tab whose visible DOM confirms an authenticated session. */
+export async function waitForAuthenticatedOjvPage(
+  page: PlaywrightPage,
+  options: Pick<MisCausasReadOptions, "signal"> = {},
+  timeoutMs = 30_000,
+): Promise<PlaywrightPage> {
+  const deadline = Date.now() + Math.max(timeoutMs, 1);
+  do {
+    assertMisCausasReadActive(options);
+    const candidates = page.context().pages().filter((candidate) => isOfficialOjvUrl(candidate.url())).reverse();
+    for (const candidate of candidates) {
+      assertMisCausasReadActive(options);
+      if (await hasVisibleOjvSessionSignal(candidate)) return candidate;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(Math.min(100, deadline - Date.now()));
+  } while (Date.now() < deadline);
+  throw new PjudScrapeError(
+    "No se confirmó una señal visible de sesión en una pestaña oficial de OJV tras volver de ClaveÚnica; no se abrió Mis Causas.",
+    502,
+  );
+}
+
+/** Wait briefly for the authenticated OJV shell to render its Mis Causas entry. */
+export async function waitForMisCausasMenuEntry(
+  page: AnyPage,
+  options: MisCausasReadOptions = {},
+  timeoutMs = 8_000,
+) {
+  const candidates = [
+    page.getByRole("link", { name: /^Mis Causas$/i }).first(),
+    page.getByRole("button", { name: /^Mis Causas$/i }).first(),
+    page.locator(OJV.misCausasMenu).first(),
+    page.locator("#menuMisCausas, #misCausas, a[href*='misCausa' i]").first(),
+    page.locator("text=/^\\s*Mis Causas\\s*$/i").first(),
+  ];
+  const deadline = Date.now() + Math.max(timeoutMs, 1);
+  do {
+    assertMisCausasReadActive(options);
+    for (const candidate of candidates) {
+      if (await candidate.count().catch(() => 0)) return true;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(Math.min(100, deadline - Date.now()));
+  } while (Date.now() < deadline);
+  return false;
+}
+
 async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = {}): Promise<boolean> {
   if (options.allowPrompts === false) {
     // Only close a recognized record detail; terms and notices remain untouched.
@@ -338,6 +407,7 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
     await waitForMisCausasMenuReady(page, options);
     return true;
   }
+  if (!(await waitForMisCausasMenuEntry(page, options))) return false;
   const candidates = [
     page.getByRole("link", { name: /^Mis Causas$/i }).first(),
     page.getByRole("button", { name: /^Mis Causas$/i }).first(),
@@ -684,40 +754,27 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
       .catch(() => undefined);
     await fillClaveUnicaLoginForm(page, opts.rut, opts.password);
 
-    // Tras OIDC puede haber popup de return.php; preferir pestaña OJV.
-    const pages = page.context().pages();
-    for (const p of pages) {
-      if (/oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(p.url())) {
-        page = p;
-        break;
-      }
-    }
-    await page
-      .waitForURL(/pjud\.cl/i, { timeout: 60_000 })
-      .catch(() => undefined);
-    await page
-      .waitForLoadState("domcontentloaded")
-      .catch(() => undefined);
+    // The first OJV tab may still be the public pre-login page. Wait for a
+    // visible session marker across official OJV tabs before selecting one.
+    page = await waitForAuthenticatedOjvPage(page, { signal: opts.signal });
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
     await dismissOjvPrompts(page);
 
     const { items, openedMenu, materiasTried } =
-      await collectMisCausasFromAuthenticatedOjv(page);
+      await collectMisCausasFromAuthenticatedOjv(page, { signal: opts.signal });
 
     if (items.length === 0) {
       const location = new URL(page.url());
       const url = `${location.origin}${location.pathname}`;
-      const stillLogin = isClaveUnicaAccountsUrl(url);
       throw new PjudScrapeError(
-        stillLogin
-          ? `El login de ClaveÚnica no llegó a OJV (url=${url}). Revise credenciales o CAPTCHA.`
-          : [
-              "Se autenticó en ClaveÚnica pero no se listaron causas en Mis Causas.",
-              openedMenu
-                ? `Menú Mis Causas abierto; materias probadas: ${materiasTried.join(", ") || "(ninguna visible)"}.`
-                : "No se encontró el menú «Mis Causas» (sesión incompleta o layout distinto).",
-              `url=${url}.`,
-              "En OJV: Mis Causas → materia (p. ej. Civil/Familia) → Filtros/Buscar.",
-            ].join(" ")
+        [
+          "Se confirmó una señal visible de sesión en OJV, pero no se listaron causas en Mis Causas.",
+          openedMenu
+            ? `Menú Mis Causas abierto; materias probadas: ${materiasTried.join(", ") || "(ninguna visible)"}.`
+            : "La sesión OJV fue visible, pero no apareció el menú «Mis Causas».",
+          `url=${url}.`,
+          "En OJV: Mis Causas → materia (p. ej. Civil/Familia) → Filtros/Buscar.",
+        ].join(" ")
       );
     }
     return items;
