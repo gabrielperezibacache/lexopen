@@ -76,7 +76,7 @@ export function inferPjudDownloadedFileMeta(
     extension = "docx";
     mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   } else if (bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("d0cf11e0", "hex")) &&
-    (/application\/msword/i.test(mime) || originalExtension === "doc")) {
+    (/msword|octet-stream/i.test(mime) || originalExtension === "doc")) {
     extension = "doc";
     mimeType = "application/msword";
   }

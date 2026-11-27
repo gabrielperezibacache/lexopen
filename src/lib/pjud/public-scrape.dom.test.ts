@@ -402,30 +402,37 @@ async function main() {
     const previousDuplicateDownload = process.env.PJUD_DOC_DOWNLOADS;
     process.env.PJUD_DOC_DOWNLOADS = "1";
     let duplicateAnnexPosts = 0;
+    const duplicateAnnexPostBodies: string[] = [];
     await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
       if (route.request().method() === "POST") {
         duplicateAnnexPosts++;
+        duplicateAnnexPostBodies.push(route.request().postData() || "");
         await route.fulfill({ status: 200, contentType: "application/msword", body: delayedWordBytes });
       } else {
         await route.fulfill({ contentType: "text/html", body: `
           <div id="modalDetalleCivil" class="modal show" style="display:block"><table class="table-titulos"><tbody><tr><td>Detalle ficticio de causa</td></tr></tbody></table><table>
             <tbody>
-              <tr><td>1</td><td>01/01/2026</td><td>Se hace parte</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil(1)">Anexo</a></td></tr>
-              <tr><td>2</td><td>02-01-2026</td><td>Se hace parte</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil(2)">Anexo</a></td></tr>
+              <tr><td>01/01/2026</td><td>Se hace parte</td><td>Presentado por Ana</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('ana')">Anexo</a></td></tr>
+              <tr><td>02-01-2026</td><td>Se hace parte</td><td>Presentado por Beatriz</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('beatriz')">Anexo</a></td></tr>
+              <tr><td>03/01/2026</td><td>Se hace parte</td><td>Presentado por Carlos</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('carlos')">Anexo</a></td></tr>
+              <tr><td>03/01/2026</td><td>Se hace parte</td><td>Presentado por Daniela</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil('daniela')">Anexo</a></td></tr>
             </tbody>
           </table></div>
-          <script>function anexoSolicitudCivil(id){document.body.insertAdjacentHTML('beforeend','<div class="modal show" id="modalDuplicate'+id+'" style="display:block"><form method="post" action="/ADIR_871/1/documentos/docuS.php"><input type="hidden" name="jwt" value="fixture-'+id+'"></form><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button></div>')}</script>
+          <script>function anexoSolicitudCivil(id){document.body.insertAdjacentHTML('beforeend','<div class="modal show" id="modalDuplicate'+id+'" style="display:block"><form method="post" action="/ADIR_871/1/documentos/docuS.php"><input type="hidden" name="jwt" value="'+id+'"></form><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button></div>')}</script>
         ` });
       }
     });
     try {
       await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
       const duplicateResult = await attachDocumentoBytesFromPage(page, [
-        { externalId: "duplicate-1", titulo: "Se hace parte", folio: "1", fecha: new Date("2026-01-01T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
-        { externalId: "duplicate-2", titulo: "Se hace parte", folio: "2", fecha: new Date("2026-01-02T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
-      ], { limit: 2, delayMs: 0, allowPrompts: false });
-      assert.equal(duplicateAnnexPosts, 2, "same-title rows are resolved by exact folio and date");
-      assert.ok(duplicateResult.every(row => Boolean(row.documentoBytes)), "both matching annexes are captured");
+        { externalId: "duplicate-ana", titulo: "Se hace parte", detalle: "01/01/2026 | Se hace parte | Presentado por Ana | Anexo", folio: "1", fecha: new Date("2026-01-01T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-beatriz", titulo: "Se hace parte", detalle: "02-01-2026 | Se hace parte | Presentado por Beatriz | Anexo", folio: "2", fecha: new Date("2026-01-02T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-carlos", titulo: "Se hace parte", detalle: "03/01/2026 | Se hace parte | Presentado por Carlos | Anexo", folio: "3", fecha: new Date("2026-01-03T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-daniela", titulo: "Se hace parte", detalle: "03/01/2026 | Se hace parte | Presentado por Daniela | Anexo", folio: "4", fecha: new Date("2026-01-03T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+      ], { limit: 4, delayMs: 0, allowPrompts: false });
+      assert.equal(duplicateAnnexPosts, 4, "same-title rows without a folio column are resolved by date, then exact detail for same-day entries");
+      assert.deepEqual(duplicateAnnexPostBodies, ["jwt=ana", "jwt=beatriz", "jwt=carlos", "jwt=daniela"], "the selected annex belongs to the matching movement");
+      assert.ok(duplicateResult.every(row => Boolean(row.documentoBytes)), "each uniquely identified annex is captured");
     } finally {
       await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
       if (previousDuplicateDownload === undefined) delete process.env.PJUD_DOC_DOWNLOADS;

@@ -1543,16 +1543,33 @@ async function captureAnnexDocumentFromRow(
     const year = parts[3]!.length === 2 ? "20" + parts[3] : parts[3]!;
     return year + "-" + parts[2]!.padStart(2, "0") + "-" + parts[1]!.padStart(2, "0");
   };
-  if (matching.length > 1 && movement.folio && movement.fecha instanceof Date && Number.isFinite(movement.fecha.getTime())) {
-    const expectedDate = movement.fecha.toISOString().slice(0, 10);
-    const identified = [];
-    for (const candidate of matching) {
-      const cells = await candidate.row.locator("td").allInnerTexts().catch(() => []);
-      const folioMatches = cells.some(cell => cell.trim() === movement.folio!.trim());
-      const dateMatches = cells.some(cell => normalizeDate(cell) === expectedDate);
-      if (folioMatches && dateMatches) identified.push(candidate);
+  if (matching.length > 1) {
+    const candidates = await Promise.all(matching.map(async candidate => ({
+      ...candidate,
+      cells: await candidate.row.locator("td").allInnerTexts().catch(() => [] as string[]),
+    })));
+    let identified = candidates;
+    const expectedDate = movement.fecha instanceof Date && Number.isFinite(movement.fecha.getTime())
+      ? movement.fecha.toISOString().slice(0, 10)
+      : null;
+    if (expectedDate) {
+      const rowsWithDates = identified.filter(candidate => candidate.cells.some(cell => normalizeDate(cell)));
+      if (rowsWithDates.length) {
+        identified = rowsWithDates.filter(candidate => candidate.cells.some(cell => normalizeDate(cell) === expectedDate));
+      }
     }
-    matching.splice(0, matching.length, ...identified);
+    const folio = movement.folio?.trim();
+    if (folio && identified.some(candidate => candidate.cells.some(cell => cell.trim() === folio))) {
+      identified = identified.filter(candidate => candidate.cells.some(cell => cell.trim() === folio));
+    }
+    if (identified.length > 1 && movement.detalle?.trim()) {
+      const normalizeText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ").trim().toLowerCase();
+      const detalle = normalizeText(movement.detalle);
+      const byDetail = identified.filter(candidate => normalizeText(candidate.cells.join(" | ")) === detalle);
+      if (byDetail.length) identified = byDetail;
+    }
+    matching.splice(0, matching.length, ...identified.map(({ row, trigger }) => ({ row, trigger })));
   }
   if (matching.length !== 1) return movement;
   await assertPjudPromptPolicy(page, manualPolicy);
