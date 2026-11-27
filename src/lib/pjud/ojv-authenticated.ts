@@ -311,10 +311,20 @@ const MIS_CAUSAS_TAB_SELECTOR = [
 async function findMisCausasMateriaControl(page: PlaywrightPage, materia: MisCausasMateria) {
   const root = (await page.locator("#contMain").count().catch(() => 0)) ? page.locator("#contMain") : page.locator("body");
   const aliases = materiaAliases(materia).map(normalizeMateriaName);
-  const controls = root.locator(MIS_CAUSAS_TAB_SELECTOR).filter({ visible: true });
+  const controls = root.locator(MIS_CAUSAS_TAB_SELECTOR);
   const match = await controls.evaluateAll((nodes, labels) => {
     for (let index = 0; index < nodes.length; index++) {
       const node = nodes[index];
+      let visible = true;
+      for (let current: Element | null = node; current; current = current.parentElement) {
+        const rect = current.getBoundingClientRect();
+        const style = getComputedStyle(current);
+        if (!rect.width || !rect.height || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+          visible = false;
+          break;
+        }
+      }
+      if (!visible) continue;
       const clone = node.cloneNode(true) as Element;
       clone.querySelectorAll("svg, i, .badge, .count, .counter, [aria-hidden='true']").forEach((el) => el.remove());
       const label = (clone.textContent || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -327,11 +337,16 @@ async function findMisCausasMateriaControl(page: PlaywrightPage, materia: MisCau
     }
     return null;
   }, aliases);
-  if (match) return { root, control: controls.nth(match.index), target: match.target || null };
+  if (match) {
+    const control = controls.nth(match.index);
+    if (await control.isVisible().catch(() => false)) return { root, control, target: match.target || null };
+  }
 
-  const select = root.locator("select").filter({ visible: true });
+  const select = root.locator("select");
   const selectMatch = await select.evaluateAll((nodes, labels) => {
     for (let index = 0; index < nodes.length; index++) {
+      const rect = nodes[index]!.getBoundingClientRect();
+      if (!rect.width || !rect.height || getComputedStyle(nodes[index]!).display === "none") continue;
       const options = [...(nodes[index] as HTMLSelectElement).options];
       if (options.some((option) => labels.includes(option.textContent?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim() || ""))) return index;
     }
@@ -346,19 +361,26 @@ async function activateMisCausasMateria(page: PlaywrightPage, materia: MisCausas
   assertMisCausasReadActive(options);
   const activeSelector = ".tab-pane.active, .panel-collapse.in, .collapse.show";
   const materiaTokens: Record<MisCausasMateria, string[]> = {
-    "Corte Suprema": ["suprema", "sup"],
-    "Corte Apelaciones": ["apelaciones", "apel", "cauca"],
-    Apelaciones: ["apelaciones", "apel", "cauca"],
-    Civil: ["civil"], Familia: ["familia", "fam"], Laboral: ["laboral", "lab"],
-    Cobranza: ["cobranza", "cob"], Penal: ["penal"], Garantía: ["garantia", "gar"],
-    "Tribunal Oral": ["tribunaloral", "oral"], Constitucional: ["constitucional", "cons"],
+    "Corte Suprema": ["sup", "suprema"],
+    "Corte Apelaciones": ["ca", "ape", "apel", "apelaciones", "appeals"],
+    Apelaciones: ["ca", "ape", "apel", "apelaciones", "appeals"],
+    Civil: ["civ", "civil"], Familia: ["fam", "familia", "family"],
+    Laboral: ["lab", "laboral", "labor"], Cobranza: ["cob", "cobranza", "collection"],
+    Penal: ["pen", "penal", "criminal"], Garantía: ["gar", "garantia"],
+    "Tribunal Oral": ["oral", "tribunaloral"], Constitucional: ["cons", "constitucional"],
   };
-  const activePanelHasMateriaData = async () => page.locator(activeSelector).evaluateAll((panels, tokens) => panels.some((panel) => {
-    const ids = [panel.id, ...[...panel.querySelectorAll("[id]")].map((node) => node.id)].join(" ").toLowerCase();
-    return tokens.some((token) => ids.includes(token));
-  }), materiaTokens[materia]);
+  const activePanelHasMateriaData = async () => page.locator(activeSelector).evaluateAll((panels, tokens) => {
+    const wanted = new Set((tokens as string[]).map(value => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")));
+    return panels.some((panel) => {
+      const ids = [panel.id, ...[...panel.querySelectorAll("[id]")].map((node) => node.id)].filter(Boolean);
+      return ids.some((id) => {
+        const match = /^(?:dtaTableDetalleMisCau|btnConsultaMisCau|filtroMisCau|tab|panel|MisCau)([A-Za-z]+)$/i.exec(id);
+        const suffix = match?.[1]?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        return Boolean(suffix && wanted.has(suffix));
+      });
+    });
+  }, materiaTokens[materia]);
   if (await activePanelHasMateriaData()) return true;
-  const activeBefore = await page.locator(activeSelector).evaluateAll((nodes) => nodes.map((node) => node.id || node.getAttribute("aria-label") || ""));
   if ("select" in found && found.select) {
     const value = await found.control.locator("option").evaluateAll((nodes, labels) => {
       const option = nodes.find((node) => labels.includes((node.textContent || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim()));
@@ -378,7 +400,7 @@ async function activateMisCausasMateria(page: PlaywrightPage, materia: MisCausas
       return element.getAttribute("aria-selected") === "true" ||
         element.getAttribute("aria-expanded") === "true" || parentActive;
     });
-    const active = await page.evaluate(({ targetId, previous, labels }) => {
+    const active = await page.evaluate(({ targetId }) => {
       if (targetId) {
         const target = document.getElementById(targetId);
         if (!target) return false;
@@ -386,19 +408,8 @@ async function activateMisCausasMateria(page: PlaywrightPage, materia: MisCausas
         const rect = target.getBoundingClientRect();
         return shown && rect.width > 0 && rect.height > 0;
       }
-      const panels = [...document.querySelectorAll(".tab-pane.active, .panel-collapse.in, .collapse.show")];
-      for (const panel of panels) {
-        const identity = (panel.id + " " + panel.getAttribute("aria-label")).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        for (const label of labels) {
-          const words = label.split(/\s+/).filter((word) => word.length > 3);
-          if (words.some((word) => identity.includes(word.slice(0, 4)))) return true;
-          if (label === "corte suprema" && identity.includes("sup")) return true;
-          if (label === "corte apelaciones" && identity.includes("appeal")) return true;
-        }
-      }
-      const current = panels.map((panel) => panel.id || panel.getAttribute("aria-label") || "");
-      return current.some((id) => !previous.includes(id)) || (previous.length === 0 && current.length > 0);
-    }, { targetId: found.target, previous: activeBefore, labels: materiaAliases(materia).map(normalizeMateriaName) });
+      return false;
+    }, { targetId: found.target });
     if (active || selected || await activePanelHasMateriaData()) return true;
     await sleep(100);
   }

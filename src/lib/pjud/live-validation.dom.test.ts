@@ -145,7 +145,7 @@ async function main() {
     </script>`);
     assert.equal(await page.locator('#filtroMisCauSup').isVisible(), false);
     const materias = await readManuallyAuthenticatedMisCausas(page);
-    assert.equal(materias.status, "listed");
+    assert.equal(materias.status, "listed", JSON.stringify(materias));
     assert.deepEqual(materias.materiasTried, ["Civil", "Corte Suprema"]);
     assert.equal(materias.itemCount, 2, "only replacement rows from the searched materias count");
     assert.doesNotMatch(JSON.stringify(materias), /PRIVATE|20-2024|Santiago|caratula|cookie/);
@@ -266,8 +266,10 @@ async function main() {
     await multiPage.setContent(`
       <a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a>
       <main id="contMain"><div class="card" id="materias">
-        <div class="card-header"><a data-toggle="collapse" href="#panelSup">Corte Suprema</a></div>
+        <div class="card-header"><a id="tabSup" data-toggle="collapse" href="#panelSup">Corte Suprema</a></div>
         <section id="panelSup" class="panel-collapse collapse in" style="display:block">
+          <button id="btnConsultaMisCauSup" onclick="window.searches.push('sup')">Buscar</button><input id="filtroMisCauSup">
+          <label id="estadoLabel">Estado</label><button id="descargarPdf">Descargar</button>
           <button onclick="window.searches.push('sup')">Buscar</button>
           <table id="dtaTableDetalleMisCauSup"><tbody><tr><td>401-2025</td><td>Corte Suprema</td><td>PRIVATE_SUPREMA</td></tr></tbody></table>
         </section>
@@ -276,11 +278,11 @@ async function main() {
           <button onclick="window.searches.push('appeals')">Buscar</button>
           <table id="dtaTableDetalleMisCauApe"><tbody><tr><td>Civil-1234-2024</td><td>C.A. de Iquique</td><td>PRIVATE_APPEALS</td></tr></tbody></table>
         </section>
-        <div class="card-header"><a data-toggle="collapse" href="#panelCivil">Civil <span class="badge">(3)</span></a></div>
-        <section id="panelCivil" class="panel-collapse collapse" style="display:none">
+        <div class="card-header"><a id="tabCiv" data-toggle="collapse" href="#panelCiv">Civil <span class="badge">(3)</span></a></div>
+        <section id="panelCiv" class="panel-collapse collapse" style="display:none">
           <button data-id="estado" onclick="openStateMenu()">Estado: Vigente</button>
           <button onclick="window.searches.push('civil')">Buscar</button>
-          <table id="dtaTableDetalleMisCauCivil"><tbody><tr><td>C-20-2024</td><td>3º Juzgado Civil de Santiago</td><td>PRIVATE_CIVIL</td></tr></tbody></table>
+          <table id="dtaTableDetalleMisCauCiv"><tbody><tr><td>C-20-2024</td><td>3º Juzgado Civil de Santiago</td><td>PRIVATE_CIVIL</td></tr></tbody></table>
         </section>
         <div class="card-header"><a data-toggle="collapse" href="#panelFamily">Familia</a></div>
         <section id="panelFamily" class="panel-collapse collapse" style="display:none">
@@ -290,17 +292,32 @@ async function main() {
         <div class="card-header"><a data-toggle="collapse" href="#panelLabor">Laboral</a></div>
         <section id="panelLabor" class="panel-collapse collapse" style="display:none">
           <button onclick="window.searches.push('labor')">Buscar</button>
-          <table id="dtaTableDetalleMisCauLabor"><tbody><tr><td>Laboral-2-2024</td><td>1º J.L.T. de Santiago</td><td>PRIVATE_LABOR</td></tr></tbody></table>
+          <table id="dtaTableDetalleMisCauLaboral"><tbody><tr><td>Laboral-2-2024</td><td>1º J.L.T. de Santiago</td><td>PRIVATE_LABOR</td></tr></tbody></table>
         </section>
         <div class="card-header"><a data-toggle="collapse" href="#panelCollection">Cobranza</a></div>
         <section id="panelCollection" class="panel-collapse collapse" style="display:none">
           <button onclick="window.searches.push('collection')">Buscar</button>
           <table id="dtaTableDetalleMisCauCollection"><tbody><tr><td>Cobranza-4-2024</td><td>Juzgado de Cobranza Laboral y Previsional de Santiago</td><td>PRIVATE_COLLECTION</td></tr></tbody></table>
         </section>
-        <div class="card-header"><a data-toggle="collapse" href="#panelCriminal">Penal</a></div>
-        <section id="panelCriminal" class="panel-collapse collapse" style="display:none">
+        <div class="card-header"><a data-toggle="collapse" href="#panelPen">Penal</a></div>
+        <section id="panelPen" class="panel-collapse collapse" style="display:none">
           <button onclick="window.searches.push('criminal')">Buscar</button>
-          <table id="dtaTableDetalleMisCauCriminal"><tbody><tr><td>Penal-3-2024</td><td>J.G. de Santiago</td><td>PRIVATE_CRIMINAL</td></tr></tbody></table>
+          <table id="dtaTableDetalleMisCauPen"><tbody><tr><td>Penal-3-2024</td><td>J.G. de Santiago</td><td>PRIVATE_CRIMINAL</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelGarantia">Garantía</a></div>
+        <section id="panelGarantia" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('garantia')">Buscar</button>
+          <table id="dtaTableDetalleMisCauGarantia"><tbody><tr><td>G-8-2024</td><td>Juzgado de Garantía de Santiago</td><td>PRIVATE_GARANTIA</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelOral">Tribunal Oral</a></div>
+        <section id="panelOral" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('oral')">Buscar</button>
+          <table id="dtaTableDetalleMisCauOral"><tbody><tr><td>Oral-9-2024</td><td>Tribunal Oral en lo Penal de Santiago</td><td>PRIVATE_ORAL</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelConstitucional">Constitucional</a></div>
+        <section id="panelConstitucional" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('constitucional')">Buscar</button>
+          <table id="dtaTableDetalleMisCauConstitucional"><tbody><tr><td>Constitucional-10-2024</td><td>Tribunal Constitucional</td><td>PRIVATE_CONSTITUCIONAL</td></tr></tbody></table>
         </section>
       </div></main>
       <script>
@@ -319,10 +336,11 @@ async function main() {
         }));
       </script>`);
     const multiResult = await collectMisCausasFromAuthenticatedOjv(multiPage);
-    assert.deepEqual(multiResult.materiasTried, ["Civil", "Familia", "Laboral", "Cobranza", "Penal", "Corte Apelaciones", "Corte Suprema"]);
-    assert.deepEqual(await multiPage.evaluate(() => (window as typeof window & { searches: string[] }).searches), ["civil", "family", "labor", "collection", "criminal", "appeals", "sup"]);
-    assert.deepEqual(multiResult.countsByMateria, { Civil: 1, Familia: 1, Laboral: 1, Cobranza: 1, Penal: 1, "Corte Apelaciones": 1, "Corte Suprema": 1 });
-    assert.equal(multiResult.items.length, 7, "a card parent, counter labels, and Appeals alias still visit each active panel exactly once");
+    assert.deepEqual(multiResult.materiasTried, ["Civil", "Familia", "Laboral", "Cobranza", "Penal", "Garantía", "Tribunal Oral", "Corte Apelaciones", "Corte Suprema", "Constitucional"]);
+    const multiSearches = await multiPage.evaluate(() => (window as typeof window & { searches: string[] }).searches);
+    assert.deepEqual(multiSearches, ["civil", "family", "labor", "collection", "criminal", "garantia", "oral", "appeals", "sup", "constitucional"], JSON.stringify({ tried: multiResult.materiasTried, errors: multiResult.materiasWithErrors, counts: multiResult.countsByMateria }));
+    assert.deepEqual(multiResult.countsByMateria, { Civil: 1, Familia: 1, Laboral: 1, Cobranza: 1, Penal: 1, Garantía: 1, "Tribunal Oral": 1, "Corte Apelaciones": 1, "Corte Suprema": 1, Constitucional: 1 });
+    assert.equal(multiResult.items.length, 10, "structured exact ID suffixes visit every matter without false matches in Supreme controls");
     assert.equal(await multiPage.evaluate(() => (window as typeof window & { stateSelectAll: number }).stateSelectAll), 1, "a body-mounted bootstrap-select menu is selected even when its button already shows a chosen state");
     await multiContext.close();
 

@@ -30,6 +30,7 @@ export type PjudFetchedMovimiento = {
    */
   documentoBytes?: Buffer | null;
   documentoFilename?: string | null;
+  documentoMimeType?: string | null;
 };
 
 export type PjudCausaRef = {

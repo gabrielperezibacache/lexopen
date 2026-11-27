@@ -442,6 +442,8 @@ export async function syncCausaPjud(
         movimientoId: mov.id,
         bytes: m.documentoBytes,
         filename: m.documentoFilename,
+        documentRef: mov.documentoRef,
+        mimeHint: m.documentoMimeType,
         esReceptor: m.esReceptor,
         actorId: opts?.fetchMovimientos ? opts.actorId || undefined : undefined,
         expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),

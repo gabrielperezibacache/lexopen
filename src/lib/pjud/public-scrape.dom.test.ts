@@ -1,7 +1,7 @@
 /** Offline browser fixtures only. No OJV navigation, credentials, or CAPTCHA. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, pjudDocumentDownloadsAllowed, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
+import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, pjudDocumentDownloadsAllowed, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeAllCuadernos, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -348,6 +348,88 @@ async function main() {
       await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
       if (priorDocPolicy === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
       else process.env.PJUD_DOC_DOWNLOADS = priorDocPolicy;
+    }
+
+    const previousDocDownload = process.env.PJUD_DOC_DOWNLOADS;
+    const previousDocDelay = process.env.PJUD_DOC_DOWNLOAD_DELAY_MS;
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    process.env.PJUD_DOC_DOWNLOAD_DELAY_MS = "0";
+    const delayedWordBytes = Buffer.concat([Buffer.from("d0cf11e0", "hex"), Buffer.alloc(140)]);
+    let delayedAnnexPosts = 0;
+    await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      if (route.request().method() === "POST") {
+        delayedAnnexPosts++;
+        await route.fulfill({ status: 200, contentType: "application/msword", body: delayedWordBytes });
+      } else {
+        await route.fulfill({ contentType: "text/html", body: `
+          <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+          <div id="modalDetalleCivil" class="modal show" style="display:block">
+            <table class="table-titulos"><tbody><tr><td>Detalle ficticio de causa</td></tr></tbody></table>
+            <nav class="nav-tabs">
+              <a href="#historyAnnex" onclick="event.preventDefault();fixtureTab('historyAnnex')">Historia</a>
+              <a href="#writingsAnnex" onclick="event.preventDefault();fixtureTab('writingsAnnex')">Escritos</a>
+            </nav>
+            <div id="historyAnnex" class="tab-pane">
+              <table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th><th>Descripción</th><th>Anexo</th></tr></thead>
+                <tbody><tr><td>11</td><td>01/01/2026</td><td>Escrito</td><td>Movimiento con anexo desde Historia</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil()">Anexo</a></td></tr></tbody>
+              </table>
+            </div>
+            <div id="writingsAnnex" class="tab-pane active"><table><thead><tr><th>Folio</th><th>Fecha</th><th>Trámite</th></tr></thead><tbody><tr><td>20</td><td>02/01/2026</td><td>Escrito secundario</td></tr></tbody></table></div>
+          </div>
+          <script>
+            function fixtureTab(id){document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id===id))}
+            function anexoSolicitudCivil(){const modal=document.createElement('div');modal.id='modalAsyncAnnex';modal.className='modal show';modal.style.display='block';modal.innerHTML='<div class="modal-body"></div><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button>';document.body.append(modal);setTimeout(()=>{modal.querySelector('.modal-body').innerHTML='<form method="post" action="/ADIR_871/1/documentos/docCausaSuprema.php"><input type="hidden" name="jwt" value="fictional-doc-token"></form>'},150)}
+          </script>
+        ` });
+      }
+    });
+    try {
+      await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+      const scrapedWithAnnex = await scrapeAllCuadernos(page, { downloadDocuments: true, allowPrompts: false, totalTimeoutMs: 10_000 });
+      const historyAnnex = scrapedWithAnnex.movimientos.find(row => row.titulo.includes("Movimiento con anexo desde Historia"));
+      assert.ok(historyAnnex?.documentoBytes, "scrapeAllCuadernos returns to an inactive Historia pane before capturing its annex");
+      assert.equal(historyAnnex.documentoFilename, "pjud-11.doc", "async .php response is named with its detected Word type");
+      assert.equal(historyAnnex.documentoMimeType, "application/msword");
+      assert.equal(delayedAnnexPosts, 1, "capture waits for the form injected after the annex modal opens");
+    } finally {
+      await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
+      if (previousDocDownload === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
+      else process.env.PJUD_DOC_DOWNLOADS = previousDocDownload;
+      if (previousDocDelay === undefined) delete process.env.PJUD_DOC_DOWNLOAD_DELAY_MS;
+      else process.env.PJUD_DOC_DOWNLOAD_DELAY_MS = previousDocDelay;
+    }
+
+    const previousDuplicateDownload = process.env.PJUD_DOC_DOWNLOADS;
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    let duplicateAnnexPosts = 0;
+    await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      if (route.request().method() === "POST") {
+        duplicateAnnexPosts++;
+        await route.fulfill({ status: 200, contentType: "application/msword", body: delayedWordBytes });
+      } else {
+        await route.fulfill({ contentType: "text/html", body: `
+          <div id="modalDetalleCivil" class="modal show" style="display:block"><table class="table-titulos"><tbody><tr><td>Detalle ficticio de causa</td></tr></tbody></table><table>
+            <tbody>
+              <tr><td>1</td><td>01/01/2026</td><td>Se hace parte</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil(1)">Anexo</a></td></tr>
+              <tr><td>2</td><td>02-01-2026</td><td>Se hace parte</td><td><a href="#" onclick="event.preventDefault();anexoSolicitudCivil(2)">Anexo</a></td></tr>
+            </tbody>
+          </table></div>
+          <script>function anexoSolicitudCivil(id){document.body.insertAdjacentHTML('beforeend','<div class="modal show" id="modalDuplicate'+id+'" style="display:block"><form method="post" action="/ADIR_871/1/documentos/docuS.php"><input type="hidden" name="jwt" value="fixture-'+id+'"></form><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button></div>')}</script>
+        ` });
+      }
+    });
+    try {
+      await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+      const duplicateResult = await attachDocumentoBytesFromPage(page, [
+        { externalId: "duplicate-1", titulo: "Se hace parte", folio: "1", fecha: new Date("2026-01-01T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+        { externalId: "duplicate-2", titulo: "Se hace parte", folio: "2", fecha: new Date("2026-01-02T12:00:00Z"), fuente: "pjud", documentoRef: null, documentoAnexoAction: "anexoSolicitudCivil" },
+      ], { limit: 2, delayMs: 0, allowPrompts: false });
+      assert.equal(duplicateAnnexPosts, 2, "same-title rows are resolved by exact folio and date");
+      assert.ok(duplicateResult.every(row => Boolean(row.documentoBytes)), "both matching annexes are captured");
+    } finally {
+      await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
+      if (previousDuplicateDownload === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
+      else process.env.PJUD_DOC_DOWNLOADS = previousDuplicateDownload;
     }
     await page.setContent('<div id="modalDetalleCivil" class="modal in" style="display:block"><nav class="nav-tabs"><a href="#historiaMissing">Historia</a></nav><div id="historiaCiv" class="tab-pane active"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/01/2026</td><td>Historia visible ficticia</td></tr></table></div></div>');
     await assert.rejects(() => scrapeModalTabs(page), /destino existente/, "a declared but missing Historia target must not be replaced blindly by the currently active pane");

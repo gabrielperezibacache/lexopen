@@ -5,7 +5,7 @@ import { getCaseManagementMode } from "@/lib/causas/management-mode";
 import { assertCausaCapability } from "@/lib/auth/causa-access";
 import { fetchSafeOutbound } from "@/lib/net/safe-url";
 import { pjudDocumentRefHash } from "./document-identity";
-import { ingestPjudDocumentBuffer, isBackupableDocumentoRef, pjudDocDownloadMaxPerRun, readPjudDocumentResponse } from "./pdf-backup";
+import { inferPjudDownloadedFileMeta, ingestPjudDocumentBuffer, isBackupableDocumentoRef, pjudDocDownloadMaxPerRun, readPjudDocumentResponse, validPjudDownloadedContent } from "./pdf-backup";
 
 export async function enqueuePjudDocumentJobs(causaId: string, options: { actorId?: string | null; waitingLogin?: boolean } = {}) {
   if (await getCaseManagementMode() !== "pjud_cl") return { created: 0 };
@@ -67,7 +67,10 @@ export async function processPendingPjudDocumentJobs(options: { limit?: number; 
       if ([401, 403].includes(response.status) || /text\/html/i.test(response.headers.get("content-type") || "")) { await response.body?.cancel(); status = "waiting_login"; lastErrorCode = "login_required"; throw new Error("login required"); }
       if (!response.ok) { await response.body?.cancel(); throw new Error("download failed"); }
       const bytes = await readPjudDocumentResponse(response);
-      const documentoId = await ingestPjudDocumentBuffer({ causaId: job.causaId, movimientoId: movement.id, bytes, filename: `pjud-${movement.folio || movement.id}.pdf`, esReceptor: movement.esReceptor, mimeHint: response.headers.get("content-type"), receiptLeaseToken: leaseToken, enqueue: options.enqueue });
+      const contentType = response.headers.get("content-type");
+      const meta = inferPjudDownloadedFileMeta(bytes, contentType, ref, "pjud-" + (movement.folio || movement.id));
+      if (!meta || !validPjudDownloadedContent(bytes, meta.mimeType, ref, 20 * 1024 * 1024)) throw new Error("unsupported document format");
+      const documentoId = await ingestPjudDocumentBuffer({ causaId: job.causaId, movimientoId: movement.id, bytes, filename: meta.filename, documentRef: ref, esReceptor: movement.esReceptor, mimeHint: meta.mimeType, receiptLeaseToken: leaseToken, enqueue: options.enqueue });
       if (!documentoId) { status = "waiting_login"; lastErrorCode = "document_unavailable"; throw new Error("not a verified document"); }
       status = "saved";
     } catch {

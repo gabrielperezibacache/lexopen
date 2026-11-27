@@ -11,7 +11,7 @@ import {
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
-import { parseMisCausasRequest, shouldProcessMisCausasInline } from "@/lib/pjud/mis-causas-request";
+import { parseMisCausasRequest, resolveMisCausasDownloadDocuments, shouldProcessMisCausasInline } from "@/lib/pjud/mis-causas-request";
 import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
 import { processPendingSyncJobs, processPjudSyncJobIdBatches } from "@/lib/pjud/queue";
 import { privatePjudJson as json, privatePjudResponse } from "@/lib/pjud/private-response";
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     const syncMovimientos = body?.syncMovimientos !== false;
-    const downloadDocuments = body?.downloadDocuments === true && process.env.PJUD_DOC_DOWNLOADS !== "0";
+    const downloadDocuments = resolveMisCausasDownloadDocuments(body?.downloadDocuments);
     // Cron / explicit wait: await. UI: 202 + background (Cloudflare ~100s).
     const waitForResult = Boolean(cron) || body?.wait === true;
 

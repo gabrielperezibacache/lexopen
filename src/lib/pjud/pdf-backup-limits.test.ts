@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { prisma } from "@/lib/db";
 import {
   backupMovimientoDocuments,
+  inferPjudDownloadedFileMeta,
   pdfBackupEnabled,
   pjudDocDownloadDelayMs,
   pjudDocDownloadMaxPerRun,
@@ -25,6 +26,12 @@ assert.equal(validPjudDownloadedContent(pdfBytes, "application/pdf", "https://of
 assert.equal(validPjudDownloadedContent(oleBytes, "application/octet-stream", "https://oficinajudicialvirtual.pjud.cl/a.doc", 1024), true);
 assert.equal(validPjudDownloadedContent(docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "https://oficinajudicialvirtual.pjud.cl/a", 1024), true);
 assert.equal(validPjudDownloadedContent(rtfBytes, "application/rtf", "https://oficinajudicialvirtual.pjud.cl/a", 1024), true);
+assert.equal(validPjudDownloadedContent(rtfBytes, "text/plain", "https://oficinajudicialvirtual.pjud.cl/doc.php", 1024), true, "an RTF signature is recognized even on a generic .php endpoint");
+assert.deepEqual(inferPjudDownloadedFileMeta(pdfBytes, "application/pdf", "https://oficinajudicialvirtual.pjud.cl/docuS.php?jwt=fixture", "pjud-1"), { filename: "pjud-1.pdf", mimeType: "application/pdf" });
+assert.deepEqual(inferPjudDownloadedFileMeta(oleBytes, "application/msword", "https://oficinajudicialvirtual.pjud.cl/docCausaSuprema.php", "pjud-4"), { filename: "pjud-4.doc", mimeType: "application/msword" });
+assert.deepEqual(inferPjudDownloadedFileMeta(docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "https://oficinajudicialvirtual.pjud.cl/anexoDocCivil.php", "pjud-5"), { filename: "pjud-5.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+assert.deepEqual(inferPjudDownloadedFileMeta(rtfBytes, "application/rtf", "https://oficinajudicialvirtual.pjud.cl/docuCobranza.php", "pjud-6"), { filename: "pjud-6.rtf", mimeType: "application/rtf" });
+assert.deepEqual(inferPjudDownloadedFileMeta(docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "https://oficinajudicialvirtual.pjud.cl/original.docx", "pjud-7"), { filename: "original.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
 assert.equal(validPjudDownloadedContent(Buffer.from("not a Word document".padEnd(140, "x")), "application/msword", "https://oficinajudicialvirtual.pjud.cl/a.doc", 1024), false);
 assert.equal(isBackupableDocumentoRef(`https://oficinajudicialvirtual.pjud.cl/doc.php?jwt=${"x".repeat(700)}`), true, "fresh signed links may exceed 500 characters");
 assert.equal(isBackupableDocumentoRef("https://oficinajudicialvirtual.pjud.cl/#modalEscritoSuprema"), false);

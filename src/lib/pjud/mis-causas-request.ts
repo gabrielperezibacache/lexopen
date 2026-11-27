@@ -13,6 +13,15 @@ export function shouldProcessMisCausasInline(input: { cron: boolean; wait?: bool
   return !input.cron && input.wait === true;
 }
 
+/** Preserve a user's saved per-cause preference unless the global kill switch is set. */
+export function resolveMisCausasDownloadDocuments(
+  requested: boolean | undefined,
+  policyValue: string | undefined = process.env.PJUD_DOC_DOWNLOADS,
+): boolean | undefined {
+  if (policyValue?.trim() === "0") return false;
+  return requested;
+}
+
 /** Cron puede omitir el cuerpo; un cuerpo inválido nunca inicia trabajo. */
 export async function parseMisCausasRequest(req: Request) {
   const raw = await req.text();

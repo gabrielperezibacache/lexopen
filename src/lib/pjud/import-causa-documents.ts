@@ -7,7 +7,7 @@ import { normalizePjudCuaderno, type PjudFetchedMovimiento } from "./types";
 import { pjudDocumentRefHash } from "./document-identity";
 import {
   ingestPjudDocumentBuffer, isBackupableDocumentoRef, listPendingPjudDocumentMovimientos,
-  readPjudDocumentResponse, validPjudDownloadedContent,
+  inferPjudDownloadedFileMeta, readPjudDocumentResponse, validPjudDownloadedContent,
 } from "./pdf-backup";
 import {
   authorizeManualImport, claimManualImport, finishClaim, LEASE_MS, updateClaim, type ClaimedManualImport,
@@ -103,7 +103,7 @@ async function runBatch(job: ClaimedManualImport, options: WorkerOptions) {
       else {
         const received = await ingestPjudDocumentBuffer({
           causaId, movimientoId: mov.id, actorId, bytes: original.bytes, filename: original.filename,
-          mimeHint: original.mime, esReceptor: original.esReceptor, enqueue: options.enqueue,
+          documentRef: mov.documentoRef, mimeHint: original.mime, esReceptor: original.esReceptor, enqueue: options.enqueue,
           expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),
           manualBatch: {
             guard: async tx => {
@@ -135,7 +135,7 @@ async function runBatch(job: ClaimedManualImport, options: WorkerOptions) {
       id: true, rit: true, ruc: true, tribunal: true, titulo: true, caratula: true,
     } });
     await updateClaim(job, { currentLabel: "Consultando OJV", note: null });
-    const found = await (options.fetchMovimientos ?? fetchPjudMovimientos)(cause, { assertActive: () => assertActive(job) })
+    const found = await (options.fetchMovimientos ?? fetchPjudMovimientos)(cause, { assertActive: () => assertActive(job), downloadDocuments: true })
       .catch(() => null);
     if (!found || found.provider === "none" || found.demo) coverageNote = "No se pudo consultar OJV.";
     else if (found.cuadernos?.status === "partial") coverageNote = "Quedaron cuadernos pendientes de lectura.";
@@ -146,11 +146,10 @@ async function runBatch(job: ClaimedManualImport, options: WorkerOptions) {
       if (row && movement.documentoBytes?.length) {
         const bytes = movement.documentoBytes;
         await importDocument(row, async () => {
-          const filename = movement.documentoFilename;
-          const mime = /\.pdf$/i.test(filename || "") ? "application/pdf" : "application/octet-stream";
           const ref = isBackupableDocumentoRef(row.documentoRef) ? row.documentoRef! : "https://www.pjud.cl/documento";
-          if (!validPjudDownloadedContent(bytes, mime, ref, 20 * 1024 * 1024)) return null;
-          return { bytes, mime, filename, esReceptor: movement.esReceptor };
+          const meta = inferPjudDownloadedFileMeta(bytes, movement.documentoMimeType, movement.documentoFilename || movement.documentoRef || ref, "pjud-" + (movement.folio || row.folio || movement.externalId));
+          if (!meta || !validPjudDownloadedContent(bytes, meta.mimeType, movement.documentoRef || ref, 20 * 1024 * 1024)) return null;
+          return { bytes, mime: meta.mimeType, filename: meta.filename, esReceptor: movement.esReceptor };
         }, movement);
       }
     }
@@ -169,8 +168,9 @@ async function runBatch(job: ClaimedManualImport, options: WorkerOptions) {
       if (!response.ok) { await response.body?.cancel(); return null; }
       const mime = response.headers.get("content-type") || "application/octet-stream";
       const bytes = await readPjudDocumentResponse(response);
-      if (!validPjudDownloadedContent(bytes, mime, ref, 20 * 1024 * 1024)) return null;
-      return { bytes, mime, filename: new URL(ref).pathname.split("/").pop(), esReceptor: row.esReceptor };
+      const meta = inferPjudDownloadedFileMeta(bytes, mime, ref, "pjud-" + (row.folio || row.id));
+      if (!meta || !validPjudDownloadedContent(bytes, meta.mimeType, ref, 20 * 1024 * 1024)) return null;
+      return { bytes, mime: meta.mimeType, filename: meta.filename, esReceptor: row.esReceptor };
     });
   }
   await assertActive(job);

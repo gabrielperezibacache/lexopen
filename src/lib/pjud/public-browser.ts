@@ -1168,6 +1168,7 @@ export function mergePjudMovimientos(
       documentoRef: m.documentoRef || prev.documentoRef,
       documentoBytes: m.documentoBytes || prev.documentoBytes,
       documentoFilename: m.documentoFilename || prev.documentoFilename,
+      documentoMimeType: m.documentoMimeType || prev.documentoMimeType,
     });
   }
   return [...map.values()].sort(
@@ -1522,13 +1523,36 @@ async function captureAnnexDocumentFromRow(
 ): Promise<PjudFetchedMovimiento> {
   const action = movement.documentoAnexoAction || "";
   if (!/^(?:anexoSolicitudCivil|escritoSuprema|verDocTramiteSupremaPdf|anexoEscritoApelaciones|anexoEscritoLaboral|anexoEscritoCobranza|anexoEscritoPenal|documentosCobranza|anexoEscritoSuprema|#modal[A-Za-z0-9_-]+)$/i.test(action)) return movement;
-  const rows = page.locator("tr").filter({ hasText: movement.titulo });
-  const matching: Locator[] = [];
+  const detailModals = page.locator(OJV.modal).filter({ visible: true }).and(page.locator('[id^="modalDetalle"]'));
+  const detailModalCount = await detailModals.count().catch(() => 0);
+  if (detailModalCount > 1) throw new PjudScrapeError("OJV mostró varios detalles de causa simultáneos; no se capturará un anexo ambiguo.");
+  const scope = detailModalCount === 1 ? detailModals.first() : page;
+  const selector = action.startsWith("#") ? 'a[href="' + action + '"]' : 'a[onclick*="' + action + '"]';
+  const rows = scope.locator("tr").filter({ hasText: movement.titulo });
+  const matching: Array<{ row: Locator; trigger: Locator }> = [];
   for (const row of await rows.all()) {
-    const selector = action.startsWith("#")
-      ? 'a[href="' + action + '"]'
-      : 'a[onclick*="' + action + '"]';
-    if (await row.locator(selector).count().catch(() => 0) === 1) matching.push(row.locator(selector));
+    const trigger = row.locator(selector);
+    if (await trigger.count().catch(() => 0) === 1) matching.push({ row, trigger });
+  }
+  const normalizeDate = (value: string) => {
+    const text = value.trim();
+    let parts = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|T)/.exec(text);
+    if (parts) return parts[1] + "-" + parts[2]!.padStart(2, "0") + "-" + parts[3]!.padStart(2, "0");
+    parts = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/.exec(text);
+    if (!parts) return null;
+    const year = parts[3]!.length === 2 ? "20" + parts[3] : parts[3]!;
+    return year + "-" + parts[2]!.padStart(2, "0") + "-" + parts[1]!.padStart(2, "0");
+  };
+  if (matching.length > 1 && movement.folio && movement.fecha instanceof Date && Number.isFinite(movement.fecha.getTime())) {
+    const expectedDate = movement.fecha.toISOString().slice(0, 10);
+    const identified = [];
+    for (const candidate of matching) {
+      const cells = await candidate.row.locator("td").allInnerTexts().catch(() => []);
+      const folioMatches = cells.some(cell => cell.trim() === movement.folio!.trim());
+      const dateMatches = cells.some(cell => normalizeDate(cell) === expectedDate);
+      if (folioMatches && dateMatches) identified.push(candidate);
+    }
+    matching.splice(0, matching.length, ...identified);
   }
   if (matching.length !== 1) return movement;
   await assertPjudPromptPolicy(page, manualPolicy);
@@ -1536,7 +1560,27 @@ async function captureAnnexDocumentFromRow(
   const before = await activeModals().count().catch(() => 0);
   let annex: Locator | null = null;
   try {
-    await matching[0].click({ timeout: 8_000 });
+    const paneId = await matching[0]!.trigger.evaluate(element => element.closest(".tab-pane[id]")?.id || "").catch(() => "");
+    if (paneId) {
+      const panes = scope.locator(".tab-pane[id]");
+      const paneVisible = await panes.evaluateAll((nodes, id) => nodes.some(node => {
+        if ((node as HTMLElement).id !== id) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && getComputedStyle(node).display !== "none";
+      }), paneId).catch(() => false);
+      if (!paneVisible) {
+        const tabs = scope.locator("a,button,[role='tab'],[data-toggle='tab'],[data-bs-toggle='tab']");
+        const tabIndex = await tabs.evaluateAll((nodes, id) => nodes.findIndex(node =>
+          ["href", "data-target", "data-bs-target"].some(attribute => node.getAttribute(attribute) === "#" + id)
+        ), paneId).catch(() => -1);
+        if (tabIndex < 0) return movement;
+        const paneTab = tabs.nth(tabIndex);
+        if (!(await paneTab.isVisible().catch(() => false))) return movement;
+        await paneTab.click({ timeout: 5_000 });
+      }
+      if (!(await waitForLocatorVisible(matching[0]!.trigger, signal, 3_000))) return movement;
+    }
+    await matching[0]!.trigger.click({ timeout: 8_000 });
     const deadline = Date.now() + 8_000;
     while (Date.now() < deadline) {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -1550,6 +1594,24 @@ async function captureAnnexDocumentFromRow(
       await delay(100);
     }
     if (!annex) return movement;
+    const readinessDeadline = Math.min(deadline, Date.now() + 3_000);
+    let idleSince = 0;
+    while (Date.now() < readinessDeadline) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const readiness = await annex.evaluate(node => {
+        const downloadable = Boolean(node.querySelector('form[action], a[href]:not([href=""]):not([href^="#"])'));
+        const busy = Boolean(node.querySelector('.spinner, .spinner-border, .fa-spinner, [aria-busy="true"], .loading, .loadingConsulta, .dataTables_processing'));
+        const host = window as typeof window & { jQuery?: { active?: number }; $?: { active?: number } };
+        const jquery = host.jQuery || host.$;
+        return { downloadable, busy, ajaxActive: Number(jquery?.active || 0) > 0 };
+      }).catch(() => ({ downloadable: false, busy: true, ajaxActive: true }));
+      if (readiness.downloadable) break;
+      if (!readiness.busy && !readiness.ajaxActive) {
+        if (!idleSince) idleSince = Date.now();
+        else if (Date.now() - idleSince >= 200) break;
+      } else idleSince = 0;
+      await delay(Math.min(50, Math.max(0, readinessDeadline - Date.now())));
+    }
     const html = await annex.innerHTML().catch(() => "");
     const post = extractDocumentoPostFromRowHtml(html);
     if (post) return { ...movement, documentoPost: post, documentoAnexoAction: undefined };
@@ -1573,13 +1635,23 @@ async function captureAnnexDocumentFromRow(
   }
 }
 
+async function waitForLocatorVisible(locator: Locator, signal: AbortSignal | undefined, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (await locator.isVisible().catch(() => false)) return true;
+    await delay(Math.min(50, Math.max(0, deadline - Date.now())));
+  }
+  return false;
+}
+
 export async function attachDocumentoBytesFromPage(
   page: PlaywrightPage,
   movimientos: PjudFetchedMovimiento[],
   opts?: { limit?: number; delayMs?: number; maxTotalBytes?: number; allowPrompts?: boolean; signal?: AbortSignal }
 ): Promise<PjudFetchedMovimiento[]> {
   if (!pjudDocumentDownloadsAllowed()) return movimientos;
-  const { validPjudDownloadedContent, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
+  const { inferPjudDownloadedFileMeta, validPjudDownloadedContent, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
   const limit = opts?.limit ?? pjudDocDownloadMaxPerRun(), delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
   let remainingBytes = Math.min(opts?.maxTotalBytes ?? 20 * 1024 * 1024, 20 * 1024 * 1024), attempted = 0;
   const out: PjudFetchedMovimiento[] = [];
@@ -1632,8 +1704,9 @@ export async function attachDocumentoBytesFromPage(
       const contentType = direct?.contentType || result!.contentType;
       if (!validPjudDownloadedContent(bytes, contentType, ref, remainingBytes)) { out.push(movement); continue; }
       remainingBytes -= bytes.length;
-      const filename = new URL(ref).pathname.split("/").filter(Boolean).pop() || `folio-${movement.folio || attempted}.pdf`;
-      out.push({ ...movement, documentoBytes: bytes, documentoFilename: filename });
+      const meta = inferPjudDownloadedFileMeta(bytes, contentType, ref, "pjud-" + (movement.folio || attempted));
+      if (!meta) { out.push(movement); continue; }
+      out.push({ ...movement, documentoBytes: bytes, documentoFilename: meta.filename, documentoMimeType: meta.mimeType });
     } catch { out.push(movement); }
   }
   return out.map(stripTransientDocumentoPayload);

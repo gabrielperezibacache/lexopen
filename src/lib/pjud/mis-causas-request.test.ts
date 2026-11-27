@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseMisCausasRequest, shouldProcessMisCausasInline } from "@/lib/pjud/mis-causas-request";
+import { parseMisCausasRequest, resolveMisCausasDownloadDocuments, shouldProcessMisCausasInline } from "@/lib/pjud/mis-causas-request";
 
 async function main() {
   const request = (body?: string) => new Request("http://fixture.invalid/api/pjud/mis-causas", { method: "POST", body });
@@ -14,6 +14,11 @@ async function main() {
   assert.equal(shouldProcessMisCausasInline({ cron: true }), false);
   assert.equal(shouldProcessMisCausasInline({ cron: false, wait: true }), true, "explicit manual wait drains its own jobs");
   assert.equal(shouldProcessMisCausasInline({ cron: false }), false, "ordinary async UI requests do not drain inline");
+  assert.equal(resolveMisCausasDownloadDocuments(undefined, undefined), undefined, "cron omission preserves saved per-cause opt-in");
+  assert.equal(resolveMisCausasDownloadDocuments(true, undefined), true, "explicit opt-in is preserved");
+  assert.equal(resolveMisCausasDownloadDocuments(false, undefined), false, "explicit opt-out is preserved");
+  assert.equal(resolveMisCausasDownloadDocuments(true, " 0 "), false, "global kill switch overrides an opt-in after trimming");
+  assert.equal(resolveMisCausasDownloadDocuments(undefined, "0"), false, "global kill switch overrides an omitted value");
   console.log("pjud/mis-causas-request.test.ts OK");
 }
 
