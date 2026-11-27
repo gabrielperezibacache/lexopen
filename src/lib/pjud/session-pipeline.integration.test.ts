@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { syncMisCausas, type MisCausasSessionSource } from "@/lib/pjud/claveunica";
 import { expireManualSessionSyncJobs, getPjudQueueStatus, processPendingSyncJobs, requeueFailedJobs, reclaimStuckRunningJobs, enqueueDueSyncJobs, PJUD_MANUAL_SESSION_TRIGGER, PJUD_MANUAL_SESSION_JOB_TTL_MS } from "@/lib/pjud/queue";
+import { claimOrCreatePjudSyncJob } from "@/lib/pjud/sync";
 import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { scrapeMovimientoIdentity, type MisCausasItem } from "@/lib/pjud/types";
 
@@ -132,6 +133,27 @@ async function main() {
     assert.equal(settings.claveUnicaPasswordEnc, null);
     assert.equal(settings.claveUnicaEnabled, false);
     assert.equal(settings.claveUnicaLastSyncStatus, "ok");
+
+    const raceCausaId = first.items[0].causaId;
+    const raceJob = await prisma.pjudSyncJob.create({ data: { causaId: raceCausaId, status: "pending", attempts: 0, trigger: "manual" } });
+    const concurrentClaims = await Promise.allSettled([
+      claimOrCreatePjudSyncJob(prisma, { causaId: raceCausaId, trigger: "manual" }),
+      claimOrCreatePjudSyncJob(prisma, { causaId: raceCausaId, trigger: "manual" }),
+    ]);
+    assert.equal(concurrentClaims.filter(result => result.status === "fulfilled").length, 1,
+      "only one real Prisma claimant may acquire the pending reservation");
+    const rejectedClaim = concurrentClaims.find(result => result.status === "rejected");
+    assert.ok(rejectedClaim && rejectedClaim.status === "rejected");
+    assert.equal((rejectedClaim.reason as { status?: number }).status, 409,
+      "the losing real Prisma claimant receives the safe active-job conflict");
+    assert.doesNotMatch(String(rejectedClaim.reason), /P2002/);
+    const activeClaims = await prisma.pjudSyncJob.findMany({ where: { causaId: raceCausaId, status: { in: ["pending", "running"] } } });
+    assert.equal(activeClaims.length, 1, "concurrent claims leave exactly one durable active reservation");
+    assert.equal(activeClaims[0].id, raceJob.id);
+    assert.equal(activeClaims[0].status, "running");
+    assert.equal(activeClaims[0].attempts, 1);
+    assert.equal(activeClaims[0].trigger, "manual");
+    await prisma.pjudSyncJob.delete({ where: { id: raceJob.id } });
 
     const pendingJob = await prisma.pjudSyncJob.create({ data: {
       causaId: first.items[0].causaId, status: "pending", attempts: 0,

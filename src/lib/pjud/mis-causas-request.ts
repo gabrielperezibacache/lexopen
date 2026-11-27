@@ -7,6 +7,11 @@ const requestSchema = z.object({
   wait: z.boolean().optional(),
 }).strict();
 
+/** Scheduled cron requests enqueue; only an explicit non-cron wait drains inline. */
+export function shouldProcessMisCausasInline(input: { cron: boolean; wait?: boolean }) {
+  return !input.cron && input.wait === true;
+}
+
 /** Cron puede omitir el cuerpo; un cuerpo inválido nunca inicia trabajo. */
 export async function parseMisCausasRequest(req: Request) {
   const raw = await req.text();
