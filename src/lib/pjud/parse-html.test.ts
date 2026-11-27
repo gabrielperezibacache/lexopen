@@ -59,6 +59,28 @@ assert.equal(list[0].rit, "C-100-2024");
 assert.equal(list[1].rit, "99-2024");
 assert.equal(list[1].tribunal, "Tribunal no identificado");
 
+const supremePublicRows = parseVerDetalleJuridicaHtml(`<table id="dtaTableDetalle">
+  <thead><tr><th></th><th>Rol</th><th>Tipo Recurso</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th></tr></thead>
+  <tbody><tr><td><a>Detalle</a></td><td>18390-2025</td><td>(Penal) Contienda de Competencia</td><td>Parte A contra Parte B</td><td>12/08/2025</td><td>Tramitación</td><td>Corte Suprema</td></tr></tbody>
+</table>`);
+assert.equal(supremePublicRows.length, 1);
+assert.equal(supremePublicRows[0].rit, "18390-2025");
+assert.equal(supremePublicRows[0].tribunal, "Corte Suprema");
+assert.equal(supremePublicRows[0].caratula, "Parte A contra Parte B");
+assert.equal(supremePublicRows[0].fecha, "2025-08-12");
+assert.equal(supremePublicRows[0].estado, "Tramitación");
+
+const supremeMisCausas = parseCausasListFromHtml(`<table id="dtaTableDetalleMisCauSup">
+  <thead><tr><th>Rol</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th><th>RUC</th></tr></thead>
+  <tbody><tr><td>38220-2025</td><td>REBOLLEDO DIAZ MARIA FERNANDA CONTRA SALA DE LA ILUSTRÍSIMA CORTE DE APELACIONES DE IQUIQUE</td><td>10/11/2025</td><td>Tramitación</td><td>Corte Suprema</td><td>00-12345678-9</td></tr></tbody>
+</table>`);
+assert.equal(supremeMisCausas.length, 1);
+assert.equal(supremeMisCausas[0].tribunal, "Corte Suprema");
+assert.equal(supremeMisCausas[0].caratula, "REBOLLEDO DIAZ MARIA FERNANDA CONTRA SALA DE LA ILUSTRÍSIMA CORTE DE APELACIONES DE IQUIQUE");
+assert.equal(supremeMisCausas[0].fecha, "2025-11-10");
+assert.equal(supremeMisCausas[0].estado, "Tramitación");
+assert.equal(supremeMisCausas[0].ruc, "00-12345678-9");
+
 const looseHtml = `
 <div class="card">
   <h3>C-55-2023</h3>
@@ -113,6 +135,14 @@ const movsLongDate = parseMovimientosFromHtml(`
 assert.equal(movsLongDate.length, 1);
 assert.equal(movsLongDate[0].fecha.toISOString().slice(0, 10), "2025-08-13");
 assert.equal(movsLongDate[0].titulo, "Resolución: se tiene por presentada");
+
+const supremeMovements = parseMovimientosFromHtml(`<div id="modalDetalleSuprema"><table id="movimientosSup">
+  <thead><tr><th>Folio</th><th>Doc.</th><th>Anexo</th><th>Año</th><th>Fecha Trámite</th><th>Trámite</th><th>Des. Trámite</th><th>Correlativo</th><th>Salas</th><th>Estado</th></tr></thead>
+  <tbody><tr><td>4</td><td></td><td></td><td>2025</td><td>14/11/2025</td><td>Ingreso</td><td>Resolución ficticia de prueba</td><td>1</td><td>Primera</td><td>Tramitación</td></tr></tbody>
+</table></div>`);
+assert.equal(supremeMovements.length, 1);
+assert.equal(supremeMovements[0].titulo, "Resolución ficticia de prueba");
+assert.equal(supremeMovements[0].fecha.toISOString().slice(0, 10), "2025-11-14");
 
 // Observed Civil table structure, with fictitious parties and movements.
 const civilListing = `<table id="dtaTableDetalle">

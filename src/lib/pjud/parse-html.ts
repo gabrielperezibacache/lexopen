@@ -163,10 +163,75 @@ function dateColumnLabel(label: string) {
   return /^(?:fecha|fec)(?: de[l]?| de la)?(?: tramite|actuacion|resolucion|ingreso|presentacion)?$/.test(label);
 }
 
+type CauseColumns = {
+  rit: number;
+  tribunal: number;
+  caratula: number;
+  fecha: number;
+  estado: number;
+  ruc: number;
+};
+
+function findTagNodes(node: HtmlNode, tagName: string): HtmlNode[] {
+  const found: HtmlNode[] = [];
+  const visit = (current: HtmlNode) => {
+    if (current.type === "tag" && current.name === tagName) found.push(current);
+    if ("children" in current) current.children.forEach(visit);
+  };
+  visit(node);
+  return found;
+}
+
+function causeTableRows(html: string, tableId?: RegExp): HtmlNode[][] {
+  const document = visibleDocument(html);
+  let tables = findTagNodes(document, "table").filter((node) => node.type === "tag");
+  if (tableId) {
+    const matching = tables.filter((table) => table.type === "tag" && tableId.test(table.attribs.id || ""));
+    if (matching.length) tables = matching;
+  }
+  if (!tables.length) return [findTagNodes(document, "tr")];
+  return tables.map((table) => findTagNodes(table, "tr"));
+}
+
+function causeRowCells(row: HtmlNode) {
+  if (!("children" in row)) return [];
+  return row.children.filter((cell): cell is HtmlNode =>
+    cell.type === "tag" && /^(?:td|th)$/.test(cell.name)
+  );
+}
+
+function causeColumnMap(labels: string[]): CauseColumns | null {
+  const normalized = labels.map(columnLabel);
+  const rit = normalized.findIndex((label) => /^(?:rit|rol|nro rol|numero rol)$/.test(label));
+  const tribunal = normalized.findIndex((label) => /^(?:tribunal|corte)$/.test(label));
+  const caratula = normalized.findIndex((label) => /^(?:caratulado|caratula|caratula causa)$/.test(label));
+  if (rit < 0 || (tribunal < 0 && caratula < 0)) return null;
+  return {
+    rit,
+    tribunal,
+    caratula,
+    fecha: normalized.findIndex(dateColumnLabel),
+    estado: normalized.findIndex((label) => /^(?:estado|estado causa|estado de causa)$/.test(label)),
+    ruc: normalized.findIndex((label) => label === "ruc"),
+  };
+}
+
+function fallbackCaratula(cells: string[], rit: string, tribunal: string) {
+  const candidate = (value: string) => {
+    const cleaned = value.trim();
+    return Boolean(cleaned && cleaned !== rit && cleaned !== tribunal &&
+      !cellLooksLikeDate(cleaned) && !/\d{1,3}-\d{8,}-\d/.test(cleaned) &&
+      !/^\([^)]+\)/.test(cleaned) &&
+      !/^(?:corte suprema|corte de apelaciones|\d+[º°o]?\s*juzgado|juzgado\b|tribunal\b)/i.test(cleaned));
+  };
+  return cells.find((cell) => candidate(cell) && /\bcontra\b|\bvs\.?\b|\bcon\b|\//i.test(cell)) ||
+    cells.find((cell) => candidate(cell) && cell.length > 8) || null;
+}
+
 function isHeaderRow(cells: string[]) {
   const labels = cells.map(columnLabel);
   const recognized = labels.filter((label) => dateColumnLabel(label) ||
-    /^(?:folio|tramite|actuacion|resolucion|etapa|descargar|doc|documento|cuaderno|anexo|foja|georref|(?:desc|descripcion)(?: del?)?(?: tramite|actuacion|resolucion)?)$/.test(label));
+    /^(?:folio|tramite|actuacion|resolucion|etapa|descargar|doc|documento|cuaderno|anexo|foja|georref|(?:des|desc|descripcion)(?: del?)?(?: tramite|actuacion|resolucion)?)$/.test(label));
   return recognized.length >= 2 && (
     labels.some(dateColumnLabel) || /^(?:folio|cuaderno)$/.test(labels[0] || "")
   );
@@ -276,7 +341,7 @@ export function parseMovimientosFromHtml(
       const labels = cells.map(columnLabel);
       cuadernoColumn = labels.findIndex((label) => label === "cuaderno");
       tramiteColumn = labels.findIndex((label) => /^(?:tramite|actuacion|resolucion|descripcion)$/.test(label));
-      descripcionColumn = labels.findIndex((label) => /^(?:desc|descripcion)(?: del?)? (?:tramite|actuacion|resolucion)$/.test(label));
+      descripcionColumn = labels.findIndex((label) => /^(?:des|desc|descripcion)(?: del?)? (?:tramite|actuacion|resolucion)$/.test(label));
       fechaColumn = labels.findIndex(dateColumnLabel);
       etapaColumn = labels.findIndex((label) => label === "etapa");
       folioColumn = labels.findIndex((label) => label === "folio");
@@ -382,47 +447,55 @@ export function parseCausasListFromHtml(html: string): Array<{
   rit: string;
   tribunal: string;
   caratula?: string | null;
+  fecha?: string | null;
   ruc?: string | null;
   estado?: string | null;
 }> {
-  html = DomUtils.getOuterHTML(visibleDocument(html));
   const items: Array<{
     rit: string;
     tribunal: string;
     caratula?: string | null;
+    fecha?: string | null;
     ruc?: string | null;
     estado?: string | null;
   }> = [];
   const seen = new Set<string>();
-  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-  let rowMatch: RegExpExecArray | null;
-
-  while ((rowMatch = rowRe.exec(html)) !== null) {
-    const cells: string[] = [];
-    let cellMatch: RegExpExecArray | null;
-    cellRe.lastIndex = 0;
-    while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-      cells.push(stripTags(cellMatch[1]));
+  for (const rows of causeTableRows(html)) {
+    let headers: CauseColumns | null = null;
+    for (const row of rows) {
+      const cellNodes = causeRowCells(row);
+      const cells = cellNodes.map((cell) => nodeText(cell).replace(/\s+/g, " ").trim());
+      if (cells.length < 2) continue;
+      const mapped = causeColumnMap(cells);
+      if (mapped) { headers = mapped; continue; }
+      if (cellNodes.some((cell) => cell.type === "tag" && cell.name === "th") || isHeaderRow(cells)) continue;
+      const joined = cells.join(" ");
+      const ritText = headers ? cells[headers.rit] || "" : joined;
+      const rits = extractRitsFromText(ritText);
+      if (rits.length !== 1) continue;
+      const rit = rits[0];
+      const tribunalText = headers && headers.tribunal >= 0 ? cells[headers.tribunal] || "" : null;
+      const tribunal = headers && headers.tribunal >= 0
+        ? pickTribunalFromTexts([tribunalText || ""]) || "Tribunal no identificado"
+        : pickTribunalFromTexts(cells) || "Tribunal no identificado";
+      if (/sin tribunal/i.test(tribunal)) continue;
+      const key = `${rit}|${tribunal}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const caratula = headers && headers.caratula >= 0
+        ? cells[headers.caratula] || null
+        : fallbackCaratula(cells, rit, tribunal);
+      const fechaText = headers && headers.fecha >= 0 ? cells[headers.fecha] || "" : cells.find(cellLooksLikeDate) || "";
+      const fecha = fechaText ? normalizeChileanDate(fechaText) : null;
+      items.push({
+        rit,
+        tribunal,
+        caratula,
+        fecha,
+        ruc: headers && headers.ruc >= 0 ? cells[headers.ruc] || null : cells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
+        estado: headers && headers.estado >= 0 ? cells[headers.estado] || null : cells.find((c) => /tramitaci|terminad|archiv/i.test(c)) || null,
+      });
     }
-    if (cells.length < 2 || isHeaderRow(cells)) continue;
-    const joined = cells.join(" ");
-    const rits = extractRitsFromText(joined);
-    if (rits.length !== 1) continue;
-    const rit = rits[0];
-    const tribunal =
-      pickTribunalFromTexts(cells) || "Tribunal no identificado";
-    if (/sin tribunal/i.test(tribunal)) continue;
-    const key = `${rit}|${tribunal}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    items.push({
-      rit,
-      tribunal,
-      caratula: cells.find((c) => !cellLooksLikeDate(c) && /\bvs\.?\b|\/|con\b/i.test(c)) || cells[0],
-      ruc: cells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
-      estado: cells.find((c) => /tramitaci|terminad|archiv/i.test(c)) || null,
-    });
   }
   return items;
 }
@@ -489,6 +562,7 @@ export type MisCausasParsedItem = {
   rit: string;
   tribunal: string;
   caratula?: string | null;
+  fecha?: string | null;
   ruc?: string | null;
   estado?: string | null;
 };
@@ -510,6 +584,7 @@ export function parseMisCausasFromHtml(html: string): MisCausasParsedItem[] {
         rit: item.rit,
         tribunal: item.tribunal,
         caratula: item.caratula ?? null,
+        fecha: item.fecha ?? null,
         ruc: item.ruc ?? null,
         estado: item.estado ?? null,
       });
@@ -545,57 +620,48 @@ export type VerDetalleRow = {
  */
 export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
   assertOjvResponseAvailable(html);
-  html = DomUtils.getOuterHTML(visibleDocument(html));
   const out: VerDetalleRow[] = [];
-  const tableMatch =
-    html.match(
-      /id=["']verDetalleJuridica["'][^>]*>([\s\S]*?)(?:<\/table>|<\/tbody>)/i
-    ) || html.match(/verDetalleJuridica[\s\S]*?<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
-  const chunk = tableMatch?.[1] || html;
-  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-  let rowMatch: RegExpExecArray | null;
   const seen = new Set<string>();
-
-  while ((rowMatch = rowRe.exec(chunk)) !== null) {
-    if (/pagination|<nav/i.test(rowMatch[1])) continue;
-    const cells: string[] = [];
-    let cellMatch: RegExpExecArray | null;
-    cellRe.lastIndex = 0;
-    while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-      cells.push(stripTags(cellMatch[1]));
+  for (const rows of causeTableRows(html, /^(?:verDetalleJuridica|dtaTableDetalle|dtaTableDetalleMisCau\w*)$/i)) {
+    let headers: CauseColumns | null = null;
+    for (const row of rows) {
+      const cellNodes = causeRowCells(row);
+      const cells = cellNodes.map((cell) => nodeText(cell).replace(/\s+/g, " ").trim());
+      if (cells.length < 2) continue;
+      if (/pagination|<nav/i.test(nodeText(row))) continue;
+      const mapped = causeColumnMap(cells);
+      if (mapped) { headers = mapped; continue; }
+      if (cellNodes.some((cell) => cell.type === "tag" && cell.name === "th")) continue;
+      const dataCells = headers ? cells :
+        (cells[0].length <= 2 || /ver|detalle|^\s*$/i.test(cells[0]) ? cells.slice(1) : cells);
+      const ritText = headers ? cells[headers.rit] || "" : dataCells.join(" ");
+      const rits = extractRitsFromText(ritText);
+      if (rits.length !== 1) continue;
+      const rit = rits[0];
+      const tribunalText = headers && headers.tribunal >= 0 ? cells[headers.tribunal] || "" : null;
+      const tribunal = headers && headers.tribunal >= 0
+        ? pickTribunalFromTexts([tribunalText || ""]) || "Tribunal no identificado"
+        : pickTribunalFromTexts(dataCells) || "Tribunal no identificado";
+      const key = `${rit}|${tribunal}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const caratula = headers && headers.caratula >= 0
+        ? cells[headers.caratula] || null
+        : fallbackCaratula(dataCells, rit, tribunal);
+      const fechaRaw = headers && headers.fecha >= 0
+        ? cells[headers.fecha] || null
+        : dataCells.find((c) => cellLooksLikeDate(c)) || null;
+      const fechaNorm = fechaRaw ? normalizeChileanDate(fechaRaw) : null;
+      out.push({
+        rit,
+        tribunal,
+        caratula,
+        ruc: headers && headers.ruc >= 0 ? cells[headers.ruc] || null : dataCells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
+        estado: headers && headers.estado >= 0 ? cells[headers.estado] || null : dataCells.find((c) => /tramitaci|terminad|archiv|vigente|activ/i.test(c)) || null,
+        fecha: fechaNorm,
+        fechaDate: fechaNorm ? parseLocalDateInput(fechaNorm) : null,
+      });
     }
-    if (cells.length < 2) continue;
-    // Skip leading empty / icon cell when present
-    const dataCells =
-      cells[0].length <= 2 || /ver|detalle|^\s*$/i.test(cells[0])
-        ? cells.slice(1)
-        : cells;
-    const joined = dataCells.join(" ");
-    const rits = extractRitsFromText(joined);
-    if (rits.length !== 1) continue;
-    const rit = rits[0];
-    const tribunal =
-      pickTribunalFromTexts(dataCells) || "Tribunal no identificado";
-    const key = `${rit}|${tribunal}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const fechaRaw = dataCells.find((c) => cellLooksLikeDate(c)) || null;
-    const fechaNorm = fechaRaw ? normalizeChileanDate(fechaRaw) : null;
-    out.push({
-      rit,
-      tribunal,
-      caratula:
-        dataCells.find((c) => !cellLooksLikeDate(c) && /\bvs\.?\b|\/|con\b/i.test(c)) ||
-        dataCells.find((c) => c.length > 8 && c !== rit && c !== tribunal && !cellLooksLikeDate(c)) ||
-        null,
-      ruc: dataCells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
-      estado:
-        dataCells.find((c) => /tramitaci|terminad|archiv|vigente|activ/i.test(c)) ||
-        null,
-      fecha: fechaNorm,
-      fechaDate: fechaNorm ? parseLocalDateInput(fechaNorm) : null,
-    });
   }
   return out;
 }

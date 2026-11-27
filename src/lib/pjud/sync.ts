@@ -58,6 +58,52 @@ function externalKey(rit: string | null, tribunal: string) {
 
 const nextSyncAtFrom = nextCaseRefreshAt;
 
+/** Atomically reuse one ordinary pending reservation before creating a new one. */
+export async function claimOrCreatePjudSyncJob(
+  client: Pick<Prisma.TransactionClient, "pjudSyncJob">,
+  input: { causaId: string; trigger: "manual" | "manual-session" | "cron" | "retry" | "webhook" | "import" }
+) {
+  if (input.trigger !== "manual-session") {
+    const startedAt = new Date();
+    const claimed = await client.pjudSyncJob.updateMany({
+      where: { causaId: input.causaId, status: "pending", trigger: { not: "manual-session" } },
+      data: {
+        status: "running",
+        attempts: { increment: 1 },
+        startedAt,
+        finishedAt: null,
+        trigger: input.trigger,
+        lastError: null,
+        note: null,
+      },
+    });
+    if (claimed.count) {
+      return client.pjudSyncJob.findFirst({
+        where: { causaId: input.causaId, status: "running", trigger: input.trigger, startedAt },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+  }
+
+  try {
+    return await client.pjudSyncJob.create({
+      data: {
+        causaId: input.causaId,
+        status: "running",
+        trigger: input.trigger,
+        attempts: 1,
+        startedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    const { isActiveJobUniqueViolation } = await import("@/lib/pjud/queue");
+    if (isActiveJobUniqueViolation(error)) {
+      throw httpError("Ya hay una actualización en curso o reservada para esta causa. Espere a que termine antes de reintentar.", 409);
+    }
+    throw error;
+  }
+}
+
 /** Promote a compatible historical fingerprint in place, preserving its documents. */
 export async function persistFetchedPjudMovimientos(
   tx: Pick<Prisma.TransactionClient, "$queryRaw" | "causaMovimiento">,
@@ -201,15 +247,7 @@ export async function syncCausaPjud(
     ? await prisma.pjudSyncJob.findUnique({
         where: { id: opts.existingJob.id, attempts: opts.existingJob.attempts, causaId, status: "running", trigger },
       })
-    : await prisma.pjudSyncJob.create({
-        data: {
-          causaId,
-          status: "running",
-          trigger,
-          attempts: 1,
-          startedAt: new Date(),
-        },
-      });
+    : await claimOrCreatePjudSyncJob(prisma, { causaId, trigger });
 
   const reservationEnded = "La reserva de esta consulta ya terminó. Inicie una nueva consulta para reintentar.";
   if (!job) throw httpError(reservationEnded, 409);

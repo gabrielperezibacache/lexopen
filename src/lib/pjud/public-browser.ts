@@ -628,7 +628,15 @@ async function readTribunalSelectOptions(
 }
 
 export async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
-  const competencia = inferCompetenciaFromTribunal(tribunal);
+  let competencia = inferCompetenciaFromTribunal(tribunal);
+  if (competencia === "7") {
+    const select = page.locator(OJV.competencia).filter({ visible: true }).first();
+    const hasFamilyOption = await select.locator("option").evaluateAll((options) =>
+      options.some((option) => (option as HTMLOptionElement).value === "7")
+    ).catch(() => false);
+    // Older OJV fixtures and portal variants expose Familia under Civil.
+    if (!hasFamilyOption) competencia = "3";
+  }
   await selectCompetencia(page, competencia);
 
   if (competencia === "1") {
@@ -646,7 +654,7 @@ export async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: stri
     return;
   }
 
-  if (["3", "4", "5", "6"].includes(competencia)) {
+  if (["3", "4", "5", "6", "7"].includes(competencia)) {
     // Prefer visible select in active tab (ROL vs Jurídica).
     const trib = page
       .locator(OJV.tribunal).filter({ visible: true })
@@ -807,22 +815,33 @@ export async function openExactCauseModal(
   page: PlaywrightPage,
   causa: { rit: string; tribunal: string },
   selector = "#dtaTableDetalle tr, #verDetalleJuridica tr, #resultConsultaJuridica tr",
-  freshScope?: Locator
+  freshScope?: Locator,
+  requireFresh = Boolean(freshScope)
 ): Promise<string | null> {
   const rows = (freshScope ?? page).locator(selector);
-  const snapshots = await rows.evaluateAll((nodes, requireFresh) => nodes.map((node) => {
+  const snapshots = await rows.evaluateAll((nodes, requireCurrentResponse) => nodes.map((node) => {
     const el = node as HTMLElement;
     const visible = el.getBoundingClientRect().height > 0 && getComputedStyle(el).visibility !== "hidden" &&
       (el.tagName === "TR" || !el.querySelector("tr, .card, .list-group-item"));
-    const fresh = !requireFresh || Boolean((window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node));
+    const fresh = !requireCurrentResponse || Boolean((window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node));
     const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
+    const table = el.closest("table");
+    const headerRow = table?.querySelector("thead tr") || [...(table?.querySelectorAll("tr") || [])].find((row) => row.querySelector("th"));
+    const headers = [...(headerRow?.children || [])].filter((cell) => /^(TD|TH)$/.test(cell.tagName))
+      .map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[._]/g, " ").replace(/\s+/g, " ").trim());
+    const ritColumn = headers.findIndex((label) => /^(?:rol|rit|nro rol|numero rol)$/.test(label));
+    const tribunalColumn = headers.findIndex((label) => /^(?:tribunal|corte)$/.test(label));
+    const mappedColumns = ritColumn >= 0 && tribunalColumn >= 0
+      ? { rit: (cells[ritColumn]?.textContent || "").replace(/\s+/g, " ").trim(), tribunal: (cells[tribunalColumn]?.textContent || "").replace(/\s+/g, " ").trim() }
+      : null;
     return {
       eligible: visible && fresh,
       cells: (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim()),
+      mappedColumns,
     };
-  }), Boolean(freshScope));
+  }), requireFresh);
   const matches = snapshots.map((row, index) => ({ ...row, index }))
-    .filter((row) => row.eligible && causeRowMatches(row.cells, causa));
+    .filter((row) => row.eligible && causeRowMatches(row.cells, causa, row.mappedColumns || undefined));
   if (matches.length > 1) {
     throw new PjudScrapeError(`OJV devolvió varias filas para ${causa.rit} y «${causa.tribunal}». No se pudo confirmar un expediente único.`);
   }
@@ -835,19 +854,19 @@ export async function openExactCauseModal(
   const staleDetails = (await page.locator(".modal").evaluateAll((nodes) => nodes.map((node) => node.innerHTML)))
     .filter((html) => parseMovimientosFromHtml(html).length > 0 || hasExplicitEmptyHistory(html));
   const row = rows.nth(matches[0].index);
-  const clicked = await row.evaluate((node, expectedCells) => {
-    if (expectedCells) {
+  const clicked = await row.evaluate((node, expected) => {
+    if (expected?.requireFresh) {
       if (!(window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node)) return false;
       const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
       const texts = (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim());
-      if (texts.length !== expectedCells.length || texts.some((text, index) => text !== expectedCells[index])) return false;
+      if (texts.length !== expected.cells.length || texts.some((text, index) => text !== expected.cells[index])) return false;
     }
     const icon = node.querySelector('img[src*="lupa" i], .glyphicon-search, .fa-search');
     const target = icon?.closest("a, button") || node.querySelector('a[title*="detalle" i], a[title*="ver" i], td a[onclick], td a, a[onclick], button');
     if (!(target instanceof HTMLElement)) return false;
     target.click();
     return true;
-  }, freshScope ? matches[0].cells : undefined);
+  }, requireFresh ? { cells: matches[0].cells, requireFresh: true } : undefined);
   if (!clicked) throw new PjudScrapeError(`La fila exacta de ${causa.rit} no tiene un enlace de detalle reconocible.`);
   await page.locator(`:is(${OJV.modal}):visible`).first().waitFor({ state: "visible", timeout: 20_000 });
   if (staleDetails.length) {
@@ -862,7 +881,7 @@ export async function openExactCauseModal(
   if (!(await cuadernoSelector(page))?.options.length) {
     await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId });
   }
-  return pickTribunalFromTexts(matches[0].cells);
+  return matches[0].mappedColumns?.tribunal || pickTribunalFromTexts(matches[0].cells);
 }
 
 export async function modalInnerHtml(page: PlaywrightPage) {

@@ -38,6 +38,7 @@ assert.equal(inferCompetenciaFromTribunal("1º Juzgado Civil de Santiago"), "3")
 assert.equal(inferCompetenciaFromTribunal("Corte de Apelaciones de Santiago"), "2");
 assert.equal(inferCompetenciaFromTribunal("C.A. Santiago"), "2");
 assert.equal(inferCompetenciaFromTribunal("Juzgado de Cobranza de Santiago"), "6");
+assert.equal(inferCompetenciaFromTribunal("1º Juzgado de Familia de Santiago"), "7");
 assert.equal(inferCompetenciaFromTribunal("Tribunal de Juicio Oral en lo Penal"), "5");
 assert.equal(tribunalLabelsMatch("C.A. Santiago", "Corte de Apelaciones de Santiago"), true);
 assert.equal(pickCorteForTribunal([
@@ -59,6 +60,20 @@ assert.equal(isPlaceholderTribunal("1º Juzgado Civil de Santiago"), false);
 assert.equal(
   pickTribunalFromTexts(["C-1-2024", "1º Juzgado de Familia de Santiago", "Tramitación"]),
   "1º Juzgado de Familia de Santiago"
+);
+assert.equal(
+  pickTribunalFromTexts([
+    "38220-2025",
+    "REBOLLEDO DIAZ MARIA FERNANDA CONTRA SALA DE LA ILUSTRÍSIMA CORTE DE APELACIONES DE IQUIQUE",
+    "Corte Suprema",
+  ]),
+  "Corte Suprema",
+  "a canonical Supreme Court cell outranks the court name embedded in a case caption"
+);
+assert.equal(
+  pickTribunalFromTexts(["18390-2025", "(Penal) Contienda de Competencia", "Corte Suprema"]),
+  "Corte Suprema",
+  "a resource type must not be mistaken for the tribunal"
 );
 assert.equal(
   tribunalLabelsMatch(
@@ -99,6 +114,10 @@ assert.equal(ritLabelsMatch("C-11-2024", wanted.rit), false);
 assert.equal(ritLabelsMatch("F-1-2024", wanted.rit), false);
 assert.equal(ritLabelsMatch("1-2024", wanted.rit), false, "a missing letter is not a confirmed identity");
 assert.equal(causeRowMatches(["C-1-2024", wanted.tribunal], wanted), true);
+assert.equal(causeRowMatches(
+  ["18390-2025", "(Penal) Contienda de Competencia", "Parte A CONTRA Sala de la Corte de Apelaciones de Iquique", "Corte Suprema"],
+  { rit: "18390-2025", tribunal: "Corte Suprema" }
+), true, "the exact Supreme Court column confirms this row despite unrelated text cells");
 assert.equal(causeRowMatches(["C-11-2024", wanted.tribunal], wanted), false);
 assert.equal(causeRowMatches(["F-1-2024", wanted.tribunal], wanted), false);
 assert.equal(causeRowMatches(["C-1-2024", "2º Juzgado Civil de Santiago"], wanted), false);

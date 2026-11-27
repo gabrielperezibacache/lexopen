@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { readManuallyAuthenticatedMisCausas } from "@/lib/pjud/live-validation";
 import { redactedPjudValidationUrl, startClaveUnicaOidcFromOjv } from "@/lib/pjud/ojv-oidc";
-import { applyMisCausasFiltros, clickMisCausasBuscar, collectMisCausasFromAuthenticatedOjv, openClaveUnicaFromOjv } from "@/lib/pjud/public-scrape";
+import { applyMisCausasFiltros, clickMisCausasBuscar, collectMisCausasFromAuthenticatedOjv, openClaveUnicaFromOjv, readCausaDetailFromAuthenticatedOjv } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -206,6 +206,58 @@ async function main() {
     assert.equal(returnPage.url(), homeReturn, "manual mode preserves the selected homepage without entering a shell");
     assert.equal(shellVisits, 1, "manual mode does not navigate through post-authentication URLs");
     await returnContext.close();
+
+    const delayedContext = await browser.newContext();
+    await delayedContext.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: `
+        <a id="menuMisCausas" href="#" onclick="event.preventDefault();window.loadMenu()">Mis Causas</a><main id="misCausas"></main>
+        <script>
+          window.loadMenu=()=>setTimeout(()=>{
+            const section=document.createElement('section'); section.className='tab-pane active';
+            const category=document.createElement('a'); category.href='#'; category.textContent='Civil'; section.append(category);
+            const table=document.createElement('table'); table.id='dtaTableDetalleMisCauCiv';
+            table.innerHTML='<thead><tr><th>Rol</th><th>Tribunal</th><th>Fecha Ingreso</th><th>Estado Causa</th></tr></thead><tbody id="rowsCiv"></tbody>';
+            const button=document.createElement('button'); button.textContent='Buscar';
+            button.onclick=()=>{document.querySelector('#rowsCiv').innerHTML='<tr><td>C-1-2024</td><td>1º Juzgado Civil de Santiago</td><td>12/08/2026</td><td>Tramitación</td></tr>'};
+            section.append(button,table); document.querySelector('#misCausas').replaceChildren(section);
+          },850);
+        </script>
+      ` });
+    });
+    const delayedPage = await delayedContext.newPage();
+    await delayedPage.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+    const delayedResult = await collectMisCausasFromAuthenticatedOjv(delayedPage, { materias: ["Civil"] });
+    assert.equal(delayedResult.openedMenu, true);
+    assert.deepEqual(delayedResult.materiasTried, ["Civil"]);
+    assert.equal(delayedResult.items.length, 1, "automatic mode waits for menu content added after the old 700 ms delay");
+    assert.equal(delayedResult.items[0].rit, "C-1-2024");
+    await delayedContext.close();
+
+    const detailContext = await browser.newContext();
+    await detailContext.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: `
+        <a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a>
+        <a href="#tabSup">Corte Suprema</a><a href="#tabCiv">Civil</a>
+        <section id="tabSup" class="tab-pane active">
+          <label class="switch"><input id="filtroMisCauSup" type="checkbox"><span>Filtro</span></label>
+          <button id="buscarSup" onclick="window.searched=(window.searched||[]).concat('Sup')">Buscar</button>
+          <table id="dtaTableDetalleMisCauSup"><thead><tr><th></th><th>Rol</th><th>Tipo Recurso</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th></tr></thead><tbody>
+            <tr><td><a href="#" onclick="event.preventDefault();window.detailOpened=true;const modal=document.querySelector('#modalDetalleSuprema');modal.innerHTML='<table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th><th>Des. Trámite</th></tr></thead><tbody><tr><td>4</td><td>14/11/2025</td><td>Ingreso</td><td>Resolución ficticia de Corte Suprema</td></tr></tbody></table>';modal.style.display='block';modal.classList.add('show')">Ver</a></td><td>18390-2025</td><td>(Penal) Contienda de Competencia</td><td>Parte A contra Sala de la Corte de Apelaciones de Iquique</td><td>14/11/2025</td><td>Tramitación</td><td>Corte Suprema</td></tr>
+          </tbody></table>
+        </section>
+        <section id="tabCiv" class="tab-pane"><button onclick="window.searched=(window.searched||[]).concat('Civil')">Buscar</button></section>
+        <div id="modalDetalleSuprema" class="modal" style="display:none"></div>
+      ` });
+    });
+    const detailPage = await detailContext.newPage();
+    await detailPage.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+    const detailResult = await readCausaDetailFromAuthenticatedOjv(detailPage, {
+      id: "fixture-causa", rit: "18390-2025", ruc: null, tribunal: "Corte Suprema", titulo: "Corte Suprema", caratula: null,
+    }, { downloadDocuments: false });
+    assert.deepEqual(await detailPage.evaluate(() => (window as typeof window & { searched?: string[] }).searched), ["Sup"], "the matching materia is searched before Civil");
+    assert.equal(await detailPage.evaluate(() => Boolean((window as typeof window & { detailOpened?: boolean }).detailOpened)), true);
+    assert.equal(detailResult.movimientos.some(movement => movement.titulo.includes("Resolución ficticia de Corte Suprema")), true);
+    await detailContext.close();
     console.log("pjud/live-validation.dom.test.ts OK (offline browser fixtures)");
   } finally {
     await browser.close();

@@ -426,6 +426,25 @@ async function main() {
     assert.equal(await current.evaluate(() => Boolean((window as typeof window & { wrongDetail?: boolean }).wrongDetail)), false);
     assert.equal(await current.locator("#modalDetalleCivil").isVisible(), true);
 
+    await current.setContent(`<table id="dtaTableDetalle"><thead><tr><th></th><th>Rol</th><th>Tipo Recurso</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th></tr></thead>
+      <tbody><tr><td><a href="#" onclick="event.preventDefault();const modal=document.querySelector('#modalDetalleSuprema');modal.innerHTML='<table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th><th>Des. Trámite</th></tr></thead><tbody><tr><td>4</td><td>14/11/2025</td><td>Ingreso</td><td>Resolución ficticia</td></tr></tbody></table>';modal.style.display='block';modal.classList.add('show')">Ver</a></td>
+        <td>18390-2025</td><td>(Penal) Contienda de Competencia</td><td>Parte A contra Sala de la Corte de Apelaciones de Iquique</td><td>14/11/2025</td><td>Tramitación</td><td>Corte Suprema</td></tr></tbody>
+      </table>
+      <div id="modalDetalleSuprema" class="modal" style="display:none"></div>`);
+    assert.equal(await openExactCauseModal(current, { rit: "18390-2025", tribunal: "Corte Suprema" }), "Corte Suprema");
+    assert.equal(await current.locator("#modalDetalleSuprema").isVisible(), true, "the exact mapped Corte Suprema row opens its detail");
+
+    const familyTribunal = "1º Juzgado de Familia de Santiago";
+    await current.setContent(`<select id="competencia"><option value="3">Civil</option><option value="7">Familia</option></select>
+      <select id="conTribunal"><option value="0">Todos</option><option value="261">${familyTribunal}</option></select>`);
+    await selectTribunalOrCorte(current, familyTribunal);
+    assert.equal(await current.locator("#competencia").inputValue(), "7");
+    assert.equal(await current.locator("#conTribunal").inputValue(), "261");
+    await current.setContent(`<select id="competencia"><option value="3">Civil</option></select>
+      <select id="conTribunal"><option value="0">Todos</option><option value="261">${familyTribunal}</option></select>`);
+    await selectTribunalOrCorte(current, familyTribunal);
+    assert.equal(await current.locator("#competencia").inputValue(), "3", "older OJV fixtures fall back to Civil when Familia value 7 is missing");
+
     await current.setContent(`<select id="competencia"><option value="3">Civil</option></select><select id="conCorte"><option value="0">Todos</option><option value="90">C.A. Santiago</option><option value="92">C.A. Santiago</option></select><select id="conTribunal"><option value="0">Todos</option></select>`);
     await assert.rejects(() => selectTribunalOrCorte(current, "3º Juzgado Civil de Santiago"), /única corte/);
     assert.equal(await current.locator("#conCorte").inputValue(), "0", "an ambiguous court is not selected");

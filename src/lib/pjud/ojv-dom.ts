@@ -66,7 +66,7 @@ export const OJV = {
     'button:has-text("Buscar"), input[type="submit"][value*="Buscar" i], #btnBuscar',
 } as const;
 
-export type OjvCompetenciaValue = "1" | "2" | "3" | "4" | "5" | "6";
+export type OjvCompetenciaValue = "1" | "2" | "3" | "4" | "5" | "6" | "7";
 
 export function inferCompetenciaFromTribunal(
   tribunal: string
@@ -74,6 +74,7 @@ export function inferCompetenciaFromTribunal(
   const t = tribunal.toLowerCase();
   if (/suprema/.test(t)) return "1";
   if (/apelaci[oó]n|corte de apel|^\s*c\s*\.\s*a\s*\./.test(t)) return "2";
+  if (/familia/.test(t)) return "7";
   if (/laboral|juzgado del trabajo|cobranza laboral|previsional/.test(t))
     return "4";
   if (
@@ -226,12 +227,16 @@ export function ritLabelsMatch(candidate: string, wanted: string) {
 /** A detail link must belong to one exact RIT and a compatible real tribunal. */
 export function causeRowMatches(
   cells: string[],
-  wanted: { rit: string; tribunal: string }
+  wanted: { rit: string; tribunal: string },
+  columns?: { rit?: string; tribunal?: string | null }
 ) {
   if (isPlaceholderTribunal(wanted.tribunal)) return false;
-  const rits = extractRitsFromText(cells.join(" "));
+  const ritText = columns?.rit !== undefined ? columns.rit : cells.join(" ");
+  const rits = extractRitsFromText(ritText);
   if (rits.length !== 1 || !ritLabelsMatch(rits[0], wanted.rit)) return false;
-  const tribunal = pickTribunalFromTexts(cells);
+  const tribunal = columns && Object.hasOwn(columns, "tribunal")
+    ? columns.tribunal?.trim() || null
+    : pickTribunalFromTexts(cells);
   return Boolean(tribunal && tribunalLabelsMatch(tribunal, wanted.tribunal));
 }
 
@@ -256,16 +261,21 @@ export function isPlaceholderTribunal(tribunal: string | null | undefined) {
 const TRIBUNAL_CELL_RE =
   /juzgado|corte de|tribunal oral|tribunal de|tribunal constitucional|juz\.\s|jpl\b|polic[ií]a local|garant[ií]a|cobranza|familia|laboral|\bcivil\b|\bpenal\b|apelaci[oó]n|suprema/i;
 
+function isCanonicalTribunalLabel(label: string) {
+  return /^(?:corte suprema|corte\s+(?:de\s+)?apelaciones\s+(?:de\s+)?[\p{L} .'-]+|c\.?\s*a\.?\s+(?:de\s+)?[\p{L} .'-]+|\d+[º°o]?\s*juzgado\b.*|juzgado\b.*|tribunal\s+(?:oral|de|constitucional)\b.*|polic[ií]a\s+local\b.*|jpl\b.*)$/iu.test(label);
+}
+
 /** Pick best tribunal label from table cells; null if none look real. */
 export function pickTribunalFromTexts(texts: string[]): string | null {
   const cleaned = texts.map((c) => c.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const canonical = cleaned.find((c) => isCanonicalTribunalLabel(c));
+  if (canonical) return canonical.slice(0, 180);
   const strong = cleaned.find((c) =>
-    /juzgado|corte de|tribunal oral|tribunal de|tribunal constitucional|polic[ií]a local/i.test(
-      c
-    )
+    /juzgado|corte\s+(?:de\s+)?suprema|corte de|tribunal oral|tribunal de|tribunal constitucional|polic[ií]a local/i.test(c) &&
+    !/^\([^)]+\)/.test(c)
   );
   if (strong) return strong.slice(0, 180);
-  const soft = cleaned.find((c) => TRIBUNAL_CELL_RE.test(c) && c.length >= 4);
+  const soft = cleaned.find((c) => TRIBUNAL_CELL_RE.test(c) && c.length >= 4 && !/^\([^)]+\)/.test(c));
   if (soft) return soft.slice(0, 180);
   return null;
 }

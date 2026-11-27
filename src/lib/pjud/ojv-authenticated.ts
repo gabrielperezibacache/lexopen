@@ -267,6 +267,21 @@ export type MisCausasReadOptions = {
   signal?: AbortSignal;
 };
 
+function preferredMisCausasMateria(tribunal: string): MisCausasMateria | null {
+  const label = tribunal.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/suprema/.test(label)) return "Corte Suprema";
+  if (/apelaci|corte de apel/.test(label)) return "Apelaciones";
+  if (/oral|juicio oral/.test(label)) return "Tribunal Oral";
+  if (/laboral|trabajo|previsional/.test(label)) return "Laboral";
+  if (/cobranza/.test(label)) return "Cobranza";
+  if (/familia/.test(label)) return "Familia";
+  if (/garantia/.test(label)) return "Garantía";
+  if (/penal/.test(label)) return "Penal";
+  if (/constitucional/.test(label)) return "Constitucional";
+  if (/civil/.test(label)) return "Civil";
+  return null;
+}
+
 function assertMisCausasReadActive(options: MisCausasReadOptions) {
   if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 }
@@ -336,18 +351,18 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
     } else {
       await loc.click({ timeout: 8_000 }).catch(() => undefined);
     }
-    await page
-      .waitForLoadState("domcontentloaded")
-      .catch(() => undefined);
-    await sleep(700);
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
     await dismissOjvPrompts(page);
+    await waitForMisCausasMenuReady(page, options);
     return true;
   }
   // Intento por texto en sidebar / menú
   const byText = page.locator("text=/^\\s*Mis Causas\\s*$/i").first();
   if ((await byText.count().catch(() => 0)) > 0) {
     await byText.click({ force: true, timeout: 8_000 }).catch(() => undefined);
-    await sleep(700);
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    await dismissOjvPrompts(page);
+    await waitForMisCausasMenuReady(page, options);
     return true;
   }
   return false;
@@ -358,6 +373,27 @@ async function misCausasActiveScope(page: PlaywrightPage) {
   const current = active.filter({ has: page.locator('[id^="filtroMisCau"], [id^="btnConsultaMisCau"], table[id^="dtaTableDetalleMisCau"]') });
   if (await current.count()) return current.last();
   return await active.count() ? active.last() : page.locator("body");
+}
+
+async function waitForMisCausasSearchIdle(page: AnyPage, options: MisCausasReadOptions) {
+  const deadline = Date.now() + 3_500;
+  while (Date.now() < deadline) {
+    assertMisCausasReadActive(options);
+    const idle = await page.evaluate(() => {
+      const jquery = (window as typeof window & { jQuery?: { active?: number } }).jQuery;
+      const active = Number(jquery?.active || 0);
+      const visible = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width || !rect.height) return false;
+        const style = getComputedStyle(element);
+        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) !== 0;
+      };
+      const loaders = [...document.querySelectorAll('#loadPreMisCau, #loadPreJuridica, #loadPreCausa, .loadingConsulta, .dataTables_processing, [aria-busy="true"], .spinner, .spinner-border, .fa-spinner')];
+      return !(Number.isFinite(active) && active > 0) && !loaders.some(visible);
+    }).catch(() => true);
+    if (idle) return;
+    await sleep(100);
+  }
 }
 
 export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}, scope?: Locator) {
@@ -379,6 +415,7 @@ export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasRead
   }
   await sleep(1200);
   await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+  await waitForMisCausasSearchIdle(page, options);
   return true;
 }
 
@@ -712,9 +749,14 @@ export async function readCausaDetailFromAuthenticatedOjv(
   }
 
   const identity = { rit: causa.rit, tribunal: causa.tribunal };
+  const requestedMaterias = [...(options.materias ?? MIS_CAUSAS_MATERIAS)];
+  const preferredMateria = preferredMisCausasMateria(causa.tribunal);
+  const materias = preferredMateria && requestedMaterias.includes(preferredMateria)
+    ? [preferredMateria, ...requestedMaterias.filter((materia) => materia !== preferredMateria)]
+    : requestedMaterias;
   const searchForDetail = async () => {
     await applyMisCausasFiltros(page);
-    const scope = options.allowPrompts === false ? await misCausasActiveScope(page) : undefined;
+    const scope = await misCausasActiveScope(page);
     const response = await clickMisCausasBuscar(page, options, scope);
     let firstPage = Array.isArray(response) ? response : undefined;
     return collectOjvResultPages(page, async () => {
@@ -725,19 +767,19 @@ export async function readCausaDetailFromAuthenticatedOjv(
           return false;
         }
       }
-      return Boolean(await openExactCauseModal(page, identity, "tr, .card, .list-group-item", scope));
+      return Boolean(await openExactCauseModal(page, identity, "tr, .card, .list-group-item", scope, options.allowPrompts === false));
     }, scope);
   };
 
   let opened = false;
   try {
-    for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
+    for (const materia of materias) {
       assertMisCausasReadActive(options);
       if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
       let tab = page
         .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
         .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
-        .or(page.locator(`a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a`));
+        .or(page.locator(`a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a, div.card:has-text("${materia}")`));
       if (options.allowPrompts === false) tab = tab.filter({ visible: true });
       tab = tab.first();
       if ((await tab.count().catch(() => 0)) === 0) continue;

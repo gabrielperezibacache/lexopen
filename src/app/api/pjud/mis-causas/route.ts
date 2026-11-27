@@ -13,6 +13,7 @@ import {
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { parseMisCausasRequest } from "@/lib/pjud/mis-causas-request";
 import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
+import { processPendingSyncJobs } from "@/lib/pjud/queue";
 import { privatePjudJson as json, privatePjudResponse } from "@/lib/pjud/private-response";
 import { after, NextRequest } from "next/server";
 
@@ -123,6 +124,15 @@ export async function POST(req: NextRequest) {
                 async: true,
               },
             });
+          }
+          if (syncMovimientos && result.enqueuedJobIds.length && await getCaseManagementMode() === "pjud_cl") {
+            try {
+              await processPendingSyncJobs({ actorId: actor, jobIds: result.enqueuedJobIds });
+            } catch {
+              if (await getCaseManagementMode() === "pjud_cl") {
+                console.error("[pjud/mis-causas] background movement processing failed.");
+              }
+            }
           }
         } catch (error) {
           if (await getCaseManagementMode() !== "pjud_cl") return;
