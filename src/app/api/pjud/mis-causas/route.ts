@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     const syncMovimientos = body?.syncMovimientos !== false;
+    const downloadDocuments = body?.downloadDocuments === true && process.env.PJUD_DOC_DOWNLOADS !== "0";
     // Cron / explicit wait: await. UI: 202 + background (Cloudflare ~100s).
     const waitForResult = Boolean(cron) || body?.wait === true;
 
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
           const result = await syncMisCausas({
             actorId: actor,
             syncMovimientos,
+            downloadDocuments,
             processJobsInline: false,
             claim: { settingsId: claim.settingsId, claimedAt: claim.claimedAt! },
           });
@@ -129,7 +131,7 @@ export async function POST(req: NextRequest) {
             try {
               await processPjudSyncJobIdBatches(result.enqueuedJobIds, async (jobIds) => {
                 if (await getCaseManagementMode() !== "pjud_cl") return [];
-                return processPendingSyncJobs({ actorId: actor, jobIds, limit: jobIds.length });
+                return processPendingSyncJobs({ actorId: actor, jobIds, limit: jobIds.length, downloadDocuments });
               });
             } catch {
               if (await getCaseManagementMode() === "pjud_cl") {
@@ -161,6 +163,7 @@ export async function POST(req: NextRequest) {
       automatic: Boolean(cron),
       actorId,
       syncMovimientos,
+      downloadDocuments,
       // Scheduled refresh keeps its enqueue-only contract. An explicit wait=true request
       // drains just the IDs created by this run before returning.
       processJobsInline: shouldProcessMisCausasInline({ cron: Boolean(cron), wait: body?.wait }),

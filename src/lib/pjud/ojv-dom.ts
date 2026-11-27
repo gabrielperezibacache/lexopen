@@ -63,7 +63,7 @@ export const OJV = {
   misCausasMenu:
     'a:has-text("Mis Causas"), a:has-text("MIS CAUSAS"), #menuMisCausas, [onclick*="MisCausas" i]',
   misCausasBuscar:
-    'button:has-text("Buscar"), input[type="submit"][value*="Buscar" i], #btnBuscar',
+    'button:has-text("Buscar"), a.btn:has-text("Buscar"), input[type="submit"][value*="Buscar" i], input[type="button"][value*="Buscar" i], [id^="btnConsultaMisCau"], #btnBuscar',
 } as const;
 
 export type OjvCompetenciaValue = "1" | "2" | "3" | "4" | "5" | "6" | "7";
@@ -90,7 +90,12 @@ export function inferCompetenciaFromTribunal(
 /** Tokenize for fuzzy tribunal matching (º/°/1er ≈ 1). */
 export function tribunalMatchTokens(label: string) {
   return normalizeTribunalLabel(label)
-    .replace(/^c\s*\.\s*a\s*\.\s*/, "corte de apelaciones de ")
+    .replace(/^c\s*\.?\s*a\s*\.?\s*/, "corte de apelaciones de ")
+    .replace(/\bj\s*\.?\s*l\s*\.?\s*t\s*\.?(?=\s|$)/g, "juzgado de letras del trabajo")
+    .replace(/\bj\s*\.?\s*l\s*\.?(?=\s|$)/g, "juzgado de letras")
+    .replace(/\bj\s*\.?\s*g\s*\.?(?=\s|$)/g, "juzgado de garantia")
+    .replace(/\bt\s*\.?\s*o\s*\.?\s*p\s*\.?(?=\s|$)/g, "tribunal oral en lo penal")
+    .replace(/\bjuz\s*\.\s*/g, "juzgado ")
     .replace(/\b(\d+)(?:º|°|o|er|ra|do|da|to|ta|mo|ma|vo|va|no|na)?\b/gi, "$1")
     .replace(/\bprimer[oa]?\b/g, "1")
     .replace(/\bsegund[oa]\b/g, "2")
@@ -195,26 +200,48 @@ export function splitRut(rut: string): { cuerpo: string; dv: string } | null {
   return null;
 }
 
-/** Parse RIT like C-100-2024 or 100-2024 → { tipo?, numero, era }. */
+/** Parse RIT like C-100-2024, Civil-100-2024 or 100-2024. */
 export function parseRitParts(rit: string): {
   tipo: string | null;
   numero: string;
   era: string;
 } | null {
-  const raw = rit.trim().toUpperCase().replace(/\s+/g, "");
-  const withTipo = raw.match(/^([A-Z]{1,4})-(\d{1,6})-(\d{4})$/);
+  const raw = rit.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase().replace(/\s+/g, " ");
+  const withTipo = raw.match(/^([A-Z][A-Z .]{0,30}?)-\s*(\d{1,6})-\s*(\d{4})$/);
   if (withTipo) {
-    return { tipo: withTipo[1], numero: withTipo[2], era: withTipo[3] };
+    return { tipo: withTipo[1].replace(/[. ]+/g, " ").trim(), numero: withTipo[2], era: withTipo[3] };
   }
-  const plain = raw.match(/^(\d{1,6})-(\d{4})$/);
+  const plain = raw.match(/^(\d{1,6})-\s*(\d{4})$/);
   if (plain) return { tipo: null, numero: plain[1], era: plain[2] };
   return null;
 }
 
 /** Complete RIT/ROL tokens only; never match C-1-2024 inside C-11-2024. */
 export function extractRitsFromText(text: string): string[] {
+  const normalized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const knownBooks = [
+    "POLICIA LOCAL", "RECURSO DE HECHO", "PROTECCION", "CONSTITUCIONAL",
+    "COBRANZA", "LABORAL", "FAMILIA", "PENAL", "CIVIL", "AMPARO", "EXHORTO", "TRIBUTARIO",
+  ];
+  const normalizeType = (raw: string) => {
+    const candidate = raw.replace(/^(?:(?:RIT|ROL|VER)\s+)+/, "").replace(/[. ]+/g, " ").trim();
+    const book = knownBooks.find((name) => candidate === name || candidate.endsWith(` ${name}`));
+    if (book) return book;
+    return /^[A-Z]{1,4}$/.test(candidate) ? candidate : null;
+  };
+  const found: string[] = [];
+  const knownBookPattern = knownBooks.slice().sort((a, b) => b.length - a.length).map(value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const typedPattern = new RegExp(`(?:^|[^A-Z0-9-])((?:${knownBookPattern}|[A-Z]{1,4}))\\s*-\\s*(\\d{1,6})\\s*-\\s*(\\d{4})(?![A-Z0-9-])`, "g");
+  for (const match of normalized.matchAll(typedPattern)) {
+    const type = normalizeType(match[1]!);
+    if (type) found.push(`${type}-${match[2]}-${match[3]}`);
+  }
+  for (const match of normalized.matchAll(/(?:^|[^A-Z0-9-])(\d{1,6})-\s*(\d{4})(?![A-Z0-9-])/g)) {
+    found.push(`${match[1]}-${match[2]}`);
+  }
   return [...new Set(
-    Array.from(text.toUpperCase().matchAll(/(?:^|[^A-Z0-9-])([A-Z]{1,4}-\d{1,6}-\d{4}|\d{1,6}-\d{4})(?![A-Z0-9-])/g), (m) => m[1])
+    found
   )];
 }
 
@@ -259,23 +286,25 @@ export function isPlaceholderTribunal(tribunal: string | null | undefined) {
 }
 
 const TRIBUNAL_CELL_RE =
-  /juzgado|corte de|tribunal oral|tribunal de|tribunal constitucional|juz\.\s|jpl\b|polic[ií]a local|garant[ií]a|cobranza|familia|laboral|\bcivil\b|\bpenal\b|apelaci[oó]n|suprema/i;
+  /juzgado|juz\.|j\s*\.?\s*l\s*\.?\s*t|j\s*\.?\s*l\s*\.?|j\s*\.?\s*g\s*\.?|t\s*\.?\s*o\s*\.?\s*p|c\s*\.?\s*a\s*\.?|corte de|tribunal oral|tribunal de|tribunal constitucional|jpl\b|polic[ií]a local|garant[ií]a|cobranza|familia|laboral|\bcivil\b|\bpenal\b|apelaci[oó]n|suprema/i;
 
 function isCanonicalTribunalLabel(label: string) {
-  return /^(?:corte suprema|corte\s+(?:de\s+)?apelaciones\s+(?:de\s+)?[\p{L} .'-]+|c\.?\s*a\.?\s+(?:de\s+)?[\p{L} .'-]+|\d+[º°o]?\s*juzgado\b.*|juzgado\b.*|tribunal\s+(?:oral|de|constitucional)\b.*|polic[ií]a\s+local\b.*|jpl\b.*)$/iu.test(label);
+  return /^(?:corte suprema|corte\s+(?:de\s+)?apelaciones\s+(?:de\s+)?[\p{L} .'-]+|c\.?\s*a\.?\s+(?:de\s+)?[\p{L} .'-]+|\d+[º°o]?\s*(?:juzgado|juz\.|j\.?\s*l\.?\s*t\.?|j\.?\s*l\.?)\b.*|j\.?\s*g\.?\s+(?:de\s+)?[\p{L} .'-]+|t\.?\s*o\.?\s*p\.?\s+(?:de\s+)?[\p{L} .'-]+|juzgado\b.*|tribunal\s+(?:oral|de|constitucional)\b.*|polic[ií]a\s+local\b.*|jpl\b.*)$/iu.test(label);
 }
 
 /** Pick best tribunal label from table cells; null if none look real. */
 export function pickTribunalFromTexts(texts: string[]): string | null {
   const cleaned = texts.map((c) => c.replace(/\s+/g, " ").trim()).filter(Boolean);
-  const canonical = cleaned.find((c) => isCanonicalTribunalLabel(c));
+  const captionOrResource = (value: string) => /\b(?:contra|vs\.?|versus)\b|\//i.test(value) || /^\([^)]+\)|^(?:tipo recurso|recurso|materia)\b/i.test(value);
+  const canonicalCandidates = cleaned.filter((c) => isCanonicalTribunalLabel(c) && !captionOrResource(c));
+  const canonical = canonicalCandidates.find((c) => /^corte suprema$/i.test(c)) || canonicalCandidates[0];
   if (canonical) return canonical.slice(0, 180);
   const strong = cleaned.find((c) =>
-    /juzgado|corte\s+(?:de\s+)?suprema|corte de|tribunal oral|tribunal de|tribunal constitucional|polic[ií]a local/i.test(c) &&
-    !/^\([^)]+\)/.test(c)
+    /juzgado|juz\.|\bj\.?\s*l\.?\s*t\.?\b|\bj\.?\s*l\.?\b|\bj\.?\s*g\.?\b|\bt\.?\s*o\.?\s*p\.?\b|corte\s+(?:de\s+)?suprema|corte de|tribunal oral|tribunal de|tribunal constitucional|polic[ií]a local/i.test(c) &&
+    !captionOrResource(c)
   );
   if (strong) return strong.slice(0, 180);
-  const soft = cleaned.find((c) => TRIBUNAL_CELL_RE.test(c) && c.length >= 4 && !/^\([^)]+\)/.test(c));
+  const soft = cleaned.find((c) => TRIBUNAL_CELL_RE.test(c) && c.length >= 4 && !captionOrResource(c));
   if (soft) return soft.slice(0, 180);
   return null;
 }

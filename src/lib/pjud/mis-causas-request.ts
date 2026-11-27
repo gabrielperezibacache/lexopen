@@ -4,6 +4,7 @@ import { httpError } from "@/lib/auth/access";
 const requestSchema = z.object({
   action: z.enum(["sync", "clear_errors"]).optional(),
   syncMovimientos: z.boolean().optional(),
+  downloadDocuments: z.boolean().optional(),
   wait: z.boolean().optional(),
 }).strict();
 

@@ -14,7 +14,7 @@ function overrideMethod(target: object, key: string, replacement: unknown) {
 function restoreMethods() { restorers.splice(0).reverse().forEach((restore) => restore()); }
 
 async function main() {
-  const envNames = ["PJUD_CLAVEUNICA_SCRAPE", "PJUD_PUBLIC_SCRAPE", "PJUD_SCRAPER_URL", "PJUD_SCRAPER_ALLOW_PRIVATE", "PJUD_SECRETS_KEY"] as const;
+  const envNames = ["PJUD_CLAVEUNICA_SCRAPE", "PJUD_PUBLIC_SCRAPE", "PJUD_SCRAPER_URL", "PJUD_SCRAPER_ALLOW_PRIVATE", "PJUD_SECRETS_KEY", "PJUD_DOC_DOWNLOADS"] as const;
   const previousEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
   process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
   process.env.PJUD_PUBLIC_SCRAPE = "1";
@@ -26,6 +26,9 @@ async function main() {
   let fetches = 0;
   let causes: MisCausasItem[] = [];
   let created = 0;
+  const createdPayloads: Array<Record<string, unknown>> = [];
+  const causeUpdates: Array<{ where: { id: string }; data: Record<string, unknown> }> = [];
+  let capabilityChecks = 0;
   let failCreateAt = 0;
   let replaceClaim = false;
   let failQueue = false;
@@ -35,6 +38,7 @@ async function main() {
   let claimBeforeClear = false;
   let caseManagementMode = "pjud_cl", pauseAt: "health" | "mis-causas" | null = null;
   const whereCalls: unknown[] = [];
+  let existingCausa: { id: string; pjudOrigin: string | null; pjudMonitoreoActivo: boolean; pjudDocumentDownloadsEnabled: boolean; pjudDocumentDownloadOwnerId: string | null } | null = null;
   const queueBatches: string[][] = [];
   const drainedJobSelections: string[][] = [];
   const fixture = () => ({
@@ -70,9 +74,19 @@ async function main() {
   });
   overrideMethod(prisma.causa, "findFirst", async ({ where }: { where: unknown }) => {
     whereCalls.push(where);
-    return null;
+    return existingCausa;
   });
-  overrideMethod(prisma.causa, "create", async () => {
+  overrideMethod(prisma.user, "findUnique", async () => ({ id: "fixture-actor", role: "admin", capabilityGrants: null, capabilityRevokes: null }));
+  overrideMethod(prisma.causa, "findUnique", async ({ where }: { where: { id: string } }) => {
+    capabilityChecks++;
+    return { id: where.id, acceso: "estudio", abogadoId: null, miembros: [] };
+  });
+  overrideMethod(prisma.causa, "update", async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+    causeUpdates.push({ where, data });
+    return { id: where.id, ...data };
+  });
+  overrideMethod(prisma.causa, "create", async ({ data }: { data: Record<string, unknown> }) => {
+    createdPayloads.push(data);
     created += 1;
     if (replaceClaim) {
       settings.claveUnicaLastSyncAt = new Date("2099-01-01T00:00:00Z");
@@ -118,12 +132,15 @@ async function main() {
   });
   const reset = () => {
     settings = fixture(); created = 0; failCreateAt = 0; replaceClaim = false;
+    createdPayloads.length = 0; causeUpdates.length = 0; capabilityChecks = 0;
+    existingCausa = null;
     failQueue = false; claimBeforeClear = false; fetches = 0; credentialReads = 0; whereCalls.length = 0; queueBatches.length = 0; drainedJobSelections.length = 0;
     jobCreateCount = 0; failJobCreateAt = 0; createdJobs.length = 0;
     causes = [item("C-1-2026")];
     caseManagementMode = "pjud_cl"; pauseAt = null;
     process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
     process.env.PJUD_PUBLIC_SCRAPE = "1";
+    delete process.env.PJUD_DOC_DOWNLOADS;
   };
   try {
     const sessionSource = {
@@ -142,6 +159,29 @@ async function main() {
     assert.equal(credentialReads, 0, "session source must never read vault credentials");
     assert.equal(fetches, 0, "session source must not contact the credential sidecar");
     assert.deepEqual(sessionImport.enqueuedJobIds, []);
+
+    reset();
+    const automaticDocuments = await syncMisCausas({ actorId: "fixture-actor", downloadDocuments: true, syncMovimientos: false });
+    assert.equal(automaticDocuments.created, 1);
+    assert.equal(createdPayloads[0].pjudDocumentDownloadsEnabled, false, "a new row is not enabled before its actor's cause.write capability is verified");
+    assert.deepEqual(causeUpdates[0], { where: { id: "fixture-causa-1" }, data: { pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: "fixture-actor" } });
+    assert.equal(capabilityChecks, 1);
+
+    reset();
+    existingCausa = { id: "fixture-existing-causa", pjudOrigin: "claveunica", pjudMonitoreoActivo: true, pjudDocumentDownloadsEnabled: false, pjudDocumentDownloadOwnerId: null };
+    const linkedDocuments = await syncMisCausas({ actorId: "fixture-actor", downloadDocuments: true, syncMovimientos: false });
+    assert.equal(linkedDocuments.linked, 1);
+    assert.equal(created, 0);
+    assert.equal(causeUpdates[0]?.data.pjudDocumentDownloadsEnabled, true, "an authorized existing cause gains document downloads when it has no owner yet");
+    assert.equal(causeUpdates[0]?.data.pjudDocumentDownloadOwnerId, "fixture-actor");
+    assert.equal(capabilityChecks, 1);
+
+    reset();
+    process.env.PJUD_DOC_DOWNLOADS = "0";
+    await syncMisCausas({ actorId: "fixture-actor", downloadDocuments: true, syncMovimientos: false });
+    assert.equal(createdPayloads[0].pjudDocumentDownloadsEnabled, false, "the host kill switch wins over the request checkbox");
+    assert.equal(causeUpdates.length, 0);
+    assert.equal(capabilityChecks, 0, "a disabled download request does not grant document ownership");
 
     reset(); causes.push(item("C-2-2026")); failJobCreateAt = 2;
     await assert.rejects(syncMisCausas({ sessionSource, processJobsInline: true }), /second-job-create-failure/);

@@ -34,8 +34,8 @@ const partnerMovementSchema = z.object({
   tramite: z.string().max(200).optional().nullable(),
   esReceptor: z.boolean().optional(),
   receptor: z.boolean().optional(),
-  documentoRef: z.string().max(500).optional().nullable(),
-  documentoUrl: z.string().max(500).optional().nullable(),
+  documentoRef: z.string().max(4000).optional().nullable(),
+  documentoUrl: z.string().max(4000).optional().nullable(),
 });
 
 function mapPartnerMovement(
@@ -363,7 +363,7 @@ export function pjudSyncIntervalMs() {
 
 export async function fetchPjudMovimientos(
   causa: PjudCausaRef,
-  controls?: { assertActive?: () => Promise<void> }
+  controls?: { assertActive?: () => Promise<void>; downloadDocuments?: boolean; excludeDocumentExternalIds?: readonly string[] }
 ): Promise<PjudFetchResult> {
   // Self-hosted LexOpen: datos/vault en este host. APIs externas (OJV,
   // CAPTCHA, partner) están permitidas; no se usa un host SaaS ajeno.
@@ -378,7 +378,9 @@ export async function fetchPjudMovimientos(
     if (health.reachable) {
       await controls?.assertActive?.();
       try {
-        const fromSidecar = await fetchFromScraperSidecar(causa);
+        const fromSidecar = await fetchFromScraperSidecar(causa, undefined, {
+          downloadDocuments: controls?.downloadDocuments === true,
+        });
         if (fromSidecar) return fromSidecar;
       } catch (error) {
         sidecarError =
@@ -401,7 +403,10 @@ export async function fetchPjudMovimientos(
       const { tryScrapeCausaDetailAuthenticated } = await import(
         "@/lib/pjud/claveunica"
       );
-      const fromCu = await tryScrapeCausaDetailAuthenticated(causa);
+        const fromCu = await tryScrapeCausaDetailAuthenticated(causa, {
+          downloadDocuments: controls?.downloadDocuments,
+          excludeDocumentExternalIds: controls?.excludeDocumentExternalIds,
+        });
       if (fromCu && (fromCu.movimientos.length > 0 || fromCu.cuadernos?.status === "complete")) return fromCu;
     } catch (error) {
       claveUnicaError =
@@ -413,7 +418,7 @@ export async function fetchPjudMovimientos(
   if (publicScrapeReady()) {
     await controls?.assertActive?.();
     try {
-      const scraped = await scrapeCausaByRol(causa);
+      const scraped = await scrapeCausaByRol(causa, undefined, { downloadDocuments: controls?.downloadDocuments });
       return {
         provider: "scrape",
         movimientos: scraped.movimientos,

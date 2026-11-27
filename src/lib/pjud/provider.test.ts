@@ -64,6 +64,11 @@ async function coverageFromPartner() {
     assert.equal(unsafe.cuadernos?.status, "unknown");
     assert.doesNotMatch(JSON.stringify(unsafe.cuadernos), /PRIVATE_SESSION/);
     assert.equal(requests, 3);
+    const signedUrl = `https://oficinajudicialvirtual.pjud.cl/docCausaSuprema.php?jwt=${"x".repeat(640)}`;
+    response = { movimientos: [{ titulo: "Resolución ficticia", fecha: "2026-11-01", documentoRef: signedUrl }] };
+    assert.equal((await fetchPjudMovimientos(causa)).movimientos[0].documentoRef, signedUrl,
+      "fresh OJV document links longer than 500 characters survive provider validation");
+    assert.equal(requests, 4);
     for (const failure of [{}, { status: "error", movimientos: [] }, { ok: false, movimientos: [] }, { error: "PRIVATE_SESSION", movimientos: [] }]) {
       response = failure;
       await assert.rejects(fetchPjudMovimientos(causa), { message: "El proveedor PJUD no confirmó una lectura del historial de movimientos." });

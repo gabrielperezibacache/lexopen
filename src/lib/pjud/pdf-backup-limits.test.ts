@@ -5,6 +5,8 @@ import {
   pdfBackupEnabled,
   pjudDocDownloadDelayMs,
   pjudDocDownloadMaxPerRun,
+  validPjudDownloadedContent,
+  isBackupableDocumentoRef,
 } from "@/lib/pjud/pdf-backup";
 
 const prevDelay = process.env.PJUD_DOC_DOWNLOAD_DELAY_MS;
@@ -14,6 +16,20 @@ delete process.env.PJUD_DOC_DOWNLOAD_DELAY_MS;
 delete process.env.PJUD_DOC_DOWNLOAD_MAX;
 assert.equal(pjudDocDownloadDelayMs(), 2500);
 assert.equal(pjudDocDownloadMaxPerRun(), 20);
+
+const pdfBytes = Buffer.from("%PDF-1.7\n" + "x".repeat(120));
+const oleBytes = Buffer.concat([Buffer.from("d0cf11e0", "hex"), Buffer.alloc(120)]);
+const docxBytes = Buffer.concat([Buffer.from("504b0304", "hex"), Buffer.alloc(120)]);
+const rtfBytes = Buffer.from("{\\rtf1" + "x".repeat(120));
+assert.equal(validPjudDownloadedContent(pdfBytes, "application/pdf", "https://oficinajudicialvirtual.pjud.cl/a.pdf", 1024), true);
+assert.equal(validPjudDownloadedContent(oleBytes, "application/octet-stream", "https://oficinajudicialvirtual.pjud.cl/a.doc", 1024), true);
+assert.equal(validPjudDownloadedContent(docxBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "https://oficinajudicialvirtual.pjud.cl/a", 1024), true);
+assert.equal(validPjudDownloadedContent(rtfBytes, "application/rtf", "https://oficinajudicialvirtual.pjud.cl/a", 1024), true);
+assert.equal(validPjudDownloadedContent(Buffer.from("not a Word document".padEnd(140, "x")), "application/msword", "https://oficinajudicialvirtual.pjud.cl/a.doc", 1024), false);
+assert.equal(isBackupableDocumentoRef(`https://oficinajudicialvirtual.pjud.cl/doc.php?jwt=${"x".repeat(700)}`), true, "fresh signed links may exceed 500 characters");
+assert.equal(isBackupableDocumentoRef("https://oficinajudicialvirtual.pjud.cl/#modalEscritoSuprema"), false);
+assert.equal(isBackupableDocumentoRef("https://oficinajudicialvirtual.pjud.cl/doc.php#fragment"), false);
+assert.equal(isBackupableDocumentoRef(`https://oficinajudicialvirtual.pjud.cl/doc.php?jwt=${"x".repeat(4001)}`), false);
 
 process.env.PJUD_DOC_DOWNLOAD_DELAY_MS = "4000";
 process.env.PJUD_DOC_DOWNLOAD_MAX = "8";

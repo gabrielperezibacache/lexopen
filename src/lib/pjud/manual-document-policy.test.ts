@@ -14,6 +14,10 @@ async function main() {
   const bytes = Buffer.from("%PDF-1.4\n" + "x".repeat(341));
   globalThis.fetch = async (input, options) => {
     requests++; assert.equal(new URL(String(input)).origin, origin); assert.equal(options?.redirect,"error"); assert.equal(options?.credentials,"include");
+    if (options?.method === "POST") {
+      assert.equal(new Headers(options.headers).get("content-type"), "application/x-www-form-urlencoded;charset=UTF-8");
+      assert.equal(String(options.body), "jwt=fictional-post-token");
+    }
     let index = 0;
     return { ok: responseStatus === 200, headers: new Headers({ "content-type":"application/pdf", ...(mode === "oversized-header" ? { "content-length": String(21 * 1024 * 1024) } : {}) }), body: {
       cancel: async () => { cancelled++; },
@@ -23,7 +27,7 @@ async function main() {
       }, cancel: async () => { cancelled++; }, releaseLock: () => undefined }; },
     } } as unknown as Response;
   };
-  const page = { url: () => `${origin}/indexN.php`, evaluate: async (work: (args: { href:string;maximum:number })=>Promise<unknown>, args: { href:string;maximum:number }) => work(args) } as unknown as Parameters<typeof attachDocumentoBytesFromPage>[0];
+  const page = { url: () => origin + "/indexN.php", evaluate: async (work: (args: { href:string;maximum:number;fields?:Array<[string,string]>|null })=>Promise<unknown>, args: { href:string;maximum:number;fields?:Array<[string,string]>|null }) => work(args) } as unknown as Parameters<typeof attachDocumentoBytesFromPage>[0];
   const rows: PjudFetchedMovimiento[] = Array.from({ length:10 },(_,index)=>({ externalId:`fixture-${index}`,titulo:"Synthetic resolution",fecha:new Date(),fuente:"pjud",documentoRef:`${origin}/f-${index}.pdf` }));
   try {
     await withManualPjudInteraction(async()=>{ assert.equal(pjudDocumentDownloadsAllowed(),false); await attachDocumentoBytesFromPage(page,rows,{limit:2,delayMs:0}); });
@@ -33,6 +37,12 @@ async function main() {
     responseStatus=200;
     const result=await withManualPjudInteraction(()=>attachDocumentoBytesFromPage(page,rows,{limit:2,delayMs:0}),{downloadDocuments:true});
     assert.equal(result.filter(row=>row.documentoBytes).length,2); assert.equal(requests,4);
+    const posted = await withManualPjudInteraction(() => attachDocumentoBytesFromPage(page, [{
+      externalId: "fixture-post", titulo: "Synthetic Supreme resolution", fecha: new Date(), fuente: "pjud",
+      documentoRef: null, documentoPost: { action: origin + "/docCausaSuprema.php", fields: [["jwt", "fictional-post-token"]] },
+    }], { limit: 1, delayMs: 0 }), { downloadDocuments: true });
+    assert.ok(posted[0].documentoBytes, "a signed same-origin OJV POST form is downloaded inside the authenticated browser session");
+    assert.equal(requests, 5);
     mode="invalid-pdf";
     const invalid=await withManualPjudInteraction(()=>attachDocumentoBytesFromPage(page,rows,{limit:1,delayMs:0}),{downloadDocuments:true});
     assert.equal(invalid[0].documentoBytes,undefined,"a response advertised as PDF is not stored without the PDF signature");

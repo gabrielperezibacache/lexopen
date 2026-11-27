@@ -276,7 +276,7 @@ export async function clearClaveUnicaSyncMessages() {
   return getClaveUnicaStatus();
 }
 
-async function resolveMisCausasList(): Promise<MisCausasItem[]> {
+async function resolveMisCausasList(onSummary?: (summary: { countsByMateria: Record<string, number>; materiasWithErrors: string[] }) => void): Promise<MisCausasItem[]> {
   if (!claveUnicaAutomationAllowed(true)) {
     throw httpError(
       "Automatización ClaveÚnica deshabilitada (PJUD_CLAVEUNICA_SCRAPE=0).",
@@ -330,6 +330,7 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
       rut: settings.claveUnicaRut,
       password,
       optedIn: settings.claveUnicaEnabled,
+      onSummary,
     });
   } catch (error) {
     if (sidecarError) {
@@ -382,7 +383,8 @@ export function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error)
  * Devuelve null si no hay credenciales / automatización; lanza si el scrape falla.
  */
 export async function tryScrapeCausaDetailAuthenticated(
-  causa: PjudCausaRef
+  causa: PjudCausaRef,
+  options: { downloadDocuments?: boolean; excludeDocumentExternalIds?: readonly string[] } = {}
 ): Promise<PjudFetchResult | null> {
   if (await getCaseManagementMode() !== "pjud_cl") return null;
   const { settings } = await getOrCreateFirmSettings();
@@ -402,6 +404,8 @@ export async function tryScrapeCausaDetailAuthenticated(
     password,
     causa,
     optedIn: settings.claveUnicaEnabled,
+    downloadDocuments: options.downloadDocuments,
+    excludeDocumentExternalIds: options.excludeDocumentExternalIds,
   });
   return {
     provider: "scrape",
@@ -422,7 +426,7 @@ async function findExistingCausa(item: MisCausasItem, actor?: CausaAccessUser | 
   const now = new Date();
   return prisma.causa.findFirst({
     where: actor ? { AND: [where, causaAccessWhere(actor), ...(can(actor, "causa.write") ? [] : [{ OR: [{ abogadoId: actor.id }, { miembros: { some: { userId: actor.id, rol: { not: "lectura" }, desde: { lte: now }, OR: [{ hasta: null }, { hasta: { gt: now } }] } } }] }])] } : where,
-    select: { id: true, pjudOrigin: true, pjudMonitoreoActivo: true },
+    select: { id: true, pjudOrigin: true, pjudMonitoreoActivo: true, pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: true },
   });
 }
 
@@ -458,6 +462,7 @@ export async function syncMisCausas(opts?: {
   automatic?: boolean;
   actorId?: string | null;
   syncMovimientos?: boolean;
+  downloadDocuments?: boolean;
   /**
    * When true, also drain enqueued movimiento jobs in this call.
    * Default false: enqueue only — avoids Cloudflare 524 / proxy ~100s limits.
@@ -486,6 +491,8 @@ export async function syncMisCausas(opts?: {
   await opts?.sessionSource?.assertActive?.();
   const actor = opts?.actorId ? await prisma.user.findUnique({ where: { id: opts.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } }) : null;
   if (opts?.actorId && (!actor || (opts.sessionSource && !manualMisCausasAllowed(actor)))) throw httpError("No tiene permiso para importar causas.", 403);
+  const requestDocumentDownloads = Boolean(actor && process.env.PJUD_DOC_DOWNLOADS !== "0" &&
+    (opts?.sessionSource ? opts.sessionSource.downloadDocuments === true : opts?.downloadDocuments === true));
   const slot = opts?.automatic ? await claimAutomaticRefresh("portfolio") : null;
   if (opts?.automatic && !slot) throw httpError(SCHEDULED_REFRESH_NOTE, 409);
   const assertSchedule = () => { if (slot) assertRefreshCycleActive(slot); };
@@ -529,9 +536,10 @@ export async function syncMisCausas(opts?: {
       throw httpError("La consulta de la sesión OJV está deshabilitada en este servidor.", 409);
     }
     assertSchedule();
+    let scrapeSummary: { countsByMateria: Record<string, number>; materiasWithErrors: string[] } = { countsByMateria: {}, materiasWithErrors: [] };
     const items = opts?.sessionSource
       ? await opts.sessionSource.listMisCausas()
-      : await resolveMisCausasList();
+      : await resolveMisCausasList((summary) => { scrapeSummary = summary; });
     await assertPjudManagementEnabled();
     phase = "import";
     const causaIdsForSync: string[] = [];
@@ -562,8 +570,7 @@ export async function syncMisCausas(opts?: {
               ? "terminada"
               : "activa",
             pjudMonitoreoActivo: true,
-            pjudDocumentDownloadsEnabled: opts?.sessionSource?.downloadDocuments === true && Boolean(opts.actorId),
-            ...(opts?.sessionSource?.downloadDocuments === true && opts.actorId ? { pjudDocumentDownloadOwnerId: opts.actorId } : {}),
+            pjudDocumentDownloadsEnabled: false,
             pjudSyncIntervalMinutes: null,
             pjudFromMisCausas: true,
             pjudOrigin: "claveunica",
@@ -575,13 +582,22 @@ export async function syncMisCausas(opts?: {
         });
         causaId = createdCausa.id;
         created.push(causaId);
+        if (requestDocumentDownloads && actor) {
+          await assertCausaCapability(causaId, actor, "causa.write");
+          await prisma.causa.update({
+            where: { id: causaId },
+            data: { pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: actor.id },
+          });
+        }
       } else {
         if (actor) await assertCausaCapability(causaId, actor, "causa.write");
         await prisma.causa.update({
           where: { id: causaId },
           data: {
             pjudFromMisCausas: true,
-            ...(opts?.sessionSource?.downloadDocuments === true && opts.actorId ? { pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: opts.actorId } : {}),
+            ...(requestDocumentDownloads && actor &&
+              (!existing?.pjudDocumentDownloadsEnabled || !existing?.pjudDocumentDownloadOwnerId)
+              ? { pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: actor.id } : {}),
             pjudSyncIntervalMinutes: null,
             ...(existing?.pjudOrigin ? {} : { pjudOrigin: "claveunica" }),
             pjudSource: "claveunica",
@@ -644,7 +660,7 @@ export async function syncMisCausas(opts?: {
             jobIds,
             fetchMovimientos: opts?.sessionSource?.fetchMovimientos,
             assertActive: opts?.sessionSource?.assertActive,
-            downloadDocuments: opts?.sessionSource?.downloadDocuments,
+            downloadDocuments: opts?.sessionSource ? opts.sessionSource.downloadDocuments : opts?.downloadDocuments,
             ...(opts?.sessionSource ? { concurrency: 1 } : {}),
           });
         });
@@ -695,6 +711,12 @@ export async function syncMisCausas(opts?: {
       `${created.length} nueva${created.length === 1 ? "" : "s"}`,
       `${linked.length} ya estaba${linked.length === 1 ? "" : "n"} en LexOpen`,
     ];
+    const matterSummary = Object.entries(scrapeSummary.countsByMateria).filter(([, count]) => count > 0)
+      .map(([materia, count]) => materia + ": " + count).join(", ");
+    if (matterSummary) noteParts.push("causas por apartado (" + matterSummary + ")");
+    if (scrapeSummary.materiasWithErrors.length) {
+      noteParts.push("apartados con lectura incompleta: " + scrapeSummary.materiasWithErrors.join(", "));
+    }
     if (enqueued) {
       noteParts.push(
         `${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para actualizar movimientos`

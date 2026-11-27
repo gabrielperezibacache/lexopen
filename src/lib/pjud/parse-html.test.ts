@@ -6,6 +6,8 @@ import {
   parseMovimientosFromHtml,
   parseSalaFromHtml,
   extractDocumentoHrefFromRowHtml,
+  extractDocumentoPostFromRowHtml,
+  extractDocumentoAnnexActionFromRowHtml,
   hasExplicitEmptyHistory,
   parseVerDetalleJuridicaHtml,
 } from "@/lib/pjud/parse-html";
@@ -44,6 +46,25 @@ assert.equal(
   ),
   "https://oficinajudicialvirtual.pjud.cl/documentos/xyz.pdf"
 );
+assert.equal(extractDocumentoHrefFromRowHtml('<a href="#modalEscritoSuprema">Ver escrito</a>'), null,
+  "fragment-only modal links are not persistent document URLs");
+for (const action of ["docuS.php", "docCausaApelaciones.php", "docCausaSuprema.php", "docReformadoLaboral.php", "docuCobranza.php"]) {
+  const token = "X".repeat(640);
+  const href = extractDocumentoHrefFromRowHtml(`<form action="ADIR_871/3/documentos/${action}" method="get"><input type="hidden" name="jwt" value="${token}"><a onclick="$(this).closest('form').submit()">PDF</a></form>`);
+  assert.ok(href?.includes(`/${action}?jwt=${token}`), `${action} GET form must produce a fresh signed OJV URL`);
+  assert.ok((href || "").length > 500, `${action} JWT URL is not truncated`);
+}
+const prioritizedForm = extractDocumentoHrefFromRowHtml(`<form action="docCertificadoEscrito.php" method="get"><input type="hidden" name="cert" value="1"></form><form action="docCausaSuprema.php" method="get"><input type="hidden" name="doc" value="2"></form>`);
+assert.match(prioritizedForm || "", /docCausaSuprema\.php\?doc=2/);
+assert.doesNotMatch(prioritizedForm || "", /docCertificadoEscrito/);
+const postForm = extractDocumentoPostFromRowHtml('<form action="docCausaSuprema.php" method="post"><input type="hidden" name="jwt" value="fixture-token"><input name="ignored" value="not-hidden"></form>');
+assert.deepEqual(postForm, {
+  action: "https://oficinajudicialvirtual.pjud.cl/docCausaSuprema.php",
+  fields: [["jwt", "fixture-token"]],
+});
+assert.equal(extractDocumentoAnnexActionFromRowHtml('<td><a onclick="anexoEscritoApelaciones(23)">Anexo</a></td>'), "anexoEscritoApelaciones");
+assert.equal(extractDocumentoAnnexActionFromRowHtml('<td><a href="#modalEscritoSuprema">Anexo</a></td>'), "#modalEscritoSuprema");
+assert.equal(extractDocumentoAnnexActionFromRowHtml('<td><a onclick="doSomethingPrivate()">Anexo</a></td>'), null);
 
 const listHtml = `
 <table>
@@ -80,6 +101,15 @@ assert.equal(supremeMisCausas[0].caratula, "REBOLLEDO DIAZ MARIA FERNANDA CONTRA
 assert.equal(supremeMisCausas[0].fecha, "2025-11-10");
 assert.equal(supremeMisCausas[0].estado, "Tramitación");
 assert.equal(supremeMisCausas[0].ruc, "00-12345678-9");
+
+const appellateBooks = parseVerDetalleJuridicaHtml(`<table id="dtaTableDetalleMisCauApel"><thead><tr><th>Rol/Rit</th><th>Libro</th><th>Año</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Procesal</th><th>Tribunal/Corte</th></tr></thead><tbody>
+  <tr><td>1234</td><td>Civil</td><td>2024</td><td>Demandante CONTRA Demandado</td><td>12/08/2024</td><td>Tramitación</td><td>C.A. de Iquique</td></tr>
+</tbody></table>`);
+assert.equal(appellateBooks.length, 1);
+assert.equal(appellateBooks[0].rit, "CIVIL-1234-2024");
+assert.equal(appellateBooks[0].tribunal, "C.A. de Iquique");
+assert.equal(appellateBooks[0].caratula, "Demandante CONTRA Demandado");
+assert.equal(appellateBooks[0].estado, "Tramitación");
 
 const looseHtml = `
 <div class="card">
@@ -143,6 +173,11 @@ const supremeMovements = parseMovimientosFromHtml(`<div id="modalDetalleSuprema"
 assert.equal(supremeMovements.length, 1);
 assert.equal(supremeMovements[0].titulo, "Resolución ficticia de prueba");
 assert.equal(supremeMovements[0].fecha.toISOString().slice(0, 10), "2025-11-14");
+
+const appellateDescription = parseMovimientosFromHtml(`<div class="modal in"><div class="panel-collapse collapse show"><table id="movimientosApelaciones"><thead><tr><th>Folio</th><th>Doc.</th><th>Anexo</th><th>Trámite</th><th>Descripción</th><th>Fecha</th></tr></thead><tbody><tr><td>17</td><td></td><td></td><td>Ingreso</td><td>Resolución ficticia de Apelaciones</td><td>14/11/2025</td></tr></tbody></table></div><div class="panel-collapse collapse"><table><tr><th>Folio</th><th>Fecha</th><th>Trámite</th></tr><tr><td>18</td><td>15/11/2025</td><td>Movimiento oculto ficticio</td></tr></table></div></div>`);
+assert.equal(appellateDescription.length, 1, "only the active accordion history is parsed");
+assert.equal(appellateDescription[0].titulo, "Resolución ficticia de Apelaciones");
+assert.equal(appellateDescription[0].tramite, "Ingreso");
 
 // Observed Civil table structure, with fictitious parties and movements.
 const civilListing = `<table id="dtaTableDetalle">

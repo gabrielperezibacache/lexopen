@@ -47,14 +47,20 @@ export function looksLikePdf(buf: Buffer) {
   return buf.subarray(0, 5).toString("utf8") === "%PDF-";
 }
 
-/** Reject login/error pages and files advertised as PDF without a PDF signature. */
+/** Reject login/error pages and verify the binary signature for each supported file type. */
 export function validPjudDownloadedContent(bytes: Buffer, contentType: string, ref: string, maximum: number) {
   if (bytes.length < 100 || bytes.length > maximum || /^\s*</.test(bytes.subarray(0, 40).toString("utf8"))) return false;
   const pdf = looksLikePdf(bytes);
-  let pdfPath = false;
-  try { pdfPath = new URL(ref).pathname.toLowerCase().endsWith(".pdf"); } catch { return false; }
-  if ((pdfPath || /pdf/i.test(contentType)) && !pdf) return false;
-  return pdf || /msword|officedocument|octet-stream/i.test(contentType);
+  const mime = contentType.toLowerCase();
+  let path = "";
+  try { path = new URL(ref).pathname.toLowerCase(); } catch { return false; }
+  if (path.endsWith(".pdf") || /application\/pdf/i.test(mime)) return pdf;
+  if (pdf) return true;
+  const ole = bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("d0cf11e0", "hex"));
+  const docxZip = bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from("504b0304", "hex")) && /officedocument\.wordprocessingml\.document|application\/msword/i.test(mime);
+  const rtf = bytes.subarray(0, 5).toString("ascii").toLowerCase() === "{\\rtf" && /application\/rtf|text\/rtf|application\/msword/i.test(mime);
+  const legacyDocPath = /\.doc$/i.test(path);
+  return docxZip || rtf || (ole && (/msword|octet-stream/i.test(mime) || legacyDocPath));
 }
 
 /** PJUD document hosts only — not arbitrary public HTTPS (SSRF / data exfil). */
@@ -67,6 +73,7 @@ function isAllowedPjudDocumentoHost(hostname: string) {
 export function isBackupableDocumentoRef(ref: string | null | undefined) {
   if (!ref?.trim()) return false;
   const value = ref.trim();
+  if (value.length > 4000 || value.includes("#")) return false;
   if (value.startsWith("doc:") || value.startsWith("lexopen:")) return false;
   if (!/^https?:\/\//i.test(value)) return false;
   // OJV / pjud.cl hosts only — block SSRF to private/metadata and unrelated HTTPS.
@@ -78,7 +85,8 @@ export function isBackupableDocumentoRef(ref: string | null | undefined) {
     return false;
   }
   try {
-    return isAllowedPjudDocumentoHost(new URL(value).hostname);
+    const parsed = new URL(value);
+    return !parsed.hash && isAllowedPjudDocumentoHost(parsed.hostname);
   } catch {
     return false;
   }

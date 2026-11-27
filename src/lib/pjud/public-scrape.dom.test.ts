@@ -1,7 +1,7 @@
 /** Offline browser fixtures only. No OJV navigation, credentials, or CAPTCHA. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
+import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, pjudDocumentDownloadsAllowed, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -232,6 +232,23 @@ async function main() {
     await page.setContent(`<table><tr><td>C-1-2024</td></tr></table><nav class="pagination"><button>Siguiente</button></nav>`);
     await assert.rejects(() => collectOjvResultPages(page, async () => {}), /repitió una página/);
 
+    await page.setContent(`
+      <div id="dtScope"><table><tbody id="dtRows"></tbody></table><div class="dataTables_paginate"><a href="#" class="paginate_button next" aria-label="Next">Next</a></div></div>
+      <script>
+        window.dtPage=0;
+        function renderDataTablePage(){
+          document.querySelector('#dtRows').innerHTML='<tr><td>RIT ficticio '+(window.dtPage+1)+'</td></tr>';
+          const next=document.querySelector('.dataTables_paginate a.next');
+          next.classList.toggle('disabled',window.dtPage===1);
+          next.onclick=event=>{event.preventDefault();if(window.dtPage===0){window.dtPage=1;renderDataTablePage()}};
+        }
+        renderDataTablePage();
+      </script>
+    `);
+    const dataTablePages: string[] = [];
+    await collectOjvResultPages(page, async () => { dataTablePages.push(await page.locator("#dtRows").innerText()); }, page.locator("#dtScope"));
+    assert.deepEqual(dataTablePages, ["RIT ficticio 1", "RIT ficticio 2"], "DataTables next controls are followed only while enabled");
+
     await page.setContent(`<button id="btnBuscar" onclick="setTimeout(()=>document.querySelector('#resultConsultaJuridica').textContent='C-2-2024',150)">Buscar</button><div id="resultConsultaJuridica">C-1-2024</div>`);
     await clickBuscar(page, 2_000);
     assert.equal(await page.locator("#resultConsultaJuridica").innerText(), "C-2-2024", "submission must await the new response before parsing");
@@ -276,6 +293,62 @@ async function main() {
     assert.ok(scopedMovements.every(movement => !movement.titulo.includes("otra corte")), "auxiliary referrals outside the active tab are not movements");
     assert.ok(scopedMovements.every(movement => !movement.titulo.includes("otro modal")), "a coexisting document modal is not the selected case detail");
     assert.equal(await page.evaluate(() => Boolean((window as typeof window & { badAnexoClicked?: boolean }).badAnexoClicked)), false, "an earlier document Anexo link must not be mistaken for Historia");
+
+    await page.setContent(`
+      <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+      <div id="modalDetalleSupremaFixture" class="modal show" style="display:block">
+        <nav class="nav-tabs">
+          <a href="#movimientosFixture" data-toggle="tab">Movimientos</a>
+          <a href="#pendientesFixture" data-toggle="tab">Escritos Pendientes</a>
+          <a href="#diligenciasFixture" data-toggle="tab">Diligencias</a>
+        </nav>
+        <div id="movimientosFixture" class="tab-pane active"><table><thead><tr><th>Folio</th><th>Fecha Trámite</th><th>Trámite</th></tr></thead><tbody><tr><td>1</td><td>05/01/2026</td><td>Movimiento ficticio de Suprema</td></tr></tbody></table></div>
+        <div id="pendientesFixture" class="tab-pane"><table><thead><tr><th>Folio</th><th>Fecha Ingreso</th><th>Tipo Escrito</th></tr></thead><tbody><tr><td>2</td><td>06/01/2026</td><td>Escrito pendiente ficticio</td></tr></tbody></table></div>
+        <div id="diligenciasFixture" class="tab-pane"><table><thead><tr><th>Folio</th><th>Fecha</th><th>Trámite</th></tr></thead><tbody><tr><td>3</td><td>07/01/2026</td><td>Diligencia ficticia</td></tr></tbody></table></div>
+      </div>
+      <script>document.querySelectorAll('.nav-tabs a').forEach(link=>link.onclick=event=>{event.preventDefault();document.querySelectorAll('.tab-pane').forEach(pane=>pane.classList.toggle('active',pane.id===link.hash.slice(1)))})</script>
+    `);
+    const multiTabMovements = await scrapeModalTabs(page);
+    assert.ok(multiTabMovements.some(movement => movement.titulo.includes("Movimiento ficticio de Suprema")), "Movimientos is the primary history tab when Historia is absent");
+    assert.ok(multiTabMovements.some(movement => movement.titulo.includes("Escrito pendiente ficticio")), "Escritos Pendientes contributes its rows");
+    assert.ok(multiTabMovements.some(movement => movement.titulo.includes("Diligencia ficticia")), "Diligencias contributes its rows");
+
+    const priorDocPolicy = process.env.PJUD_DOC_DOWNLOADS;
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    assert.equal(pjudDocumentDownloadsAllowed(), true, "the fixture opts into only its synthetic document capture");
+    let annexPostRequests = 0;
+    const wordBytes = Buffer.concat([Buffer.from("d0cf11e0", "hex"), Buffer.alloc(140)]);
+    await page.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
+      if (route.request().method() === "POST") {
+        annexPostRequests++;
+        assert.match(route.request().postData() || "", /^jwt=fictional-annex-token$/);
+        await route.fulfill({ status: 200, contentType: "application/msword", body: wordBytes });
+      } else {
+        await route.fulfill({ contentType: "text/html", body: `
+          <meta charset="utf-8">
+          <table><tbody><tr><td>Resolucion con anexo</td><td><a href="#" onclick="event.preventDefault();escritoSuprema(1)">Anexo</a></td></tr></tbody></table>
+          <script>function escritoSuprema(){window.annexOpened=(window.annexOpened||0)+1;document.body.insertAdjacentHTML('beforeend','<div class="modal show" id="modalAnexoFixture" style="display:block"><form action="/ADIR_871/1/documentos/docCausaSuprema.php" method="post"><input type="hidden" name="jwt" value="fictional-annex-token"></form><button data-dismiss="modal" onclick="this.parentElement.remove()">Cerrar</button></div>')}</script>
+        ` });
+      }
+    });
+    try {
+      await page.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+      assert.equal(await page.locator('a[onclick*="escritoSuprema"]').count(), 1, "the intercepted annex trigger is present in the fixture row");
+      assert.equal(await page.locator("tr").filter({ hasText: "Resolucion con anexo" }).count(), 1, "the annex trigger belongs to one exact movement row");
+      assert.equal(await page.locator("tr").filter({ hasText: "Resolucion con anexo" }).locator('a[onclick*="escritoSuprema"]').count(), 1);
+      const annexResult = await attachDocumentoBytesFromPage(page, [{
+        externalId: "fixture-annex", titulo: "Resolucion con anexo", fecha: new Date("2026-01-01T12:00:00Z"),
+        fuente: "pjud", documentoRef: null, documentoAnexoAction: "escritoSuprema",
+      }], { limit: 1, delayMs: 0, allowPrompts: false });
+      assert.equal(annexPostRequests, 1, `the exact annex form is submitted once through the intercepted official-origin route; click=${await page.evaluate(() => (window as typeof window & { annexOpened?: number }).annexOpened || 0)} result=${JSON.stringify(annexResult.map(row => ({ documentoBytes: Boolean(row.documentoBytes), documentoAnexoAction: row.documentoAnexoAction, documentoPost: Boolean(row.documentoPost) })))}`);
+      assert.equal(annexResult[0].documentoBytes?.subarray(0, 4).toString("hex"), "d0cf11e0", "a valid Word attachment is captured while the OJV page is open");
+      assert.equal(await page.locator("#modalAnexoFixture").count(), 0, "only the opened annex modal is closed after capture");
+      assert.equal(annexResult[0].documentoPost, undefined, "temporary signed POST fields never leave the page capture");
+    } finally {
+      await page.unroute("https://oficinajudicialvirtual.pjud.cl/**");
+      if (priorDocPolicy === undefined) delete process.env.PJUD_DOC_DOWNLOADS;
+      else process.env.PJUD_DOC_DOWNLOADS = priorDocPolicy;
+    }
     await page.setContent('<div id="modalDetalleCivil" class="modal in" style="display:block"><nav class="nav-tabs"><a href="#historiaMissing">Historia</a></nav><div id="historiaCiv" class="tab-pane active"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/01/2026</td><td>Historia visible ficticia</td></tr></table></div></div>');
     await assert.rejects(() => scrapeModalTabs(page), /destino existente/, "a declared but missing Historia target must not be replaced blindly by the currently active pane");
     await page.setContent('<div class="modal in" style="display:block"><div class="tab-pane">Historial no seleccionado</div><table><tr><td>Auxiliar</td></tr></table></div>');

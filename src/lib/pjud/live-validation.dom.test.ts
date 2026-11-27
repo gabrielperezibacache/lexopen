@@ -259,6 +259,73 @@ async function main() {
     assert.equal(detailResult.movimientos.some(movement => movement.titulo.includes("Resolución ficticia de Corte Suprema")), true);
     await detailContext.close();
 
+    const multiContext = await browser.newContext();
+    await multiContext.route("https://oficinajudicialvirtual.pjud.cl/**", route => route.fulfill({ contentType: "text/html; charset=utf-8", body: "<html><body></body></html>" }));
+    const multiPage = await multiContext.newPage();
+    await multiPage.goto("https://oficinajudicialvirtual.pjud.cl/indexN.php");
+    await multiPage.setContent(`
+      <a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a>
+      <main id="contMain"><div class="card" id="materias">
+        <div class="card-header"><a data-toggle="collapse" href="#panelSup">Corte Suprema</a></div>
+        <section id="panelSup" class="panel-collapse collapse in" style="display:block">
+          <button onclick="window.searches.push('sup')">Buscar</button>
+          <table id="dtaTableDetalleMisCauSup"><tbody><tr><td>401-2025</td><td>Corte Suprema</td><td>PRIVATE_SUPREMA</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelAppeals">Corte Apelaciones <span class="badge">(2)</span></a></div>
+        <section id="panelAppeals" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('appeals')">Buscar</button>
+          <table id="dtaTableDetalleMisCauApe"><tbody><tr><td>Civil-1234-2024</td><td>C.A. de Iquique</td><td>PRIVATE_APPEALS</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelCivil">Civil <span class="badge">(3)</span></a></div>
+        <section id="panelCivil" class="panel-collapse collapse" style="display:none">
+          <button data-id="estado" onclick="openStateMenu()">Estado: Vigente</button>
+          <button onclick="window.searches.push('civil')">Buscar</button>
+          <table id="dtaTableDetalleMisCauCivil"><tbody><tr><td>C-20-2024</td><td>3º Juzgado Civil de Santiago</td><td>PRIVATE_CIVIL</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelFamily">Familia</a></div>
+        <section id="panelFamily" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('family')">Buscar</button>
+          <table id="dtaTableDetalleMisCauFamily"><tbody><tr><td>Familia-5-2024</td><td>1º Juzgado de Familia de Santiago</td><td>PRIVATE_FAMILY</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelLabor">Laboral</a></div>
+        <section id="panelLabor" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('labor')">Buscar</button>
+          <table id="dtaTableDetalleMisCauLabor"><tbody><tr><td>Laboral-2-2024</td><td>1º J.L.T. de Santiago</td><td>PRIVATE_LABOR</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelCollection">Cobranza</a></div>
+        <section id="panelCollection" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('collection')">Buscar</button>
+          <table id="dtaTableDetalleMisCauCollection"><tbody><tr><td>Cobranza-4-2024</td><td>Juzgado de Cobranza Laboral y Previsional de Santiago</td><td>PRIVATE_COLLECTION</td></tr></tbody></table>
+        </section>
+        <div class="card-header"><a data-toggle="collapse" href="#panelCriminal">Penal</a></div>
+        <section id="panelCriminal" class="panel-collapse collapse" style="display:none">
+          <button onclick="window.searches.push('criminal')">Buscar</button>
+          <table id="dtaTableDetalleMisCauCriminal"><tbody><tr><td>Penal-3-2024</td><td>J.G. de Santiago</td><td>PRIVATE_CRIMINAL</td></tr></tbody></table>
+        </section>
+      </div></main>
+      <script>
+        window.searches=[];window.stateSelectAll=0;
+        function openStateMenu(){
+          const popup=document.createElement('div');popup.className='bs-container open';popup.style.cssText='position:absolute;z-index:2000';
+          popup.innerHTML='<div class="dropdown-menu"><a href="#">Seleccionar Todos</a></div>';
+          popup.querySelector('a').onclick=event=>{event.preventDefault();window.stateSelectAll++;popup.remove()};
+          document.body.append(popup);
+        }
+        document.querySelectorAll('[data-toggle="collapse"]').forEach(tab=>tab.addEventListener('click', event=>{
+          event.preventDefault();
+          document.querySelectorAll('.panel-collapse').forEach(panel=>{panel.classList.remove('in');panel.style.display='none'});
+          const panel=document.querySelector(tab.getAttribute('href'));
+          panel.classList.add('in');panel.style.display='block';
+        }));
+      </script>`);
+    const multiResult = await collectMisCausasFromAuthenticatedOjv(multiPage);
+    assert.deepEqual(multiResult.materiasTried, ["Civil", "Familia", "Laboral", "Cobranza", "Penal", "Corte Apelaciones", "Corte Suprema"]);
+    assert.deepEqual(await multiPage.evaluate(() => (window as typeof window & { searches: string[] }).searches), ["civil", "family", "labor", "collection", "criminal", "appeals", "sup"]);
+    assert.deepEqual(multiResult.countsByMateria, { Civil: 1, Familia: 1, Laboral: 1, Cobranza: 1, Penal: 1, "Corte Apelaciones": 1, "Corte Suprema": 1 });
+    assert.equal(multiResult.items.length, 7, "a card parent, counter labels, and Appeals alias still visit each active panel exactly once");
+    assert.equal(await multiPage.evaluate(() => (window as typeof window & { stateSelectAll: number }).stateSelectAll), 1, "a body-mounted bootstrap-select menu is selected even when its button already shows a chosen state");
+    await multiContext.close();
+
     const readinessContext = await browser.newContext();
     await readinessContext.route("https://oficinajudicialvirtual.pjud.cl/**", async route => {
       const pathname = new URL(route.request().url()).pathname;

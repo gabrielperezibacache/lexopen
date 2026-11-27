@@ -18,6 +18,12 @@ export type PjudFetchedMovimiento = {
   esReceptor?: boolean;
   pendienteResolucion?: boolean;
   documentoRef?: string | null;
+  /** Transient same-page POST form data; consumed before a scrape result leaves Playwright. */
+  documentoPost?: { action: string; fields: Array<[string, string]> } | null;
+  /** True only when the movement row exposes a recognized OJV annex-modal action. */
+  documentoAnexo?: boolean;
+  /** Whitelisted OJV action token or modal fragment; transient and never persisted. */
+  documentoAnexoAction?: string | null;
   /**
    * Ephemeral PDF/DOC bytes captured during Playwright scrape (session cookies).
    * Not serialized over HTTP; consumed by sync → Documento LexOpen.

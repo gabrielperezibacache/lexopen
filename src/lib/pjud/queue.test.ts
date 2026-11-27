@@ -104,7 +104,8 @@ const fixtureError = Buffer.from("La sesión caducó. " + "x".repeat(140));
 assert.equal(validPjudDownloadedContent(fixturePdf, "application/pdf", "https://civil.pjud.cl/doc.pdf", 1000), true);
 assert.equal(validPjudDownloadedContent(fixtureError, "application/pdf", "https://civil.pjud.cl/doc.pdf", 1000), false);
 assert.equal(validPjudDownloadedContent(fixtureError, "application/octet-stream", "https://civil.pjud.cl/doc.pdf", 1000), false);
-assert.equal(validPjudDownloadedContent(fixtureError, "application/msword", "https://civil.pjud.cl/doc.doc", 1000), true);
+assert.equal(validPjudDownloadedContent(fixtureError, "application/msword", "https://civil.pjud.cl/doc.doc", 1000), false);
+assert.equal(validPjudDownloadedContent(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, ...Buffer.alloc(140)]), "application/msword", "https://civil.pjud.cl/doc.doc", 1000), true);
 assert.equal(validPjudDownloadedContent(Buffer.from("<html>" + "x".repeat(140)), "application/octet-stream", "https://civil.pjud.cl/doc", 1000), false);
 assert.equal(validPjudDownloadedContent(fixturePdf, "application/pdf", "https://civil.pjud.cl/doc.pdf", 100), false);
 

@@ -10,12 +10,15 @@ type HtmlNode = ReturnType<typeof parseDocument>["children"][number];
 
 function excludedNode(node: HtmlNode): boolean {
   if (node.type === "script" || node.type === "style" || node.type === "comment") return true;
-  return node.type === "tag" && (
+  if (node.type !== "tag") return false;
+  const classes = node.attribs.class || "";
+  return (
     /^(noscript|template)$/.test(node.name) ||
     "hidden" in node.attribs ||
     node.attribs["aria-hidden"] === "true" ||
     /display\s*:\s*none|visibility\s*:\s*hidden/i.test(node.attribs.style || "") ||
-    (/\btab-pane\b/.test(node.attribs.class || "") && !/\bactive\b/.test(node.attribs.class || ""))
+    (/\btab-pane\b/.test(classes) && !/\bactive\b/.test(classes)) ||
+    (/\b(?:panel-collapse|collapse)\b/.test(classes) && !/\b(?:in|show)\b/.test(classes))
   );
 }
 
@@ -156,7 +159,7 @@ function parseHistoryDate(raw: string, identifiedColumn: boolean): Date | null {
 
 function columnLabel(cell: string) {
   return cell.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    .replace(/[._]/g, " ").replace(/\s+/g, " ").trim();
+    .replace(/[._/]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function dateColumnLabel(label: string) {
@@ -170,6 +173,9 @@ type CauseColumns = {
   fecha: number;
   estado: number;
   ruc: number;
+  libro: number;
+  numero: number;
+  era: number;
 };
 
 function findTagNodes(node: HtmlNode, tagName: string): HtmlNode[] {
@@ -202,8 +208,8 @@ function causeRowCells(row: HtmlNode) {
 
 function causeColumnMap(labels: string[]): CauseColumns | null {
   const normalized = labels.map(columnLabel);
-  const rit = normalized.findIndex((label) => /^(?:rit|rol|nro rol|numero rol)$/.test(label));
-  const tribunal = normalized.findIndex((label) => /^(?:tribunal|corte)$/.test(label));
+  const rit = normalized.findIndex((label) => /^(?:rit|rol|rol rit|nro rol|numero rol|nro rit|numero rit)$/.test(label));
+  const tribunal = normalized.findIndex((label) => /^(?:tribunal|corte|tribunal corte|corte tribunal)$/.test(label));
   const caratula = normalized.findIndex((label) => /^(?:caratulado|caratula|caratula causa)$/.test(label));
   if (rit < 0 || (tribunal < 0 && caratula < 0)) return null;
   return {
@@ -211,9 +217,24 @@ function causeColumnMap(labels: string[]): CauseColumns | null {
     tribunal,
     caratula,
     fecha: normalized.findIndex(dateColumnLabel),
-    estado: normalized.findIndex((label) => /^(?:estado|estado causa|estado de causa)$/.test(label)),
+    estado: normalized.findIndex((label) => /^(?:estado|estado causa|estado de causa|estado procesal)$/.test(label)),
     ruc: normalized.findIndex((label) => label === "ruc"),
+    libro: normalized.findIndex((label) => /^(?:libro|tipo libro|tipo recurso)$/.test(label)),
+    numero: normalized.findIndex((label) => /^(?:nro|numero|nro causa|numero causa|nro rol|numero rol)$/.test(label)),
+    era: normalized.findIndex((label) => /^(?:ano|era|periodo|year)$/.test(label)),
   };
+}
+
+function mappedRit(cells: string[], headers: CauseColumns | null) {
+  const direct = headers && headers.rit >= 0 ? extractRitsFromText(cells[headers.rit] || "") : [];
+  if (direct.length === 1) return direct;
+  if (!headers || headers.libro < 0) return direct;
+  const book = cells[headers.libro]?.trim();
+  const number = headers.numero >= 0 ? cells[headers.numero]?.trim() : headers.rit >= 0 ? cells[headers.rit]?.trim() : "";
+  const year = headers.era >= 0 ? cells[headers.era]?.trim() : "";
+  if (!book || !number || !year || !/^\d{1,6}$/.test(number) || !/^\d{4}$/.test(year)) return direct;
+  const composite = extractRitsFromText(`${book}-${number}-${year}`);
+  return composite.length === 1 ? composite : direct;
 }
 
 function fallbackCaratula(cells: string[], rit: string, tribunal: string) {
@@ -231,17 +252,15 @@ function fallbackCaratula(cells: string[], rit: string, tribunal: string) {
 function isHeaderRow(cells: string[]) {
   const labels = cells.map(columnLabel);
   const recognized = labels.filter((label) => dateColumnLabel(label) ||
-    /^(?:folio|tramite|actuacion|resolucion|etapa|descargar|doc|documento|cuaderno|anexo|foja|georref|(?:des|desc|descripcion)(?: del?)?(?: tramite|actuacion|resolucion)?)$/.test(label));
+    /^(?:folio|tramite|actuacion|resolucion|descripcion|etapa|descargar|doc|documento|cuaderno|anexo|foja|georref|(?:des|desc|descripcion)(?: del?)?(?: tramite|actuacion|resolucion)?)$/.test(label));
   return recognized.length >= 2 && (
     labels.some(dateColumnLabel) || /^(?:folio|cuaderno)$/.test(labels[0] || "")
   );
 }
 
-/** Absolute OJV download URL from a table row's anchors (href / onclick). */
-export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null {
-  const resolve = (href: string): string | null => {
+function resolveDocumentoUrl(href: string): string | null {
     const value = href.trim();
-    if (!value || value === "#" || /^javascript:/i.test(value)) return null;
+    if (!value || value.startsWith("#") || /^javascript:/i.test(value)) return null;
     if (/^https?:\/\//i.test(value)) return value;
     if (value.startsWith("//")) return `https:${value}`;
     if (value.startsWith("/")) {
@@ -250,12 +269,75 @@ export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null 
     // Relative paths from OJV modal / includes
     const cleaned = value.replace(/^\.\//, "").replace(/^(\.\.\/)+/, "");
     return `https://oficinajudicialvirtual.pjud.cl/${cleaned}`;
-  };
+}
 
-  const looksLikeDoc = (href: string, text: string) =>
+function looksLikeDocumentAction(href: string, text = "") {
+  return (
     /\.(pdf|doc|docx)(\?|$)/i.test(href) ||
-    /documento|descarg|archivo|anexo|escrito|ebook|pdf|folio/i.test(href) ||
-    /descarg|pdf|documento|ver\s*doc|anexo|escrito/i.test(text);
+    /\bdoc(?:u|umento|cau|reformado)|descarg|archivo|anexo|escrito|ebook|pdf|folio/i.test(href) ||
+    /descarg|pdf|documento|ver\s*doc|anexo|escrito/i.test(text)
+  );
+}
+
+type DocumentoForm = { action: string; method: "GET" | "POST"; fields: Array<[string, string]> };
+
+function documentoFormsFromRow(rowHtml: string): DocumentoForm[] {
+  const document = parseDocument(rowHtml);
+  return findTagNodes(document, "form").flatMap((node) => {
+    if (node.type !== "tag") return [];
+    const action = resolveDocumentoUrl(node.attribs.action || "");
+    const method = (node.attribs.method || "get").toUpperCase();
+    if (!action || (method !== "GET" && method !== "POST") || !looksLikeDocumentAction(action)) return [];
+    const fields = findTagNodes(node, "input").flatMap((input) => {
+      if (input.type !== "tag" || !input.attribs.name || (input.attribs.type || "text").toLowerCase() !== "hidden") return [];
+      return [[input.attribs.name, input.attribs.value || ""] as [string, string]];
+    });
+    return [{ action, method: method as "GET" | "POST", fields }];
+  }).sort((left, right) => Number(/doccertificado/i.test(left.action)) - Number(/doccertificado/i.test(right.action)));
+}
+
+function getFormUrl(form: DocumentoForm): string {
+  const url = new URL(form.action);
+  for (const [name, value] of form.fields) url.searchParams.append(name, value);
+  return url.toString();
+}
+
+/** POST form data is transient: it is used only while the authenticated page is open. */
+export function extractDocumentoPostFromRowHtml(rowHtml: string): { action: string; fields: Array<[string, string]> } | null {
+  const form = documentoFormsFromRow(rowHtml).find((candidate) => candidate.method === "POST");
+  return form ? { action: form.action, fields: form.fields } : null;
+}
+
+/** True only for known OJV attachment-modal actions, never arbitrary onclick scripts. */
+export function hasRecognizedDocumentoAnnexAction(rowHtml: string): boolean {
+  const document = parseDocument(rowHtml);
+  const allowed = /\b(?:anexoSolicitudCivil|escritoSuprema|verDocTramiteSupremaPdf|anexoEscritoApelaciones|anexoEscritoLaboral|anexoEscritoCobranza|anexoEscritoPenal|documentosCobranza|anexoEscritoSuprema)\s*\(/i;
+  return findTagNodes(document, "a").some((node) => node.type === "tag" && (
+    allowed.test(node.attribs.onclick || "") ||
+    /^#modal[^#]*(?:anexo|escrito|doc)/i.test(node.attribs.href || "")
+  ));
+}
+
+/** Return only a whitelisted function name or a fragment-only target for a known attachment modal. */
+export function extractDocumentoAnnexActionFromRowHtml(rowHtml: string): string | null {
+  const document = parseDocument(rowHtml);
+  const allowed = /\b(?:anexoSolicitudCivil|escritoSuprema|verDocTramiteSupremaPdf|anexoEscritoApelaciones|anexoEscritoLaboral|anexoEscritoCobranza|anexoEscritoPenal|documentosCobranza|anexoEscritoSuprema)\s*\(/i;
+  for (const node of findTagNodes(document, "a")) {
+    if (node.type !== "tag") continue;
+    const onclick = node.attribs.onclick || "";
+    const action = onclick.match(allowed)?.[0]?.replace(/\s*\($/, "") || "";
+    if (action) return action;
+    const href = node.attribs.href || "";
+    if (/^#modal[^#]*(?:anexo|escrito|doc)/i.test(href)) return href;
+  }
+  return null;
+}
+
+/** Absolute OJV download URL from a row form or direct anchor. */
+export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null {
+  const forms = documentoFormsFromRow(rowHtml);
+  const getForm = forms.find((form) => form.method === "GET");
+  if (getForm) return getFormUrl(getForm);
 
   const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
   let match: RegExpExecArray | null;
@@ -264,8 +346,8 @@ export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null 
     const text = stripTags(match[2] || "").toLowerCase();
     const hrefMatch = attrs.match(/href\s*=\s*["']([^"']+)["']/i);
     const href = hrefMatch?.[1]?.trim() || "";
-    if (href && looksLikeDoc(href, text)) {
-      const resolved = resolve(href);
+    if (href && looksLikeDocumentAction(href, text)) {
+      const resolved = resolveDocumentoUrl(href);
       if (resolved) return resolved;
     }
     // onclick="window.open('…')" / location.href='…'
@@ -282,8 +364,8 @@ export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null 
         js.match(
           /['"](\/?[^'"]*(?:documento|descarg|ebook|anexo|archivo|\.pdf)[^'"]*)['"]/i
         );
-      if (fromJs?.[1] && looksLikeDoc(fromJs[1], text || "documento")) {
-        const resolved = resolve(fromJs[1]);
+      if (fromJs?.[1] && looksLikeDocumentAction(fromJs[1], text || "documento")) {
+        const resolved = resolveDocumentoUrl(fromJs[1]);
         if (resolved) return resolved;
       }
     }
@@ -341,7 +423,7 @@ export function parseMovimientosFromHtml(
       const labels = cells.map(columnLabel);
       cuadernoColumn = labels.findIndex((label) => label === "cuaderno");
       tramiteColumn = labels.findIndex((label) => /^(?:tramite|actuacion|resolucion|descripcion)$/.test(label));
-      descripcionColumn = labels.findIndex((label) => /^(?:des|desc|descripcion)(?: del?)? (?:tramite|actuacion|resolucion)$/.test(label));
+      descripcionColumn = labels.findIndex((label) => /^(?:des|desc|descripcion)(?: del?)?(?: (?:tramite|actuacion|resolucion))?$/.test(label));
       fechaColumn = labels.findIndex(dateColumnLabel);
       etapaColumn = labels.findIndex((label) => label === "etapa");
       folioColumn = labels.findIndex((label) => label === "folio");
@@ -405,6 +487,9 @@ export function parseMovimientosFromHtml(
     const folioCandidate = /^\d{1,5}$/.test(folioValue || "") ? folioValue : null;
     const folio = folioCandidate || String(folioSeq);
     const documentoRef = extractDocumentoHrefFromRowHtml(rowMatch[1]);
+    const documentoPost = extractDocumentoPostFromRowHtml(rowMatch[1]);
+    const documentoAnexoAction = !documentoRef && !documentoPost ? extractDocumentoAnnexActionFromRowHtml(rowMatch[1]) : null;
+    const documentoAnexo = Boolean(documentoAnexoAction);
 
     movimientos.push({
       ...scrapeMovimientoIdentity(titulo, fecha, folio, identifiedCuaderno),
@@ -426,6 +511,9 @@ export function parseMovimientosFromHtml(
       esReceptor,
       pendienteResolucion,
       documentoRef,
+      documentoPost,
+      documentoAnexo,
+      documentoAnexoAction,
     });
     if (movimientos.length >= limit) break;
   }
@@ -470,8 +558,7 @@ export function parseCausasListFromHtml(html: string): Array<{
       if (mapped) { headers = mapped; continue; }
       if (cellNodes.some((cell) => cell.type === "tag" && cell.name === "th") || isHeaderRow(cells)) continue;
       const joined = cells.join(" ");
-      const ritText = headers ? cells[headers.rit] || "" : joined;
-      const rits = extractRitsFromText(ritText);
+      const rits = headers ? mappedRit(cells, headers) : extractRitsFromText(joined);
       if (rits.length !== 1) continue;
       const rit = rits[0];
       const tribunalText = headers && headers.tribunal >= 0 ? cells[headers.tribunal] || "" : null;
@@ -622,7 +709,7 @@ export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
   assertOjvResponseAvailable(html);
   const out: VerDetalleRow[] = [];
   const seen = new Set<string>();
-  for (const rows of causeTableRows(html, /^(?:verDetalleJuridica|dtaTableDetalle|dtaTableDetalleMisCau\w*)$/i)) {
+  for (const rows of causeTableRows(html, /^(?:verDetalleJuridica|dtaTableDetalle.*)$/i)) {
     let headers: CauseColumns | null = null;
     for (const row of rows) {
       const cellNodes = causeRowCells(row);
@@ -634,8 +721,7 @@ export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
       if (cellNodes.some((cell) => cell.type === "tag" && cell.name === "th")) continue;
       const dataCells = headers ? cells :
         (cells[0].length <= 2 || /ver|detalle|^\s*$/i.test(cells[0]) ? cells.slice(1) : cells);
-      const ritText = headers ? cells[headers.rit] || "" : dataCells.join(" ");
-      const rits = extractRitsFromText(ritText);
+      const rits = headers ? mappedRit(cells, headers) : extractRitsFromText(dataCells.join(" "));
       if (rits.length !== 1) continue;
       const rit = rits[0];
       const tribunalText = headers && headers.tribunal >= 0 ? cells[headers.tribunal] || "" : null;

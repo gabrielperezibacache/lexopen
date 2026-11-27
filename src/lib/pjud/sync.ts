@@ -129,7 +129,12 @@ export async function persistFetchedPjudMovimientos(
     const current = byExternalId.get(movement.externalId);
     if (current) {
       // Signed download links expire; refresh unresolved sources without replacing saved originals.
-      if (movement.documentoRef && current.documentoRef !== movement.documentoRef && !current.documentoRef?.startsWith("doc:") && !current.documentoRef?.startsWith("lexopen:")) await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: movement.documentoRef } });
+      if (current.documentoRef?.includes("#") && !current.documentoRef.startsWith("doc:") && !current.documentoRef.startsWith("lexopen:")) {
+        const nextRef = movement.documentoRef && !movement.documentoRef.includes("#") ? movement.documentoRef : null;
+        if (nextRef !== current.documentoRef) await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: nextRef } });
+      } else if (movement.documentoRef && current.documentoRef !== movement.documentoRef && !current.documentoRef?.startsWith("doc:") && !current.documentoRef?.startsWith("lexopen:")) {
+        await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: movement.documentoRef } });
+      }
       continue;
     }
     seen.add(movement.externalId);
@@ -187,6 +192,7 @@ export async function syncCausaPjud(
     /** Internal session guards; HTTP handlers must never accept these options. */
     assertActive?: () => Promise<void>;
     downloadDocuments?: boolean;
+    excludeDocumentExternalIds?: readonly string[];
   }
 ): Promise<SyncCausaResult> {
   if (opts?.fetchMovimientos !== undefined && typeof opts.fetchMovimientos !== "function") {
@@ -279,7 +285,15 @@ export async function syncCausaPjud(
     await assertPjudManagementEnabled();
     assertSchedule();
     await opts?.assertActive?.();
+    const documentDownloadsAllowed = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled &&
+      causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId) && process.env.PJUD_DOC_DOWNLOADS !== "0";
+    const backedDocuments = documentDownloadsAllowed
+      ? await prisma.causaMovimiento.findMany({ where: { causaId, documentoRef: { startsWith: "doc:" } }, select: { externalId: true } })
+      : [];
+    const excludeDocumentExternalIds = opts?.excludeDocumentExternalIds ?? backedDocuments.flatMap((movement) => movement.externalId ? [movement.externalId] : []);
     const fetchMovimientos: PjudMovimientosFetcher = opts?.fetchMovimientos ?? ((ref) => fetchPjudMovimientos(ref, {
+      downloadDocuments: documentDownloadsAllowed,
+      excludeDocumentExternalIds,
       assertActive: async () => {
         await assertPjudManagementEnabled();
         assertSchedule();
@@ -409,7 +423,7 @@ export async function syncCausaPjud(
   });
 
   let pdfBackedUp = 0;
-  const downloadDocuments = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled && causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId);
+  const downloadDocuments = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled && causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId) && process.env.PJUD_DOC_DOWNLOADS !== "0";
   if (downloadDocuments) await enqueuePjudDocumentJobs(causaId, { actorId: opts?.actorId, waitingLogin: Boolean(opts?.fetchMovimientos) });
   // Prefer bytes captured with OJV session cookies during scrape.
   for (const m of fetchResult.movimientos) {
